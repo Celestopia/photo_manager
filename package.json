@@ -4,12 +4,18 @@
   "description": "Local photo manager built with Electron and Vue",
   "main": "src/main/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "npm run build:renderer && node scripts/start-electron.js",
+    "dev:renderer": "vite --config vite.config.mjs",
+    "build:renderer": "vite build --config vite.config.mjs",
     "init-metadata": "node scripts/init-metadata.js",
     "update-metadata": "node scripts/update-metadata.js",
     "verify-metadata": "node scripts/verify-metadata.js",
     "export-metadata-csv": "node scripts/export-metadata-csv.js",
-    "start:web": "node scripts/start-web-preview.js"
+    "start:web": "npm run build:renderer && node scripts/start-web-preview.js"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^5.4.11"
   },
   "dependencies": {
     "electron": "^35.0.0",

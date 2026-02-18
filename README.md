@@ -32,7 +32,12 @@ npm run start:web
 ```
 
 Then open `http://localhost:5173/`.
-Root path redirects to `src/renderer/browser.html`.
+
+4. Optional renderer dev server (for SFC hot reload):
+
+```bash
+npm run dev:renderer
+```
 
 ## Macro Architecture
 
@@ -49,8 +54,8 @@ The project has three runtime layers:
 - Prevents renderer from direct Node access.
 - Serializes payloads to avoid structured-clone errors.
 
-3. Renderer UI (`src/renderer/app.js`)
-- Vue single-file runtime (no bundler).
+3. Renderer UI (`src/renderer/App.vue` + `src/renderer/app.js`)
+- Vue Single File Component (SFC) powered by Vite build pipeline.
 - Gallery mode: filter/search/sort/paginate/group by date.
 - Viewer mode: zoom/pan/mirror/fullscreen/navigation/edit metadata.
 - Calls `photoManagerApi` for data and persistence operations.
@@ -59,9 +64,9 @@ The project has three runtime layers:
 
 Browser preview exists for debugging UI without Electron:
 
-- `scripts/start-web-preview.js`: static file server.
-- `src/renderer/browser.html`: renderer entry for browser mode.
-- `src/renderer/browser-api.js`: mock implementation of `photoManagerApi`.
+- `scripts/start-web-preview.js`: static server for built renderer and local metadata/workspace files.
+- `dist/renderer/browser.html`: renderer entry for browser mode (built from `src/renderer/browser.html`).
+- `src/renderer/public/browser-api.js`: mock implementation of `photoManagerApi`.
 
 Important difference:
 - Browser mode metadata edits are in-memory only (no write-back to JSONL).
@@ -144,9 +149,15 @@ src/
   renderer/
     index.html       # Electron renderer entry
     browser.html     # Browser preview entry
-    app.js           # Vue UI logic
-    browser-api.js   # Browser-mode API shim
+    App.vue          # Main SFC component
+    app.js           # Vue mount entry
+    components/
+      GalleryView.vue # Gallery mode component
+      ViewerView.vue  # Viewer mode component
+    public/
+      browser-api.js # Browser-mode API shim
     styles.css       # UI style
+vite.config.mjs      # Vite config for multi-page renderer build
 scripts/
   common.js          # Shared metadata utilities
   init-metadata.js   # Full rebuild script

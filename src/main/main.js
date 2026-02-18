@@ -15,6 +15,7 @@ const yaml = require("js-yaml");
 
 const APP_ROOT = path.resolve(__dirname, "..", "..");
 const CONFIG_PATH = path.join(APP_ROOT, "config.yml");
+const RENDERER_INDEX_PATH = path.join(APP_ROOT, "dist", "renderer", "index.html");
 
 const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
@@ -526,7 +527,17 @@ async function bootstrap() {
   mainWindow.on("enter-full-screen", emitWindowState);
   mainWindow.on("leave-full-screen", emitWindowState);
 
-  await mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+  if (fs.existsSync(RENDERER_INDEX_PATH)) {
+    await mainWindow.loadFile(RENDERER_INDEX_PATH);
+  } else {
+    const message = "Renderer bundle not found. Run `npm run build:renderer` first.";
+    appendLog(message);
+    await mainWindow.loadURL(
+      `data:text/html;charset=UTF-8,${encodeURIComponent(
+        `<h2 style="font-family:Segoe UI, Arial, sans-serif; padding: 20px;">${message}</h2>`,
+      )}`,
+    );
+  }
   emitWindowState();
 }
 

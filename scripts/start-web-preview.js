@@ -41,9 +41,10 @@ function safePath(urlPath) {
 
 const server = http.createServer(async (req, res) => {
   try {
-    // Redirect root path so relative assets are resolved from renderer directory.
-    if ((req.url || "/").split("?")[0] === "/") {
-      res.writeHead(302, { Location: "/src/renderer/browser.html" });
+    // Browser preview entry is built into dist/renderer.
+    const urlPath = (req.url || "/").split("?")[0];
+    if (urlPath === "/" || urlPath === "/browser.html") {
+      res.writeHead(302, { Location: "/dist/renderer/browser.html" });
       res.end();
       return;
     }
