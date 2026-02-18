@@ -28,7 +28,12 @@
         <div class="photo-grid">
           <article class="photo-card" :class="{ selected: isSelectionMode && isGallerySelected(item.FilePath) }" v-for="item in group.items" :key="item.FilePath" @click="onGalleryCardClick(item)">
             <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.FilePath) }" @click.stop="toggleGallerySelection(item.FilePath)">✓</button>
-            <img :src="buildImageUrl(item.__absolutePath)" :alt="item.Customization?.Title || item.FilePath" loading="lazy" />
+            <img
+              :src="resolveGalleryImageSrc(item)"
+              :alt="item.Customization?.Title || item.FilePath"
+              loading="lazy"
+              @error="onGalleryImageError(item, $event)"
+            />
             <div class="card-caption"><div class="title" :title="item.Customization?.Title || item.FilePath.split('/').pop()">{{ item.Customization?.Title || item.FilePath.split('/').pop() }}</div><div class="meta"><span>评级 {{ item.Customization?.Rating || '-' }}</span><span>{{ item.Picture?.Width || 0 }}x{{ item.Picture?.Height || 0 }}</span></div></div>
           </article>
         </div>
@@ -68,7 +73,7 @@
 </template>
 
 <script setup>
-import { inject } from "vue";
+import { inject, ref } from "vue";
 
 const app = inject("appContext");
 if (!app) {
@@ -112,4 +117,41 @@ const {
   doWindowAction,
   toggleWindowMaximizeRestore,
 } = app;
+
+// Track thumbnail load failures by hash to avoid repeated failing requests.
+const brokenThumbnailHashes = ref(new Set());
+
+/**
+ * Resolve gallery card image source.
+ * Priority:
+ * 1) cached thumbnail file
+ * 2) original image file fallback
+ */
+function resolveGalleryImageSrc(item) {
+  const hash = item?.SHA256Hash || "";
+  const thumbnailPath = item?.__thumbnailPath || "";
+  if (hash && brokenThumbnailHashes.value.has(hash)) {
+    return buildImageUrl(item.__absolutePath);
+  }
+  if (thumbnailPath) {
+    return buildImageUrl(thumbnailPath);
+  }
+  return buildImageUrl(item.__absolutePath);
+}
+
+/**
+ * Fallback to original image when thumbnail is missing or broken.
+ */
+function onGalleryImageError(item, event) {
+  const hash = item?.SHA256Hash || "";
+  if (hash) {
+    const next = new Set(brokenThumbnailHashes.value);
+    next.add(hash);
+    brokenThumbnailHashes.value = next;
+  }
+  const originalSrc = buildImageUrl(item.__absolutePath);
+  if (event?.target?.src !== originalSrc) {
+    event.target.src = originalSrc;
+  }
+}
 </script>

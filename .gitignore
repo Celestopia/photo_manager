@@ -16,6 +16,8 @@ logs/*
 # Local photo library and generated metadata (machine/user specific)
 photo_workspace/*
 !photo_workspace/.gitkeep
+thumb_cache/*
+!thumb_cache/.gitkeep
 photo_metadata.jsonl
 photo_metadata.csv
 

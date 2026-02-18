@@ -1,21 +1,33 @@
 # PhotoManager default configuration
-workspaceRoot: ./photo_workspace
-metadataFile: ./photo_metadata.jsonl
-logDir: ./logs
+
+workspaceRoot: ./photo_workspace # Root directory of your photo library.
+metadataFile: ./photo_metadata.jsonl # Metadata storage file in JSONL format (one JSON record per line).
+logDir: ./logs # Directory used for runtime log files.
+
+thumbnail:
+  dir: ./thumb_cache # Thumbnail cache directory. Files are stored as <SHA256Hash>.webp.
+  size: 320 # Target thumbnail square size in pixels (width = height = size).
+  webpQuality: 80 # WebP encoding quality for thumbnails (1-100).
+  extremeAspectRatio: 4 # Aspect-ratio threshold to treat an image as "extreme" (very tall / very wide). # Example: 4 means ratio >= 4:1 is considered extreme.
+  maxConcurrency: 4 # Maximum concurrent workers used when generating thumbnail cache.
+
 ui:
-  language: zh-CN
+  language: zh-CN # UI language code.
   gallery:
-    pageSize: 120
-    minCardWidth: 190
+    pageSize: 120 # Number of photos loaded per page request in gallery view.
+    minCardWidth: 190 # Minimum card width (px) for responsive gallery layout.
+
   viewer:
     panelRatio:
-      left: 1
-      center: 3
-      right: 1
+      left: 1 # Default width ratio of the left metadata panel.
+      center: 3 # Default width ratio of the center image panel.
+      right: 1 # Default width ratio of the right customization panel.
+
     panels:
-      showLeft: true
-      showRight: true
+      showLeft: true # Whether the left panel is visible by default.
+      showRight: true # Whether the right panel is visible by default.
+
     zoom:
-      minPercent: 10
-      maxPercent: 1000
-      stepPercent: 10
+      minPercent: 10 # Minimum zoom percentage allowed in viewer mode.
+      maxPercent: 1000 # Maximum zoom percentage allowed in viewer mode.
+      stepPercent: 10 # Base zoom step percentage for zoom controls. # Note: runtime logic can dynamically increase step at high zoom levels.

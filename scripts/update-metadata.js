@@ -9,6 +9,7 @@
  */
 const path = require("node:path");
 const { resolveConfig, absFromConfig, walkFiles, buildMetadata, loadExisting, writeAll, extensionType } = require("./common");
+const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 
 /**
 
@@ -22,6 +23,8 @@ async function run() {
   const config = resolveConfig();
   const root = absFromConfig(config, config.workspaceRoot);
   const metadataFile = absFromConfig(config, config.metadataFile);
+  const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
+  const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);
 
   const existing = await loadExisting(metadataFile);
   const files = await walkFiles(root);
@@ -58,8 +61,19 @@ async function run() {
     }
   }
 
-  await writeAll(metadataFile, [...next.values()]);
+  const nextEntries = [...next.values()];
+  await writeAll(metadataFile, nextEntries);
+  const thumbnailStats = await ensureThumbnailsForItems(nextEntries, {
+    workspaceRoot: root,
+    cacheDir: thumbnailDir,
+    options: thumbnailConfig,
+    maxConcurrency: thumbnailConfig.maxConcurrency,
+    logger: (message) => console.warn(message),
+  });
   console.log(`Updated metadata: ${next.size} images`);
+  console.log(
+    `Thumbnail cache: generated=${thumbnailStats.generated}, skipped=${thumbnailStats.skipped}, failed=${thumbnailStats.failed}`,
+  );
 }
 
 run().catch((error) => {

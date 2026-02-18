@@ -10,6 +10,13 @@
   const DEFAULT_CONFIG = {
     workspaceRoot: "./photo_workspace",
     metadataFile: "./photo_metadata.jsonl",
+    thumbnail: {
+      dir: "./thumb_cache",
+      size: 320,
+      webpQuality: 80,
+      extremeAspectRatio: 4,
+      maxConcurrency: 4,
+    },
     ui: {
       gallery: { pageSize: 120, minCardWidth: 190 },
       viewer: {
@@ -42,7 +49,7 @@
 
    * Lazy-load metadata JSONL and build in-memory records for browser preview mode.
 
-   * Also injects renderer helper fields (__absolutePath/__groupDate).
+   * Also injects renderer helper fields (__absolutePath/__thumbnailPath/__groupDate).
 
    */
 
@@ -58,6 +65,7 @@
       .map((item) => ({
         ...item,
         __absolutePath: `/photo_workspace/${item.FilePath}`,
+        __thumbnailPath: item?.SHA256Hash ? `/thumb_cache/${item.SHA256Hash}.webp` : "",
         __groupDate: (item?.FileSystem?.ShootingTimeString || "").slice(0, 10) || "Unknown",
       }));
     return cache;

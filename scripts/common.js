@@ -19,6 +19,13 @@ const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
   metadataFile: "./photo_metadata.jsonl",
   logDir: "./logs",
+  thumbnail: {
+    dir: "./thumb_cache",
+    size: 320,
+    webpQuality: 80,
+    extremeAspectRatio: 4,
+    maxConcurrency: 4,
+  },
 };
 
 // Load config.yml and guarantee required defaults.

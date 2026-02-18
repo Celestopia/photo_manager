@@ -12,6 +12,11 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const yaml = require("js-yaml");
+const {
+  normalizeThumbnailConfig,
+  thumbnailAbsolutePath,
+  ensureThumbnailsForItems,
+} = require(path.join(__dirname, "..", "..", "scripts", "thumbnail-cache.js"));
 
 const APP_ROOT = path.resolve(__dirname, "..", "..");
 const CONFIG_PATH = path.join(APP_ROOT, "config.yml");
@@ -21,6 +26,13 @@ const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
   metadataFile: "./photo_metadata.jsonl",
   logDir: "./logs",
+  thumbnail: {
+    dir: "./thumb_cache",
+    size: 320,
+    webpQuality: 80,
+    extremeAspectRatio: 4,
+    maxConcurrency: 4,
+  },
   ui: {
     language: "zh-CN",
     gallery: {
@@ -50,6 +62,7 @@ const DEFAULT_CONFIG = {
 let mainWindow = null;
 let config = null;
 let metadataIndex = new Map();
+let thumbnailWarmupStarted = false;
 
 /**
  * Force value into plain JSON-serializable structure.
@@ -76,6 +89,10 @@ function ensureConfig() {
     config = {
       ...DEFAULT_CONFIG,
       ...parsed,
+      thumbnail: {
+        ...DEFAULT_CONFIG.thumbnail,
+        ...(parsed?.thumbnail || {}),
+      },
       ui: {
         ...DEFAULT_CONFIG.ui,
         ...(parsed?.ui || {}),
@@ -266,12 +283,42 @@ function filterAndSort(list, options) {
  */
 function enrichItem(item) {
   const workspaceRoot = toAbsolutePath(config.workspaceRoot);
+  const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
+  const thumbnailDir = toAbsolutePath(thumbnailConfig.dir);
   const absPath = path.join(workspaceRoot, item.FilePath);
+  const thumbPath = item?.SHA256Hash ? thumbnailAbsolutePath(thumbnailDir, item.SHA256Hash) : "";
   return {
     ...item,
     __absolutePath: absPath,
+    __thumbnailPath: thumbPath,
     __groupDate: (item?.FileSystem?.ShootingTimeString || "").slice(0, 10) || "Unknown",
   };
+}
+
+/**
+ * Warm thumbnail cache in the background.
+ * Gallery rendering can still fall back to original image paths while cache fills.
+ */
+async function warmupThumbnailCache() {
+  if (thumbnailWarmupStarted) return;
+  thumbnailWarmupStarted = true;
+
+  const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
+  const workspaceRoot = toAbsolutePath(config.workspaceRoot);
+  const thumbnailDir = toAbsolutePath(thumbnailConfig.dir);
+  const imageItems = [...metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "image");
+  if (!imageItems.length) return;
+
+  const stats = await ensureThumbnailsForItems(imageItems, {
+    workspaceRoot,
+    cacheDir: thumbnailDir,
+    options: thumbnailConfig,
+    maxConcurrency: thumbnailConfig.maxConcurrency,
+    logger: (message) => appendLog(message),
+  });
+  appendLog(
+    `thumbnail-warmup total=${stats.total} generated=${stats.generated} skipped=${stats.skipped} failed=${stats.failed}`,
+  );
 }
 
 /**
@@ -474,6 +521,8 @@ function registerIpcHandlers() {
 async function bootstrap() {
   ensureConfig();
   await loadMetadataIndex();
+  // Start thumbnail warmup as soon as metadata is ready.
+  warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
 
   mainWindow = new BrowserWindow({
     width: 1600,

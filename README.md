@@ -2,7 +2,7 @@
 
 PhotoManager is a local-first desktop photo manager built with Electron + Vue.
 It is designed for personal usage on Windows and stores everything as local files
-(`config.yml`, `photo_metadata.jsonl`, image files, logs).
+(`config.yml`, `photo_metadata.jsonl`, image files, thumbnail cache, logs).
 
 ## Quick Start
 
@@ -39,6 +39,12 @@ Then open `http://localhost:5173/`.
 npm run dev:renderer
 ```
 
+5. Optional thumbnail cache warmup only:
+
+```bash
+npm run build-thumbnails
+```
+
 ## Macro Architecture
 
 The project has three runtime layers:
@@ -56,7 +62,7 @@ The project has three runtime layers:
 
 3. Renderer UI (`src/renderer/App.vue` + `src/renderer/app.js`)
 - Vue Single File Component (SFC) powered by Vite build pipeline.
-- Gallery mode: filter/search/sort/paginate/group by date.
+- Gallery mode: filter/search/sort/paginate/group by date, thumbnail-first loading.
 - Viewer mode: zoom/pan/mirror/fullscreen/navigation/edit metadata.
 - Calls `photoManagerApi` for data and persistence operations.
 
@@ -78,6 +84,7 @@ Important difference:
 
 - `config.yml`: runtime configuration.
 - `photo_workspace/`: image root folder.
+- `thumb_cache/`: hash-addressed thumbnail cache (`<SHA256Hash>.webp`).
 - `photo_metadata.jsonl`: one JSON object per line.
 - `logs/YYYY-MM-DD.log`: runtime diagnostics.
 
@@ -85,10 +92,11 @@ Important difference:
 
 1. Main process loads config.
 2. Main process loads metadata JSONL into in-memory index.
-3. Renderer asks config via IPC (`app:get-config`).
-4. Renderer requests first gallery page (`gallery:query`).
-5. Main process filters/sorts/paginates and returns serializable payload.
-6. Renderer renders grouped gallery.
+3. Main process starts thumbnail warmup for missing cache entries.
+4. Renderer asks config via IPC (`app:get-config`).
+5. Renderer requests first gallery page (`gallery:query`).
+6. Main process filters/sorts/paginates and returns serializable payload with thumbnail paths.
+7. Renderer renders grouped gallery (thumbnail first, original image fallback on error).
 
 ### Edit flow (Customization update)
 
@@ -106,6 +114,7 @@ Run these from project root:
 npm run init-metadata
 npm run update-metadata
 npm run verify-metadata
+npm run build-thumbnails
 ```
 
 ### `init-metadata`
@@ -123,6 +132,11 @@ npm run verify-metadata
 - Recomputes hashes from disk.
 - Compares with JSONL.
 - Reports missing or tampered records.
+
+### `build-thumbnails`
+- Loads existing metadata records.
+- Generates missing thumbnails into `thumb_cache/` using `<SHA256Hash>.webp`.
+- Applies long-image crop strategy (top for very tall images, left for very wide images).
 
 ## Key Design Decisions
 
@@ -160,6 +174,8 @@ src/
 vite.config.mjs      # Vite config for multi-page renderer build
 scripts/
   common.js          # Shared metadata utilities
+  thumbnail-cache.js # Shared thumbnail generation/cache utilities
+  build-thumbnails.js # Thumbnail cache warmup script
   init-metadata.js   # Full rebuild script
   update-metadata.js # Incremental sync script
   verify-metadata.js # Integrity check script

@@ -9,6 +9,7 @@
  */
 const path = require("node:path");
 const { resolveConfig, absFromConfig, walkFiles, buildMetadata, writeAll, extensionType } = require("./common");
+const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 
 /**
 
@@ -23,6 +24,8 @@ async function run() {
   const config = resolveConfig();
   const root = absFromConfig(config, config.workspaceRoot);
   const metadataFile = absFromConfig(config, config.metadataFile);
+  const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
+  const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);
 
   const files = await walkFiles(root);
   // Keep only recognized media extensions, then filter to image metadata below.
@@ -40,7 +43,17 @@ async function run() {
   }
 
   await writeAll(metadataFile, entries);
+  const thumbnailStats = await ensureThumbnailsForItems(entries, {
+    workspaceRoot: root,
+    cacheDir: thumbnailDir,
+    options: thumbnailConfig,
+    maxConcurrency: thumbnailConfig.maxConcurrency,
+    logger: (message) => console.warn(message),
+  });
   console.log(`Initialized metadata: ${entries.length} images`);
+  console.log(
+    `Thumbnail cache: generated=${thumbnailStats.generated}, skipped=${thumbnailStats.skipped}, failed=${thumbnailStats.failed}`,
+  );
 }
 
 run().catch((error) => {
