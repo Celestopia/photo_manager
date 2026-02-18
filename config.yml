@@ -1,0 +1,21 @@
+# PhotoManager default configuration
+workspaceRoot: ./photo_workspace
+metadataFile: ./photo_metadata.jsonl
+logDir: ./logs
+ui:
+  language: zh-CN
+  gallery:
+    pageSize: 120
+    minCardWidth: 190
+  viewer:
+    panelRatio:
+      left: 1
+      center: 3
+      right: 1
+    panels:
+      showLeft: true
+      showRight: true
+    zoom:
+      minPercent: 10
+      maxPercent: 1000
+      stepPercent: 10

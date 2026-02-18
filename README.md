@@ -1,0 +1,161 @@
+# PhotoManager
+
+PhotoManager is a local-first desktop photo manager built with Electron + Vue.
+It is designed for personal usage on Windows and stores everything as local files
+(`config.yml`, `photo_metadata.jsonl`, image files, logs).
+
+## Quick Start
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Start Electron app:
+
+```bash
+npm start
+```
+
+If your shell previously set `ELECTRON_RUN_AS_NODE=1`, clear it first:
+
+```powershell
+$env:ELECTRON_RUN_AS_NODE=$null
+npm start
+```
+
+3. Optional browser preview mode:
+
+```bash
+npm run start:web
+```
+
+Then open `http://localhost:5173/`.
+Root path redirects to `src/renderer/browser.html`.
+
+## Macro Architecture
+
+The project has three runtime layers:
+
+1. Electron main process (`src/main/main.js`)
+- Loads and merges `config.yml` with defaults.
+- Loads `photo_metadata.jsonl` into memory (`Map<FilePath, Metadata>`).
+- Exposes IPC APIs for query/update/copy/window control.
+- Creates and monitors BrowserWindow.
+
+2. Preload bridge (`src/main/preload.js`)
+- Exposes a minimal `window.photoManagerApi`.
+- Prevents renderer from direct Node access.
+- Serializes payloads to avoid structured-clone errors.
+
+3. Renderer UI (`src/renderer/app.js`)
+- Vue single-file runtime (no bundler).
+- Gallery mode: filter/search/sort/paginate/group by date.
+- Viewer mode: zoom/pan/mirror/fullscreen/navigation/edit metadata.
+- Calls `photoManagerApi` for data and persistence operations.
+
+## Browser Preview Architecture
+
+Browser preview exists for debugging UI without Electron:
+
+- `scripts/start-web-preview.js`: static file server.
+- `src/renderer/browser.html`: renderer entry for browser mode.
+- `src/renderer/browser-api.js`: mock implementation of `photoManagerApi`.
+
+Important difference:
+- Browser mode metadata edits are in-memory only (no write-back to JSONL).
+- Electron mode writes updates back to `photo_metadata.jsonl`.
+
+## Metadata and Data Flow
+
+### Files
+
+- `config.yml`: runtime configuration.
+- `photo_workspace/`: image root folder.
+- `photo_metadata.jsonl`: one JSON object per line.
+- `logs/YYYY-MM-DD.log`: runtime diagnostics.
+
+### Startup flow (Electron mode)
+
+1. Main process loads config.
+2. Main process loads metadata JSONL into in-memory index.
+3. Renderer asks config via IPC (`app:get-config`).
+4. Renderer requests first gallery page (`gallery:query`).
+5. Main process filters/sorts/paginates and returns serializable payload.
+6. Renderer renders grouped gallery.
+
+### Edit flow (Customization update)
+
+1. User edits fields in viewer panel.
+2. Renderer sends `photo:update-customization`.
+3. Main process updates metadata Map record and stamps `MetadataUpdateDate`.
+4. Main process atomically rewrites JSONL (`.tmp` -> rename).
+5. Updated item is returned and renderer cache is patched in place.
+
+## Metadata Maintenance Scripts
+
+Run these from project root:
+
+```bash
+npm run init-metadata
+npm run update-metadata
+npm run verify-metadata
+```
+
+### `init-metadata`
+- Full scan of workspace.
+- Builds metadata from file stats + EXIF + SHA256.
+- Rewrites JSONL from scratch (image records in v1 UI).
+
+### `update-metadata`
+- Incremental rescan.
+- Preserves `Customization` from existing metadata.
+- Uses SHA256 to track moved/renamed files.
+- Rewrites JSONL snapshot.
+
+### `verify-metadata`
+- Recomputes hashes from disk.
+- Compares with JSONL.
+- Reports missing or tampered records.
+
+## Key Design Decisions
+
+1. Local-first and offline
+- No database, no network dependency for core features.
+
+2. JSONL + in-memory Map
+- Fast random access by `FilePath`.
+- Easy to inspect and recover manually.
+
+3. Atomic file write for metadata
+- Prevents partial-write corruption on crashes.
+
+4. Explicit IPC surface
+- Narrow bridge (`photoManagerApi`) keeps renderer/main responsibilities clear.
+
+## Project Structure
+
+```text
+src/
+  main/
+    main.js          # Electron main process + IPC + window lifecycle
+    preload.js       # Secure renderer bridge
+  renderer/
+    index.html       # Electron renderer entry
+    browser.html     # Browser preview entry
+    app.js           # Vue UI logic
+    browser-api.js   # Browser-mode API shim
+    styles.css       # UI style
+scripts/
+  common.js          # Shared metadata utilities
+  init-metadata.js   # Full rebuild script
+  update-metadata.js # Incremental sync script
+  verify-metadata.js # Integrity check script
+```
+
+## Notes
+
+- Before first run, verify `config.yml` paths match your local folders.
+- Current implementation focuses on image management; video schema hooks are reserved.
+- Runtime errors are surfaced inside HTML pages to avoid silent blank screens.
