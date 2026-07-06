@@ -70,19 +70,7 @@
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'LocationSite'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'LocationSite'">{{ saveNotice.message }}</div>
     <label>标签</label>
-    <div class="tag-editor" @click="$event.currentTarget.querySelector('input')?.focus()">
-      <span class="tag-chip" v-for="(tag, index) in editDraft.Tags" :key="tag + '_' + index">
-        <span>{{ tag }}</span>
-        <button type="button" class="tag-remove" @click.stop="removeTagAt(index)">×</button>
-      </span>
-      <input
-        class="tag-input"
-        v-model="pendingTagInput"
-        @keydown="onTagInputKeydown"
-        @blur="addTag"
-        placeholder="输入标签后按回车"
-      />
-    </div>
+    <TagPicker target="viewer" placeholder="搜索已有标签" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Tags'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Tags'">{{ saveNotice.message }}</div>
     <label>描述</label><textarea class="input textarea" v-model="editDraft.Description" @input="requestEdit('Description')"></textarea>
@@ -121,6 +109,7 @@
 
 <script setup>
 import { inject } from "vue";
+import TagPicker from "./TagPicker.vue";
 
 const app = inject("appContext");
 if (!app) {
@@ -146,7 +135,6 @@ const {
   saveNotice,
   STAR_LEVELS,
   showLocationInfoMenu,
-  pendingTagInput,
   showPrivateNote,
   viewerImageStyle,
   minZoom,
@@ -173,9 +161,6 @@ const {
   cancelEdit,
   setRating,
   toggleLocationInfoMenu,
-  removeTagAt,
-  onTagInputKeydown,
-  addTag,
   requestEdit,
   toggleLeftPanel,
   zoomIn,

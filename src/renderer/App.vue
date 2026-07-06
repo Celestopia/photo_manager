@@ -9,6 +9,41 @@
       ref="dynamicTooltipRef"
       :style="{ left: dynamicTooltip.x + 'px', top: dynamicTooltip.y + 'px' }"
     >{{ dynamicTooltip.text }}</div>
+    <div class="tag-modal-backdrop" v-if="tagManager.visible" @click="closeTagManager">
+      <section class="tag-manager-modal" @click.stop>
+        <header class="tag-manager-header">
+          <h3>标签管理</h3>
+          <button class="btn" @click="closeTagManager">关闭</button>
+        </header>
+        <input class="input tag-manager-search" v-model="tagManager.search" placeholder="搜索标签或说明" />
+        <div class="tag-manager-list">
+          <article class="tag-manager-item" v-for="tag in managerFilteredTags" :key="'manager_' + tag.Text">
+            <div class="tag-manager-item-main">
+              <div class="tag-manager-item-title">
+                <strong>{{ tag.Text }}</strong>
+                <span>{{ tag.UsageCount || 0 }} 张</span>
+              </div>
+              <textarea
+                v-if="tagManager.editingText === tag.Text"
+                class="input tag-manager-description-input"
+                v-model="tagManager.editDescription"
+              ></textarea>
+              <p v-else>{{ tag.Description }}</p>
+              <div class="tag-manager-error" v-if="tagManager.error && tagManager.editingText === tag.Text">{{ tagManager.error }}</div>
+            </div>
+            <div class="tag-manager-actions" v-if="tagManager.editingText === tag.Text">
+              <button class="btn btn-primary" @click="saveTagDescription">保存</button>
+              <button class="btn" @click="cancelTagDescriptionEdit">取消</button>
+            </div>
+            <div class="tag-manager-actions" v-else>
+              <button class="btn" @click="startTagDescriptionEdit(tag)">编辑说明</button>
+              <button class="btn danger-text" @click="deleteTagGlobally(tag)">全局删除</button>
+            </div>
+          </article>
+          <div class="tag-manager-empty" v-if="!managerFilteredTags.length">没有匹配的标签</div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -44,6 +79,7 @@ const ICONS = {
   windowMaximize: new URL("./assets/window_maximize.svg", import.meta.url).href,
   windowRestore: new URL("./assets/window_restore.svg", import.meta.url).href,
   windowClose: new URL("./assets/window_close.svg", import.meta.url).href,
+  settings: new URL("./assets/settings.svg", import.meta.url).href,
   metadataInfo: new URL("./assets/metadata_info.svg", import.meta.url).href,
   zoomIn: new URL("./assets/image_zoom_in.svg", import.meta.url).href,
   zoomOut: new URL("./assets/image_zoom_out.svg", import.meta.url).href,
@@ -106,6 +142,11 @@ export default {
     const hasMore = ref(false);
     const loading = ref(false);
     const filterOptions = reactive({ albums: [], tags: [] });
+    const tagRegistry = ref([]);
+    const tagSearch = reactive({ viewer: "", batch: "" });
+    const tagDropdown = reactive({ viewer: false, batch: false });
+    const tagCreate = reactive({ visible: false, target: "viewer", text: "", description: "", error: "" });
+    const tagManager = reactive({ visible: false, search: "", editingText: "", editDescription: "", error: "" });
 
     // --- Selection state ---
     const selectedItem = ref(null);
@@ -116,7 +157,6 @@ export default {
     const batchEdit = reactive({
       title: "",
       tags: [],
-      pendingTagInput: "",
       locationCountry: "",
       locationProvince: "",
       locationCity: "",
@@ -134,6 +174,12 @@ export default {
       return false;
     });
     const canApplyBatchEdit = computed(() => selectedGalleryCount.value > 0 && batchHasChanges.value);
+    const managerFilteredTags = computed(() => {
+      const keyword = tagManager.search.trim();
+      const source = [...tagRegistry.value].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
+      if (!keyword) return source;
+      return source.filter((tag) => tag.Text.includes(keyword) || (tag.Description || "").includes(keyword));
+    });
 
     // --- Viewer transform state ---
     const zoomPercent = ref(100);
@@ -169,7 +215,6 @@ export default {
       Description: "",
       HiddenDescription: "",
     });
-    const pendingTagInput = ref("");
     const editingDirty = ref(false);
     const activeEditField = ref("");
     const STAR_LEVELS = [1, 2, 3, 4, 5];
@@ -253,7 +298,8 @@ export default {
       editDraft.Tags = [...(item?.Customization?.Tags || [])];
       editDraft.Description = item?.Customization?.Description || "";
       editDraft.HiddenDescription = item?.Customization?.HiddenDescription || "";
-      pendingTagInput.value = "";
+      tagSearch.viewer = "";
+      tagDropdown.viewer = false;
       editingDirty.value = false;
       if (!keepActiveField) activeEditField.value = "";
       nextTick(() => autoGrowAllFieldTextareas());
@@ -361,7 +407,7 @@ export default {
      */
 
     function onTooltipMouseOver(event) {
-      const target = event.target.closest(".icon-btn[data-tip]");
+      const target = event.target.closest("[data-tip]");
       if (!target) return;
       if (target === tooltipTarget && dynamicTooltip.visible) return;
       scheduleDynamicTooltip(target);
@@ -374,7 +420,7 @@ export default {
      */
 
     function onTooltipMouseOut(event) {
-      const leaving = event.target.closest?.(".icon-btn[data-tip]");
+      const leaving = event.target.closest?.("[data-tip]");
       if (!leaving) return;
       if (leaving !== tooltipTarget) return;
       const related = event.relatedTarget;
@@ -406,23 +452,216 @@ export default {
       await positionDynamicTooltip(tooltipTarget);
     }
 
-    /**
+    function normalizeTagText(value) {
+      return String(value ?? "").trim();
+    }
 
-     * Add one tag from pending input into current draft with duplicate validation.
+    function applyTagRegistry(tags) {
+      tagRegistry.value = (Array.isArray(tags) ? tags : [])
+        .map((tag) => ({
+          Text: normalizeTagText(tag?.Text),
+          Description: normalizeTagText(tag?.Description),
+          CreatedAt: tag?.CreatedAt || "",
+          UpdatedAt: tag?.UpdatedAt || "",
+          UsageCount: Number(tag?.UsageCount || 0),
+        }))
+        .filter((tag) => tag.Text);
+      filterOptions.tags = tagRegistry.value.map((tag) => tag.Text);
+      if (query.filters.tag && !filterOptions.tags.includes(query.filters.tag)) {
+        query.filters.tag = "";
+      }
+    }
 
-     */
+    async function loadTags() {
+      if (typeof API.listTags !== "function") return;
+      const result = await API.listTags();
+      if (result?.ok) applyTagRegistry(result.tags);
+    }
 
-    function addTag() {
-      const tag = pendingTagInput.value.trim();
-      if (!tag) return;
-      if (editDraft.Tags.includes(tag)) {
-        showToastMessage(`标签“${tag}”已存在，添加失败`);
-        pendingTagInput.value = "";
+    function selectedTagsForTarget(target) {
+      return target === "batch" ? batchEdit.tags : editDraft.Tags;
+    }
+
+    function getTagOptions(target) {
+      const keyword = normalizeTagText(tagSearch[target]);
+      const selected = new Set(selectedTagsForTarget(target));
+      return tagRegistry.value
+        .filter((tag) => !selected.has(tag.Text))
+        .filter((tag) => !keyword || tag.Text.includes(keyword) || (tag.Description || "").includes(keyword))
+        .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"))
+        .slice(0, 50);
+    }
+
+    function getTagDescription(tagText) {
+      return tagRegistry.value.find((tag) => tag.Text === tagText)?.Description || "";
+    }
+
+    function openTagDropdown(target) {
+      tagDropdown[target] = true;
+    }
+
+    function closeTagDropdown(target) {
+      tagDropdown[target] = false;
+    }
+
+    function closeAllTagDropdowns() {
+      tagDropdown.viewer = false;
+      tagDropdown.batch = false;
+    }
+
+    function addTagToTarget(target, rawTagText) {
+      const tagText = normalizeTagText(rawTagText);
+      if (!tagText) return;
+      const tags = selectedTagsForTarget(target);
+      if (tags.includes(tagText)) {
+        showToastMessage(`标签“${tagText}”已存在，添加失败`);
+        tagSearch[target] = "";
+        closeTagDropdown(target);
         return;
       }
-      editDraft.Tags.push(tag);
-      requestEdit("Tags");
-      pendingTagInput.value = "";
+      tags.push(tagText);
+      tagSearch[target] = "";
+      closeTagDropdown(target);
+      if (target === "viewer") requestEdit("Tags");
+    }
+
+    function addTag() {
+      const first = getTagOptions("viewer")[0];
+      if (first) addTagToTarget("viewer", first.Text);
+    }
+
+    function onTagSearchKeydown(event, target) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const first = getTagOptions(target)[0];
+        if (first) addTagToTarget(target, first.Text);
+        return;
+      }
+      if (event.key === "Escape") {
+        closeTagDropdown(target);
+        return;
+      }
+      if (event.key === "Backspace" && !tagSearch[target]) {
+        event.preventDefault();
+        if (target === "batch") removeBatchTagAt(batchEdit.tags.length - 1);
+        else removeTagAt(editDraft.Tags.length - 1);
+      }
+    }
+
+    function openCreateTagMenu(target) {
+      tagCreate.visible = true;
+      tagCreate.target = target;
+      tagCreate.text = normalizeTagText(tagSearch[target]);
+      tagCreate.description = "";
+      tagCreate.error = "";
+      closeTagDropdown(target);
+    }
+
+    function closeCreateTagMenu() {
+      tagCreate.visible = false;
+      tagCreate.text = "";
+      tagCreate.description = "";
+      tagCreate.error = "";
+    }
+
+    async function createTagAndSelect() {
+      const text = normalizeTagText(tagCreate.text);
+      const description = normalizeTagText(tagCreate.description);
+      if (!text || !description) {
+        tagCreate.error = "标签名称和说明不能为空";
+        return;
+      }
+      const result = await API.createTag({ text, description });
+      if (!result?.ok) {
+        tagCreate.error = result?.error || "创建标签失败";
+        return;
+      }
+      applyTagRegistry(result.tags);
+      addTagToTarget(tagCreate.target, result.tag.Text);
+      closeCreateTagMenu();
+    }
+
+    async function openTagManager() {
+      await loadTags();
+      tagManager.visible = true;
+      tagManager.error = "";
+    }
+
+    function closeTagManager() {
+      tagManager.visible = false;
+      tagManager.search = "";
+      tagManager.editingText = "";
+      tagManager.editDescription = "";
+      tagManager.error = "";
+    }
+
+    function startTagDescriptionEdit(tag) {
+      tagManager.editingText = tag.Text;
+      tagManager.editDescription = tag.Description || "";
+      tagManager.error = "";
+    }
+
+    function cancelTagDescriptionEdit() {
+      tagManager.editingText = "";
+      tagManager.editDescription = "";
+      tagManager.error = "";
+    }
+
+    async function saveTagDescription() {
+      const text = tagManager.editingText;
+      const description = normalizeTagText(tagManager.editDescription);
+      if (!text || !description) {
+        tagManager.error = "说明不能为空";
+        return;
+      }
+      const result = await API.updateTagDescription({ text, description });
+      if (!result?.ok) {
+        tagManager.error = result?.error || "保存说明失败";
+        return;
+      }
+      applyTagRegistry(result.tags);
+      cancelTagDescriptionEdit();
+      showToastMessage("标签说明已更新");
+    }
+
+    function stripTagFromItem(item, tagText) {
+      const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+      if (!tags.includes(tagText)) return item;
+      return {
+        ...item,
+        Customization: {
+          ...(item.Customization || {}),
+          Tags: tags.filter((tag) => tag !== tagText),
+        },
+      };
+    }
+
+    function syncDeletedTagLocally(tagText) {
+      if (selectedItem.value) selectedItem.value = stripTagFromItem(selectedItem.value, tagText);
+      editDraft.Tags = editDraft.Tags.filter((tag) => tag !== tagText);
+      batchEdit.tags = batchEdit.tags.filter((tag) => tag !== tagText);
+      orderedItems.value = orderedItems.value.map((item) => stripTagFromItem(item, tagText));
+      for (const group of galleryGroups.value) {
+        group.items = group.items.map((item) => stripTagFromItem(item, tagText));
+      }
+    }
+
+    async function deleteTagGlobally(tag) {
+      const usage = Number(tag?.UsageCount || 0);
+      const ok = window.confirm(`确定全局删除标签“${tag.Text}”？这会从 ${usage} 张图片中移除。`);
+      if (!ok) return;
+      const result = await API.deleteTagGlobally({ text: tag.Text });
+      if (!result?.ok) {
+        showToastMessage(`删除标签失败：${result?.error || "未知错误"}`);
+        return;
+      }
+      applyTagRegistry(result.tags);
+      syncDeletedTagLocally(tag.Text);
+      if (query.filters.tag === tag.Text) {
+        query.filters.tag = "";
+        await queryGallery(true);
+      }
+      showToastMessage(`已全局删除标签“${tag.Text}”`);
     }
 
     /**
@@ -531,15 +770,8 @@ export default {
      */
 
     function addBatchTag() {
-      const tag = batchEdit.pendingTagInput.trim();
-      if (!tag) return;
-      if (batchEdit.tags.includes(tag)) {
-        showToastMessage(`标签“${tag}”已存在于待添加列表，添加失败`);
-        batchEdit.pendingTagInput = "";
-        return;
-      }
-      batchEdit.tags.push(tag);
-      batchEdit.pendingTagInput = "";
+      const first = getTagOptions("batch")[0];
+      if (first) addTagToTarget("batch", first.Text);
     }
 
     /**
@@ -563,7 +795,8 @@ export default {
     function clearBatchEditInputs({ keepStatus = false } = {}) {
       batchEdit.title = "";
       batchEdit.tags = [];
-      batchEdit.pendingTagInput = "";
+      tagSearch.batch = "";
+      tagDropdown.batch = false;
       batchEdit.locationCountry = "";
       batchEdit.locationProvince = "";
       batchEdit.locationCity = "";
@@ -606,15 +839,7 @@ export default {
      */
 
     function onBatchTagInputKeydown(event) {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        addBatchTag();
-        return;
-      }
-      if (event.key === "Backspace" && !batchEdit.pendingTagInput) {
-        event.preventDefault();
-        removeBatchTagAt(batchEdit.tags.length - 1);
-      }
+      onTagSearchKeydown(event, "batch");
     }
 
     /**
@@ -659,6 +884,7 @@ export default {
 
       const updatedItems = Array.isArray(result.items) ? result.items : [];
       syncUpdatedItemsIntoGallery(updatedItems);
+      await loadTags();
       const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
       const missingCount = Number(result.missingCount || 0);
       const requestedCount = Number(result.requestedCount || filePaths.length || 0);
@@ -706,16 +932,7 @@ export default {
      */
 
     function onTagInputKeydown(event) {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        event.stopPropagation();
-        addTag();
-        return;
-      }
-      if (event.key === "Backspace" && !pendingTagInput.value) {
-        event.preventDefault();
-        removeTagAt(editDraft.Tags.length - 1);
-      }
+      onTagSearchKeydown(event, "viewer");
     }
 
     /**
@@ -973,6 +1190,7 @@ export default {
     function closeTransientPanels() {
       showContextMenu.value = false;
       showLocationInfoMenu.value = false;
+      closeAllTagDropdowns();
     }
 
     /**
@@ -1131,6 +1349,9 @@ export default {
         setDraftFromItem(result.item, true);
         activeEditField.value = saveField;
         showSaveNotice("已修改", saveField);
+        await loadTags();
+      } else {
+        showToastMessage(`修改失败：${result?.error || "未知错误"}`);
       }
     }
 
@@ -1240,6 +1461,7 @@ export default {
     onMounted(async () => {
       // Initial render flow: config -> first gallery query -> global listeners.
       await loadConfig();
+      await loadTags();
       await queryGallery(true);
       await refreshWindowState();
       await nextTick();
@@ -1287,6 +1509,12 @@ export default {
       hasMore,
       loading,
       filterOptions,
+      tagRegistry,
+      tagSearch,
+      tagDropdown,
+      tagCreate,
+      tagManager,
+      managerFilteredTags,
       isSelectionMode,
       batchStatus,
       selectedGalleryCount,
@@ -1311,7 +1539,6 @@ export default {
       dynamicTooltipRef,
       editDraft,
       batchEdit,
-      pendingTagInput,
       editingDirty,
       activeEditField,
       STAR_LEVELS,
@@ -1334,6 +1561,21 @@ export default {
       addBatchTag,
       removeBatchTagAt,
       onBatchTagInputKeydown,
+      getTagOptions,
+      getTagDescription,
+      openTagDropdown,
+      closeTagDropdown,
+      addTagToTarget,
+      onTagSearchKeydown,
+      openCreateTagMenu,
+      closeCreateTagMenu,
+      createTagAndSelect,
+      openTagManager,
+      closeTagManager,
+      startTagDescriptionEdit,
+      cancelTagDescriptionEdit,
+      saveTagDescription,
+      deleteTagGlobally,
       clearBatchEditInputs,
       applyBatchEdit,
       loadMore,
@@ -1378,4 +1620,3 @@ export default {
   },
 };
 </script>
-

@@ -18,6 +18,7 @@ const APP_ROOT = path.resolve(__dirname, "..");
 const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
   metadataFile: "./photo_metadata.jsonl",
+  tagRegistryFile: "./tag_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",

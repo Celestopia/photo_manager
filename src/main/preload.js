@@ -26,6 +26,12 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   updateCustomization: (payload) => ipcRenderer.invoke("photo:update-customization", toSerializable(payload)),
   batchUpdateMetadata: (payload) => ipcRenderer.invoke("photo:batch-update", toSerializable(payload)),
 
+  // Tag registry
+  listTags: () => ipcRenderer.invoke("tag:list"),
+  createTag: (payload) => ipcRenderer.invoke("tag:create", toSerializable(payload)),
+  updateTagDescription: (payload) => ipcRenderer.invoke("tag:update-description", toSerializable(payload)),
+  deleteTagGlobally: (payload) => ipcRenderer.invoke("tag:delete-global", toSerializable(payload)),
+
   // Clipboard helpers
   copyPath: (absolutePath) => ipcRenderer.invoke("photo:copy-path", absolutePath),
   copyJson: (item) => ipcRenderer.invoke("photo:copy-json", toSerializable(item)),

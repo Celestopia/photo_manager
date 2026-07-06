@@ -2,6 +2,7 @@
 
 workspaceRoot: ./photo_workspace # Root directory of your photo library.
 metadataFile: ./photo_metadata.jsonl # Metadata storage file in JSONL format (one JSON record per line).
+tagRegistryFile: ./tag_registry.jsonl # Tag registry storage file in JSONL format (one tag definition per line).
 logDir: ./logs # Directory used for runtime log files.
 
 thumbnail:

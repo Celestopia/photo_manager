@@ -25,6 +25,7 @@ const RENDERER_INDEX_PATH = path.join(APP_ROOT, "dist", "renderer", "index.html"
 const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
   metadataFile: "./photo_metadata.jsonl",
+  tagRegistryFile: "./tag_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -62,7 +63,9 @@ const DEFAULT_CONFIG = {
 let mainWindow = null;
 let config = null;
 let metadataIndex = new Map();
+let tagRegistryIndex = new Map();
 let thumbnailWarmupStarted = false;
+const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
 
 /**
  * Force value into plain JSON-serializable structure.
@@ -221,6 +224,126 @@ async function loadMetadataIndex() {
 }
 
 /**
+ * Normalize tag text into the canonical key stored in photo metadata.
+ */
+function normalizeTagText(value) {
+  return String(value ?? "").trim();
+}
+
+/**
+ * Return tag definitions sorted by tag text, including current usage counts.
+ */
+function listTagDefinitions() {
+  const usage = getTagUsageCounts();
+  return [...tagRegistryIndex.values()]
+    .map((tag) => ({
+      ...tag,
+      UsageCount: usage.get(tag.Text) || 0,
+    }))
+    .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
+}
+
+/**
+ * Count how many metadata records currently use each registered tag text.
+ */
+function getTagUsageCounts() {
+  const counts = new Map();
+  for (const item of metadataIndex.values()) {
+    const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+    for (const rawTag of tags) {
+      const tag = normalizeTagText(rawTag);
+      if (!tag) continue;
+      counts.set(tag, (counts.get(tag) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/**
+ * Persist tag registry JSONL using the same temp-file replacement style as metadata.
+ */
+async function saveTagRegistryMap() {
+  const registryFile = toAbsolutePath(config.tagRegistryFile || DEFAULT_CONFIG.tagRegistryFile);
+  const tempFile = `${registryFile}.tmp`;
+  const lines = [...tagRegistryIndex.values()]
+    .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"))
+    .map((tag) => JSON.stringify(tag));
+  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
+  await fsp.rename(tempFile, registryFile);
+}
+
+/**
+ * Add missing registry definitions for tags already present in photo metadata.
+ */
+function seedRegistryFromMetadata() {
+  const now = new Date().toISOString();
+  let added = 0;
+
+  for (const item of metadataIndex.values()) {
+    const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+    for (const rawTag of tags) {
+      const tagText = normalizeTagText(rawTag);
+      if (!tagText || tagRegistryIndex.has(tagText)) continue;
+      tagRegistryIndex.set(tagText, {
+        Text: tagText,
+        Description: DEFAULT_TAG_DESCRIPTION,
+        CreatedAt: now,
+        UpdatedAt: now,
+      });
+      added += 1;
+    }
+  }
+
+  return added;
+}
+
+/**
+ * Read the tag registry JSONL into memory, then backfill definitions for legacy tags.
+ */
+async function loadTagRegistryIndex() {
+  tagRegistryIndex.clear();
+  const registryFile = toAbsolutePath(config.tagRegistryFile || DEFAULT_CONFIG.tagRegistryFile);
+  const fileExists = fs.existsSync(registryFile);
+
+  if (fileExists) {
+    const content = await fsp.readFile(registryFile, "utf8");
+    const lines = content.split(/\r?\n/).filter(Boolean);
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        const text = normalizeTagText(parsed?.Text);
+        if (!text) continue;
+        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+        tagRegistryIndex.set(text, {
+          Text: text,
+          Description: normalizeTagText(parsed?.Description) || DEFAULT_TAG_DESCRIPTION,
+          CreatedAt: createdAt,
+          UpdatedAt: updatedAt,
+        });
+      } catch (error) {
+        appendLog(`Skip invalid tag registry line: ${error.message}`);
+      }
+    }
+  }
+
+  const added = seedRegistryFromMetadata();
+  if (!fileExists || added > 0) {
+    await saveTagRegistryMap();
+  }
+}
+
+/**
+ * Normalize and validate tag arrays before writing photo metadata.
+ */
+function normalizeRegisteredTags(rawTags) {
+  const tags = Array.isArray(rawTags) ? rawTags : [];
+  const normalized = [...new Set(tags.map(normalizeTagText).filter(Boolean))];
+  const unknown = normalized.filter((tag) => !tagRegistryIndex.has(tag));
+  return { tags: normalized, unknown };
+}
+
+/**
  * Apply gallery-level filtering/searching/sorting in memory.
  * Filter semantics match the requirement document:
  * - hidden items are excluded
@@ -376,10 +499,97 @@ function registerIpcHandlers() {
       groups: [...grouped.entries()].map(([date, items]) => ({ date, items })),
       filterOptions: {
         albums: [...new Set(all.map((item) => item?.Customization?.Album).filter(Boolean))].sort(),
-        tags: [...new Set(all.flatMap((item) => item?.Customization?.Tags || []).filter(Boolean))].sort(),
+        tags: [...tagRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
       },
     };
     return toSerializable(payload);
+  });
+
+  ipcMain.handle("tag:list", async () => toSerializable({ ok: true, tags: listTagDefinitions() }));
+
+  ipcMain.handle("tag:create", async (_, payload) => {
+    const text = normalizeTagText(payload?.text ?? payload?.Text);
+    const description = normalizeTagText(payload?.description ?? payload?.Description);
+    if (!text || !description) {
+      return { ok: false, error: "Tag text and description are required" };
+    }
+    if (tagRegistryIndex.has(text)) {
+      return { ok: false, error: "Tag already exists" };
+    }
+
+    const now = new Date().toISOString();
+    const tag = { Text: text, Description: description, CreatedAt: now, UpdatedAt: now };
+    tagRegistryIndex.set(text, tag);
+    try {
+      await saveTagRegistryMap();
+      return toSerializable({ ok: true, tag: { ...tag, UsageCount: 0 }, tags: listTagDefinitions() });
+    } catch (error) {
+      tagRegistryIndex.delete(text);
+      appendLog(`Failed to create tag: ${error.message}`);
+      return { ok: false, error: "Failed to write tag registry" };
+    }
+  });
+
+  ipcMain.handle("tag:update-description", async (_, payload) => {
+    const text = normalizeTagText(payload?.text ?? payload?.Text);
+    const description = normalizeTagText(payload?.description ?? payload?.Description);
+    const current = tagRegistryIndex.get(text);
+    if (!text || !description) {
+      return { ok: false, error: "Tag text and description are required" };
+    }
+    if (!current) {
+      return { ok: false, error: "Tag not found" };
+    }
+
+    const previous = { ...current };
+    const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+    tagRegistryIndex.set(text, next);
+    try {
+      await saveTagRegistryMap();
+      return toSerializable({ ok: true, tag: { ...next, UsageCount: getTagUsageCounts().get(text) || 0 }, tags: listTagDefinitions() });
+    } catch (error) {
+      tagRegistryIndex.set(text, previous);
+      appendLog(`Failed to update tag description: ${error.message}`);
+      return { ok: false, error: "Failed to write tag registry" };
+    }
+  });
+
+  ipcMain.handle("tag:delete-global", async (_, payload) => {
+    const text = normalizeTagText(payload?.text ?? payload?.Text);
+    const current = tagRegistryIndex.get(text);
+    if (!text || !current) {
+      return { ok: false, error: "Tag not found" };
+    }
+
+    const previousRegistry = new Map(tagRegistryIndex);
+    const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
+    let updatedCount = 0;
+    tagRegistryIndex.delete(text);
+
+    for (const [filePath, item] of metadataIndex.entries()) {
+      const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+      if (!tags.includes(text)) continue;
+      const nextTags = tags.filter((tag) => tag !== text);
+      item.Customization = {
+        ...(item.Customization || {}),
+        Tags: nextTags,
+        MetadataUpdateDate: new Date().toISOString(),
+      };
+      delete item.Customization.Category;
+      metadataIndex.set(filePath, item);
+      updatedCount += 1;
+    }
+
+    try {
+      await saveTagRegistryMap();
+      if (updatedCount) await saveMetadataMap();
+      return toSerializable({ ok: true, deleted: text, updatedCount, tags: listTagDefinitions() });
+    } catch (error) {
+      tagRegistryIndex = previousRegistry;
+      metadataIndex = previousMetadata;
+      appendLog(`Failed to delete tag globally: ${error.message}`);
+      return { ok: false, error: "Failed to delete tag" };
+    }
   });
 
   ipcMain.handle("photo:update-customization", async (_, payload) => {
@@ -388,6 +598,14 @@ function registerIpcHandlers() {
 
     if (!current) {
       return { ok: false, error: "Metadata item not found" };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(customization || {}, "Tags")) {
+      const validation = normalizeRegisteredTags(customization.Tags);
+      if (validation.unknown.length) {
+        return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
+      }
+      customization.Tags = validation.tags;
     }
 
     // Merge user edits and stamp update time.
@@ -425,6 +643,10 @@ function registerIpcHandlers() {
 
     const locationKeys = ["Country", "Province", "City", "Site"];
     const dedupTags = [...new Set(addTags.map((x) => String(x || "").trim()).filter(Boolean))];
+    const validation = normalizeRegisteredTags(dedupTags);
+    if (validation.unknown.length) {
+      return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
+    }
     const updatedItems = [];
     const requestedCount = filePaths.length;
     let missingCount = 0;
@@ -438,7 +660,7 @@ function registerIpcHandlers() {
 
       const currentTags = Array.isArray(current?.Customization?.Tags) ? current.Customization.Tags : [];
       const mergedTags = [...currentTags];
-      for (const tag of dedupTags) {
+      for (const tag of validation.tags) {
         if (!mergedTags.includes(tag)) mergedTags.push(tag);
       }
 
@@ -521,6 +743,7 @@ function registerIpcHandlers() {
 async function bootstrap() {
   ensureConfig();
   await loadMetadataIndex();
+  await loadTagRegistryIndex();
   // Start thumbnail warmup as soon as metadata is ready.
   warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
 

@@ -20,6 +20,7 @@ thumb_cache/*
 !thumb_cache/.gitkeep
 photo_metadata.jsonl
 photo_metadata.csv
+tag_registry.jsonl
 
 # Temporary files
 *.tmp

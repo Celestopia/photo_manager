@@ -10,6 +10,7 @@
   const DEFAULT_CONFIG = {
     workspaceRoot: "./photo_workspace",
     metadataFile: "./photo_metadata.jsonl",
+    tagRegistryFile: "./tag_registry.jsonl",
     thumbnail: {
       dir: "./thumb_cache",
       size: 320,
@@ -25,9 +26,11 @@
       },
     },
   };
+  const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
 
   // Metadata cache for the current browser session.
   let cache = [];
+  let tagRegistry = null;
 
   /**
 
@@ -69,6 +72,83 @@
         __groupDate: (item?.FileSystem?.ShootingTimeString || "").slice(0, 10) || "Unknown",
       }));
     return cache;
+  }
+
+  function normalizeTagText(value) {
+    return String(value ?? "").trim();
+  }
+
+  function tagUsageCounts() {
+    const counts = new Map();
+    for (const item of cache) {
+      const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+      for (const rawTag of tags) {
+        const tag = normalizeTagText(rawTag);
+        if (!tag) continue;
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
+    }
+    return counts;
+  }
+
+  function seedTagRegistryFromMetadata() {
+    const now = new Date().toISOString();
+    for (const item of cache) {
+      const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+      for (const rawTag of tags) {
+        const tag = normalizeTagText(rawTag);
+        if (!tag || tagRegistry.has(tag)) continue;
+        tagRegistry.set(tag, {
+          Text: tag,
+          Description: DEFAULT_TAG_DESCRIPTION,
+          CreatedAt: now,
+          UpdatedAt: now,
+        });
+      }
+    }
+  }
+
+  function listTagDefinitions() {
+    const usage = tagUsageCounts();
+    return [...tagRegistry.values()]
+      .map((tag) => ({ ...tag, UsageCount: usage.get(tag.Text) || 0 }))
+      .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
+  }
+
+  async function loadTagRegistry() {
+    if (tagRegistry) return tagRegistry;
+    await loadMetadata();
+    tagRegistry = new Map();
+    try {
+      const res = await fetch("/tag_registry.jsonl");
+      if (res.ok) {
+        const text = await res.text();
+        for (const line of text.split(/\r?\n/).filter(Boolean)) {
+          const parsed = JSON.parse(line);
+          const tagText = normalizeTagText(parsed?.Text);
+          if (!tagText) continue;
+          const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+          const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+          tagRegistry.set(tagText, {
+            Text: tagText,
+            Description: normalizeTagText(parsed?.Description) || DEFAULT_TAG_DESCRIPTION,
+            CreatedAt: createdAt,
+            UpdatedAt: updatedAt,
+          });
+        }
+      }
+    } catch {
+      // Browser preview keeps a memory-only registry when the file is absent.
+    }
+    seedTagRegistryFromMetadata();
+    return tagRegistry;
+  }
+
+  function normalizeRegisteredTags(rawTags) {
+    const tags = Array.isArray(rawTags) ? rawTags : [];
+    const normalized = [...new Set(tags.map(normalizeTagText).filter(Boolean))];
+    const unknown = normalized.filter((tag) => !tagRegistry.has(tag));
+    return { tags: normalized, unknown };
   }
 
   /**
@@ -124,6 +204,7 @@
     },
     async queryGallery(query) {
       const all = await loadMetadata();
+      await loadTagRegistry();
       const filtered = filterAndSort(all, query);
       const page = Math.max(1, Number(query.page || 1));
       const pageSize = Math.max(1, Number(query.pageSize || 120));
@@ -144,15 +225,65 @@
         groups: [...grouped.entries()].map(([date, items]) => ({ date, items })),
         filterOptions: {
           albums: [...new Set(all.map((item) => item?.Customization?.Album).filter(Boolean))].sort(),
-          tags: [...new Set(all.flatMap((item) => item?.Customization?.Tags || []).filter(Boolean))].sort(),
+          tags: [...tagRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
         },
       };
+    },
+    async listTags() {
+      await loadTagRegistry();
+      return { ok: true, tags: listTagDefinitions() };
+    },
+    async createTag(payload) {
+      await loadTagRegistry();
+      const text = normalizeTagText(payload?.text ?? payload?.Text);
+      const description = normalizeTagText(payload?.description ?? payload?.Description);
+      if (!text || !description) return { ok: false, error: "Tag text and description are required" };
+      if (tagRegistry.has(text)) return { ok: false, error: "Tag already exists" };
+      const now = new Date().toISOString();
+      const tag = { Text: text, Description: description, CreatedAt: now, UpdatedAt: now };
+      tagRegistry.set(text, tag);
+      return { ok: true, tag: { ...tag, UsageCount: 0 }, tags: listTagDefinitions() };
+    },
+    async updateTagDescription(payload) {
+      await loadTagRegistry();
+      const text = normalizeTagText(payload?.text ?? payload?.Text);
+      const description = normalizeTagText(payload?.description ?? payload?.Description);
+      const current = tagRegistry.get(text);
+      if (!text || !description) return { ok: false, error: "Tag text and description are required" };
+      if (!current) return { ok: false, error: "Tag not found" };
+      const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+      tagRegistry.set(text, next);
+      return { ok: true, tag: { ...next, UsageCount: tagUsageCounts().get(text) || 0 }, tags: listTagDefinitions() };
+    },
+    async deleteTagGlobally(payload) {
+      await loadTagRegistry();
+      const text = normalizeTagText(payload?.text ?? payload?.Text);
+      if (!text || !tagRegistry.has(text)) return { ok: false, error: "Tag not found" };
+      tagRegistry.delete(text);
+      let updatedCount = 0;
+      for (const item of cache) {
+        const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
+        if (!tags.includes(text)) continue;
+        item.Customization = {
+          ...(item.Customization || {}),
+          Tags: tags.filter((tag) => tag !== text),
+          MetadataUpdateDate: new Date().toISOString(),
+        };
+        updatedCount += 1;
+      }
+      return { ok: true, deleted: text, updatedCount, tags: listTagDefinitions() };
     },
     async updateCustomization(payload) {
       // Browser mode updates in memory only; it does not write back to disk.
       const all = await loadMetadata();
+      await loadTagRegistry();
       const idx = all.findIndex((x) => x.FilePath === payload.filePath);
       if (idx < 0) return { ok: false, error: "Item not found" };
+      if (Object.prototype.hasOwnProperty.call(payload?.customization || {}, "Tags")) {
+        const validation = normalizeRegisteredTags(payload.customization.Tags);
+        if (validation.unknown.length) return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
+        payload.customization.Tags = validation.tags;
+      }
       all[idx].Customization = {
         ...all[idx].Customization,
         ...payload.customization,
@@ -167,8 +298,11 @@
     },
     async batchUpdateMetadata(payload) {
       const all = await loadMetadata();
+      await loadTagRegistry();
       const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
       const addTags = [...new Set((payload?.addTags || []).map((x) => String(x || "").trim()).filter(Boolean))];
+      const validation = normalizeRegisteredTags(addTags);
+      if (validation.unknown.length) return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
       const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? payload.locationPatch : {};
       const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? payload.customizationPatch : {};
       const locationKeys = ["Country", "Province", "City", "Site"];
@@ -185,7 +319,7 @@
 
         const currentTags = Array.isArray(all[idx]?.Customization?.Tags) ? all[idx].Customization.Tags : [];
         const mergedTags = [...currentTags];
-        for (const tag of addTags) {
+        for (const tag of validation.tags) {
           if (!mergedTags.includes(tag)) mergedTags.push(tag);
         }
 

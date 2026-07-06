@@ -16,7 +16,7 @@
   <section class="gallery-content">
     <section class="toolbar-row">
       <div class="toolbar-group"><label>相册</label><select class="input" v-model="query.filters.album" @change="applyFilterSort"><option value="">全部</option><option v-for="album in filterOptions.albums" :key="album" :value="album">{{ album }}</option></select></div>
-      <div class="toolbar-group"><label>标签</label><select class="input" v-model="query.filters.tag" @change="applyFilterSort"><option value="">全部</option><option v-for="tag in filterOptions.tags" :key="tag" :value="tag">{{ tag }}</option></select></div>
+      <div class="toolbar-group"><label>标签</label><select class="input" v-model="query.filters.tag" @change="applyFilterSort"><option value="">全部</option><option v-for="tag in filterOptions.tags" :key="tag" :value="tag" :title="getTagDescription(tag)">{{ tag }}</option></select></div>
       <div class="toolbar-group" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
       <div class="toolbar-group" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
       <div class="toolbar-group right"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option><option value="filename">文件名</option><option value="rating">评级</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
@@ -46,19 +46,7 @@
     <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 张图片</div>
     <label>批量标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选图片标题" />
     <label>添加标签</label>
-    <div class="tag-editor" @click="$event.currentTarget.querySelector('input')?.focus()">
-      <span class="tag-chip" v-for="(tag, index) in batchEdit.tags" :key="'batch_tag_' + tag + '_' + index">
-        <span>{{ tag }}</span>
-        <button type="button" class="tag-remove" @click.stop="removeBatchTagAt(index)">×</button>
-      </span>
-      <input
-        class="tag-input"
-        v-model="batchEdit.pendingTagInput"
-        @keydown="onBatchTagInputKeydown"
-        @blur="addBatchTag"
-        placeholder="输入标签后按回车"
-      />
-    </div>
+    <TagPicker target="batch" placeholder="搜索已有标签" />
     <label>国家</label><input class="input" v-model="batchEdit.locationCountry" placeholder="如：中国" />
     <label>省/州</label><input class="input" v-model="batchEdit.locationProvince" placeholder="如：北京 / California" />
     <label>城市</label><input class="input" v-model="batchEdit.locationCity" placeholder="如：北京 / San Francisco" />
@@ -74,6 +62,7 @@
 
 <script setup>
 import { inject, ref } from "vue";
+import TagPicker from "./TagPicker.vue";
 
 const app = inject("appContext");
 if (!app) {
@@ -97,6 +86,7 @@ const {
   canApplyBatchEdit,
   windowToggleTip,
   windowToggleIcon,
+  getTagDescription,
   resetAll,
   applySearch,
   applyFilterSort,
@@ -107,9 +97,6 @@ const {
   toggleGallerySelection,
   clearGallerySelection,
   selectAllGalleryPhotos,
-  addBatchTag,
-  removeBatchTagAt,
-  onBatchTagInputKeydown,
   clearBatchEditInputs,
   applyBatchEdit,
   loadMore,
