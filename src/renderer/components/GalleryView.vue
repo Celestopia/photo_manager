@@ -15,7 +15,7 @@
 <main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode && selectedGalleryCount > 0 }">
   <section class="gallery-content">
     <section class="toolbar-row">
-      <div class="toolbar-group"><label>相册</label><select class="input" v-model="query.filters.album" @change="applyFilterSort"><option value="">全部</option><option v-for="album in filterOptions.albums" :key="album" :value="album">{{ album }}</option></select></div>
+      <div class="toolbar-group"><label>相册</label><select class="input" v-model="query.filters.album" @change="applyFilterSort"><option value="">全部</option><option v-if="filterOptions.unassignedAlbumCount > 0" :value="UNASSIGNED_ALBUM_FILTER">未设置相册</option><option v-for="album in filterOptions.albums" :key="album" :value="album" :title="getAlbumDescription(album)">{{ album }}</option></select></div>
       <div class="toolbar-group"><label>标签</label><select class="input" v-model="query.filters.tag" @change="applyFilterSort"><option value="">全部</option><option v-for="tag in filterOptions.tags" :key="tag" :value="tag" :title="getTagDescription(tag)">{{ tag }}</option></select></div>
       <div class="toolbar-group" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
       <div class="toolbar-group" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
@@ -45,6 +45,8 @@
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
     <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 张图片</div>
     <label>批量标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选图片标题" />
+    <label>设置相册</label>
+    <AlbumPicker target="batch" placeholder="搜索已有相册" />
     <label>添加标签</label>
     <TagPicker target="batch" placeholder="搜索已有标签" />
     <label>国家</label><input class="input" v-model="batchEdit.locationCountry" placeholder="如：中国" />
@@ -62,6 +64,7 @@
 
 <script setup>
 import { inject, ref } from "vue";
+import AlbumPicker from "./AlbumPicker.vue";
 import TagPicker from "./TagPicker.vue";
 
 const app = inject("appContext");
@@ -86,6 +89,8 @@ const {
   canApplyBatchEdit,
   windowToggleTip,
   windowToggleIcon,
+  UNASSIGNED_ALBUM_FILTER,
+  getAlbumDescription,
   getTagDescription,
   resetAll,
   applySearch,

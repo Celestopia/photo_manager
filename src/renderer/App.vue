@@ -44,6 +44,41 @@
         </div>
       </section>
     </div>
+    <div class="tag-modal-backdrop" v-if="albumManager.visible" @click="closeAlbumManager">
+      <section class="tag-manager-modal" @click.stop>
+        <header class="tag-manager-header">
+          <h3>相册管理</h3>
+          <button class="btn" @click="closeAlbumManager">关闭</button>
+        </header>
+        <input class="input tag-manager-search" v-model="albumManager.search" placeholder="搜索相册或说明" />
+        <div class="tag-manager-list">
+          <article class="tag-manager-item" v-for="album in managerFilteredAlbums" :key="'album_manager_' + album.Title">
+            <div class="tag-manager-item-main">
+              <div class="tag-manager-item-title">
+                <strong>{{ album.Title }}</strong>
+                <span>{{ album.UsageCount || 0 }} 张</span>
+              </div>
+              <textarea
+                v-if="albumManager.editingTitle === album.Title"
+                class="input tag-manager-description-input"
+                v-model="albumManager.editDescription"
+              ></textarea>
+              <p v-else>{{ album.Description }}</p>
+              <div class="tag-manager-error" v-if="albumManager.error && albumManager.editingTitle === album.Title">{{ albumManager.error }}</div>
+            </div>
+            <div class="tag-manager-actions" v-if="albumManager.editingTitle === album.Title">
+              <button class="btn btn-primary" @click="saveAlbumDescription">保存</button>
+              <button class="btn" @click="cancelAlbumDescriptionEdit">取消</button>
+            </div>
+            <div class="tag-manager-actions" v-else>
+              <button class="btn" @click="startAlbumDescriptionEdit(album)">编辑说明</button>
+              <button class="btn danger-text" @click="deleteAlbumGlobally(album)">全局删除</button>
+            </div>
+          </article>
+          <div class="tag-manager-empty" v-if="!managerFilteredAlbums.length">没有匹配的相册</div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -72,6 +107,7 @@ const WINDOW_ACTIONS = {
   restore: "restore",
   close: "close",
 };
+const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
 
 const ICONS = {
   gallery: new URL("./assets/gallery.svg", import.meta.url).href,
@@ -141,12 +177,17 @@ export default {
     const total = ref(0);
     const hasMore = ref(false);
     const loading = ref(false);
-    const filterOptions = reactive({ albums: [], tags: [] });
+    const filterOptions = reactive({ albums: [], tags: [], unassignedAlbumCount: 0 });
     const tagRegistry = ref([]);
+    const albumRegistry = ref([]);
     const tagSearch = reactive({ viewer: "", batch: "" });
+    const albumSearch = reactive({ viewer: "", batch: "" });
     const tagDropdown = reactive({ viewer: false, batch: false });
+    const albumDropdown = reactive({ viewer: false, batch: false });
     const tagCreate = reactive({ visible: false, target: "viewer", text: "", description: "", error: "" });
+    const albumCreate = reactive({ visible: false, target: "viewer", title: "", description: "", error: "" });
     const tagManager = reactive({ visible: false, search: "", editingText: "", editDescription: "", error: "" });
+    const albumManager = reactive({ visible: false, search: "", editingTitle: "", editDescription: "", error: "" });
 
     // --- Selection state ---
     const selectedItem = ref(null);
@@ -156,6 +197,7 @@ export default {
     const gallerySelection = ref(new Set());
     const batchEdit = reactive({
       title: "",
+      album: "",
       tags: [],
       locationCountry: "",
       locationProvince: "",
@@ -166,6 +208,7 @@ export default {
     const selectedGalleryCount = computed(() => gallerySelection.value.size);
     const batchHasChanges = computed(() => {
       if (batchEdit.title.trim()) return true;
+      if (batchEdit.album.trim()) return true;
       if (batchEdit.tags.length) return true;
       if (batchEdit.locationCountry.trim()) return true;
       if (batchEdit.locationProvince.trim()) return true;
@@ -179,6 +222,12 @@ export default {
       const source = [...tagRegistry.value].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
       if (!keyword) return source;
       return source.filter((tag) => tag.Text.includes(keyword) || (tag.Description || "").includes(keyword));
+    });
+    const managerFilteredAlbums = computed(() => {
+      const keyword = albumManager.search.trim();
+      const source = [...albumRegistry.value].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"));
+      if (!keyword) return source;
+      return source.filter((album) => album.Title.includes(keyword) || (album.Description || "").includes(keyword));
     });
 
     // --- Viewer transform state ---
@@ -664,6 +713,223 @@ export default {
       showToastMessage(`已全局删除标签“${tag.Text}”`);
     }
 
+    function normalizeAlbumTitle(value) {
+      return String(value ?? "").trim();
+    }
+
+    function applyAlbumRegistry(albums) {
+      albumRegistry.value = (Array.isArray(albums) ? albums : [])
+        .map((album) => ({
+          Title: normalizeAlbumTitle(album?.Title),
+          Description: normalizeAlbumTitle(album?.Description),
+          CreatedAt: album?.CreatedAt || "",
+          UpdatedAt: album?.UpdatedAt || "",
+          UsageCount: Number(album?.UsageCount || 0),
+        }))
+        .filter((album) => album.Title);
+      filterOptions.albums = albumRegistry.value.map((album) => album.Title);
+      if (
+        query.filters.album &&
+        query.filters.album !== UNASSIGNED_ALBUM_FILTER &&
+        !filterOptions.albums.includes(query.filters.album)
+      ) {
+        query.filters.album = "";
+      }
+    }
+
+    async function loadAlbums() {
+      if (typeof API.listAlbums !== "function") return;
+      const result = await API.listAlbums();
+      if (result?.ok) applyAlbumRegistry(result.albums);
+    }
+
+    function selectedAlbumForTarget(target) {
+      return target === "batch" ? batchEdit.album : editDraft.Album;
+    }
+
+    function getAlbumOptions(target) {
+      const keyword = normalizeAlbumTitle(albumSearch[target]);
+      const selected = selectedAlbumForTarget(target);
+      return albumRegistry.value
+        .filter((album) => album.Title !== selected)
+        .filter((album) => !keyword || album.Title.includes(keyword) || (album.Description || "").includes(keyword))
+        .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"))
+        .slice(0, 50);
+    }
+
+    function getAlbumDescription(albumTitle) {
+      return albumRegistry.value.find((album) => album.Title === albumTitle)?.Description || "";
+    }
+
+    function openAlbumDropdown(target) {
+      albumDropdown[target] = true;
+    }
+
+    function closeAlbumDropdown(target) {
+      albumDropdown[target] = false;
+    }
+
+    function closeAllAlbumDropdowns() {
+      albumDropdown.viewer = false;
+      albumDropdown.batch = false;
+    }
+
+    function setAlbumForTarget(target, rawTitle) {
+      const title = normalizeAlbumTitle(rawTitle);
+      if (!title) return;
+      if (target === "batch") {
+        batchEdit.album = title;
+      } else {
+        editDraft.Album = title;
+        requestEdit("Album");
+      }
+      albumSearch[target] = "";
+      closeAlbumDropdown(target);
+    }
+
+    function clearAlbumForTarget(target) {
+      if (target === "batch") {
+        batchEdit.album = "";
+      } else {
+        editDraft.Album = "";
+        requestEdit("Album");
+      }
+      albumSearch[target] = "";
+      closeAlbumDropdown(target);
+    }
+
+    function onAlbumSearchKeydown(event, target) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const first = getAlbumOptions(target)[0];
+        if (first) setAlbumForTarget(target, first.Title);
+        return;
+      }
+      if (event.key === "Escape") {
+        closeAlbumDropdown(target);
+        return;
+      }
+      if (event.key === "Backspace" && !albumSearch[target] && selectedAlbumForTarget(target)) {
+        event.preventDefault();
+        clearAlbumForTarget(target);
+      }
+    }
+
+    function openCreateAlbumMenu(target) {
+      albumCreate.visible = true;
+      albumCreate.target = target;
+      albumCreate.title = normalizeAlbumTitle(albumSearch[target]);
+      albumCreate.description = "";
+      albumCreate.error = "";
+      closeAlbumDropdown(target);
+    }
+
+    function closeCreateAlbumMenu() {
+      albumCreate.visible = false;
+      albumCreate.title = "";
+      albumCreate.description = "";
+      albumCreate.error = "";
+    }
+
+    async function createAlbumAndSelect() {
+      const title = normalizeAlbumTitle(albumCreate.title);
+      const description = normalizeAlbumTitle(albumCreate.description);
+      if (!title || !description) {
+        albumCreate.error = "相册名称和说明不能为空";
+        return;
+      }
+      const result = await API.createAlbum({ title, description });
+      if (!result?.ok) {
+        albumCreate.error = result?.error || "创建相册失败";
+        return;
+      }
+      applyAlbumRegistry(result.albums);
+      setAlbumForTarget(albumCreate.target, result.album.Title);
+      closeCreateAlbumMenu();
+    }
+
+    async function openAlbumManager() {
+      await loadAlbums();
+      albumManager.visible = true;
+      albumManager.error = "";
+    }
+
+    function closeAlbumManager() {
+      albumManager.visible = false;
+      albumManager.search = "";
+      albumManager.editingTitle = "";
+      albumManager.editDescription = "";
+      albumManager.error = "";
+    }
+
+    function startAlbumDescriptionEdit(album) {
+      albumManager.editingTitle = album.Title;
+      albumManager.editDescription = album.Description || "";
+      albumManager.error = "";
+    }
+
+    function cancelAlbumDescriptionEdit() {
+      albumManager.editingTitle = "";
+      albumManager.editDescription = "";
+      albumManager.error = "";
+    }
+
+    async function saveAlbumDescription() {
+      const title = albumManager.editingTitle;
+      const description = normalizeAlbumTitle(albumManager.editDescription);
+      if (!title || !description) {
+        albumManager.error = "说明不能为空";
+        return;
+      }
+      const result = await API.updateAlbumDescription({ title, description });
+      if (!result?.ok) {
+        albumManager.error = result?.error || "保存说明失败";
+        return;
+      }
+      applyAlbumRegistry(result.albums);
+      cancelAlbumDescriptionEdit();
+      showToastMessage("相册说明已更新");
+    }
+
+    function clearAlbumFromItem(item, albumTitle) {
+      if (normalizeAlbumTitle(item?.Customization?.Album) !== albumTitle) return item;
+      return {
+        ...item,
+        Customization: {
+          ...(item.Customization || {}),
+          Album: "",
+        },
+      };
+    }
+
+    function syncDeletedAlbumLocally(albumTitle) {
+      if (selectedItem.value) selectedItem.value = clearAlbumFromItem(selectedItem.value, albumTitle);
+      if (editDraft.Album === albumTitle) editDraft.Album = "";
+      if (batchEdit.album === albumTitle) batchEdit.album = "";
+      orderedItems.value = orderedItems.value.map((item) => clearAlbumFromItem(item, albumTitle));
+      for (const group of galleryGroups.value) {
+        group.items = group.items.map((item) => clearAlbumFromItem(item, albumTitle));
+      }
+    }
+
+    async function deleteAlbumGlobally(album) {
+      const usage = Number(album?.UsageCount || 0);
+      const ok = window.confirm(`确定全局删除相册“${album.Title}”？这会清空 ${usage} 张图片的相册字段。`);
+      if (!ok) return;
+      const result = await API.deleteAlbumGlobally({ title: album.Title });
+      if (!result?.ok) {
+        showToastMessage(`删除相册失败：${result?.error || "未知错误"}`);
+        return;
+      }
+      applyAlbumRegistry(result.albums);
+      syncDeletedAlbumLocally(album.Title);
+      if (query.filters.album === album.Title) {
+        query.filters.album = "";
+        await queryGallery(true);
+      }
+      showToastMessage(`已全局删除相册“${album.Title}”`);
+    }
+
     /**
 
      * Enable gallery selection mode for multi-select and batch editing.
@@ -794,9 +1060,12 @@ export default {
 
     function clearBatchEditInputs({ keepStatus = false } = {}) {
       batchEdit.title = "";
+      batchEdit.album = "";
       batchEdit.tags = [];
       tagSearch.batch = "";
       tagDropdown.batch = false;
+      albumSearch.batch = "";
+      albumDropdown.batch = false;
       batchEdit.locationCountry = "";
       batchEdit.locationProvince = "";
       batchEdit.locationCity = "";
@@ -862,6 +1131,7 @@ export default {
       if (batchEdit.locationSite.trim()) locationPatch.Site = batchEdit.locationSite.trim();
       const customizationPatch = {};
       if (batchEdit.title.trim()) customizationPatch.Title = batchEdit.title.trim();
+      if (batchEdit.album.trim()) customizationPatch.Album = batchEdit.album.trim();
 
       const addTags = [...new Set(batchEdit.tags.map((x) => x.trim()).filter(Boolean))];
       if (!addTags.length && !Object.keys(locationPatch).length && !Object.keys(customizationPatch).length) {
@@ -885,6 +1155,7 @@ export default {
       const updatedItems = Array.isArray(result.items) ? result.items : [];
       syncUpdatedItemsIntoGallery(updatedItems);
       await loadTags();
+      await loadAlbums();
       const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
       const missingCount = Number(result.missingCount || 0);
       const requestedCount = Number(result.requestedCount || filePaths.length || 0);
@@ -968,8 +1239,9 @@ export default {
         const res = await API.queryGallery(safeQuery);
         total.value = res.total;
         hasMore.value = res.hasMore;
-        filterOptions.albums = res.filterOptions.albums;
-        filterOptions.tags = res.filterOptions.tags;
+        filterOptions.albums = Array.isArray(res?.filterOptions?.albums) ? res.filterOptions.albums : [];
+        filterOptions.unassignedAlbumCount = Number(res?.filterOptions?.unassignedAlbumCount || 0);
+        filterOptions.tags = Array.isArray(res?.filterOptions?.tags) ? res.filterOptions.tags : [];
 
         if (query.page === 1) {
           // First page replaces existing gallery snapshot.
@@ -1191,6 +1463,7 @@ export default {
       showContextMenu.value = false;
       showLocationInfoMenu.value = false;
       closeAllTagDropdowns();
+      closeAllAlbumDropdowns();
     }
 
     /**
@@ -1350,6 +1623,7 @@ export default {
         activeEditField.value = saveField;
         showSaveNotice("已修改", saveField);
         await loadTags();
+        await loadAlbums();
       } else {
         showToastMessage(`修改失败：${result?.error || "未知错误"}`);
       }
@@ -1462,6 +1736,7 @@ export default {
       // Initial render flow: config -> first gallery query -> global listeners.
       await loadConfig();
       await loadTags();
+      await loadAlbums();
       await queryGallery(true);
       await refreshWindowState();
       await nextTick();
@@ -1510,11 +1785,18 @@ export default {
       loading,
       filterOptions,
       tagRegistry,
+      albumRegistry,
       tagSearch,
+      albumSearch,
       tagDropdown,
+      albumDropdown,
       tagCreate,
+      albumCreate,
       tagManager,
+      albumManager,
       managerFilteredTags,
+      managerFilteredAlbums,
+      UNASSIGNED_ALBUM_FILTER,
       isSelectionMode,
       batchStatus,
       selectedGalleryCount,
@@ -1563,19 +1845,35 @@ export default {
       onBatchTagInputKeydown,
       getTagOptions,
       getTagDescription,
+      getAlbumOptions,
+      getAlbumDescription,
       openTagDropdown,
       closeTagDropdown,
       addTagToTarget,
       onTagSearchKeydown,
+      openAlbumDropdown,
+      closeAlbumDropdown,
+      setAlbumForTarget,
+      clearAlbumForTarget,
+      onAlbumSearchKeydown,
       openCreateTagMenu,
       closeCreateTagMenu,
       createTagAndSelect,
+      openCreateAlbumMenu,
+      closeCreateAlbumMenu,
+      createAlbumAndSelect,
       openTagManager,
       closeTagManager,
       startTagDescriptionEdit,
       cancelTagDescriptionEdit,
       saveTagDescription,
       deleteTagGlobally,
+      openAlbumManager,
+      closeAlbumManager,
+      startAlbumDescriptionEdit,
+      cancelAlbumDescriptionEdit,
+      saveAlbumDescription,
+      deleteAlbumGlobally,
       clearBatchEditInputs,
       applyBatchEdit,
       loadMore,

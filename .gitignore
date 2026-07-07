@@ -21,6 +21,7 @@ thumb_cache/*
 photo_metadata.jsonl
 photo_metadata.csv
 tag_registry.jsonl
+album_registry.jsonl
 
 # Temporary files
 *.tmp

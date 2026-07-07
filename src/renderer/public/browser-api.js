@@ -11,6 +11,7 @@
     workspaceRoot: "./photo_workspace",
     metadataFile: "./photo_metadata.jsonl",
     tagRegistryFile: "./tag_registry.jsonl",
+    albumRegistryFile: "./album_registry.jsonl",
     thumbnail: {
       dir: "./thumb_cache",
       size: 320,
@@ -27,10 +28,13 @@
     },
   };
   const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
+  const DEFAULT_ALBUM_DESCRIPTION = "待补充：请填写该相册的明确含义。";
+  const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
 
   // Metadata cache for the current browser session.
   let cache = [];
   let tagRegistry = null;
+  let albumRegistry = null;
 
   /**
 
@@ -151,6 +155,76 @@
     return { tags: normalized, unknown };
   }
 
+  function normalizeAlbumTitle(value) {
+    return String(value ?? "").trim();
+  }
+
+  function albumUsageCounts() {
+    const counts = new Map();
+    for (const item of cache) {
+      const album = normalizeAlbumTitle(item?.Customization?.Album);
+      if (!album) continue;
+      counts.set(album, (counts.get(album) || 0) + 1);
+    }
+    return counts;
+  }
+
+  function seedAlbumRegistryFromMetadata() {
+    const now = new Date().toISOString();
+    for (const item of cache) {
+      const title = normalizeAlbumTitle(item?.Customization?.Album);
+      if (!title || albumRegistry.has(title)) continue;
+      albumRegistry.set(title, {
+        Title: title,
+        Description: DEFAULT_ALBUM_DESCRIPTION,
+        CreatedAt: now,
+        UpdatedAt: now,
+      });
+    }
+  }
+
+  function listAlbumDefinitions() {
+    const usage = albumUsageCounts();
+    return [...albumRegistry.values()]
+      .map((album) => ({ ...album, UsageCount: usage.get(album.Title) || 0 }))
+      .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"));
+  }
+
+  async function loadAlbumRegistry() {
+    if (albumRegistry) return albumRegistry;
+    await loadMetadata();
+    albumRegistry = new Map();
+    try {
+      const res = await fetch("/album_registry.jsonl");
+      if (res.ok) {
+        const text = await res.text();
+        for (const line of text.split(/\r?\n/).filter(Boolean)) {
+          const parsed = JSON.parse(line);
+          const title = normalizeAlbumTitle(parsed?.Title);
+          if (!title) continue;
+          const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+          const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+          albumRegistry.set(title, {
+            Title: title,
+            Description: normalizeAlbumTitle(parsed?.Description) || DEFAULT_ALBUM_DESCRIPTION,
+            CreatedAt: createdAt,
+            UpdatedAt: updatedAt,
+          });
+        }
+      }
+    } catch {
+      // Browser preview keeps a memory-only registry when the file is absent.
+    }
+    seedAlbumRegistryFromMetadata();
+    return albumRegistry;
+  }
+
+  function normalizeRegisteredAlbum(rawAlbum) {
+    const album = normalizeAlbumTitle(rawAlbum);
+    const unknown = album && !albumRegistry.has(album) ? [album] : [];
+    return { album, unknown };
+  }
+
   /**
 
    * Apply gallery filters, search conditions, and sorting to the cached list.
@@ -163,7 +237,11 @@
     const { filters, search, sortBy, sortOrder } = options;
     let output = list.filter((item) => !item?.Customization?.Hidden);
 
-    if (filters.album) output = output.filter((item) => item?.Customization?.Album === filters.album);
+    if (filters.album === UNASSIGNED_ALBUM_FILTER) {
+      output = output.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album));
+    } else if (filters.album) {
+      output = output.filter((item) => item?.Customization?.Album === filters.album);
+    }
     if (filters.tag) output = output.filter((item) => (item?.Customization?.Tags || []).includes(filters.tag));
 
     if (search?.field && search?.value) {
@@ -205,6 +283,7 @@
     async queryGallery(query) {
       const all = await loadMetadata();
       await loadTagRegistry();
+      await loadAlbumRegistry();
       const filtered = filterAndSort(all, query);
       const page = Math.max(1, Number(query.page || 1));
       const pageSize = Math.max(1, Number(query.pageSize || 120));
@@ -224,7 +303,8 @@
         hasMore: start + pageSize < filtered.length,
         groups: [...grouped.entries()].map(([date, items]) => ({ date, items })),
         filterOptions: {
-          albums: [...new Set(all.map((item) => item?.Customization?.Album).filter(Boolean))].sort(),
+          albums: [...albumRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+          unassignedAlbumCount: all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length,
           tags: [...tagRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
         },
       };
@@ -273,16 +353,65 @@
       }
       return { ok: true, deleted: text, updatedCount, tags: listTagDefinitions() };
     },
+    async listAlbums() {
+      await loadAlbumRegistry();
+      return { ok: true, albums: listAlbumDefinitions() };
+    },
+    async createAlbum(payload) {
+      await loadAlbumRegistry();
+      const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
+      const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
+      if (!title || !description) return { ok: false, error: "Album title and description are required" };
+      if (albumRegistry.has(title)) return { ok: false, error: "Album already exists" };
+      const now = new Date().toISOString();
+      const album = { Title: title, Description: description, CreatedAt: now, UpdatedAt: now };
+      albumRegistry.set(title, album);
+      return { ok: true, album: { ...album, UsageCount: 0 }, albums: listAlbumDefinitions() };
+    },
+    async updateAlbumDescription(payload) {
+      await loadAlbumRegistry();
+      const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
+      const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
+      const current = albumRegistry.get(title);
+      if (!title || !description) return { ok: false, error: "Album title and description are required" };
+      if (!current) return { ok: false, error: "Album not found" };
+      const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+      albumRegistry.set(title, next);
+      return { ok: true, album: { ...next, UsageCount: albumUsageCounts().get(title) || 0 }, albums: listAlbumDefinitions() };
+    },
+    async deleteAlbumGlobally(payload) {
+      await loadAlbumRegistry();
+      const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
+      if (!title || !albumRegistry.has(title)) return { ok: false, error: "Album not found" };
+      albumRegistry.delete(title);
+      let updatedCount = 0;
+      for (const item of cache) {
+        if (normalizeAlbumTitle(item?.Customization?.Album) !== title) continue;
+        item.Customization = {
+          ...(item.Customization || {}),
+          Album: "",
+          MetadataUpdateDate: new Date().toISOString(),
+        };
+        updatedCount += 1;
+      }
+      return { ok: true, deleted: title, updatedCount, albums: listAlbumDefinitions() };
+    },
     async updateCustomization(payload) {
       // Browser mode updates in memory only; it does not write back to disk.
       const all = await loadMetadata();
       await loadTagRegistry();
+      await loadAlbumRegistry();
       const idx = all.findIndex((x) => x.FilePath === payload.filePath);
       if (idx < 0) return { ok: false, error: "Item not found" };
       if (Object.prototype.hasOwnProperty.call(payload?.customization || {}, "Tags")) {
         const validation = normalizeRegisteredTags(payload.customization.Tags);
         if (validation.unknown.length) return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
         payload.customization.Tags = validation.tags;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload?.customization || {}, "Album")) {
+        const validation = normalizeRegisteredAlbum(payload.customization.Album);
+        if (validation.unknown.length) return { ok: false, error: `Unknown album: ${validation.unknown.join(", ")}` };
+        payload.customization.Album = validation.album;
       }
       all[idx].Customization = {
         ...all[idx].Customization,
@@ -299,12 +428,18 @@
     async batchUpdateMetadata(payload) {
       const all = await loadMetadata();
       await loadTagRegistry();
+      await loadAlbumRegistry();
       const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
       const addTags = [...new Set((payload?.addTags || []).map((x) => String(x || "").trim()).filter(Boolean))];
       const validation = normalizeRegisteredTags(addTags);
       if (validation.unknown.length) return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
       const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? payload.locationPatch : {};
       const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? payload.customizationPatch : {};
+      if (Object.prototype.hasOwnProperty.call(customizationPatch, "Album")) {
+        const albumValidation = normalizeRegisteredAlbum(customizationPatch.Album);
+        if (albumValidation.unknown.length) return { ok: false, error: `Unknown album: ${albumValidation.unknown.join(", ")}` };
+        customizationPatch.Album = albumValidation.album;
+      }
       const locationKeys = ["Country", "Province", "City", "Site"];
       const items = [];
       const requestedCount = filePaths.length;

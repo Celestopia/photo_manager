@@ -26,6 +26,7 @@ const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
   metadataFile: "./photo_metadata.jsonl",
   tagRegistryFile: "./tag_registry.jsonl",
+  albumRegistryFile: "./album_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -64,8 +65,11 @@ let mainWindow = null;
 let config = null;
 let metadataIndex = new Map();
 let tagRegistryIndex = new Map();
+let albumRegistryIndex = new Map();
 let thumbnailWarmupStarted = false;
 const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
+const DEFAULT_ALBUM_DESCRIPTION = "待补充：请填写该相册的明确含义。";
+const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
 
 /**
  * Force value into plain JSON-serializable structure.
@@ -344,6 +348,119 @@ function normalizeRegisteredTags(rawTags) {
 }
 
 /**
+ * Normalize album title into the canonical string stored on photo metadata.
+ */
+function normalizeAlbumTitle(value) {
+  return String(value ?? "").trim();
+}
+
+/**
+ * Count how many metadata records currently use each registered album title.
+ */
+function getAlbumUsageCounts() {
+  const counts = new Map();
+  for (const item of metadataIndex.values()) {
+    const album = normalizeAlbumTitle(item?.Customization?.Album);
+    if (!album) continue;
+    counts.set(album, (counts.get(album) || 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Return album definitions sorted by title, including current usage counts.
+ */
+function listAlbumDefinitions() {
+  const usage = getAlbumUsageCounts();
+  return [...albumRegistryIndex.values()]
+    .map((album) => ({
+      ...album,
+      UsageCount: usage.get(album.Title) || 0,
+    }))
+    .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"));
+}
+
+/**
+ * Persist album registry JSONL using temp-file replacement.
+ */
+async function saveAlbumRegistryMap() {
+  const registryFile = toAbsolutePath(config.albumRegistryFile || DEFAULT_CONFIG.albumRegistryFile);
+  const tempFile = `${registryFile}.tmp`;
+  const lines = [...albumRegistryIndex.values()]
+    .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"))
+    .map((album) => JSON.stringify(album));
+  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
+  await fsp.rename(tempFile, registryFile);
+}
+
+/**
+ * Add missing registry definitions for albums already present in photo metadata.
+ */
+function seedAlbumRegistryFromMetadata() {
+  const now = new Date().toISOString();
+  let added = 0;
+
+  for (const item of metadataIndex.values()) {
+    const title = normalizeAlbumTitle(item?.Customization?.Album);
+    if (!title || albumRegistryIndex.has(title)) continue;
+    albumRegistryIndex.set(title, {
+      Title: title,
+      Description: DEFAULT_ALBUM_DESCRIPTION,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+    added += 1;
+  }
+
+  return added;
+}
+
+/**
+ * Read the album registry JSONL into memory, then backfill legacy albums.
+ */
+async function loadAlbumRegistryIndex() {
+  albumRegistryIndex.clear();
+  const registryFile = toAbsolutePath(config.albumRegistryFile || DEFAULT_CONFIG.albumRegistryFile);
+  const fileExists = fs.existsSync(registryFile);
+
+  if (fileExists) {
+    const content = await fsp.readFile(registryFile, "utf8");
+    const lines = content.split(/\r?\n/).filter(Boolean);
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        const title = normalizeAlbumTitle(parsed?.Title);
+        if (!title) continue;
+        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+        albumRegistryIndex.set(title, {
+          Title: title,
+          Description: normalizeAlbumTitle(parsed?.Description) || DEFAULT_ALBUM_DESCRIPTION,
+          CreatedAt: createdAt,
+          UpdatedAt: updatedAt,
+        });
+      } catch (error) {
+        appendLog(`Skip invalid album registry line: ${error.message}`);
+      }
+    }
+  }
+
+  const added = seedAlbumRegistryFromMetadata();
+  if (!fileExists || added > 0) {
+    await saveAlbumRegistryMap();
+  }
+}
+
+/**
+ * Normalize and validate a photo album value before writing metadata.
+ */
+function normalizeRegisteredAlbum(rawAlbum) {
+  const album = normalizeAlbumTitle(rawAlbum);
+  const unknown = album && !albumRegistryIndex.has(album) ? [album] : [];
+  return { album, unknown };
+}
+
+/**
  * Apply gallery-level filtering/searching/sorting in memory.
  * Filter semantics match the requirement document:
  * - hidden items are excluded
@@ -355,7 +472,9 @@ function filterAndSort(list, options) {
 
   let output = list.filter((item) => !item?.Customization?.Hidden);
 
-  if (filters.album) {
+  if (filters.album === UNASSIGNED_ALBUM_FILTER) {
+    output = output.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album));
+  } else if (filters.album) {
     output = output.filter((item) => item?.Customization?.Album === filters.album);
   }
 
@@ -491,6 +610,7 @@ function registerIpcHandlers() {
     }
 
     // Pagination happens after filter/sort to keep UI behavior consistent.
+    const unassignedAlbumCount = all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length;
     const payload = {
       total: filtered.length,
       page,
@@ -498,7 +618,8 @@ function registerIpcHandlers() {
       hasMore: start + pageSize < filtered.length,
       groups: [...grouped.entries()].map(([date, items]) => ({ date, items })),
       filterOptions: {
-        albums: [...new Set(all.map((item) => item?.Customization?.Album).filter(Boolean))].sort(),
+        albums: [...albumRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+        unassignedAlbumCount,
         tags: [...tagRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
       },
     };
@@ -592,6 +713,91 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle("album:list", async () => toSerializable({ ok: true, albums: listAlbumDefinitions() }));
+
+  ipcMain.handle("album:create", async (_, payload) => {
+    const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
+    const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
+    if (!title || !description) {
+      return { ok: false, error: "Album title and description are required" };
+    }
+    if (albumRegistryIndex.has(title)) {
+      return { ok: false, error: "Album already exists" };
+    }
+
+    const now = new Date().toISOString();
+    const album = { Title: title, Description: description, CreatedAt: now, UpdatedAt: now };
+    albumRegistryIndex.set(title, album);
+    try {
+      await saveAlbumRegistryMap();
+      return toSerializable({ ok: true, album: { ...album, UsageCount: 0 }, albums: listAlbumDefinitions() });
+    } catch (error) {
+      albumRegistryIndex.delete(title);
+      appendLog(`Failed to create album: ${error.message}`);
+      return { ok: false, error: "Failed to write album registry" };
+    }
+  });
+
+  ipcMain.handle("album:update-description", async (_, payload) => {
+    const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
+    const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
+    const current = albumRegistryIndex.get(title);
+    if (!title || !description) {
+      return { ok: false, error: "Album title and description are required" };
+    }
+    if (!current) {
+      return { ok: false, error: "Album not found" };
+    }
+
+    const previous = { ...current };
+    const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+    albumRegistryIndex.set(title, next);
+    try {
+      await saveAlbumRegistryMap();
+      return toSerializable({ ok: true, album: { ...next, UsageCount: getAlbumUsageCounts().get(title) || 0 }, albums: listAlbumDefinitions() });
+    } catch (error) {
+      albumRegistryIndex.set(title, previous);
+      appendLog(`Failed to update album description: ${error.message}`);
+      return { ok: false, error: "Failed to write album registry" };
+    }
+  });
+
+  ipcMain.handle("album:delete-global", async (_, payload) => {
+    const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
+    const current = albumRegistryIndex.get(title);
+    if (!title || !current) {
+      return { ok: false, error: "Album not found" };
+    }
+
+    const previousRegistry = new Map(albumRegistryIndex);
+    const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
+    let updatedCount = 0;
+    albumRegistryIndex.delete(title);
+
+    for (const [filePath, item] of metadataIndex.entries()) {
+      if (normalizeAlbumTitle(item?.Customization?.Album) !== title) continue;
+      item.Customization = {
+        ...(item.Customization || {}),
+        Album: "",
+        MetadataUpdateDate: new Date().toISOString(),
+      };
+      delete item.Customization.Category;
+      metadataIndex.set(filePath, item);
+      updatedCount += 1;
+    }
+
+    try {
+      await saveAlbumRegistryMap();
+      if (updatedCount) await saveMetadataMap();
+      return toSerializable({ ok: true, deleted: title, updatedCount, albums: listAlbumDefinitions() });
+    } catch (error) {
+      albumRegistryIndex = previousRegistry;
+      metadataIndex = previousMetadata;
+      appendLog(`Failed to delete album globally: ${error.message}`);
+      return { ok: false, error: "Failed to delete album" };
+    }
+  });
+
   ipcMain.handle("photo:update-customization", async (_, payload) => {
     const { filePath, customization, location } = payload;
     const current = metadataIndex.get(filePath);
@@ -606,6 +812,14 @@ function registerIpcHandlers() {
         return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
       }
       customization.Tags = validation.tags;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(customization || {}, "Album")) {
+      const validation = normalizeRegisteredAlbum(customization.Album);
+      if (validation.unknown.length) {
+        return { ok: false, error: `Unknown album: ${validation.unknown.join(", ")}` };
+      }
+      customization.Album = validation.album;
     }
 
     // Merge user edits and stamp update time.
@@ -646,6 +860,13 @@ function registerIpcHandlers() {
     const validation = normalizeRegisteredTags(dedupTags);
     if (validation.unknown.length) {
       return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
+    }
+    if (Object.prototype.hasOwnProperty.call(customizationPatch, "Album")) {
+      const albumValidation = normalizeRegisteredAlbum(customizationPatch.Album);
+      if (albumValidation.unknown.length) {
+        return { ok: false, error: `Unknown album: ${albumValidation.unknown.join(", ")}` };
+      }
+      customizationPatch.Album = albumValidation.album;
     }
     const updatedItems = [];
     const requestedCount = filePaths.length;
@@ -744,6 +965,7 @@ async function bootstrap() {
   ensureConfig();
   await loadMetadataIndex();
   await loadTagRegistryIndex();
+  await loadAlbumRegistryIndex();
   // Start thumbnail warmup as soon as metadata is ready.
   warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
 

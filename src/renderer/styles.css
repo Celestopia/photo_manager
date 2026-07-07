@@ -259,6 +259,54 @@ html, body, #app {
   min-width: 0;
   max-width: 100%;
 }
+.album-picker {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+.album-control {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.album-input-wrap {
+  position: relative;
+  min-width: 0;
+}
+.album-input {
+  width: 100%;
+  min-height: 34px;
+  padding-right: 30px;
+}
+.album-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #35699a;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 0;
+}
+.album-clear-btn:hover {
+  background: #edf5ff;
+}
+.album-picker .tag-actions {
+  margin-left: 0;
+}
+.album-picker .tag-dropdown {
+  left: 0;
+  right: auto;
+  width: min(240px, 100%);
+}
 .controlled-tag-editor {
   align-items: center;
   min-width: 0;

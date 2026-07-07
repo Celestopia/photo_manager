@@ -19,6 +19,7 @@ const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
   metadataFile: "./photo_metadata.jsonl",
   tagRegistryFile: "./tag_registry.jsonl",
+  albumRegistryFile: "./album_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",

@@ -52,7 +52,8 @@
     </div>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Rating'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Rating'">{{ saveNotice.message }}</div>
-    <label>相册</label><textarea class="input field-textarea" v-model="editDraft.Album" @input="onFieldTextareaInput($event, 'Album')" rows="1"></textarea>
+    <label>相册</label>
+    <AlbumPicker target="viewer" placeholder="搜索已有相册" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Album'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Album'">{{ saveNotice.message }}</div>
     <div class="location-field">
@@ -109,6 +110,7 @@
 
 <script setup>
 import { inject } from "vue";
+import AlbumPicker from "./AlbumPicker.vue";
 import TagPicker from "./TagPicker.vue";
 
 const app = inject("appContext");
