@@ -12,6 +12,7 @@
     metadataFile: "./photo_metadata.jsonl",
     tagRegistryFile: "./tag_registry.jsonl",
     albumRegistryFile: "./album_registry.jsonl",
+    personRegistryFile: "./person_registry.jsonl",
     thumbnail: {
       dir: "./thumb_cache",
       size: 320,
@@ -35,6 +36,7 @@
   let cache = [];
   let tagRegistry = null;
   let albumRegistry = null;
+  let personRegistry = null;
 
   /**
 
@@ -225,6 +227,82 @@
     return { album, unknown };
   }
 
+  function normalizePersonName(value) {
+    return String(value ?? "").trim();
+  }
+
+  function personUsageCounts() {
+    const counts = new Map();
+    for (const item of cache) {
+      const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+      for (const rawPerson of people) {
+        const person = normalizePersonName(rawPerson);
+        if (!person) continue;
+        counts.set(person, (counts.get(person) || 0) + 1);
+      }
+    }
+    return counts;
+  }
+
+  function seedPersonRegistryFromMetadata() {
+    const now = new Date().toISOString();
+    for (const item of cache) {
+      const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+      for (const rawPerson of people) {
+        const name = normalizePersonName(rawPerson);
+        if (!name || personRegistry.has(name)) continue;
+        personRegistry.set(name, {
+          Name: name,
+          Description: "",
+          CreatedAt: now,
+          UpdatedAt: now,
+        });
+      }
+    }
+  }
+
+  function listPersonDefinitions() {
+    const usage = personUsageCounts();
+    return [...personRegistry.values()]
+      .map((person) => ({ ...person, UsageCount: usage.get(person.Name) || 0 }))
+      .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
+  }
+
+  async function loadPersonRegistry() {
+    if (personRegistry) return personRegistry;
+    await loadMetadata();
+    personRegistry = new Map();
+    try {
+      const res = await fetch("/person_registry.jsonl");
+      if (res.ok) {
+        const text = await res.text();
+        for (const line of text.split(/\r?\n/).filter(Boolean)) {
+          const parsed = JSON.parse(line);
+          const name = normalizePersonName(parsed?.Name);
+          if (!name) continue;
+          const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+          const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+          personRegistry.set(name, {
+            Name: name,
+            Description: normalizePersonName(parsed?.Description),
+            CreatedAt: createdAt,
+            UpdatedAt: updatedAt,
+          });
+        }
+      }
+    } catch {
+      // Browser preview keeps a memory-only registry when the file is absent.
+    }
+    seedPersonRegistryFromMetadata();
+    return personRegistry;
+  }
+
+  function normalizeRegisteredPeople(rawPeople) {
+    const people = Array.isArray(rawPeople) ? rawPeople : [];
+    const normalized = [...new Set(people.map(normalizePersonName).filter(Boolean))];
+    const unknown = normalized.filter((person) => !personRegistry.has(person));
+    return { people: normalized, unknown };
+  }
   /**
 
    * Apply gallery filters, search conditions, and sorting to the cached list.
@@ -243,6 +321,7 @@
       output = output.filter((item) => item?.Customization?.Album === filters.album);
     }
     if (filters.tag) output = output.filter((item) => (item?.Customization?.Tags || []).includes(filters.tag));
+    if (filters.person) output = output.filter((item) => (item?.Customization?.People || []).includes(filters.person));
 
     if (search?.field && search?.value) {
       output = output.filter((item) => {
@@ -284,6 +363,7 @@
       const all = await loadMetadata();
       await loadTagRegistry();
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       const filtered = filterAndSort(all, query);
       const page = Math.max(1, Number(query.page || 1));
       const pageSize = Math.max(1, Number(query.pageSize || 120));
@@ -306,6 +386,7 @@
           albums: [...albumRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
           unassignedAlbumCount: all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length,
           tags: [...tagRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+          people: [...personRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
         },
       };
     },
@@ -353,12 +434,58 @@
       }
       return { ok: true, deleted: text, updatedCount, tags: listTagDefinitions() };
     },
+    async listPeople() {
+      await loadPersonRegistry();
+      return { ok: true, people: listPersonDefinitions() };
+    },
+    async createPerson(payload) {
+      await loadPersonRegistry();
+      const name = normalizePersonName(payload?.name ?? payload?.Name);
+      const description = normalizePersonName(payload?.description ?? payload?.Description);
+      if (!name) return { ok: false, error: "Person name is required" };
+      if (personRegistry.has(name)) return { ok: false, error: "Person already exists" };
+      const now = new Date().toISOString();
+      const person = { Name: name, Description: description, CreatedAt: now, UpdatedAt: now };
+      personRegistry.set(name, person);
+      return { ok: true, person: { ...person, UsageCount: 0 }, people: listPersonDefinitions() };
+    },
+    async updatePersonDescription(payload) {
+      await loadPersonRegistry();
+      const name = normalizePersonName(payload?.name ?? payload?.Name);
+      const description = normalizePersonName(payload?.description ?? payload?.Description);
+      const current = personRegistry.get(name);
+      if (!name) return { ok: false, error: "Person name is required" };
+      if (!current) return { ok: false, error: "Person not found" };
+      const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+      personRegistry.set(name, next);
+      return { ok: true, person: { ...next, UsageCount: personUsageCounts().get(name) || 0 }, people: listPersonDefinitions() };
+    },
+    async deletePersonGlobally(payload) {
+      await loadPersonRegistry();
+      const name = normalizePersonName(payload?.name ?? payload?.Name);
+      if (!name || !personRegistry.has(name)) return { ok: false, error: "Person not found" };
+      personRegistry.delete(name);
+      let updatedCount = 0;
+      for (const item of cache) {
+        const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+        if (!people.includes(name)) continue;
+        item.Customization = {
+          ...(item.Customization || {}),
+          People: people.filter((person) => person !== name),
+          MetadataUpdateDate: new Date().toISOString(),
+        };
+        updatedCount += 1;
+      }
+      return { ok: true, deleted: name, updatedCount, people: listPersonDefinitions() };
+    },
     async listAlbums() {
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       return { ok: true, albums: listAlbumDefinitions() };
     },
     async createAlbum(payload) {
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
       const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
       if (!title || !description) return { ok: false, error: "Album title and description are required" };
@@ -370,6 +497,7 @@
     },
     async updateAlbumDescription(payload) {
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
       const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
       const current = albumRegistry.get(title);
@@ -381,6 +509,7 @@
     },
     async deleteAlbumGlobally(payload) {
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
       if (!title || !albumRegistry.has(title)) return { ok: false, error: "Album not found" };
       albumRegistry.delete(title);
@@ -401,6 +530,7 @@
       const all = await loadMetadata();
       await loadTagRegistry();
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       const idx = all.findIndex((x) => x.FilePath === payload.filePath);
       if (idx < 0) return { ok: false, error: "Item not found" };
       if (Object.prototype.hasOwnProperty.call(payload?.customization || {}, "Tags")) {
@@ -412,6 +542,11 @@
         const validation = normalizeRegisteredAlbum(payload.customization.Album);
         if (validation.unknown.length) return { ok: false, error: `Unknown album: ${validation.unknown.join(", ")}` };
         payload.customization.Album = validation.album;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload?.customization || {}, "People")) {
+        const validation = normalizeRegisteredPeople(payload.customization.People);
+        if (validation.unknown.length) return { ok: false, error: `Unknown person: ${validation.unknown.join(", ")}` };
+        payload.customization.People = validation.people;
       }
       all[idx].Customization = {
         ...all[idx].Customization,
@@ -429,10 +564,14 @@
       const all = await loadMetadata();
       await loadTagRegistry();
       await loadAlbumRegistry();
+      await loadPersonRegistry();
       const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
       const addTags = [...new Set((payload?.addTags || []).map((x) => String(x || "").trim()).filter(Boolean))];
+      const addPeople = [...new Set((payload?.addPeople || []).map((x) => String(x || "").trim()).filter(Boolean))];
       const validation = normalizeRegisteredTags(addTags);
       if (validation.unknown.length) return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
+      const peopleValidation = normalizeRegisteredPeople(addPeople);
+      if (peopleValidation.unknown.length) return { ok: false, error: `Unknown person: ${peopleValidation.unknown.join(", ")}` };
       const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? payload.locationPatch : {};
       const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? payload.customizationPatch : {};
       if (Object.prototype.hasOwnProperty.call(customizationPatch, "Album")) {
@@ -458,10 +597,17 @@
           if (!mergedTags.includes(tag)) mergedTags.push(tag);
         }
 
+        const currentPeople = Array.isArray(all[idx]?.Customization?.People) ? all[idx].Customization.People : [];
+        const mergedPeople = [...currentPeople];
+        for (const person of peopleValidation.people) {
+          if (!mergedPeople.includes(person)) mergedPeople.push(person);
+        }
+
         all[idx].Customization = {
           ...all[idx].Customization,
           ...customizationPatch,
           Tags: mergedTags,
+          People: mergedPeople,
           MetadataUpdateDate: new Date().toISOString(),
         };
         delete all[idx].Customization.Category;

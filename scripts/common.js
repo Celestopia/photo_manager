@@ -20,6 +20,7 @@ const DEFAULT_CONFIG = {
   metadataFile: "./photo_metadata.jsonl",
   tagRegistryFile: "./tag_registry.jsonl",
   albumRegistryFile: "./album_registry.jsonl",
+  personRegistryFile: "./person_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -135,6 +136,7 @@ function defaultCustomization(ext) {
     Title: "",
     Album: "",
     Tags: [],
+    People: [],
     Description: "",
     HiddenDescription: "",
     Rating: isJpg ? 2 : 1,

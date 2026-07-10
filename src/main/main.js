@@ -27,6 +27,7 @@ const DEFAULT_CONFIG = {
   metadataFile: "./photo_metadata.jsonl",
   tagRegistryFile: "./tag_registry.jsonl",
   albumRegistryFile: "./album_registry.jsonl",
+  personRegistryFile: "./person_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -66,6 +67,7 @@ let config = null;
 let metadataIndex = new Map();
 let tagRegistryIndex = new Map();
 let albumRegistryIndex = new Map();
+let personRegistryIndex = new Map();
 let thumbnailWarmupStarted = false;
 const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
 const DEFAULT_ALBUM_DESCRIPTION = "待补充：请填写该相册的明确含义。";
@@ -348,6 +350,125 @@ function normalizeRegisteredTags(rawTags) {
 }
 
 /**
+ * Normalize person name into the canonical key stored in photo metadata.
+ */
+function normalizePersonName(value) {
+  return String(value ?? "").trim();
+}
+
+/**
+ * Count how many metadata records currently reference each registered person.
+ */
+function getPersonUsageCounts() {
+  const counts = new Map();
+  for (const item of metadataIndex.values()) {
+    const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+    for (const rawPerson of people) {
+      const person = normalizePersonName(rawPerson);
+      if (!person) continue;
+      counts.set(person, (counts.get(person) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/**
+ * Return person definitions sorted by name, including current usage counts.
+ */
+function listPersonDefinitions() {
+  const usage = getPersonUsageCounts();
+  return [...personRegistryIndex.values()]
+    .map((person) => ({
+      ...person,
+      UsageCount: usage.get(person.Name) || 0,
+    }))
+    .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
+}
+
+/**
+ * Persist person registry JSONL using temp-file replacement.
+ */
+async function savePersonRegistryMap() {
+  const registryFile = toAbsolutePath(config.personRegistryFile || DEFAULT_CONFIG.personRegistryFile);
+  const tempFile = `${registryFile}.tmp`;
+  const lines = [...personRegistryIndex.values()]
+    .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
+    .map((person) => JSON.stringify(person));
+  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
+  await fsp.rename(tempFile, registryFile);
+}
+
+/**
+ * Add missing registry definitions for people already present in photo metadata.
+ */
+function seedPersonRegistryFromMetadata() {
+  const now = new Date().toISOString();
+  let added = 0;
+
+  for (const item of metadataIndex.values()) {
+    const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+    for (const rawPerson of people) {
+      const name = normalizePersonName(rawPerson);
+      if (!name || personRegistryIndex.has(name)) continue;
+      personRegistryIndex.set(name, {
+        Name: name,
+        Description: "",
+        CreatedAt: now,
+        UpdatedAt: now,
+      });
+      added += 1;
+    }
+  }
+
+  return added;
+}
+
+/**
+ * Read the person registry JSONL into memory, then backfill legacy people.
+ */
+async function loadPersonRegistryIndex() {
+  personRegistryIndex.clear();
+  const registryFile = toAbsolutePath(config.personRegistryFile || DEFAULT_CONFIG.personRegistryFile);
+  const fileExists = fs.existsSync(registryFile);
+
+  if (fileExists) {
+    const content = await fsp.readFile(registryFile, "utf8");
+    const lines = content.split(/\r?\n/).filter(Boolean);
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        const name = normalizePersonName(parsed?.Name);
+        if (!name) continue;
+        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+        personRegistryIndex.set(name, {
+          Name: name,
+          Description: normalizePersonName(parsed?.Description),
+          CreatedAt: createdAt,
+          UpdatedAt: updatedAt,
+        });
+      } catch (error) {
+        appendLog(`Skip invalid person registry line: ${error.message}`);
+      }
+    }
+  }
+
+  const added = seedPersonRegistryFromMetadata();
+  if (!fileExists || added > 0) {
+    await savePersonRegistryMap();
+  }
+}
+
+/**
+ * Normalize and validate person arrays before writing photo metadata.
+ */
+function normalizeRegisteredPeople(rawPeople) {
+  const people = Array.isArray(rawPeople) ? rawPeople : [];
+  const normalized = [...new Set(people.map(normalizePersonName).filter(Boolean))];
+  const unknown = normalized.filter((person) => !personRegistryIndex.has(person));
+  return { people: normalized, unknown };
+}
+/**
  * Normalize album title into the canonical string stored on photo metadata.
  */
 function normalizeAlbumTitle(value) {
@@ -480,6 +601,10 @@ function filterAndSort(list, options) {
 
   if (filters.tag) {
     output = output.filter((item) => Array.isArray(item?.Customization?.Tags) && item.Customization.Tags.includes(filters.tag));
+  }
+
+  if (filters.person) {
+    output = output.filter((item) => Array.isArray(item?.Customization?.People) && item.Customization.People.includes(filters.person));
   }
 
   if (search?.value && search?.field) {
@@ -621,6 +746,7 @@ function registerIpcHandlers() {
         albums: [...albumRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
         unassignedAlbumCount,
         tags: [...tagRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+        people: [...personRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
       },
     };
     return toSerializable(payload);
@@ -710,6 +836,92 @@ function registerIpcHandlers() {
       metadataIndex = previousMetadata;
       appendLog(`Failed to delete tag globally: ${error.message}`);
       return { ok: false, error: "Failed to delete tag" };
+    }
+  });
+
+  ipcMain.handle("person:list", async () => toSerializable({ ok: true, people: listPersonDefinitions() }));
+
+  ipcMain.handle("person:create", async (_, payload) => {
+    const name = normalizePersonName(payload?.name ?? payload?.Name);
+    const description = normalizePersonName(payload?.description ?? payload?.Description);
+    if (!name) {
+      return { ok: false, error: "Person name is required" };
+    }
+    if (personRegistryIndex.has(name)) {
+      return { ok: false, error: "Person already exists" };
+    }
+
+    const now = new Date().toISOString();
+    const person = { Name: name, Description: description, CreatedAt: now, UpdatedAt: now };
+    personRegistryIndex.set(name, person);
+    try {
+      await savePersonRegistryMap();
+      return toSerializable({ ok: true, person: { ...person, UsageCount: 0 }, people: listPersonDefinitions() });
+    } catch (error) {
+      personRegistryIndex.delete(name);
+      appendLog(`Failed to create person: ${error.message}`);
+      return { ok: false, error: "Failed to write person registry" };
+    }
+  });
+
+  ipcMain.handle("person:update-description", async (_, payload) => {
+    const name = normalizePersonName(payload?.name ?? payload?.Name);
+    const description = normalizePersonName(payload?.description ?? payload?.Description);
+    const current = personRegistryIndex.get(name);
+    if (!name) {
+      return { ok: false, error: "Person name is required" };
+    }
+    if (!current) {
+      return { ok: false, error: "Person not found" };
+    }
+
+    const previous = { ...current };
+    const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+    personRegistryIndex.set(name, next);
+    try {
+      await savePersonRegistryMap();
+      return toSerializable({ ok: true, person: { ...next, UsageCount: getPersonUsageCounts().get(name) || 0 }, people: listPersonDefinitions() });
+    } catch (error) {
+      personRegistryIndex.set(name, previous);
+      appendLog(`Failed to update person description: ${error.message}`);
+      return { ok: false, error: "Failed to write person registry" };
+    }
+  });
+
+  ipcMain.handle("person:delete-global", async (_, payload) => {
+    const name = normalizePersonName(payload?.name ?? payload?.Name);
+    const current = personRegistryIndex.get(name);
+    if (!name || !current) {
+      return { ok: false, error: "Person not found" };
+    }
+
+    const previousRegistry = new Map(personRegistryIndex);
+    const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
+    let updatedCount = 0;
+    personRegistryIndex.delete(name);
+
+    for (const [filePath, item] of metadataIndex.entries()) {
+      const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+      if (!people.includes(name)) continue;
+      item.Customization = {
+        ...(item.Customization || {}),
+        People: people.filter((person) => person !== name),
+        MetadataUpdateDate: new Date().toISOString(),
+      };
+      delete item.Customization.Category;
+      metadataIndex.set(filePath, item);
+      updatedCount += 1;
+    }
+
+    try {
+      await savePersonRegistryMap();
+      if (updatedCount) await saveMetadataMap();
+      return toSerializable({ ok: true, deleted: name, updatedCount, people: listPersonDefinitions() });
+    } catch (error) {
+      personRegistryIndex = previousRegistry;
+      metadataIndex = previousMetadata;
+      appendLog(`Failed to delete person globally: ${error.message}`);
+      return { ok: false, error: "Failed to delete person" };
     }
   });
 
@@ -822,6 +1034,14 @@ function registerIpcHandlers() {
       customization.Album = validation.album;
     }
 
+    if (Object.prototype.hasOwnProperty.call(customization || {}, "People")) {
+      const validation = normalizeRegisteredPeople(customization.People);
+      if (validation.unknown.length) {
+        return { ok: false, error: `Unknown person: ${validation.unknown.join(", ")}` };
+      }
+      customization.People = validation.people;
+    }
+
     // Merge user edits and stamp update time.
     current.Customization = {
       ...current.Customization,
@@ -848,6 +1068,7 @@ function registerIpcHandlers() {
   ipcMain.handle("photo:batch-update", async (_, payload) => {
     const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
     const addTags = Array.isArray(payload?.addTags) ? payload.addTags : [];
+    const addPeople = Array.isArray(payload?.addPeople) ? payload.addPeople : [];
     const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? payload.locationPatch : {};
     const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? payload.customizationPatch : {};
 
@@ -860,6 +1081,11 @@ function registerIpcHandlers() {
     const validation = normalizeRegisteredTags(dedupTags);
     if (validation.unknown.length) {
       return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
+    }
+    const dedupPeople = [...new Set(addPeople.map((x) => String(x || "").trim()).filter(Boolean))];
+    const peopleValidation = normalizeRegisteredPeople(dedupPeople);
+    if (peopleValidation.unknown.length) {
+      return { ok: false, error: `Unknown person: ${peopleValidation.unknown.join(", ")}` };
     }
     if (Object.prototype.hasOwnProperty.call(customizationPatch, "Album")) {
       const albumValidation = normalizeRegisteredAlbum(customizationPatch.Album);
@@ -885,10 +1111,17 @@ function registerIpcHandlers() {
         if (!mergedTags.includes(tag)) mergedTags.push(tag);
       }
 
+      const currentPeople = Array.isArray(current?.Customization?.People) ? current.Customization.People : [];
+      const mergedPeople = [...currentPeople];
+      for (const person of peopleValidation.people) {
+        if (!mergedPeople.includes(person)) mergedPeople.push(person);
+      }
+
       current.Customization = {
         ...current.Customization,
         ...customizationPatch,
         Tags: mergedTags,
+        People: mergedPeople,
         MetadataUpdateDate: new Date().toISOString(),
       };
       delete current.Customization.Category;
@@ -966,6 +1199,7 @@ async function bootstrap() {
   await loadMetadataIndex();
   await loadTagRegistryIndex();
   await loadAlbumRegistryIndex();
+  await loadPersonRegistryIndex();
   // Start thumbnail warmup as soon as metadata is ready.
   warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
 

@@ -79,6 +79,42 @@
         </div>
       </section>
     </div>
+    <div class="tag-modal-backdrop" v-if="personManager.visible" @click="closePersonManager">
+      <section class="tag-manager-modal" @click.stop>
+        <header class="tag-manager-header">
+          <h3>人物管理</h3>
+          <button class="btn" @click="closePersonManager">关闭</button>
+        </header>
+        <input class="input tag-manager-search" v-model="personManager.search" placeholder="搜索姓名或说明" />
+        <div class="tag-manager-list">
+          <article class="tag-manager-item" v-for="person in managerFilteredPeople" :key="'person_manager_' + person.Name">
+            <div class="tag-manager-item-main">
+              <div class="tag-manager-item-title">
+                <strong>{{ person.Name }}</strong>
+                <span>{{ person.UsageCount || 0 }} 张</span>
+              </div>
+              <textarea
+                v-if="personManager.editingName === person.Name"
+                class="input tag-manager-description-input"
+                v-model="personManager.editDescription"
+                placeholder="可留空"
+              ></textarea>
+              <p v-else>{{ person.Description || '无说明' }}</p>
+              <div class="tag-manager-error" v-if="personManager.error && personManager.editingName === person.Name">{{ personManager.error }}</div>
+            </div>
+            <div class="tag-manager-actions" v-if="personManager.editingName === person.Name">
+              <button class="btn btn-primary" @click="savePersonDescription">保存</button>
+              <button class="btn" @click="cancelPersonDescriptionEdit">取消</button>
+            </div>
+            <div class="tag-manager-actions" v-else>
+              <button class="btn" @click="startPersonDescriptionEdit(person)">编辑说明</button>
+              <button class="btn danger-text" @click="deletePersonGlobally(person)">全局删除</button>
+            </div>
+          </article>
+          <div class="tag-manager-empty" v-if="!managerFilteredPeople.length">没有匹配的人物</div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -169,7 +205,7 @@ export default {
       pageSize: 120,
       sortBy: "shootingTime",
       sortOrder: "desc",
-      filters: { album: "", tag: "" },
+      filters: { album: "", tag: "", person: "" },
       search: { field: "title", value: "" },
     });
 
@@ -177,17 +213,22 @@ export default {
     const total = ref(0);
     const hasMore = ref(false);
     const loading = ref(false);
-    const filterOptions = reactive({ albums: [], tags: [], unassignedAlbumCount: 0 });
+    const filterOptions = reactive({ albums: [], tags: [], people: [], unassignedAlbumCount: 0 });
     const tagRegistry = ref([]);
     const albumRegistry = ref([]);
+    const personRegistry = ref([]);
     const tagSearch = reactive({ viewer: "", batch: "" });
     const albumSearch = reactive({ viewer: "", batch: "" });
+    const personSearch = reactive({ viewer: "", batch: "" });
     const tagDropdown = reactive({ viewer: false, batch: false });
     const albumDropdown = reactive({ viewer: false, batch: false });
+    const personDropdown = reactive({ viewer: false, batch: false });
     const tagCreate = reactive({ visible: false, target: "viewer", text: "", description: "", error: "" });
     const albumCreate = reactive({ visible: false, target: "viewer", title: "", description: "", error: "" });
+    const personCreate = reactive({ visible: false, target: "viewer", name: "", description: "", error: "" });
     const tagManager = reactive({ visible: false, search: "", editingText: "", editDescription: "", error: "" });
     const albumManager = reactive({ visible: false, search: "", editingTitle: "", editDescription: "", error: "" });
+    const personManager = reactive({ visible: false, search: "", editingName: "", editDescription: "", error: "" });
 
     // --- Selection state ---
     const selectedItem = ref(null);
@@ -199,6 +240,7 @@ export default {
       title: "",
       album: "",
       tags: [],
+      people: [],
       locationCountry: "",
       locationProvince: "",
       locationCity: "",
@@ -210,6 +252,7 @@ export default {
       if (batchEdit.title.trim()) return true;
       if (batchEdit.album.trim()) return true;
       if (batchEdit.tags.length) return true;
+      if (batchEdit.people.length) return true;
       if (batchEdit.locationCountry.trim()) return true;
       if (batchEdit.locationProvince.trim()) return true;
       if (batchEdit.locationCity.trim()) return true;
@@ -229,7 +272,12 @@ export default {
       if (!keyword) return source;
       return source.filter((album) => album.Title.includes(keyword) || (album.Description || "").includes(keyword));
     });
-
+    const managerFilteredPeople = computed(() => {
+      const keyword = personManager.search.trim();
+      const source = [...personRegistry.value].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
+      if (!keyword) return source;
+      return source.filter((person) => person.Name.includes(keyword) || (person.Description || "").includes(keyword));
+    });
     // --- Viewer transform state ---
     const zoomPercent = ref(100);
     const rotateDeg = ref(0);
@@ -261,6 +309,7 @@ export default {
       Album: "",
       LocationSite: "",
       Tags: [],
+      People: [],
       Description: "",
       HiddenDescription: "",
     });
@@ -345,10 +394,13 @@ export default {
       editDraft.Album = item?.Customization?.Album || "";
       editDraft.LocationSite = item?.Location?.Site || "";
       editDraft.Tags = [...(item?.Customization?.Tags || [])];
+      editDraft.People = [...(item?.Customization?.People || [])];
       editDraft.Description = item?.Customization?.Description || "";
       editDraft.HiddenDescription = item?.Customization?.HiddenDescription || "";
       tagSearch.viewer = "";
       tagDropdown.viewer = false;
+      personSearch.viewer = "";
+      personDropdown.viewer = false;
       editingDirty.value = false;
       if (!keepActiveField) activeEditField.value = "";
       nextTick(() => autoGrowAllFieldTextareas());
@@ -713,6 +765,212 @@ export default {
       showToastMessage(`已全局删除标签“${tag.Text}”`);
     }
 
+    function normalizePersonName(value) {
+      return String(value ?? "").trim();
+    }
+
+    function applyPersonRegistry(people) {
+      personRegistry.value = (Array.isArray(people) ? people : [])
+        .map((person) => ({
+          Name: normalizePersonName(person?.Name),
+          Description: normalizePersonName(person?.Description),
+          CreatedAt: person?.CreatedAt || "",
+          UpdatedAt: person?.UpdatedAt || "",
+          UsageCount: Number(person?.UsageCount || 0),
+        }))
+        .filter((person) => person.Name);
+      filterOptions.people = personRegistry.value.map((person) => person.Name);
+      if (query.filters.person && !filterOptions.people.includes(query.filters.person)) {
+        query.filters.person = "";
+      }
+    }
+
+    async function loadPeople() {
+      if (typeof API.listPeople !== "function") return;
+      const result = await API.listPeople();
+      if (result?.ok) applyPersonRegistry(result.people);
+    }
+
+    function selectedPeopleForTarget(target) {
+      return target === "batch" ? batchEdit.people : editDraft.People;
+    }
+
+    function getPersonOptions(target) {
+      const keyword = normalizePersonName(personSearch[target]);
+      const selected = new Set(selectedPeopleForTarget(target));
+      return personRegistry.value
+        .filter((person) => !selected.has(person.Name))
+        .filter((person) => !keyword || person.Name.includes(keyword) || (person.Description || "").includes(keyword))
+        .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
+        .slice(0, 50);
+    }
+
+    function getPersonDescription(personName) {
+      return personRegistry.value.find((person) => person.Name === personName)?.Description || "";
+    }
+
+    function openPersonDropdown(target) {
+      personDropdown[target] = true;
+    }
+
+    function closePersonDropdown(target) {
+      personDropdown[target] = false;
+    }
+
+    function closeAllPersonDropdowns() {
+      personDropdown.viewer = false;
+      personDropdown.batch = false;
+    }
+
+    function addPersonToTarget(target, rawName) {
+      const name = normalizePersonName(rawName);
+      if (!name) return;
+      const people = selectedPeopleForTarget(target);
+      if (people.includes(name)) {
+        showToastMessage(`人物“${name}”已存在，添加失败`);
+        personSearch[target] = "";
+        closePersonDropdown(target);
+        return;
+      }
+      people.push(name);
+      personSearch[target] = "";
+      closePersonDropdown(target);
+      if (target === "viewer") requestEdit("People");
+    }
+
+    function onPersonSearchKeydown(event, target) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const first = getPersonOptions(target)[0];
+        if (first) addPersonToTarget(target, first.Name);
+        return;
+      }
+      if (event.key === "Escape") {
+        closePersonDropdown(target);
+        return;
+      }
+      if (event.key === "Backspace" && !personSearch[target]) {
+        event.preventDefault();
+        if (target === "batch") removeBatchPersonAt(batchEdit.people.length - 1);
+        else removePersonAt(editDraft.People.length - 1);
+      }
+    }
+
+    function openCreatePersonMenu(target) {
+      personCreate.visible = true;
+      personCreate.target = target;
+      personCreate.name = normalizePersonName(personSearch[target]);
+      personCreate.description = "";
+      personCreate.error = "";
+      closePersonDropdown(target);
+    }
+
+    function closeCreatePersonMenu() {
+      personCreate.visible = false;
+      personCreate.name = "";
+      personCreate.description = "";
+      personCreate.error = "";
+    }
+
+    async function createPersonAndSelect() {
+      const name = normalizePersonName(personCreate.name);
+      const description = normalizePersonName(personCreate.description);
+      if (!name) {
+        personCreate.error = "人物姓名不能为空";
+        return;
+      }
+      const result = await API.createPerson({ name, description });
+      if (!result?.ok) {
+        personCreate.error = result?.error || "创建人物失败";
+        return;
+      }
+      applyPersonRegistry(result.people);
+      addPersonToTarget(personCreate.target, result.person.Name);
+      closeCreatePersonMenu();
+    }
+
+    async function openPersonManager() {
+      await loadPeople();
+      personManager.visible = true;
+      personManager.error = "";
+    }
+
+    function closePersonManager() {
+      personManager.visible = false;
+      personManager.search = "";
+      personManager.editingName = "";
+      personManager.editDescription = "";
+      personManager.error = "";
+    }
+
+    function startPersonDescriptionEdit(person) {
+      personManager.editingName = person.Name;
+      personManager.editDescription = person.Description || "";
+      personManager.error = "";
+    }
+
+    function cancelPersonDescriptionEdit() {
+      personManager.editingName = "";
+      personManager.editDescription = "";
+      personManager.error = "";
+    }
+
+    async function savePersonDescription() {
+      const name = personManager.editingName;
+      const description = normalizePersonName(personManager.editDescription);
+      if (!name) {
+        personManager.error = "人物姓名不能为空";
+        return;
+      }
+      const result = await API.updatePersonDescription({ name, description });
+      if (!result?.ok) {
+        personManager.error = result?.error || "保存说明失败";
+        return;
+      }
+      applyPersonRegistry(result.people);
+      cancelPersonDescriptionEdit();
+      showToastMessage("人物说明已更新");
+    }
+
+    function stripPersonFromItem(item, personName) {
+      const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
+      if (!people.includes(personName)) return item;
+      return {
+        ...item,
+        Customization: {
+          ...(item.Customization || {}),
+          People: people.filter((person) => person !== personName),
+        },
+      };
+    }
+
+    function syncDeletedPersonLocally(personName) {
+      if (selectedItem.value) selectedItem.value = stripPersonFromItem(selectedItem.value, personName);
+      editDraft.People = editDraft.People.filter((person) => person !== personName);
+      batchEdit.people = batchEdit.people.filter((person) => person !== personName);
+      orderedItems.value = orderedItems.value.map((item) => stripPersonFromItem(item, personName));
+      for (const group of galleryGroups.value) {
+        group.items = group.items.map((item) => stripPersonFromItem(item, personName));
+      }
+    }
+
+    async function deletePersonGlobally(person) {
+      const usage = Number(person?.UsageCount || 0);
+      const ok = window.confirm(`确定全局删除人物“${person.Name}”？这会从 ${usage} 张图片中移除。`);
+      if (!ok) return;
+      const result = await API.deletePersonGlobally({ name: person.Name });
+      if (!result?.ok) {
+        showToastMessage(`删除人物失败：${result?.error || "未知错误"}`);
+        return;
+      }
+      applyPersonRegistry(result.people);
+      syncDeletedPersonLocally(person.Name);
+      if (query.filters.person === person.Name) {
+        query.filters.person = "";
+        await queryGallery(true);
+      }
+      showToastMessage(`已全局删除人物“${person.Name}”`);
+    }
     function normalizeAlbumTitle(value) {
       return String(value ?? "").trim();
     }
@@ -1062,8 +1320,11 @@ export default {
       batchEdit.title = "";
       batchEdit.album = "";
       batchEdit.tags = [];
+      batchEdit.people = [];
       tagSearch.batch = "";
       tagDropdown.batch = false;
+      personSearch.batch = "";
+      personDropdown.batch = false;
       albumSearch.batch = "";
       albumDropdown.batch = false;
       batchEdit.locationCountry = "";
@@ -1107,6 +1368,17 @@ export default {
 
      */
 
+    /**
+
+     * Remove one pending batch person by index.
+
+     */
+
+    function removeBatchPersonAt(index) {
+      if (index < 0 || index >= batchEdit.people.length) return;
+      batchEdit.people.splice(index, 1);
+    }
+
     function onBatchTagInputKeydown(event) {
       onTagSearchKeydown(event, "batch");
     }
@@ -1134,7 +1406,8 @@ export default {
       if (batchEdit.album.trim()) customizationPatch.Album = batchEdit.album.trim();
 
       const addTags = [...new Set(batchEdit.tags.map((x) => x.trim()).filter(Boolean))];
-      if (!addTags.length && !Object.keys(locationPatch).length && !Object.keys(customizationPatch).length) {
+      const addPeople = [...new Set(batchEdit.people.map((x) => x.trim()).filter(Boolean))];
+      if (!addTags.length && !addPeople.length && !Object.keys(locationPatch).length && !Object.keys(customizationPatch).length) {
         showToastMessage("请先填写要批量修改的内容");
         return;
       }
@@ -1142,6 +1415,7 @@ export default {
       const result = await API.batchUpdateMetadata({
         filePaths,
         addTags,
+        addPeople,
         locationPatch,
         customizationPatch,
       });
@@ -1156,6 +1430,7 @@ export default {
       syncUpdatedItemsIntoGallery(updatedItems);
       await loadTags();
       await loadAlbums();
+      await loadPeople();
       const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
       const missingCount = Number(result.missingCount || 0);
       const requestedCount = Number(result.requestedCount || filePaths.length || 0);
@@ -1188,6 +1463,18 @@ export default {
      * Set star rating in draft and mark Rating field dirty when value changes.
 
      */
+
+    /**
+
+     * Remove one person from single-photo draft and mark people field as pending save.
+
+     */
+
+    function removePersonAt(index) {
+      if (index < 0 || index >= editDraft.People.length) return;
+      editDraft.People.splice(index, 1);
+      requestEdit("People");
+    }
 
     function setRating(ratingValue) {
       const normalized = Math.min(5, Math.max(1, Number(ratingValue || 1)));
@@ -1230,6 +1517,7 @@ export default {
           filters: {
             album: query.filters.album,
             tag: query.filters.tag,
+            person: query.filters.person,
           },
           search: {
             field: query.search.field,
@@ -1242,6 +1530,7 @@ export default {
         filterOptions.albums = Array.isArray(res?.filterOptions?.albums) ? res.filterOptions.albums : [];
         filterOptions.unassignedAlbumCount = Number(res?.filterOptions?.unassignedAlbumCount || 0);
         filterOptions.tags = Array.isArray(res?.filterOptions?.tags) ? res.filterOptions.tags : [];
+        filterOptions.people = Array.isArray(res?.filterOptions?.people) ? res.filterOptions.people : [];
 
         if (query.page === 1) {
           // First page replaces existing gallery snapshot.
@@ -1293,6 +1582,7 @@ export default {
     async function resetAll() {
       query.filters.album = "";
       query.filters.tag = "";
+      query.filters.person = "";
       query.search.field = "title";
       query.search.value = "";
       query.sortBy = "shootingTime";
@@ -1464,6 +1754,7 @@ export default {
       showLocationInfoMenu.value = false;
       closeAllTagDropdowns();
       closeAllAlbumDropdowns();
+      closeAllPersonDropdowns();
     }
 
     /**
@@ -1602,6 +1893,7 @@ export default {
           Rating: Math.min(5, Math.max(1, Number(editDraft.Rating || 1))),
           Album: editDraft.Album,
           Tags: [...editDraft.Tags],
+          People: [...editDraft.People],
           Description: editDraft.Description,
           HiddenDescription: editDraft.HiddenDescription,
         },
@@ -1624,6 +1916,7 @@ export default {
         showSaveNotice("已修改", saveField);
         await loadTags();
         await loadAlbums();
+        await loadPeople();
       } else {
         showToastMessage(`修改失败：${result?.error || "未知错误"}`);
       }
@@ -1715,18 +2008,21 @@ export default {
         editDraft.Album,
         editDraft.LocationSite,
         editDraft.Tags.join("\u0001"),
+        editDraft.People.join("\u0001"),
         editDraft.Description,
         editDraft.HiddenDescription,
       ],
       () => {
         if (view.value !== "viewer") return;
         const compareTags = (selectedItem.value?.Customization?.Tags || []).join("\u0001");
+        const comparePeople = (selectedItem.value?.Customization?.People || []).join("\u0001");
         editingDirty.value =
           editDraft.Title !== (selectedItem.value?.Customization?.Title || "") ||
           Number(editDraft.Rating || 1) !== Number(selectedItem.value?.Customization?.Rating || 1) ||
           editDraft.Album !== (selectedItem.value?.Customization?.Album || "") ||
           editDraft.LocationSite !== (selectedItem.value?.Location?.Site || "") ||
           editDraft.Tags.join("\u0001") !== compareTags ||
+          editDraft.People.join("\u0001") !== comparePeople ||
           editDraft.Description !== (selectedItem.value?.Customization?.Description || "") ||
           editDraft.HiddenDescription !== (selectedItem.value?.Customization?.HiddenDescription || "");
       }
@@ -1737,6 +2033,7 @@ export default {
       await loadConfig();
       await loadTags();
       await loadAlbums();
+      await loadPeople();
       await queryGallery(true);
       await refreshWindowState();
       await nextTick();
@@ -1786,16 +2083,22 @@ export default {
       filterOptions,
       tagRegistry,
       albumRegistry,
+      personRegistry,
       tagSearch,
       albumSearch,
+      personSearch,
       tagDropdown,
       albumDropdown,
+      personDropdown,
       tagCreate,
       albumCreate,
+      personCreate,
       tagManager,
       albumManager,
+      personManager,
       managerFilteredTags,
       managerFilteredAlbums,
+      managerFilteredPeople,
       UNASSIGNED_ALBUM_FILTER,
       isSelectionMode,
       batchStatus,
@@ -1842,11 +2145,14 @@ export default {
       selectAllGalleryPhotos,
       addBatchTag,
       removeBatchTagAt,
+      removeBatchPersonAt,
       onBatchTagInputKeydown,
       getTagOptions,
       getTagDescription,
       getAlbumOptions,
       getAlbumDescription,
+      getPersonOptions,
+      getPersonDescription,
       openTagDropdown,
       closeTagDropdown,
       addTagToTarget,
@@ -1856,12 +2162,19 @@ export default {
       setAlbumForTarget,
       clearAlbumForTarget,
       onAlbumSearchKeydown,
+      openPersonDropdown,
+      closePersonDropdown,
+      addPersonToTarget,
+      onPersonSearchKeydown,
       openCreateTagMenu,
       closeCreateTagMenu,
       createTagAndSelect,
       openCreateAlbumMenu,
       closeCreateAlbumMenu,
       createAlbumAndSelect,
+      openCreatePersonMenu,
+      closeCreatePersonMenu,
+      createPersonAndSelect,
       openTagManager,
       closeTagManager,
       startTagDescriptionEdit,
@@ -1874,6 +2187,12 @@ export default {
       cancelAlbumDescriptionEdit,
       saveAlbumDescription,
       deleteAlbumGlobally,
+      openPersonManager,
+      closePersonManager,
+      startPersonDescriptionEdit,
+      cancelPersonDescriptionEdit,
+      savePersonDescription,
+      deletePersonGlobally,
       clearBatchEditInputs,
       applyBatchEdit,
       loadMore,
@@ -1904,6 +2223,7 @@ export default {
       onTagInputKeydown,
       addTag,
       removeTagAt,
+      removePersonAt,
       setRating,
       onFieldTextareaInput,
       requestEdit,

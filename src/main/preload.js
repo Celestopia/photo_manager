@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   updateAlbumDescription: (payload) => ipcRenderer.invoke("album:update-description", toSerializable(payload)),
   deleteAlbumGlobally: (payload) => ipcRenderer.invoke("album:delete-global", toSerializable(payload)),
 
+  // Person registry
+  listPeople: () => ipcRenderer.invoke("person:list"),
+  createPerson: (payload) => ipcRenderer.invoke("person:create", toSerializable(payload)),
+  updatePersonDescription: (payload) => ipcRenderer.invoke("person:update-description", toSerializable(payload)),
+  deletePersonGlobally: (payload) => ipcRenderer.invoke("person:delete-global", toSerializable(payload)),
+
   // Clipboard helpers
   copyPath: (absolutePath) => ipcRenderer.invoke("photo:copy-path", absolutePath),
   copyJson: (item) => ipcRenderer.invoke("photo:copy-json", toSerializable(item)),

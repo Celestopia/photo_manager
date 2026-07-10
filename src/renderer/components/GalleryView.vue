@@ -17,6 +17,7 @@
     <section class="toolbar-row">
       <div class="toolbar-group"><label>相册</label><select class="input" v-model="query.filters.album" @change="applyFilterSort"><option value="">全部</option><option v-if="filterOptions.unassignedAlbumCount > 0" :value="UNASSIGNED_ALBUM_FILTER">未设置相册</option><option v-for="album in filterOptions.albums" :key="album" :value="album" :title="getAlbumDescription(album)">{{ album }}</option></select></div>
       <div class="toolbar-group"><label>标签</label><select class="input" v-model="query.filters.tag" @change="applyFilterSort"><option value="">全部</option><option v-for="tag in filterOptions.tags" :key="tag" :value="tag" :title="getTagDescription(tag)">{{ tag }}</option></select></div>
+      <div class="toolbar-group"><label>人物</label><select class="input" v-model="query.filters.person" @change="applyFilterSort"><option value="">全部</option><option v-for="person in filterOptions.people" :key="person" :value="person" :title="getPersonDescription(person)">{{ person }}</option></select></div>
       <div class="toolbar-group" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
       <div class="toolbar-group" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
       <div class="toolbar-group right"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option><option value="filename">文件名</option><option value="rating">评级</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
@@ -49,6 +50,8 @@
     <AlbumPicker target="batch" placeholder="搜索已有相册" />
     <label>添加标签</label>
     <TagPicker target="batch" placeholder="搜索已有标签" />
+    <label>添加人物</label>
+    <PeoplePicker target="batch" placeholder="搜索已有人物" />
     <label>国家</label><input class="input" v-model="batchEdit.locationCountry" placeholder="如：中国" />
     <label>省/州</label><input class="input" v-model="batchEdit.locationProvince" placeholder="如：北京 / California" />
     <label>城市</label><input class="input" v-model="batchEdit.locationCity" placeholder="如：北京 / San Francisco" />
@@ -65,6 +68,7 @@
 <script setup>
 import { inject, ref } from "vue";
 import AlbumPicker from "./AlbumPicker.vue";
+import PeoplePicker from "./PeoplePicker.vue";
 import TagPicker from "./TagPicker.vue";
 
 const app = inject("appContext");
@@ -92,6 +96,7 @@ const {
   UNASSIGNED_ALBUM_FILTER,
   getAlbumDescription,
   getTagDescription,
+  getPersonDescription,
   resetAll,
   applySearch,
   applyFilterSort,

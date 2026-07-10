@@ -3,10 +3,7 @@
 PhotoManager is a local-first desktop photo manager built with Electron + Vue.
 It is designed for personal usage on Windows and stores everything as local files
 (`config.yml`, `photo_metadata.jsonl`, image files, thumbnail cache, logs).
-Tag definitions are stored separately in `tag_registry.jsonl` so each tag has a
-clear description and can be reused consistently. Album definitions use the same
-registered-data approach in `album_registry.jsonl`, while each photo keeps at
-most one album title in `Customization.Album`.
+Tag definitions are stored separately in `tag_registry.jsonl` so each tag has a clear description and can be reused consistently. Album definitions use the same registered-data approach in `album_registry.jsonl`, while each photo keeps at most one album title in `Customization.Album`. Person definitions are managed in `person_registry.jsonl`; photos store selected person names in `Customization.People`.
 
 ## Quick Start
 
@@ -58,7 +55,8 @@ The project has three runtime layers:
 - Loads `photo_metadata.jsonl` into memory (`Map<FilePath, Metadata>`).
 - Loads `tag_registry.jsonl` into memory (`Map<Text, TagDefinition>`).
 - Loads `album_registry.jsonl` into memory (`Map<Title, AlbumDefinition>`).
-- Exposes IPC APIs for query/update/tag registry/album registry/copy/window control.
+- Loads `person_registry.jsonl` into memory (`Map<Name, PersonDefinition>`).
+- Exposes IPC APIs for query/update/tag registry/album registry/person registry/copy/window control.
 - Creates and monitors BrowserWindow.
 
 2. Preload bridge (`src/main/preload.js`)
@@ -84,7 +82,8 @@ Important difference:
 - Browser mode metadata edits are in-memory only (no write-back to JSONL).
 - Browser mode tag registry edits are also in-memory only.
 - Browser mode album registry edits are also in-memory only.
-- Electron mode writes updates back to `photo_metadata.jsonl`, `tag_registry.jsonl`, and `album_registry.jsonl`.
+- Browser mode person registry edits are also in-memory only.
+- Electron mode writes updates back to `photo_metadata.jsonl`, `tag_registry.jsonl`, `album_registry.jsonl`, and `person_registry.jsonl`.
 
 ## Metadata and Data Flow
 
@@ -96,6 +95,7 @@ Important difference:
 - `photo_metadata.jsonl`: one JSON object per line.
 - `tag_registry.jsonl`: one tag definition per line (`Text`, `Description`, `CreatedAt`, `UpdatedAt`).
 - `album_registry.jsonl`: one album definition per line (`Title`, `Description`, `CreatedAt`, `UpdatedAt`).
+- `person_registry.jsonl`: one person definition per line (`Name`, optional `Description`, `CreatedAt`, `UpdatedAt`).
 - `logs/YYYY-MM-DD.log`: runtime diagnostics.
 
 ### Startup flow (Electron mode)
@@ -104,21 +104,23 @@ Important difference:
 2. Main process loads metadata JSONL into in-memory index.
 3. Main process loads tag registry JSONL and backfills definitions for legacy tags already used by metadata.
 4. Main process loads album registry JSONL and backfills definitions for legacy non-empty albums.
-5. Main process starts thumbnail warmup for missing cache entries.
-6. Renderer asks config plus tag/album registries via IPC.
-7. Renderer requests first gallery page (`gallery:query`).
-8. Main process filters/sorts/paginates and returns serializable payload with thumbnail paths.
-9. Renderer renders grouped gallery (thumbnail first, original image fallback on error).
+5. Main process loads person registry JSONL and backfills definitions for legacy people.
+6. Main process starts thumbnail warmup for missing cache entries.
+7. Renderer asks config plus tag/album/person registries via IPC.
+8. Renderer requests first gallery page (`gallery:query`).
+9. Main process filters/sorts/paginates and returns serializable payload with thumbnail paths.
+10. Renderer renders grouped gallery (thumbnail first, original image fallback on error).
 
 ### Edit flow (Customization update)
 
 1. User edits fields in viewer panel.
 2. User sets album by selecting from the registered album list or creating an album with a required description.
 3. User adds tags by selecting from the registered tag list or creating a tag with a required description.
-4. Renderer sends `photo:update-customization`.
-5. Main process rejects unregistered albums/tags, updates metadata Map record, and stamps `MetadataUpdateDate`.
-6. Main process atomically rewrites JSONL (`.tmp` -> rename).
-7. Updated item is returned and renderer cache is patched in place.
+4. User adds people by selecting from the registered person list or creating a person; description may be empty.
+5. Renderer sends `photo:update-customization`.
+6. Main process rejects unregistered albums/tags/people, updates metadata Map record, and stamps `MetadataUpdateDate`.
+7. Main process atomically rewrites JSONL (`.tmp` -> rename).
+8. Updated item is returned and renderer cache is patched in place.
 
 ### Tag registry flow
 
@@ -133,6 +135,13 @@ Important difference:
 2. `album:create` requires non-empty album title and description, then rewrites `album_registry.jsonl`.
 3. `album:update-description` updates an album description without changing photo metadata.
 4. `album:delete-global` removes an album from the registry and clears that album field on every photo that uses it.
+
+### Person registry flow
+
+1. Renderer loads person definitions via `person:list`.
+2. `person:create` requires a non-empty person name; description may be empty.
+3. `person:update-description` updates optional person notes without changing photo metadata.
+4. `person:delete-global` removes a person from the registry and from every photo record that uses it.
 
 ## Metadata Maintenance Scripts
 

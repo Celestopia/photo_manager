@@ -16,6 +16,7 @@ const COLUMNS = [
   { header: "Rating", get: (item) => item?.Customization?.Rating ?? "" },
   { header: "Album", get: (item) => item?.Customization?.Album || "" },
   { header: "Tags", get: (item) => (item?.Customization?.Tags || []).join(" | ") },
+  { header: "People", get: (item) => (item?.Customization?.People || []).join(" | ") },
   { header: "Description", get: (item) => item?.Customization?.Description || "" },
   { header: "HiddenDescription", get: (item) => item?.Customization?.HiddenDescription || "" },
   { header: "Hidden", get: (item) => item?.Customization?.Hidden ?? false },
