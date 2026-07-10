@@ -74,6 +74,24 @@ html, body, #app {
 }
 .toolbar-group { display: flex; align-items: center; gap: 8px; }
 .toolbar-group.right { margin-left: auto; }
+.toolbar-group.location-filter-group {
+  align-items: center;
+}
+.location-filter-picker {
+  position: relative;
+  width: clamp(280px, 24vw, 360px);
+  min-width: 0;
+}
+.location-filter-input {
+  width: 100%;
+  min-height: 34px;
+  padding-right: 30px;
+}
+.location-filter-dropdown {
+  left: 0;
+  right: auto;
+  width: min(360px, calc(100vw - 32px));
+}
 .batch-count { color: var(--text-soft); font-size: 13px; min-width: 72px; }
 .gallery-list { min-height: 0; overflow: auto; padding-right: 8px; }
 .summary { margin-bottom: 10px; color: var(--text-soft); }
@@ -471,7 +489,7 @@ html, body, #app {
 .image-stage:-webkit-full-screen .nav-btn { display: none; }
 .context-menu {
   position: fixed; z-index: 30; display: flex; flex-direction: column;
-  border: 1px solid var(--line); background: #fff; border-radius: 8px; box-shadow: var(--shadow); min-width: 180px;
+  border: 1px solid var(--line); background: #fff; border-radius: 8px; box-shadow: var(--shadow); min-width: clamp(280px, 24vw, 360px);
 }
 .context-menu button { border: 0; text-align: left; background: transparent; padding: 10px; cursor: pointer; }
 .context-menu button:hover { background: #eff6ff; }
@@ -587,6 +605,136 @@ html, body, #app {
   width: 100%;
   min-height: 72px;
   resize: vertical;
+}
+.location-manager-list {
+  gap: 6px;
+}
+.location-manager-current-context {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  color: var(--text-soft);
+  background: #fff;
+  border: 1px solid rgba(144, 185, 232, 0.45);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.location-manager-group-row {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  color: var(--text-soft);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.location-manager-item {
+  margin: 0;
+}
+.location-manager-item-title {
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 0;
+}
+.location-manager-title-text {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.location-manager-title-text strong,
+.location-manager-title-text small {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.location-manager-title-text small {
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.location-manager-edit {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.location-manager-edit label {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.location-manager-edit textarea,
+.location-manager-edit .tag-manager-description-input {
+  grid-column: 2;
+}
+.location-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+.album-picker .location-dropdown {
+  width: min(280px, calc(100vw - 32px));
+}
+.location-dropdown {
+  width: min(280px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: none;
+  overflow: hidden;
+  padding: 0;
+}
+.location-dropdown-scroll {
+  max-height: 270px;
+  overflow: auto;
+  padding: 6px;
+}
+.location-dropdown-current-context {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 5px;
+  color: var(--text-soft);
+  background: #fff;
+  border-bottom: 1px solid rgba(144, 185, 232, 0.55);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.location-section-label {
+  padding: 6px 8px 4px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.2;
+}
+.location-option {
+  min-height: 34px;
+  align-items: center;
+}
+.location-option.location-group-selectable {
+  font-weight: 600;
+}
+.location-group-row {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.25;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 .tag-manager-actions {
   flex: 0 0 auto;

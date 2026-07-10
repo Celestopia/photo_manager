@@ -23,6 +23,7 @@ photo_metadata.csv
 tag_registry.jsonl
 album_registry.jsonl
 person_registry.jsonl
+location_registry.jsonl
 
 # Temporary files
 *.tmp

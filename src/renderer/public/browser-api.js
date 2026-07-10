@@ -13,6 +13,7 @@
     tagRegistryFile: "./tag_registry.jsonl",
     albumRegistryFile: "./album_registry.jsonl",
     personRegistryFile: "./person_registry.jsonl",
+    locationRegistryFile: "./location_registry.jsonl",
     thumbnail: {
       dir: "./thumb_cache",
       size: 320,
@@ -37,6 +38,7 @@
   let tagRegistry = null;
   let albumRegistry = null;
   let personRegistry = null;
+  let locationRegistry = null;
 
   /**
 
@@ -303,6 +305,175 @@
     const unknown = normalized.filter((person) => !personRegistry.has(person));
     return { people: normalized, unknown };
   }
+  function normalizeLocationName(value) {
+    return String(value ?? "").trim();
+  }
+
+  function normalizeLocationField(value) {
+    return String(value ?? "").trim();
+  }
+
+  function normalizeLocationObject(rawLocation) {
+    const source = rawLocation && typeof rawLocation === "object" ? rawLocation : {};
+    return {
+      Place: normalizeLocationName(source.Place ?? source.Site),
+      Detail: normalizeLocationField(source.Detail),
+    };
+  }
+
+  function locationUsageCounts() {
+    const counts = new Map();
+    for (const item of cache) {
+      const place = normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site);
+      if (!place) continue;
+      counts.set(place, (counts.get(place) || 0) + 1);
+    }
+    return counts;
+  }
+
+  function locationChildrenMap() {
+    const children = new Map();
+    for (const location of locationRegistry.values()) {
+      if (!children.has(location.Name)) children.set(location.Name, []);
+    }
+    for (const location of locationRegistry.values()) {
+      const parent = normalizeLocationName(location.Parent);
+      if (!parent || !locationRegistry.has(parent)) continue;
+      if (!children.has(parent)) children.set(parent, []);
+      children.get(parent).push(location.Name);
+    }
+    for (const names of children.values()) names.sort((a, b) => a.localeCompare(b, "zh-CN"));
+    return children;
+  }
+
+  function locationDescendants(name) {
+    const root = normalizeLocationName(name);
+    const children = locationChildrenMap();
+    const output = [];
+    const stack = [...(children.get(root) || [])];
+    const seen = new Set();
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current || seen.has(current)) continue;
+      seen.add(current);
+      output.push(current);
+      stack.push(...(children.get(current) || []));
+    }
+    return output;
+  }
+
+  function locationPath(name) {
+    const parts = [];
+    const seen = new Set();
+    let current = normalizeLocationName(name);
+    while (current && locationRegistry.has(current) && !seen.has(current)) {
+      seen.add(current);
+      parts.unshift(current);
+      current = normalizeLocationName(locationRegistry.get(current)?.Parent);
+    }
+    return parts;
+  }
+
+  function validateLocationParent(name, parent) {
+    const normalizedName = normalizeLocationName(name);
+    const normalizedParent = normalizeLocationName(parent);
+    if (!normalizedParent) return { ok: true, parent: "" };
+    if (!locationRegistry.has(normalizedParent)) return { ok: false, error: "Parent location not found" };
+    if (normalizedParent === normalizedName) return { ok: false, error: "Location cannot be its own parent" };
+    if (normalizedName && locationDescendants(normalizedName).includes(normalizedParent)) return { ok: false, error: "Parent cannot be a descendant location" };
+    return { ok: true, parent: normalizedParent };
+  }
+
+  function seedLocationRegistryFromMetadata() {
+    const now = new Date().toISOString();
+    for (const item of cache) {
+      const original = item?.Location && typeof item.Location === "object" ? item.Location : {};
+      const place = normalizeLocationName(original.Place ?? original.Site);
+      const detail = normalizeLocationField(original.Detail);
+      if (place && !locationRegistry.has(place)) {
+        locationRegistry.set(place, {
+          Name: place,
+          Country: normalizeLocationField(original.Country),
+          Province: normalizeLocationField(original.Province),
+          City: normalizeLocationField(original.City),
+          Parent: "",
+          Description: "",
+          CreatedAt: now,
+          UpdatedAt: now,
+        });
+      }
+      item.Location = { Place: place, Detail: detail };
+    }
+  }
+
+  function sanitizeLocationParents() {
+    for (const [name, location] of locationRegistry.entries()) {
+      const parent = normalizeLocationName(location.Parent);
+      if (!parent) {
+        location.Parent = "";
+        continue;
+      }
+      const validation = validateLocationParent(name, parent);
+      if (!validation.ok) location.Parent = "";
+    }
+  }
+
+  function listLocationDefinitions() {
+    const usage = locationUsageCounts();
+    const children = locationChildrenMap();
+    return [...locationRegistry.values()]
+      .map((location) => {
+        const path = locationPath(location.Name);
+        return {
+          ...location,
+          UsageCount: usage.get(location.Name) || 0,
+          Children: children.get(location.Name) || [],
+          Depth: Math.max(0, path.length - 1),
+          Path: path,
+        };
+      })
+      .sort((a, b) => a.Path.join("/").localeCompare(b.Path.join("/"), "zh-CN"));
+  }
+
+  async function loadLocationRegistry() {
+    if (locationRegistry) return locationRegistry;
+    await loadMetadata();
+    locationRegistry = new Map();
+    try {
+      const res = await fetch("/location_registry.jsonl");
+      if (res.ok) {
+        const text = await res.text();
+        for (const line of text.split(/\r?\n/).filter(Boolean)) {
+          const parsed = JSON.parse(line);
+          const name = normalizeLocationName(parsed?.Name);
+          if (!name) continue;
+          const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+          const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+          locationRegistry.set(name, {
+            Name: name,
+            Country: normalizeLocationField(parsed?.Country),
+            Province: normalizeLocationField(parsed?.Province),
+            City: normalizeLocationField(parsed?.City),
+            Parent: normalizeLocationName(parsed?.Parent),
+            Description: normalizeLocationField(parsed?.Description),
+            CreatedAt: createdAt,
+            UpdatedAt: updatedAt,
+          });
+        }
+      }
+    } catch {
+      // Browser preview keeps a memory-only registry when the file is absent.
+    }
+    seedLocationRegistryFromMetadata();
+    sanitizeLocationParents();
+    return locationRegistry;
+  }
+
+  function normalizeRegisteredLocation(rawLocation) {
+    const location = normalizeLocationObject(rawLocation);
+    const unknown = location.Place && !locationRegistry.has(location.Place) ? [location.Place] : [];
+    return { location, unknown };
+  }
   /**
 
    * Apply gallery filters, search conditions, and sorting to the cached list.
@@ -322,6 +493,10 @@
     }
     if (filters.tag) output = output.filter((item) => (item?.Customization?.Tags || []).includes(filters.tag));
     if (filters.person) output = output.filter((item) => (item?.Customization?.People || []).includes(filters.person));
+    if (filters.location) {
+      const allowedLocations = new Set([normalizeLocationName(filters.location), ...locationDescendants(filters.location)]);
+      output = output.filter((item) => allowedLocations.has(normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site)));
+    }
 
     if (search?.field && search?.value) {
       output = output.filter((item) => {
@@ -364,6 +539,7 @@
       await loadTagRegistry();
       await loadAlbumRegistry();
       await loadPersonRegistry();
+      await loadLocationRegistry();
       const filtered = filterAndSort(all, query);
       const page = Math.max(1, Number(query.page || 1));
       const pageSize = Math.max(1, Number(query.pageSize || 120));
@@ -387,6 +563,7 @@
           unassignedAlbumCount: all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length,
           tags: [...tagRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
           people: [...personRegistry.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+          locations: listLocationDefinitions(),
         },
       };
     },
@@ -478,9 +655,78 @@
       }
       return { ok: true, deleted: name, updatedCount, people: listPersonDefinitions() };
     },
+    async listLocations() {
+      await loadLocationRegistry();
+      return { ok: true, locations: listLocationDefinitions() };
+    },
+    async createLocation(payload) {
+      await loadLocationRegistry();
+      const name = normalizeLocationName(payload?.name ?? payload?.Name);
+      if (!name) return { ok: false, error: "Location name is required" };
+      if (locationRegistry.has(name)) return { ok: false, error: "Location already exists" };
+      const parentValidation = validateLocationParent(name, payload?.parent ?? payload?.Parent);
+      if (!parentValidation.ok) return { ok: false, error: parentValidation.error };
+      const now = new Date().toISOString();
+      const location = {
+        Name: name,
+        Country: normalizeLocationField(payload?.country ?? payload?.Country),
+        Province: normalizeLocationField(payload?.province ?? payload?.Province),
+        City: normalizeLocationField(payload?.city ?? payload?.City),
+        Parent: parentValidation.parent,
+        Description: normalizeLocationField(payload?.description ?? payload?.Description),
+        CreatedAt: now,
+        UpdatedAt: now,
+      };
+      locationRegistry.set(name, location);
+      return { ok: true, location: listLocationDefinitions().find((item) => item.Name === name), locations: listLocationDefinitions() };
+    },
+    async updateLocation(payload) {
+      await loadLocationRegistry();
+      const name = normalizeLocationName(payload?.name ?? payload?.Name);
+      const current = locationRegistry.get(name);
+      if (!name || !current) return { ok: false, error: "Location not found" };
+      const parentValidation = validateLocationParent(name, payload?.parent ?? payload?.Parent);
+      if (!parentValidation.ok) return { ok: false, error: parentValidation.error };
+      const next = {
+        ...current,
+        Country: normalizeLocationField(payload?.country ?? payload?.Country),
+        Province: normalizeLocationField(payload?.province ?? payload?.Province),
+        City: normalizeLocationField(payload?.city ?? payload?.City),
+        Parent: parentValidation.parent,
+        Description: normalizeLocationField(payload?.description ?? payload?.Description),
+        UpdatedAt: new Date().toISOString(),
+      };
+      locationRegistry.set(name, next);
+      return { ok: true, location: listLocationDefinitions().find((item) => item.Name === name), locations: listLocationDefinitions() };
+    },
+    async deleteLocationGlobally(payload) {
+      await loadLocationRegistry();
+      const name = normalizeLocationName(payload?.name ?? payload?.Name);
+      if (!name || !locationRegistry.has(name)) return { ok: false, error: "Location not found" };
+      locationRegistry.delete(name);
+      let orphanedChildren = 0;
+      let updatedCount = 0;
+      const now = new Date().toISOString();
+      for (const [childName, location] of locationRegistry.entries()) {
+        if (normalizeLocationName(location.Parent) !== name) continue;
+        locationRegistry.set(childName, { ...location, Parent: "", UpdatedAt: now });
+        orphanedChildren += 1;
+      }
+      for (const item of cache) {
+        if (normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site) !== name) continue;
+        item.Location = { Place: "", Detail: "" };
+        item.Customization = {
+          ...(item.Customization || {}),
+          MetadataUpdateDate: now,
+        };
+        updatedCount += 1;
+      }
+      return { ok: true, deleted: name, updatedCount, orphanedChildren, locations: listLocationDefinitions() };
+    },
     async listAlbums() {
       await loadAlbumRegistry();
       await loadPersonRegistry();
+      await loadLocationRegistry();
       return { ok: true, albums: listAlbumDefinitions() };
     },
     async createAlbum(payload) {
@@ -531,6 +777,7 @@
       await loadTagRegistry();
       await loadAlbumRegistry();
       await loadPersonRegistry();
+      await loadLocationRegistry();
       const idx = all.findIndex((x) => x.FilePath === payload.filePath);
       if (idx < 0) return { ok: false, error: "Item not found" };
       if (Object.prototype.hasOwnProperty.call(payload?.customization || {}, "Tags")) {
@@ -548,16 +795,19 @@
         if (validation.unknown.length) return { ok: false, error: `Unknown person: ${validation.unknown.join(", ")}` };
         payload.customization.People = validation.people;
       }
+      let normalizedLocation = null;
+      if (payload.location && typeof payload.location === "object") {
+        const locationValidation = normalizeRegisteredLocation(payload.location);
+        if (locationValidation.unknown.length) return { ok: false, error: `Unknown location: ${locationValidation.unknown.join(", ")}` };
+        normalizedLocation = locationValidation.location;
+      }
       all[idx].Customization = {
         ...all[idx].Customization,
         ...payload.customization,
         MetadataUpdateDate: new Date().toISOString(),
       };
       delete all[idx].Customization.Category;
-      all[idx].Location = {
-        ...(all[idx].Location || {}),
-        ...(payload.location || {}),
-      };
+      if (normalizedLocation) all[idx].Location = normalizedLocation;
       return { ok: true, item: all[idx] };
     },
     async batchUpdateMetadata(payload) {
@@ -565,6 +815,7 @@
       await loadTagRegistry();
       await loadAlbumRegistry();
       await loadPersonRegistry();
+      await loadLocationRegistry();
       const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
       const addTags = [...new Set((payload?.addTags || []).map((x) => String(x || "").trim()).filter(Boolean))];
       const addPeople = [...new Set((payload?.addPeople || []).map((x) => String(x || "").trim()).filter(Boolean))];
@@ -579,7 +830,12 @@
         if (albumValidation.unknown.length) return { ok: false, error: `Unknown album: ${albumValidation.unknown.join(", ")}` };
         customizationPatch.Album = albumValidation.album;
       }
-      const locationKeys = ["Country", "Province", "City", "Site"];
+      let normalizedLocationPatch = null;
+      if (Object.prototype.hasOwnProperty.call(locationPatch, "Place")) {
+        const locationValidation = normalizeRegisteredLocation({ Place: locationPatch.Place, Detail: "" });
+        if (locationValidation.unknown.length) return { ok: false, error: `Unknown location: ${locationValidation.unknown.join(", ")}` };
+        normalizedLocationPatch = locationValidation.location;
+      }
       const items = [];
       const requestedCount = filePaths.length;
       let missingCount = 0;
@@ -612,13 +868,9 @@
         };
         delete all[idx].Customization.Category;
 
-        all[idx].Location = {
-          ...(all[idx].Location || {}),
-        };
-        for (const key of locationKeys) {
-          if (Object.prototype.hasOwnProperty.call(locationPatch, key)) {
-            all[idx].Location[key] = String(locationPatch[key] ?? "");
-          }
+        all[idx].Location = normalizeLocationObject(all[idx].Location);
+        if (normalizedLocationPatch) {
+          all[idx].Location.Place = normalizedLocationPatch.Place;
         }
         items.push(all[idx]);
       }

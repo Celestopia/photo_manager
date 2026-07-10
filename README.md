@@ -3,7 +3,7 @@
 PhotoManager is a local-first desktop photo manager built with Electron + Vue.
 It is designed for personal usage on Windows and stores everything as local files
 (`config.yml`, `photo_metadata.jsonl`, image files, thumbnail cache, logs).
-Tag definitions are stored separately in `tag_registry.jsonl` so each tag has a clear description and can be reused consistently. Album definitions use the same registered-data approach in `album_registry.jsonl`, while each photo keeps at most one album title in `Customization.Album`. Person definitions are managed in `person_registry.jsonl`; photos store selected person names in `Customization.People`.
+Tag definitions are stored separately in `tag_registry.jsonl` so each tag has a clear description and can be reused consistently. Album definitions use the same registered-data approach in `album_registry.jsonl`, while each photo keeps at most one album title in `Customization.Album`. Person definitions are managed in `person_registry.jsonl`; photos store selected person names in `Customization.People`. Primary location names are managed in `location_registry.jsonl`; photos store only `Location.Place` plus optional free-text `Location.Detail`.
 
 ## Quick Start
 
@@ -56,7 +56,8 @@ The project has three runtime layers:
 - Loads `tag_registry.jsonl` into memory (`Map<Text, TagDefinition>`).
 - Loads `album_registry.jsonl` into memory (`Map<Title, AlbumDefinition>`).
 - Loads `person_registry.jsonl` into memory (`Map<Name, PersonDefinition>`).
-- Exposes IPC APIs for query/update/tag registry/album registry/person registry/copy/window control.
+- Loads `location_registry.jsonl` into memory (`Map<Name, LocationDefinition>`), backfilling from legacy location metadata when needed.
+- Exposes IPC APIs for query/update/tag registry/album registry/person registry/location registry/copy/window control.
 - Creates and monitors BrowserWindow.
 
 2. Preload bridge (`src/main/preload.js`)
@@ -83,7 +84,8 @@ Important difference:
 - Browser mode tag registry edits are also in-memory only.
 - Browser mode album registry edits are also in-memory only.
 - Browser mode person registry edits are also in-memory only.
-- Electron mode writes updates back to `photo_metadata.jsonl`, `tag_registry.jsonl`, `album_registry.jsonl`, and `person_registry.jsonl`.
+- Browser mode location registry edits are also in-memory only.
+- Electron mode writes updates back to `photo_metadata.jsonl`, `tag_registry.jsonl`, `album_registry.jsonl`, `person_registry.jsonl`, and `location_registry.jsonl`.
 
 ## Metadata and Data Flow
 
@@ -96,6 +98,7 @@ Important difference:
 - `tag_registry.jsonl`: one tag definition per line (`Text`, `Description`, `CreatedAt`, `UpdatedAt`).
 - `album_registry.jsonl`: one album definition per line (`Title`, `Description`, `CreatedAt`, `UpdatedAt`).
 - `person_registry.jsonl`: one person definition per line (`Name`, optional `Description`, `CreatedAt`, `UpdatedAt`).
+- `location_registry.jsonl`: one location definition per line (`Name`, optional `Country`/`Province`/`City`/`Parent`/`Description`, `CreatedAt`, `UpdatedAt`).
 - `logs/YYYY-MM-DD.log`: runtime diagnostics.
 
 ### Startup flow (Electron mode)
@@ -105,11 +108,12 @@ Important difference:
 3. Main process loads tag registry JSONL and backfills definitions for legacy tags already used by metadata.
 4. Main process loads album registry JSONL and backfills definitions for legacy non-empty albums.
 5. Main process loads person registry JSONL and backfills definitions for legacy people.
-6. Main process starts thumbnail warmup for missing cache entries.
-7. Renderer asks config plus tag/album/person registries via IPC.
-8. Renderer requests first gallery page (`gallery:query`).
-9. Main process filters/sorts/paginates and returns serializable payload with thumbnail paths.
-10. Renderer renders grouped gallery (thumbnail first, original image fallback on error).
+6. Main process loads location registry JSONL, migrates legacy `Location.Site` into `Location.Place`, and backfills missing location definitions.
+7. Main process starts thumbnail warmup for missing cache entries.
+8. Renderer asks config plus tag/album/person/location registries via IPC.
+9. Renderer requests first gallery page (`gallery:query`).
+10. Main process filters/sorts/paginates and returns serializable payload with thumbnail paths.
+11. Renderer renders grouped gallery (thumbnail first, original image fallback on error).
 
 ### Edit flow (Customization update)
 
@@ -117,10 +121,11 @@ Important difference:
 2. User sets album by selecting from the registered album list or creating an album with a required description.
 3. User adds tags by selecting from the registered tag list or creating a tag with a required description.
 4. User adds people by selecting from the registered person list or creating a person; description may be empty.
-5. Renderer sends `photo:update-customization`.
-6. Main process rejects unregistered albums/tags/people, updates metadata Map record, and stamps `MetadataUpdateDate`.
-7. Main process atomically rewrites JSONL (`.tmp` -> rename).
-8. Updated item is returned and renderer cache is patched in place.
+5. User sets primary location from the registered location tree, optionally adding free-text location detail.
+6. Renderer sends `photo:update-customization`.
+7. Main process rejects unregistered albums/tags/people/locations, updates metadata Map record, and stamps `MetadataUpdateDate`.
+8. Main process atomically rewrites JSONL (`.tmp` -> rename).
+9. Updated item is returned and renderer cache is patched in place.
 
 ### Tag registry flow
 
@@ -142,6 +147,14 @@ Important difference:
 2. `person:create` requires a non-empty person name; description may be empty.
 3. `person:update-description` updates optional person notes without changing photo metadata.
 4. `person:delete-global` removes a person from the registry and from every photo record that uses it.
+
+### Location registry flow
+
+1. Renderer loads location definitions via `location:list`.
+2. `location:create` requires a unique non-empty `Name`; country, province, city, parent, and description are optional.
+3. `location:update` can edit country/province/city/parent/description but cannot rename the location.
+4. `location:delete-global` removes the location, clears exact photo references, and makes its direct children parentless.
+5. Gallery location filtering includes the selected location and all descendants; `Location.Detail` is not searchable.
 
 ## Metadata Maintenance Scripts
 

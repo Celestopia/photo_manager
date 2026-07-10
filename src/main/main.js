@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   tagRegistryFile: "./tag_registry.jsonl",
   albumRegistryFile: "./album_registry.jsonl",
   personRegistryFile: "./person_registry.jsonl",
+  locationRegistryFile: "./location_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -68,6 +69,7 @@ let metadataIndex = new Map();
 let tagRegistryIndex = new Map();
 let albumRegistryIndex = new Map();
 let personRegistryIndex = new Map();
+let locationRegistryIndex = new Map();
 let thumbnailWarmupStarted = false;
 const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
 const DEFAULT_ALBUM_DESCRIPTION = "待补充：请填写该相册的明确含义。";
@@ -469,6 +471,235 @@ function normalizeRegisteredPeople(rawPeople) {
   return { people: normalized, unknown };
 }
 /**
+ * Normalize location text fields into canonical registry strings.
+ */
+function normalizeLocationName(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizeLocationField(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizeLocationObject(rawLocation) {
+  const source = rawLocation && typeof rawLocation === "object" ? rawLocation : {};
+  return {
+    Place: normalizeLocationName(source.Place ?? source.Site),
+    Detail: normalizeLocationField(source.Detail),
+  };
+}
+
+function getLocationUsageCounts() {
+  const counts = new Map();
+  for (const item of metadataIndex.values()) {
+    const place = normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site);
+    if (!place) continue;
+    counts.set(place, (counts.get(place) || 0) + 1);
+  }
+  return counts;
+}
+
+function getLocationChildrenMap() {
+  const children = new Map();
+  for (const location of locationRegistryIndex.values()) {
+    if (!children.has(location.Name)) children.set(location.Name, []);
+  }
+  for (const location of locationRegistryIndex.values()) {
+    const parent = normalizeLocationName(location.Parent);
+    if (!parent || !locationRegistryIndex.has(parent)) continue;
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(location.Name);
+  }
+  for (const names of children.values()) {
+    names.sort((a, b) => a.localeCompare(b, "zh-CN"));
+  }
+  return children;
+}
+
+function getLocationDescendants(name) {
+  const root = normalizeLocationName(name);
+  const children = getLocationChildrenMap();
+  const output = [];
+  const stack = [...(children.get(root) || [])];
+  const seen = new Set();
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current || seen.has(current)) continue;
+    seen.add(current);
+    output.push(current);
+    stack.push(...(children.get(current) || []));
+  }
+  return output;
+}
+
+function buildLocationPath(name) {
+  const parts = [];
+  const seen = new Set();
+  let current = normalizeLocationName(name);
+  while (current && locationRegistryIndex.has(current) && !seen.has(current)) {
+    seen.add(current);
+    parts.unshift(current);
+    current = normalizeLocationName(locationRegistryIndex.get(current)?.Parent);
+  }
+  return parts;
+}
+
+function getLocationDepth(name) {
+  return Math.max(0, buildLocationPath(name).length - 1);
+}
+
+function validateLocationParent(name, parent) {
+  const normalizedName = normalizeLocationName(name);
+  const normalizedParent = normalizeLocationName(parent);
+  if (!normalizedParent) return { ok: true, parent: "" };
+  if (!locationRegistryIndex.has(normalizedParent)) {
+    return { ok: false, error: "Parent location not found" };
+  }
+  if (normalizedParent === normalizedName) {
+    return { ok: false, error: "Location cannot be its own parent" };
+  }
+  if (normalizedName && getLocationDescendants(normalizedName).includes(normalizedParent)) {
+    return { ok: false, error: "Parent cannot be a descendant location" };
+  }
+  return { ok: true, parent: normalizedParent };
+}
+
+function listLocationDefinitions() {
+  const usage = getLocationUsageCounts();
+  const children = getLocationChildrenMap();
+  return [...locationRegistryIndex.values()]
+    .map((location) => ({
+      ...location,
+      UsageCount: usage.get(location.Name) || 0,
+      Children: children.get(location.Name) || [],
+      Depth: getLocationDepth(location.Name),
+      Path: buildLocationPath(location.Name),
+    }))
+    .sort((a, b) => a.Path.join("/").localeCompare(b.Path.join("/"), "zh-CN"));
+}
+
+async function saveLocationRegistryMap() {
+  const registryFile = toAbsolutePath(config.locationRegistryFile || DEFAULT_CONFIG.locationRegistryFile);
+  const tempFile = `${registryFile}.tmp`;
+  const lines = [...locationRegistryIndex.values()]
+    .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
+    .map((location) => JSON.stringify(location));
+  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
+  await fsp.rename(tempFile, registryFile);
+}
+
+function upsertLocationFromMetadata(name, sourceLocation, now) {
+  const locationName = normalizeLocationName(name);
+  if (!locationName || locationRegistryIndex.has(locationName)) return false;
+  locationRegistryIndex.set(locationName, {
+    Name: locationName,
+    Country: normalizeLocationField(sourceLocation?.Country),
+    Province: normalizeLocationField(sourceLocation?.Province),
+    City: normalizeLocationField(sourceLocation?.City),
+    Parent: "",
+    Description: "",
+    CreatedAt: now,
+    UpdatedAt: now,
+  });
+  return true;
+}
+
+function normalizeAllMetadataLocations() {
+  const now = new Date().toISOString();
+  let registryAdded = 0;
+  let metadataChanged = 0;
+
+  for (const [filePath, item] of metadataIndex.entries()) {
+    const original = item?.Location && typeof item.Location === "object" ? item.Location : {};
+    const place = normalizeLocationName(original.Place ?? original.Site);
+    const detail = normalizeLocationField(original.Detail);
+
+    if (place && upsertLocationFromMetadata(place, original, now)) {
+      registryAdded += 1;
+    }
+
+    const nextLocation = { Place: place, Detail: detail };
+    if (original.Place !== nextLocation.Place || original.Detail !== nextLocation.Detail || Object.keys(original).some((key) => !["Place", "Detail"].includes(key))) {
+      item.Location = nextLocation;
+      item.Customization = {
+        ...(item.Customization || {}),
+        MetadataUpdateDate: item?.Customization?.MetadataUpdateDate || now,
+      };
+      metadataIndex.set(filePath, item);
+      metadataChanged += 1;
+    }
+  }
+
+  return { registryAdded, metadataChanged };
+}
+
+function sanitizeLocationParentLinks() {
+  let changed = 0;
+  for (const [name, location] of locationRegistryIndex.entries()) {
+    const parent = normalizeLocationName(location.Parent);
+    if (!parent) {
+      if (location.Parent !== "") {
+        locationRegistryIndex.set(name, { ...location, Parent: "", UpdatedAt: new Date().toISOString() });
+        changed += 1;
+      }
+      continue;
+    }
+    const validation = validateLocationParent(name, parent);
+    if (!validation.ok) {
+      locationRegistryIndex.set(name, { ...location, Parent: "", UpdatedAt: new Date().toISOString() });
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+async function loadLocationRegistryIndex() {
+  locationRegistryIndex.clear();
+  const registryFile = toAbsolutePath(config.locationRegistryFile || DEFAULT_CONFIG.locationRegistryFile);
+  const fileExists = fs.existsSync(registryFile);
+
+  if (fileExists) {
+    const content = await fsp.readFile(registryFile, "utf8");
+    const lines = content.split(/\r?\n/).filter(Boolean);
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        const name = normalizeLocationName(parsed?.Name);
+        if (!name) continue;
+        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+        locationRegistryIndex.set(name, {
+          Name: name,
+          Country: normalizeLocationField(parsed?.Country),
+          Province: normalizeLocationField(parsed?.Province),
+          City: normalizeLocationField(parsed?.City),
+          Parent: normalizeLocationName(parsed?.Parent),
+          Description: normalizeLocationField(parsed?.Description),
+          CreatedAt: createdAt,
+          UpdatedAt: updatedAt,
+        });
+      } catch (error) {
+        appendLog(`Skip invalid location registry line: ${error.message}`);
+      }
+    }
+  }
+
+  const normalized = normalizeAllMetadataLocations();
+  const parentFixes = sanitizeLocationParentLinks();
+  if (!fileExists || normalized.registryAdded > 0 || parentFixes > 0) {
+    await saveLocationRegistryMap();
+  }
+  if (normalized.metadataChanged > 0) {
+    await saveMetadataMap();
+  }
+}
+
+function normalizeRegisteredLocation(rawLocation) {
+  const location = normalizeLocationObject(rawLocation);
+  const unknown = location.Place && !locationRegistryIndex.has(location.Place) ? [location.Place] : [];
+  return { location, unknown };
+}
+/**
  * Normalize album title into the canonical string stored on photo metadata.
  */
 function normalizeAlbumTitle(value) {
@@ -605,6 +836,11 @@ function filterAndSort(list, options) {
 
   if (filters.person) {
     output = output.filter((item) => Array.isArray(item?.Customization?.People) && item.Customization.People.includes(filters.person));
+  }
+
+  if (filters.location) {
+    const allowedLocations = new Set([normalizeLocationName(filters.location), ...getLocationDescendants(filters.location)]);
+    output = output.filter((item) => allowedLocations.has(normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site)));
   }
 
   if (search?.value && search?.field) {
@@ -747,6 +983,7 @@ function registerIpcHandlers() {
         unassignedAlbumCount,
         tags: [...tagRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
         people: [...personRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+        locations: listLocationDefinitions(),
       },
     };
     return toSerializable(payload);
@@ -925,6 +1162,118 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle("location:list", async () => toSerializable({ ok: true, locations: listLocationDefinitions() }));
+
+  ipcMain.handle("location:create", async (_, payload) => {
+    const name = normalizeLocationName(payload?.name ?? payload?.Name);
+    if (!name) {
+      return { ok: false, error: "Location name is required" };
+    }
+    if (locationRegistryIndex.has(name)) {
+      return { ok: false, error: "Location already exists" };
+    }
+    const parentValidation = validateLocationParent(name, payload?.parent ?? payload?.Parent);
+    if (!parentValidation.ok) {
+      return { ok: false, error: parentValidation.error };
+    }
+
+    const now = new Date().toISOString();
+    const location = {
+      Name: name,
+      Country: normalizeLocationField(payload?.country ?? payload?.Country),
+      Province: normalizeLocationField(payload?.province ?? payload?.Province),
+      City: normalizeLocationField(payload?.city ?? payload?.City),
+      Parent: parentValidation.parent,
+      Description: normalizeLocationField(payload?.description ?? payload?.Description),
+      CreatedAt: now,
+      UpdatedAt: now,
+    };
+    locationRegistryIndex.set(name, location);
+    try {
+      await saveLocationRegistryMap();
+      return toSerializable({ ok: true, location: { ...location, UsageCount: 0, Children: [], Depth: getLocationDepth(name), Path: buildLocationPath(name) }, locations: listLocationDefinitions() });
+    } catch (error) {
+      locationRegistryIndex.delete(name);
+      appendLog(`Failed to create location: ${error.message}`);
+      return { ok: false, error: "Failed to write location registry" };
+    }
+  });
+
+  ipcMain.handle("location:update", async (_, payload) => {
+    const name = normalizeLocationName(payload?.name ?? payload?.Name);
+    const current = locationRegistryIndex.get(name);
+    if (!name || !current) {
+      return { ok: false, error: "Location not found" };
+    }
+    const parentValidation = validateLocationParent(name, payload?.parent ?? payload?.Parent);
+    if (!parentValidation.ok) {
+      return { ok: false, error: parentValidation.error };
+    }
+
+    const previous = { ...current };
+    const next = {
+      ...current,
+      Country: normalizeLocationField(payload?.country ?? payload?.Country),
+      Province: normalizeLocationField(payload?.province ?? payload?.Province),
+      City: normalizeLocationField(payload?.city ?? payload?.City),
+      Parent: parentValidation.parent,
+      Description: normalizeLocationField(payload?.description ?? payload?.Description),
+      UpdatedAt: new Date().toISOString(),
+    };
+    locationRegistryIndex.set(name, next);
+    try {
+      await saveLocationRegistryMap();
+      return toSerializable({ ok: true, location: listLocationDefinitions().find((location) => location.Name === name), locations: listLocationDefinitions() });
+    } catch (error) {
+      locationRegistryIndex.set(name, previous);
+      appendLog(`Failed to update location: ${error.message}`);
+      return { ok: false, error: "Failed to write location registry" };
+    }
+  });
+
+  ipcMain.handle("location:delete-global", async (_, payload) => {
+    const name = normalizeLocationName(payload?.name ?? payload?.Name);
+    const current = locationRegistryIndex.get(name);
+    if (!name || !current) {
+      return { ok: false, error: "Location not found" };
+    }
+
+    const previousRegistry = new Map(locationRegistryIndex);
+    const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
+    let updatedCount = 0;
+    let orphanedChildren = 0;
+    const now = new Date().toISOString();
+    locationRegistryIndex.delete(name);
+
+    for (const [childName, location] of locationRegistryIndex.entries()) {
+      if (normalizeLocationName(location.Parent) !== name) continue;
+      locationRegistryIndex.set(childName, { ...location, Parent: "", UpdatedAt: now });
+      orphanedChildren += 1;
+    }
+
+    for (const [filePath, item] of metadataIndex.entries()) {
+      if (normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site) !== name) continue;
+      item.Location = { Place: "", Detail: "" };
+      item.Customization = {
+        ...(item.Customization || {}),
+        MetadataUpdateDate: now,
+      };
+      metadataIndex.set(filePath, item);
+      updatedCount += 1;
+    }
+
+    try {
+      await saveLocationRegistryMap();
+      if (updatedCount) await saveMetadataMap();
+      return toSerializable({ ok: true, deleted: name, updatedCount, orphanedChildren, locations: listLocationDefinitions() });
+    } catch (error) {
+      locationRegistryIndex = previousRegistry;
+      metadataIndex = previousMetadata;
+      appendLog(`Failed to delete location globally: ${error.message}`);
+      return { ok: false, error: "Failed to delete location" };
+    }
+  });
+
   ipcMain.handle("album:list", async () => toSerializable({ ok: true, albums: listAlbumDefinitions() }));
 
   ipcMain.handle("album:create", async (_, payload) => {
@@ -1042,6 +1391,15 @@ function registerIpcHandlers() {
       customization.People = validation.people;
     }
 
+    let normalizedLocation = null;
+    if (location && typeof location === "object") {
+      const validation = normalizeRegisteredLocation(location);
+      if (validation.unknown.length) {
+        return { ok: false, error: `Unknown location: ${validation.unknown.join(", ")}` };
+      }
+      normalizedLocation = validation.location;
+    }
+
     // Merge user edits and stamp update time.
     current.Customization = {
       ...current.Customization,
@@ -1049,10 +1407,9 @@ function registerIpcHandlers() {
       MetadataUpdateDate: new Date().toISOString(),
     };
     delete current.Customization.Category;
-    current.Location = {
-      ...(current.Location || {}),
-      ...(location || {}),
-    };
+    if (normalizedLocation) {
+      current.Location = normalizedLocation;
+    }
 
     metadataIndex.set(filePath, current);
 
@@ -1076,7 +1433,6 @@ function registerIpcHandlers() {
       return { ok: false, error: "No target file paths" };
     }
 
-    const locationKeys = ["Country", "Province", "City", "Site"];
     const dedupTags = [...new Set(addTags.map((x) => String(x || "").trim()).filter(Boolean))];
     const validation = normalizeRegisteredTags(dedupTags);
     if (validation.unknown.length) {
@@ -1093,6 +1449,14 @@ function registerIpcHandlers() {
         return { ok: false, error: `Unknown album: ${albumValidation.unknown.join(", ")}` };
       }
       customizationPatch.Album = albumValidation.album;
+    }
+    let normalizedLocationPatch = null;
+    if (Object.prototype.hasOwnProperty.call(locationPatch, "Place")) {
+      const locationValidation = normalizeRegisteredLocation({ Place: locationPatch.Place, Detail: "" });
+      if (locationValidation.unknown.length) {
+        return { ok: false, error: `Unknown location: ${locationValidation.unknown.join(", ")}` };
+      }
+      normalizedLocationPatch = locationValidation.location;
     }
     const updatedItems = [];
     const requestedCount = filePaths.length;
@@ -1126,13 +1490,9 @@ function registerIpcHandlers() {
       };
       delete current.Customization.Category;
 
-      current.Location = {
-        ...(current.Location || {}),
-      };
-      for (const key of locationKeys) {
-        if (Object.prototype.hasOwnProperty.call(locationPatch, key)) {
-          current.Location[key] = String(locationPatch[key] ?? "");
-        }
+      current.Location = normalizeLocationObject(current.Location);
+      if (normalizedLocationPatch) {
+        current.Location.Place = normalizedLocationPatch.Place;
       }
 
       metadataIndex.set(filePath, current);
@@ -1200,6 +1560,7 @@ async function bootstrap() {
   await loadTagRegistryIndex();
   await loadAlbumRegistryIndex();
   await loadPersonRegistryIndex();
+  await loadLocationRegistryIndex();
   // Start thumbnail warmup as soon as metadata is ready.
   warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
 

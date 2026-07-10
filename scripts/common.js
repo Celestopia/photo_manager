@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
   tagRegistryFile: "./tag_registry.jsonl",
   albumRegistryFile: "./album_registry.jsonl",
   personRegistryFile: "./person_registry.jsonl",
+  locationRegistryFile: "./location_registry.jsonl",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -152,10 +153,8 @@ function defaultCustomization(ext) {
  */
 function defaultLocation() {
   return {
-    Country: "",
-    Province: "",
-    City: "",
-    Site: "",
+    Place: "",
+    Detail: "",
   };
 }
 

@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   updateTagDescription: (payload) => ipcRenderer.invoke("tag:update-description", toSerializable(payload)),
   deleteTagGlobally: (payload) => ipcRenderer.invoke("tag:delete-global", toSerializable(payload)),
 
+  // Location registry
+  listLocations: () => ipcRenderer.invoke("location:list"),
+  createLocation: (payload) => ipcRenderer.invoke("location:create", toSerializable(payload)),
+  updateLocation: (payload) => ipcRenderer.invoke("location:update", toSerializable(payload)),
+  deleteLocationGlobally: (payload) => ipcRenderer.invoke("location:delete-global", toSerializable(payload)),
+
   // Album registry
   listAlbums: () => ipcRenderer.invoke("album:list"),
   createAlbum: (payload) => ipcRenderer.invoke("album:create", toSerializable(payload)),
