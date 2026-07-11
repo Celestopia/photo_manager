@@ -15,9 +15,9 @@
 <main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode && selectedGalleryCount > 0 }">
   <section class="gallery-content">
     <section class="toolbar-row">
-      <div class="toolbar-group"><label>相册</label><select class="input" v-model="query.filters.album" @change="applyFilterSort"><option value="">全部</option><option v-if="filterOptions.unassignedAlbumCount > 0" :value="UNASSIGNED_ALBUM_FILTER">未设置相册</option><option v-for="album in filterOptions.albums" :key="album" :value="album" :title="getAlbumDescription(album)">{{ album }}</option></select></div>
-      <div class="toolbar-group"><label>标签</label><select class="input" v-model="query.filters.tag" @change="applyFilterSort"><option value="">全部</option><option v-for="tag in filterOptions.tags" :key="tag" :value="tag" :title="getTagDescription(tag)">{{ tag }}</option></select></div>
-      <div class="toolbar-group"><label>人物</label><select class="input" v-model="query.filters.person" @change="applyFilterSort"><option value="">全部</option><option v-for="person in filterOptions.people" :key="person" :value="person" :title="getPersonDescription(person)">{{ person }}</option></select></div>
+      <div class="toolbar-group"><label>相册</label><RegistryFilterPicker kind="album" label="相册" /></div>
+      <div class="toolbar-group"><label>标签</label><RegistryFilterPicker kind="tag" label="标签" /></div>
+      <div class="toolbar-group"><label>人物</label><RegistryFilterPicker kind="person" label="人物" /></div>
       <div class="toolbar-group location-filter-group"><label>地点</label><LocationFilterPicker /></div>
       <div class="toolbar-group" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
       <div class="toolbar-group" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
@@ -70,6 +70,7 @@ import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
 import LocationFilterPicker from "./LocationFilterPicker.vue";
+import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
 
 const app = inject("appContext");

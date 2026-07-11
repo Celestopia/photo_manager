@@ -70,7 +70,7 @@
         <span v-if="editDraft.LocationDetail && !locationDetailExpanded" class="viewer-detail-indicator" aria-hidden="true"></span>
       </button>
     </div>
-    <LocationPicker target="viewer" placeholder="搜索已有地点" />
+    <LocationPicker target="viewer" placeholder="添加已有地点" search-placeholder="搜索已有地点" />
     <textarea
       v-if="locationDetailExpanded"
       class="input field-textarea location-detail-input"
@@ -82,7 +82,7 @@
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Location'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Location'">{{ saveNotice.message }}</div>
     <label>人物</label>
-    <PeoplePicker target="viewer" placeholder="搜索已有人物" />
+    <PeoplePicker target="viewer" placeholder="添加已有人物" search-placeholder="搜索已有人物" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'People'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'People'">{{ saveNotice.message }}</div>
     <label>标签</label>

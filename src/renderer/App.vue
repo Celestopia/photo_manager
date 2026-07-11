@@ -666,7 +666,7 @@ export default {
     }
 
     function openTagDropdown(target) {
-      tagDropdown[target] = true;
+      tagDropdown[target] = !tagDropdown[target];
     }
 
     function closeTagDropdown(target) {
@@ -878,7 +878,7 @@ export default {
     }
 
     function openPersonDropdown(target) {
-      personDropdown[target] = true;
+      personDropdown[target] = !personDropdown[target];
     }
 
     function closePersonDropdown(target) {
@@ -1417,7 +1417,7 @@ export default {
     }
 
     function openLocationDropdown(target) {
-      locationDropdown[target] = true;
+      locationDropdown[target] = !locationDropdown[target];
     }
 
     function closeLocationDropdown(target) {
@@ -1687,7 +1687,7 @@ export default {
     }
 
     function openAlbumDropdown(target) {
-      albumDropdown[target] = true;
+      albumDropdown[target] = !albumDropdown[target];
     }
 
     function closeAlbumDropdown(target) {

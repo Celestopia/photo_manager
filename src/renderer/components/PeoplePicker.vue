@@ -11,30 +11,33 @@
         <span>{{ person }}</span>
         <button type="button" class="tag-remove" @click.stop="removeSelectedPerson(index)">×</button>
       </span>
-      <div class="tag-search-wrap">
-        <input
-          class="tag-input"
-          v-model="personSearch[target]"
-          @focus="openPersonDropdown(target)"
-          @input="openPersonDropdown(target)"
-          @keydown="onPersonSearchKeydown($event, target)"
-          :placeholder="placeholder"
-          autocomplete="off"
-        />
-        <div class="tag-dropdown" v-if="personDropdown[target]">
-          <button
-            v-for="person in personOptions"
-            :key="target + '_person_option_' + person.Name"
-            type="button"
-            class="tag-option"
-            :data-tip="person.Description"
-            @mousedown.prevent="addPersonToTarget(target, person.Name)"
-          >
-            <span>{{ person.Name }}</span>
-          </button>
-          <div class="tag-option-empty" v-if="!personOptions.length">没有匹配的人物</div>
+      <button type="button" class="tag-editor-trigger" @click="openPersonDropdown(target)">
+        <span v-if="!selectedPeople.length">{{ placeholder }}</span>
+        <span v-else>选择人物</span>
+      </button>
+        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown" v-if="personDropdown[target]">
+          <input
+            autofocus
+            class="input dropdown-search-input"
+            v-model="personSearch[target]"
+            @keydown="onPersonSearchKeydown($event, target)"
+            :placeholder="searchPlaceholder"
+            autocomplete="off"
+          />
+          <div class="registry-dropdown-options">
+            <button
+              v-for="person in personOptions"
+              :key="target + '_person_option_' + person.Name"
+              type="button"
+              class="tag-option"
+              :data-tip="person.Description"
+              @mousedown.prevent="addPersonToTarget(target, person.Name)"
+            >
+              <span>{{ person.Name }}</span>
+            </button>
+            <div class="tag-option-empty" v-if="!personOptions.length">没有匹配的人物</div>
+          </div>
         </div>
-      </div>
       </div>
       <div class="tag-actions">
         <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建人物" @click.stop="openCreatePersonMenu(target)">+</button>
@@ -63,6 +66,7 @@ import { computed, inject } from "vue";
 const props = defineProps({
   target: { type: String, required: true },
   placeholder: { type: String, default: "搜索人物" },
+  searchPlaceholder: { type: String, default: "搜索人物" },
 });
 
 const app = inject("appContext");

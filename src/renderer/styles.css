@@ -74,6 +74,40 @@ html, body, #app {
 }
 .toolbar-group { display: flex; align-items: center; gap: 8px; }
 .toolbar-group.right { margin-left: auto; }
+.registry-filter-picker {
+  position: relative;
+  width: 150px;
+  min-width: 0;
+}
+.registry-trigger {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text);
+  text-align: left;
+  cursor: default;
+}
+.registry-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.registry-filter-dropdown {
+  left: 0;
+  right: auto;
+  width: 100%;
+  max-height: none;
+  overflow: hidden;
+}
+.registry-dropdown-options {
+  max-height: 220px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 .toolbar-group.location-filter-group {
   align-items: center;
 }
@@ -85,12 +119,12 @@ html, body, #app {
 .location-filter-input {
   width: 100%;
   min-height: 34px;
-  padding-right: 30px;
+  padding-right: 10px;
 }
 .location-filter-dropdown {
   left: 0;
   right: auto;
-  width: min(360px, calc(100vw - 32px));
+  width: 100%;
 }
 .batch-count { color: var(--text-soft); font-size: 13px; min-width: 72px; }
 .gallery-list { min-height: 0; overflow: auto; padding-right: 8px; }
@@ -348,6 +382,7 @@ html, body, #app {
   min-height: 34px;
   padding-right: 30px;
 }
+.album-input.registry-trigger { justify-content: flex-start; }
 .album-clear-btn {
   position: absolute;
   right: 8px;
@@ -373,12 +408,30 @@ html, body, #app {
 .album-picker .tag-dropdown {
   left: 0;
   right: auto;
-  width: min(240px, 100%);
+  width: 100%;
 }
 .controlled-tag-editor {
+  position: relative;
   align-items: center;
   min-width: 0;
   max-width: 100%;
+}
+.tag-editor-trigger {
+  min-width: 88px;
+  flex: 1 1 88px;
+  align-self: stretch;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+}
+.controlled-tag-dropdown {
+  left: 0;
+  right: auto;
+  width: 100%;
 }
 .controlled-tag-control {
   width: 100%;
@@ -426,6 +479,32 @@ html, body, #app {
   box-shadow: var(--shadow);
   z-index: 70;
   padding: 6px;
+}
+.tag-dropdown.searchable-dropdown,
+.tag-dropdown.registry-filter-dropdown {
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.tag-dropdown.registry-filter-dropdown {
+  left: 0;
+  right: auto;
+  width: 100%;
+}
+.controlled-tag-editor > .tag-dropdown,
+.album-input-wrap > .tag-dropdown {
+  left: 0;
+  right: auto;
+  width: 100%;
+}
+.dropdown-search-input {
+  position: static;
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 34px;
+  margin-bottom: 6px;
+  background: #fff;
 }
 .tag-option {
   width: 100%;
@@ -741,19 +820,23 @@ html, body, #app {
   white-space: normal;
 }
 .album-picker .location-dropdown {
-  width: min(280px, calc(100vw - 32px));
+  width: 100%;
 }
 .location-dropdown {
-  width: min(280px, calc(100vw - 32px));
+  width: 100%;
   max-width: 100%;
   max-height: none;
   overflow: hidden;
-  padding: 0;
+  padding: 6px;
+}
+.location-dropdown-search {
+  width: 100%;
+  margin: 0 0 6px;
 }
 .location-dropdown-scroll {
   max-height: 270px;
   overflow: auto;
-  padding: 6px;
+  padding: 0;
 }
 .location-dropdown-current-context {
   min-height: 32px;

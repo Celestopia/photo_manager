@@ -1,25 +1,20 @@
 <template>
   <div class="location-filter-picker" @click.stop>
     <div class="album-input-wrap">
-      <input
-        class="input location-filter-input"
-        v-model="filterInputText"
-        :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
-        @focus="openDropdown"
-        @input="openDropdown"
-        @keydown="onKeydown"
-        autocomplete="off"
-        placeholder="全部"
-      />
       <button
         type="button"
-        class="album-clear-btn"
-        v-if="selectedLocation"
-        data-tip="清除地点筛选"
-        aria-label="清除地点筛选"
-        @click.stop="clearFilter"
-      >×</button>
+        class="input location-filter-input registry-trigger"
+        :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
+        @click="openDropdown"
+      ><span>{{ selectedLocation || '全部' }}</span></button>
       <div class="tag-dropdown location-dropdown location-filter-dropdown" v-if="dropdownOpen">
+        <input
+          ref="searchInputRef"
+          class="input dropdown-search-input location-dropdown-search"
+          v-model="searchText"
+          placeholder="搜索地点"
+          @keydown="onKeydown"
+        />
         <div class="location-dropdown-current-context" v-if="filterDropdownContext">{{ filterDropdownContext }}</div>
         <div class="location-dropdown-scroll" ref="filterDropdownRef" @scroll="updateFilterDropdownContext">
           <button type="button" class="tag-option location-option" @mousedown.prevent="selectLocation('')">
@@ -54,7 +49,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const app = inject("appContext");
 if (!app) {
@@ -70,22 +65,27 @@ const {
 } = app;
 
 const dropdownOpen = ref(false);
+const pickerId = Symbol("location");
 const searchText = ref("");
 const filterDropdownRef = ref(null);
+const searchInputRef = ref(null);
 const filterDropdownContext = ref("");
 const selectedLocation = computed(() => query.filters.location || "");
-const filterInputText = computed({
-  get() {
-    return dropdownOpen.value ? searchText.value : selectedLocation.value || "全部";
-  },
-  set(value) {
-    searchText.value = value;
-  },
-});
 const filterRows = computed(() => getLocationFilterRows(searchText.value));
 
 function openDropdown() {
+  const nextOpen = !dropdownOpen.value;
+  if (!nextOpen) {
+    closeDropdown();
+    return;
+  }
+  window.dispatchEvent(new CustomEvent("gallery-filter-picker-open", { detail: pickerId }));
   dropdownOpen.value = true;
+  nextTick(() => searchInputRef.value?.focus());
+}
+
+function closeFromOtherPicker(event) {
+  if (event.detail !== pickerId) closeDropdown();
 }
 
 function closeDropdown() {
@@ -135,6 +135,16 @@ watch(
   () => [dropdownOpen.value, filterRows.value.length, searchText.value],
   () => scheduleFilterDropdownContextUpdate()
 );
+
+onMounted(() => {
+  window.addEventListener("click", closeDropdown);
+  window.addEventListener("gallery-filter-picker-open", closeFromOtherPicker);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("click", closeDropdown);
+  window.removeEventListener("gallery-filter-picker-open", closeFromOtherPicker);
+});
 
 function firstSelectableRow() {
   return filterRows.value.find((row) => row.Location);

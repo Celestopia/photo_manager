@@ -2,16 +2,12 @@
   <div class="album-picker" @click.stop>
     <div class="album-control">
       <div class="album-input-wrap">
-        <input
-          class="input album-input"
-          v-model="albumInputText"
+        <button
+          type="button"
+          class="input album-input registry-trigger"
           :data-tip="selectedAlbum ? getAlbumDescription(selectedAlbum) : ''"
-          @focus="openAlbumDropdown(target)"
-          @input="openAlbumDropdown(target)"
-          @keydown="onAlbumSearchKeydown($event, target)"
-          :placeholder="placeholder"
-          autocomplete="off"
-        />
+          @click="openAlbumDropdown(target)"
+        ><span>{{ selectedAlbum || placeholder }}</span></button>
         <button
           type="button"
           class="album-clear-btn"
@@ -20,18 +16,28 @@
           aria-label="将当前图片移出相册"
           @click.stop="clearAlbumForTarget(target)"
         >×</button>
-        <div class="tag-dropdown" v-if="albumDropdown[target]">
-          <button
-            v-for="album in albumOptions"
-            :key="target + '_album_option_' + album.Title"
-            type="button"
-            class="tag-option"
-            :data-tip="album.Description"
-            @mousedown.prevent="setAlbumForTarget(target, album.Title)"
-          >
-            <span>{{ album.Title }}</span>
-          </button>
-          <div class="tag-option-empty" v-if="!albumOptions.length">没有匹配的相册</div>
+        <div class="tag-dropdown searchable-dropdown" v-if="albumDropdown[target]">
+          <input
+            autofocus
+            class="input dropdown-search-input"
+            v-model="albumSearch[target]"
+            @keydown="onAlbumSearchKeydown($event, target)"
+            :placeholder="placeholder"
+            autocomplete="off"
+          />
+          <div class="registry-dropdown-options">
+            <button
+              v-for="album in albumOptions"
+              :key="target + '_album_option_' + album.Title"
+              type="button"
+              class="tag-option"
+              :data-tip="album.Description"
+              @mousedown.prevent="setAlbumForTarget(target, album.Title)"
+            >
+              <span>{{ album.Title }}</span>
+            </button>
+            <div class="tag-option-empty" v-if="!albumOptions.length">没有匹配的相册</div>
+          </div>
         </div>
       </div>
       <div class="tag-actions">
@@ -89,13 +95,5 @@ const {
 
 const target = props.target;
 const selectedAlbum = computed(() => (props.target === "batch" ? batchEdit.album : editDraft.Album));
-const albumInputText = computed({
-  get() {
-    return albumDropdown[props.target] ? albumSearch[props.target] : selectedAlbum.value;
-  },
-  set(value) {
-    albumSearch[props.target] = value;
-  },
-});
 const albumOptions = computed(() => getAlbumOptions(props.target));
 </script>

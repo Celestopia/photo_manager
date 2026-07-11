@@ -2,16 +2,12 @@
   <div class="album-picker location-picker" @click.stop>
     <div class="album-control">
       <div class="album-input-wrap">
-        <input
-          class="input album-input"
-          v-model="locationInputText"
+        <button
+          type="button"
+          class="input album-input registry-trigger"
           :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
-          @focus="openLocationDropdown(target)"
-          @input="openLocationDropdown(target)"
-          @keydown="onLocationSearchKeydown($event, target)"
-          :placeholder="placeholder"
-          autocomplete="off"
-        />
+          @click="openLocationDropdown(target)"
+        ><span>{{ selectedLocation || placeholder }}</span></button>
         <button
           type="button"
           class="album-clear-btn"
@@ -21,6 +17,14 @@
           @click.stop="clearLocationForTarget(target)"
         >×</button>
         <div class="tag-dropdown location-dropdown" v-if="locationDropdown[target]">
+          <input
+            autofocus
+            class="input dropdown-search-input location-dropdown-search"
+            v-model="locationSearch[target]"
+            @keydown="onLocationSearchKeydown($event, target)"
+            :placeholder="searchPlaceholder"
+            autocomplete="off"
+          />
           <div class="location-dropdown-current-context" v-if="locationDropdownContext">{{ locationDropdownContext }}</div>
           <div class="location-dropdown-scroll" ref="locationDropdownRef" @scroll="updateLocationDropdownContext">
             <template v-for="row in locationMenuRows" :key="target + '_' + row.Key">
@@ -119,6 +123,7 @@ import { computed, inject, nextTick, ref, watch } from "vue";
 const props = defineProps({
   target: { type: String, required: true },
   placeholder: { type: String, default: "搜索地点" },
+  searchPlaceholder: { type: String, default: "搜索地点" },
 });
 
 const app = inject("appContext");
@@ -151,14 +156,6 @@ const {
 
 const target = props.target;
 const selectedLocation = computed(() => (props.target === "batch" ? batchEdit.locationPlace : editDraft.LocationPlace));
-const locationInputText = computed({
-  get() {
-    return locationDropdown[props.target] ? locationSearch[props.target] : selectedLocation.value;
-  },
-  set(value) {
-    locationSearch[props.target] = value;
-  },
-});
 const locationMenuRows = computed(() => getLocationMenuRows(props.target));
 const createParentRows = computed(() => getLocationParentRows(locationCreate.parentSearch, locationCreate.name));
 const locationDropdownRef = ref(null);

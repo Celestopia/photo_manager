@@ -11,30 +11,33 @@
         <span>{{ tag }}</span>
         <button type="button" class="tag-remove" @click.stop="removeSelectedTag(index)">×</button>
       </span>
-      <div class="tag-search-wrap">
-        <input
-          class="tag-input"
-          v-model="tagSearch[target]"
-          @focus="openTagDropdown(target)"
-          @input="openTagDropdown(target)"
-          @keydown="onTagSearchKeydown($event, target)"
-          :placeholder="placeholder"
-          autocomplete="off"
-        />
-        <div class="tag-dropdown" v-if="tagDropdown[target]">
-          <button
-            v-for="tag in tagOptions"
-            :key="target + '_option_' + tag.Text"
-            type="button"
-            class="tag-option"
-            :data-tip="tag.Description"
-            @mousedown.prevent="addTagToTarget(target, tag.Text)"
-          >
-            <span>{{ tag.Text }}</span>
-          </button>
-          <div class="tag-option-empty" v-if="!tagOptions.length">没有匹配的标签</div>
+      <button type="button" class="tag-editor-trigger" @click="openTagDropdown(target)">
+        <span v-if="!selectedTags.length">{{ placeholder }}</span>
+        <span v-else>选择标签</span>
+      </button>
+        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown" v-if="tagDropdown[target]">
+          <input
+            autofocus
+            class="input dropdown-search-input"
+            v-model="tagSearch[target]"
+            @keydown="onTagSearchKeydown($event, target)"
+            :placeholder="placeholder"
+            autocomplete="off"
+          />
+          <div class="registry-dropdown-options">
+            <button
+              v-for="tag in tagOptions"
+              :key="target + '_option_' + tag.Text"
+              type="button"
+              class="tag-option"
+              :data-tip="tag.Description"
+              @mousedown.prevent="addTagToTarget(target, tag.Text)"
+            >
+              <span>{{ tag.Text }}</span>
+            </button>
+            <div class="tag-option-empty" v-if="!tagOptions.length">没有匹配的标签</div>
+          </div>
         </div>
-      </div>
       </div>
       <div class="tag-actions">
         <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建标签" @click.stop="openCreateTagMenu(target)">+</button>
