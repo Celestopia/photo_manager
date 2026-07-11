@@ -58,9 +58,25 @@
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Album'">{{ saveNotice.message }}</div>
     <label>地点</label>
     <LocationPicker target="viewer" placeholder="搜索已有地点" />
+    <button
+      type="button"
+      class="location-detail-toggle"
+      :aria-expanded="locationDetailExpanded"
+      @click="locationDetailExpanded = !locationDetailExpanded"
+    >
+      <span class="location-detail-chevron" :class="{ expanded: locationDetailExpanded }">&gt;</span>
+      <span>位置细节</span>
+    </button>
+    <textarea
+      v-if="locationDetailExpanded"
+      class="input field-textarea location-detail-input"
+      v-model="editDraft.LocationDetail"
+      @input="onFieldTextareaInput($event, 'Location')"
+      rows="1"
+      placeholder="输入具体位置细节"
+    ></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Location'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Location'">{{ saveNotice.message }}</div>
-    <label>位置细节</label><textarea class="input field-textarea" v-model="editDraft.LocationDetail" @input="onFieldTextareaInput($event, 'Location')" rows="1" placeholder="输入具体位置细节"></textarea>
     <label>人物</label>
     <PeoplePicker target="viewer" placeholder="搜索已有人物" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'People'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
@@ -104,7 +120,7 @@
 </template>
 
 <script setup>
-import { inject } from "vue";
+import { inject, ref } from "vue";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
@@ -114,6 +130,8 @@ const app = inject("appContext");
 if (!app) {
   throw new Error("ViewerView must be used under App.vue provider");
 }
+
+const locationDetailExpanded = ref(false);
 
 const {
   ICONS,

@@ -181,6 +181,37 @@ html, body, #app {
   overflow-y: hidden;
   resize: none;
 }
+.location-detail-toggle {
+  width: 100%;
+  min-height: 28px;
+  margin-top: 6px;
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.location-detail-chevron {
+  display: inline-block;
+  width: 12px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  transform-origin: center;
+  transition: transform 150ms ease;
+}
+.location-detail-chevron.expanded { transform: rotate(90deg); }
+.location-detail-input {
+  display: block;
+  width: calc(75% - 18px);
+  margin-left: 18px;
+}
 .location-field { position: relative; }
 .location-label-row {
   margin-top: 8px;
