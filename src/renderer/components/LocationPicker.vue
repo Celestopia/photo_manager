@@ -70,13 +70,11 @@
       <input class="input" v-model="locationCreate.city" />
       <label>父节点</label>
       <div class="album-input-wrap">
-        <input
-          class="input"
-          v-model="locationCreate.parentSearch"
-          :placeholder="locationCreate.parent || '搜索父地点，可留空'"
-          @focus="locationCreate.parentDropdown = true"
-          @input="locationCreate.parentDropdown = true"
-        />
+        <button
+          type="button"
+          class="input registry-trigger location-parent-trigger"
+          @click="locationCreate.parentDropdown = !locationCreate.parentDropdown"
+        ><span>{{ locationCreate.parent || '选择父地点，可留空' }}</span></button>
         <button
           type="button"
           class="album-clear-btn"
@@ -85,6 +83,14 @@
           @click.stop="clearCreateLocationParent"
         >×</button>
         <div class="tag-dropdown location-dropdown" v-if="locationCreate.parentDropdown">
+          <input
+            autofocus
+            class="input dropdown-search-input location-dropdown-search"
+            v-model="locationCreate.parentSearch"
+            placeholder="搜索父地点"
+            autocomplete="off"
+            @keydown.escape="locationCreate.parentDropdown = false"
+          />
           <template v-for="row in createParentRows" :key="target + '_parent_' + row.Key">
             <button
               v-if="row.Location"
