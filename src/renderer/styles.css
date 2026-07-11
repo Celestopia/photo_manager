@@ -165,9 +165,10 @@ html, body, #app {
 .side-panel.right-panel.collapsed { opacity: 0; transform: translateX(16px) scale(0.96); padding: 0; border-width: 0; pointer-events: none; overflow: hidden; }
 .side-panel h3 { margin-top: 0; }
 .side-panel dl { margin: 0; }
-.side-panel dt { color: var(--text-soft); font-size: 13px; margin-top: 10px; }
+.side-panel dt { color: var(--text-soft); font-size: 13px; font-weight: 700; margin-top: 10px; }
 .side-panel dd { margin: 2px 0 0; word-break: break-all; }
 .side-panel label { margin-top: 8px; display: block; color: var(--text-soft); font-size: 13px; }
+.right-panel > label { font-weight: 700; }
 .right-panel .input:not(.field-textarea) { width: 100%; }
 .field-textarea {
   width: 75%;
