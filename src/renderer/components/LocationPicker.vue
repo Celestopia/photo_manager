@@ -107,7 +107,7 @@
         </div>
       </div>
       <label>说明（可留空）</label>
-      <textarea class="input tag-create-description" v-model="locationCreate.description"></textarea>
+      <textarea class="input tag-create-description location-create-description" v-model="locationCreate.description"></textarea>
       <div class="tag-create-error" v-if="locationCreate.error">{{ locationCreate.error }}</div>
       <div class="tag-create-actions">
         <button class="btn" @click="closeCreateLocationMenu">取消</button>

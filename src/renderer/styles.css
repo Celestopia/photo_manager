@@ -555,6 +555,9 @@ html, body, #app {
   min-height: 88px;
   resize: vertical;
 }
+.location-picker .location-create-description {
+  min-height: 56px;
+}
 .tag-create-error,
 .tag-manager-error {
   color: var(--danger);
@@ -688,6 +691,39 @@ html, body, #app {
   background: #fff;
   box-shadow: 0 22px 60px rgba(10, 32, 54, 0.28);
 }
+.registry-create-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 32, 54, 0.42);
+}
+.registry-create-modal {
+  width: min(560px, 94vw);
+  max-height: 90vh;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(10, 32, 54, 0.36);
+  overflow: auto;
+}
+.registry-create-location-modal {
+  width: min(700px, 90vw);
+  height: min(600px, 75vh);
+  max-height: 75vh;
+  align-content: start;
+  overflow: visible;
+}
+.location-parent-trigger {
+  min-height: 36px;
+  padding-right: 30px;
+}
 .tag-manager-header,
 .tag-manager-item,
 .tag-manager-item-title,
@@ -699,11 +735,50 @@ html, body, #app {
 .tag-manager-header {
   justify-content: space-between;
 }
+.tag-manager-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-symbol-btn {
+  font-family: "Segoe UI Symbol", "Arial", sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
 .tag-manager-header h3 {
   margin: 0;
 }
+.tag-manager-controls {
+  min-height: 0;
+  display: grid;
+  gap: 8px;
+}
 .tag-manager-search {
   width: 100%;
+}
+.tag-manager-create-panel {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-card-soft);
+}
+.tag-manager-create-panel label {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.tag-manager-create-panel textarea,
+.tag-manager-create-panel .tag-create-error,
+.tag-manager-create-panel .tag-create-actions {
+  grid-column: 2;
+}
+.tag-manager-create-panel .tag-create-description {
+  min-height: 64px;
 }
 .tag-manager-list {
   min-height: 0;

@@ -13,9 +13,14 @@
       <section class="tag-manager-modal" @click.stop>
         <header class="tag-manager-header">
           <h3>标签管理</h3>
-          <button class="btn" @click="closeTagManager">关闭</button>
+          <div class="tag-manager-header-actions">
+            <button class="btn icon-btn modal-symbol-btn" data-tip="新建标签" @click="openCreateTagMenu('manager')">+</button>
+            <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeTagManager">×</button>
+          </div>
         </header>
-        <input class="input tag-manager-search" v-model="tagManager.search" placeholder="搜索标签或说明" />
+        <div class="tag-manager-controls">
+          <input class="input tag-manager-search" v-model="tagManager.search" placeholder="搜索标签或说明" />
+        </div>
         <div class="tag-manager-list">
           <article class="tag-manager-item" v-for="tag in managerFilteredTags" :key="'manager_' + tag.Text">
             <div class="tag-manager-item-main">
@@ -48,9 +53,14 @@
       <section class="tag-manager-modal" @click.stop>
         <header class="tag-manager-header">
           <h3>相册管理</h3>
-          <button class="btn" @click="closeAlbumManager">关闭</button>
+          <div class="tag-manager-header-actions">
+            <button class="btn icon-btn modal-symbol-btn" data-tip="新建相册" @click="openCreateAlbumMenu('manager')">+</button>
+            <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeAlbumManager">×</button>
+          </div>
         </header>
-        <input class="input tag-manager-search" v-model="albumManager.search" placeholder="搜索相册或说明" />
+        <div class="tag-manager-controls">
+          <input class="input tag-manager-search" v-model="albumManager.search" placeholder="搜索相册或说明" />
+        </div>
         <div class="tag-manager-list">
           <article class="tag-manager-item" v-for="album in managerFilteredAlbums" :key="'album_manager_' + album.Title">
             <div class="tag-manager-item-main">
@@ -83,9 +93,14 @@
       <section class="tag-manager-modal" @click.stop>
         <header class="tag-manager-header">
           <h3>人物管理</h3>
-          <button class="btn" @click="closePersonManager">关闭</button>
+          <div class="tag-manager-header-actions">
+            <button class="btn icon-btn modal-symbol-btn" data-tip="新建人物" @click="openCreatePersonMenu('manager')">+</button>
+            <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closePersonManager">×</button>
+          </div>
         </header>
-        <input class="input tag-manager-search" v-model="personManager.search" placeholder="搜索姓名或说明" />
+        <div class="tag-manager-controls">
+          <input class="input tag-manager-search" v-model="personManager.search" placeholder="搜索姓名或说明" />
+        </div>
         <div class="tag-manager-list">
           <article class="tag-manager-item" v-for="person in managerFilteredPeople" :key="'person_manager_' + person.Name">
             <div class="tag-manager-item-main">
@@ -119,9 +134,14 @@
       <section class="tag-manager-modal" @click.stop>
         <header class="tag-manager-header">
           <h3>地点管理</h3>
-          <button class="btn" @click="closeLocationManager">关闭</button>
+          <div class="tag-manager-header-actions">
+            <button class="btn icon-btn modal-symbol-btn" data-tip="新建地点" @click="openCreateLocationMenu('manager')">+</button>
+            <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeLocationManager">×</button>
+          </div>
         </header>
-        <input class="input tag-manager-search" v-model="locationManager.search" placeholder="搜索地点、说明或行政区" />
+        <div class="tag-manager-controls">
+          <input class="input tag-manager-search" v-model="locationManager.search" placeholder="搜索地点、说明或行政区" />
+        </div>
         <div class="location-manager-current-context" v-if="locationManagerContext">{{ locationManagerContext }}</div>
         <div class="tag-manager-list location-manager-list" ref="locationManagerListRef" @scroll="updateLocationManagerContext">
           <template v-for="row in managerLocationRows" :key="'location_manager_' + row.Key">
@@ -168,6 +188,68 @@
             </article>
           </template>
           <div class="tag-manager-empty" v-if="!managerLocationRows.length">没有匹配的地点</div>
+        </div>
+      </section>
+    </div>
+    <div class="registry-create-backdrop" v-if="tagCreate.visible && tagCreate.target === 'manager'" @click="closeCreateTagMenu">
+      <section class="registry-create-modal" @click.stop>
+        <header class="tag-manager-header"><h3>新建标签</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeCreateTagMenu">×</button></header>
+        <div class="tag-manager-create-panel">
+          <label>标签名称</label><input class="input" v-model="tagCreate.text" />
+          <label>说明</label><textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
+          <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
+          <div class="tag-create-actions"><button class="btn" @click="closeCreateTagMenu">取消</button><button class="btn btn-primary" @click="createTagAndSelect">创建</button></div>
+        </div>
+      </section>
+    </div>
+    <div class="registry-create-backdrop" v-if="albumCreate.visible && albumCreate.target === 'manager'" @click="closeCreateAlbumMenu">
+      <section class="registry-create-modal" @click.stop>
+        <header class="tag-manager-header"><h3>新建相册</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeCreateAlbumMenu">×</button></header>
+        <div class="tag-manager-create-panel">
+          <label>相册名称</label><input class="input" v-model="albumCreate.title" />
+          <label>说明</label><textarea class="input tag-create-description" v-model="albumCreate.description"></textarea>
+          <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
+          <div class="tag-create-actions"><button class="btn" @click="closeCreateAlbumMenu">取消</button><button class="btn btn-primary" @click="createAlbumAndSelect">创建</button></div>
+        </div>
+      </section>
+    </div>
+    <div class="registry-create-backdrop" v-if="personCreate.visible && personCreate.target === 'manager'" @click="closeCreatePersonMenu">
+      <section class="registry-create-modal" @click.stop>
+        <header class="tag-manager-header"><h3>新建人物</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeCreatePersonMenu">×</button></header>
+        <div class="tag-manager-create-panel">
+          <label>人物姓名</label><input class="input" v-model="personCreate.name" />
+          <label>说明（可留空）</label><textarea class="input tag-create-description" v-model="personCreate.description"></textarea>
+          <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
+          <div class="tag-create-actions"><button class="btn" @click="closeCreatePersonMenu">取消</button><button class="btn btn-primary" @click="createPersonAndSelect">创建</button></div>
+        </div>
+      </section>
+    </div>
+    <div class="registry-create-backdrop" v-if="locationCreate.visible && locationCreate.target === 'manager'" @click="closeCreateLocationMenu">
+      <section class="registry-create-modal registry-create-location-modal" @click.stop>
+        <header class="tag-manager-header"><h3>新建地点</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeCreateLocationMenu">×</button></header>
+        <div class="tag-manager-create-panel">
+          <label>地点名称</label><input class="input" v-model="locationCreate.name" />
+          <label>国家</label><input class="input" v-model="locationCreate.country" />
+          <label>省</label><input class="input" v-model="locationCreate.province" />
+          <label>市</label><input class="input" v-model="locationCreate.city" />
+          <label>父节点</label>
+          <div class="album-input-wrap">
+            <button type="button" class="input registry-trigger location-parent-trigger" @click="locationCreate.parentDropdown = !locationCreate.parentDropdown"><span>{{ locationCreate.parent || '选择父地点，可留空' }}</span></button>
+            <button type="button" class="album-clear-btn" v-if="locationCreate.parent" data-tip="清空父节点" @click.stop="clearCreateLocationParent">×</button>
+            <div class="tag-dropdown location-dropdown" v-if="locationCreate.parentDropdown">
+              <input autofocus class="input dropdown-search-input location-dropdown-search" v-model="locationCreate.parentSearch" placeholder="搜索父地点" @keydown.escape="locationCreate.parentDropdown = false" />
+              <div class="location-dropdown-scroll">
+                <template v-for="row in getLocationParentRows(locationCreate.parentSearch)" :key="'manager_create_parent_' + row.Key">
+                  <button v-if="row.Location" type="button" class="tag-option location-option" :class="{ 'location-group-selectable': row.Type === 'group' }" :data-tip="getLocationTooltip(row.Location.Name)" :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }" @mousedown.prevent="setCreateLocationParent(row.Location.Name)"><span>{{ row.Label }}</span></button>
+                  <div v-else class="location-group-row" :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }">{{ row.Label }}</div>
+                </template>
+                <div class="tag-option-empty" v-if="!getLocationParentRows(locationCreate.parentSearch).length">没有匹配的父地点</div>
+              </div>
+            </div>
+          </div>
+          <label>说明（可留空）</label><textarea class="input tag-create-description" v-model="locationCreate.description"></textarea>
+          <div class="tag-create-error" v-if="locationCreate.error">{{ locationCreate.error }}</div>
+          <div class="tag-create-actions"><button class="btn" @click="closeCreateLocationMenu">取消</button><button class="btn btn-primary" @click="createLocationAndSelect">创建</button></div>
         </div>
       </section>
     </div>
@@ -720,10 +802,10 @@ export default {
     function openCreateTagMenu(target) {
       tagCreate.visible = true;
       tagCreate.target = target;
-      tagCreate.text = normalizeTagText(tagSearch[target]);
+      tagCreate.text = target === "manager" ? "" : normalizeTagText(tagSearch[target]);
       tagCreate.description = "";
       tagCreate.error = "";
-      closeTagDropdown(target);
+      if (target !== "manager") closeTagDropdown(target);
     }
 
     function closeCreateTagMenu() {
@@ -746,7 +828,9 @@ export default {
         return;
       }
       applyTagRegistry(result.tags);
-      addTagToTarget(tagCreate.target, result.tag.Text);
+      const target = tagCreate.target;
+      if (target === "manager") showToastMessage(`已创建标签“${result.tag.Text}”`);
+      else addTagToTarget(target, result.tag.Text);
       closeCreateTagMenu();
     }
 
@@ -757,6 +841,7 @@ export default {
     }
 
     function closeTagManager() {
+      if (tagCreate.target === "manager") closeCreateTagMenu();
       tagManager.visible = false;
       tagManager.search = "";
       tagManager.editingText = "";
@@ -928,10 +1013,10 @@ export default {
     function openCreatePersonMenu(target) {
       personCreate.visible = true;
       personCreate.target = target;
-      personCreate.name = normalizePersonName(personSearch[target]);
+      personCreate.name = target === "manager" ? "" : normalizePersonName(personSearch[target]);
       personCreate.description = "";
       personCreate.error = "";
-      closePersonDropdown(target);
+      if (target !== "manager") closePersonDropdown(target);
     }
 
     function closeCreatePersonMenu() {
@@ -954,7 +1039,9 @@ export default {
         return;
       }
       applyPersonRegistry(result.people);
-      addPersonToTarget(personCreate.target, result.person.Name);
+      const target = personCreate.target;
+      if (target === "manager") showToastMessage(`已创建人物“${result.person.Name}”`);
+      else addPersonToTarget(target, result.person.Name);
       closeCreatePersonMenu();
     }
 
@@ -965,6 +1052,7 @@ export default {
     }
 
     function closePersonManager() {
+      if (personCreate.target === "manager") closeCreatePersonMenu();
       personManager.visible = false;
       personManager.search = "";
       personManager.editingName = "";
@@ -1490,8 +1578,8 @@ export default {
     function openCreateLocationMenu(target) {
       locationCreate.visible = true;
       locationCreate.target = target;
-      locationCreate.name = normalizeLocationName(locationSearch[target]);
-      const current = selectedLocationForTarget(target);
+      locationCreate.name = target === "manager" ? "" : normalizeLocationName(locationSearch[target]);
+      const current = target === "manager" ? "" : selectedLocationForTarget(target);
       const currentLocation = locationRegistry.value.find((location) => location.Name === current);
       locationCreate.country = currentLocation?.Country || "";
       locationCreate.province = currentLocation?.Province || "";
@@ -1501,7 +1589,7 @@ export default {
       locationCreate.parentDropdown = false;
       locationCreate.description = "";
       locationCreate.error = "";
-      closeLocationDropdown(target);
+      if (target !== "manager") closeLocationDropdown(target);
     }
 
     function closeCreateLocationMenu() {
@@ -1539,7 +1627,13 @@ export default {
         return;
       }
       applyLocationRegistry(result.locations);
-      setLocationForTarget(locationCreate.target, result.location.Name);
+      const target = locationCreate.target;
+      if (target === "manager") {
+        showToastMessage(`已创建地点“${result.location.Name}”`);
+        scheduleLocationManagerContextUpdate();
+      } else {
+        setLocationForTarget(target, result.location.Name);
+      }
       closeCreateLocationMenu();
     }
 
@@ -1551,6 +1645,7 @@ export default {
     }
 
     function closeLocationManager() {
+      if (locationCreate.target === "manager") closeCreateLocationMenu();
       locationManager.visible = false;
       locationManager.search = "";
       locationManagerContext.value = "";
@@ -1746,10 +1841,10 @@ export default {
     function openCreateAlbumMenu(target) {
       albumCreate.visible = true;
       albumCreate.target = target;
-      albumCreate.title = normalizeAlbumTitle(albumSearch[target]);
+      albumCreate.title = target === "manager" ? "" : normalizeAlbumTitle(albumSearch[target]);
       albumCreate.description = "";
       albumCreate.error = "";
-      closeAlbumDropdown(target);
+      if (target !== "manager") closeAlbumDropdown(target);
     }
 
     function closeCreateAlbumMenu() {
@@ -1772,7 +1867,9 @@ export default {
         return;
       }
       applyAlbumRegistry(result.albums);
-      setAlbumForTarget(albumCreate.target, result.album.Title);
+      const target = albumCreate.target;
+      if (target === "manager") showToastMessage(`已创建相册“${result.album.Title}”`);
+      else setAlbumForTarget(target, result.album.Title);
       closeCreateAlbumMenu();
     }
 
@@ -1783,6 +1880,7 @@ export default {
     }
 
     function closeAlbumManager() {
+      if (albumCreate.target === "manager") closeCreateAlbumMenu();
       albumManager.visible = false;
       albumManager.search = "";
       albumManager.editingTitle = "";
