@@ -117,7 +117,7 @@ Important difference:
 
 1. User edits fields in viewer panel.
 2. User sets album by selecting from the registered album list or creating an album with a required description.
-3. User adds tags by selecting from the registered tag list or creating a tag with a required description.
+3. User adds tags by selecting from the registered tag list or creating a tag with an optional description.
 4. User adds people by selecting from the registered person list or creating a person; description may be empty.
 5. User sets primary location from the registered location tree, optionally adding free-text location detail.
 6. Renderer sends `photo:update-customization`.
@@ -128,8 +128,8 @@ Important difference:
 ### Tag registry flow
 
 1. Renderer loads tag definitions via `tag:list`.
-2. `tag:create` requires non-empty tag text and description, then rewrites `dataDir/tag_registry.jsonl`.
-3. `tag:update-description` updates a tag description without changing photo metadata.
+2. `tag:create` requires non-empty tag text; description is optional, then it rewrites `dataDir/tag_registry.jsonl`.
+3. `tag:update-description` updates or clears a tag description without changing photo metadata.
 4. `tag:delete-global` removes a tag from the registry and from every photo record that uses it.
 
 ### Album registry flow

@@ -1014,8 +1014,8 @@ function registerIpcHandlers() {
   ipcMain.handle("tag:create", async (_, payload) => {
     const text = normalizeTagText(payload?.text ?? payload?.Text);
     const description = normalizeTagText(payload?.description ?? payload?.Description);
-    if (!text || !description) {
-      return { ok: false, error: "Tag text and description are required" };
+    if (!text) {
+      return { ok: false, error: "Tag text is required" };
     }
     if (tagRegistryIndex.has(text)) {
       return { ok: false, error: "Tag already exists" };
@@ -1038,8 +1038,8 @@ function registerIpcHandlers() {
     const text = normalizeTagText(payload?.text ?? payload?.Text);
     const description = normalizeTagText(payload?.description ?? payload?.Description);
     const current = tagRegistryIndex.get(text);
-    if (!text || !description) {
-      return { ok: false, error: "Tag text and description are required" };
+    if (!text) {
+      return { ok: false, error: "Tag text is required" };
     }
     if (!current) {
       return { ok: false, error: "Tag not found" };

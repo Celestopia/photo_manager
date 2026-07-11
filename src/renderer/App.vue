@@ -32,8 +32,9 @@
                 v-if="tagManager.editingText === tag.Text"
                 class="input tag-manager-description-input"
                 v-model="tagManager.editDescription"
+                placeholder="可留空"
               ></textarea>
-              <p v-else>{{ tag.Description }}</p>
+              <p v-else>{{ tag.Description || '无说明' }}</p>
               <div class="tag-manager-error" v-if="tagManager.error && tagManager.editingText === tag.Text">{{ tagManager.error }}</div>
             </div>
             <div class="tag-manager-actions" v-if="tagManager.editingText === tag.Text">
@@ -196,7 +197,7 @@
         <header class="tag-manager-header"><h3>新建标签</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeCreateTagMenu">×</button></header>
         <div class="tag-manager-create-panel">
           <label>标签名称</label><input class="input" v-model="tagCreate.text" />
-          <label>说明</label><textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
+          <label>说明（可留空）</label><textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
           <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
           <div class="tag-create-actions"><button class="btn" @click="closeCreateTagMenu">取消</button><button class="btn btn-primary" @click="createTagAndSelect">创建</button></div>
         </div>
@@ -818,8 +819,8 @@ export default {
     async function createTagAndSelect() {
       const text = normalizeTagText(tagCreate.text);
       const description = normalizeTagText(tagCreate.description);
-      if (!text || !description) {
-        tagCreate.error = "标签名称和说明不能为空";
+      if (!text) {
+        tagCreate.error = "标签名称不能为空";
         return;
       }
       const result = await API.createTag({ text, description });
@@ -864,8 +865,8 @@ export default {
     async function saveTagDescription() {
       const text = tagManager.editingText;
       const description = normalizeTagText(tagManager.editDescription);
-      if (!text || !description) {
-        tagManager.error = "说明不能为空";
+      if (!text) {
+        tagManager.error = "标签不存在";
         return;
       }
       const result = await API.updateTagDescription({ text, description });

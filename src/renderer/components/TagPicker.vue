@@ -49,7 +49,7 @@
     <div class="tag-create-popover" v-if="tagCreate.visible && tagCreate.target === target" @click.stop>
       <label>标签名称</label>
       <input class="input" v-model="tagCreate.text" />
-      <label>说明</label>
+      <label>说明（可留空）</label>
       <textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
       <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
       <div class="tag-create-actions">
