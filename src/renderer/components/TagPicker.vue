@@ -1,6 +1,7 @@
 <template>
   <div class="tag-picker" @click.stop>
-    <div class="tag-editor controlled-tag-editor">
+    <div class="controlled-tag-control">
+      <div class="tag-editor controlled-tag-editor">
       <span
         class="tag-chip"
         v-for="(tag, index) in selectedTags"
@@ -33,6 +34,7 @@
           </button>
           <div class="tag-option-empty" v-if="!tagOptions.length">没有匹配的标签</div>
         </div>
+      </div>
       </div>
       <div class="tag-actions">
         <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建标签" @click.stop="openCreateTagMenu(target)">+</button>

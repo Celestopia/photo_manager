@@ -380,6 +380,14 @@ html, body, #app {
   min-width: 0;
   max-width: 100%;
 }
+.controlled-tag-control {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.controlled-tag-control .tag-actions { margin-left: 0; }
 .tag-search-wrap {
   position: relative;
   flex: 1 1 88px;
