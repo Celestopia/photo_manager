@@ -25,6 +25,20 @@
             autocomplete="off"
           />
           <div class="registry-dropdown-options">
+            <template v-if="recentTagOptions.length">
+              <div class="registry-section-label"><span>最近使用</span></div>
+              <button
+                v-for="tag in recentTagOptions"
+                :key="target + '_recent_option_' + tag.Text"
+                type="button"
+                class="tag-option"
+                :data-tip="tag.Description"
+                @mousedown.prevent="addTagToTarget(target, tag.Text)"
+              >
+                <span>{{ tag.Text }}</span>
+              </button>
+              <div class="registry-section-label registry-section-divider"><span>全部标签</span></div>
+            </template>
             <button
               v-for="tag in tagOptions"
               :key="target + '_option_' + tag.Text"
@@ -81,6 +95,7 @@ const {
   tagDropdown,
   tagCreate,
   getTagOptions,
+  getRecentTagOptions,
   getTagDescription,
   openTagDropdown,
   addTagToTarget,
@@ -96,6 +111,7 @@ const {
 const target = props.target;
 const selectedTags = computed(() => (props.target === "batch" ? batchEdit.tags : editDraft.Tags));
 const tagOptions = computed(() => getTagOptions(props.target));
+const recentTagOptions = computed(() => getRecentTagOptions(props.target));
 
 function removeSelectedTag(index) {
   if (props.target === "batch") removeBatchTagAt(index);

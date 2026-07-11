@@ -241,8 +241,8 @@
               <input autofocus class="input dropdown-search-input location-dropdown-search" v-model="locationCreate.parentSearch" placeholder="搜索父地点" @keydown.escape="locationCreate.parentDropdown = false" />
               <div class="location-dropdown-scroll">
                 <template v-for="row in getLocationParentRows(locationCreate.parentSearch)" :key="'manager_create_parent_' + row.Key">
-                  <button v-if="row.Location" type="button" class="tag-option location-option" :class="{ 'location-group-selectable': row.Type === 'group' }" :data-tip="getLocationTooltip(row.Location.Name)" :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }" @mousedown.prevent="setCreateLocationParent(row.Location.Name)"><span>{{ row.Label }}</span></button>
-                  <div v-else class="location-group-row" :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }">{{ row.Label }}</div>
+                  <button v-if="row.Location" type="button" class="tag-option location-option" :class="{ 'location-group-selectable': row.Type === 'group' }" :data-tip="getLocationTooltip(row.Location.Name)" :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }" @mousedown.prevent="setCreateLocationParent(row.Location.Name)"><span>{{ row.Label }}</span></button>
+                  <div v-else class="location-group-row" :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }">{{ row.Label }}</div>
                 </template>
                 <div class="tag-option-empty" v-if="!getLocationParentRows(locationCreate.parentSearch).length">没有匹配的父地点</div>
               </div>
@@ -357,6 +357,8 @@ export default {
     const albumRegistry = ref([]);
     const personRegistry = ref([]);
     const locationRegistry = ref([]);
+    const recentTags = ref(loadRecentRegistryValues("photoManager.recentTags", normalizeTagText));
+    const recentPeople = ref(loadRecentRegistryValues("photoManager.recentPeople", normalizePersonName));
     const recentLocations = ref(loadRecentLocations());
     const tagSearch = reactive({ viewer: "", batch: "" });
     const albumSearch = reactive({ viewer: "", batch: "" });
@@ -719,6 +721,7 @@ export default {
         }))
         .filter((tag) => tag.Text);
       filterOptions.tags = tagRegistry.value.map((tag) => tag.Text);
+      pruneRecentRegistryValues(recentTags, "photoManager.recentTags", filterOptions.tags);
       if (query.filters.tag && !filterOptions.tags.includes(query.filters.tag)) {
         query.filters.tag = "";
       }
@@ -734,14 +737,22 @@ export default {
       return target === "batch" ? batchEdit.tags : editDraft.Tags;
     }
 
-    function getTagOptions(target) {
+    function getTagCandidates(target) {
       const keyword = normalizeTagText(tagSearch[target]);
       const selected = new Set(selectedTagsForTarget(target));
       return tagRegistry.value
         .filter((tag) => !selected.has(tag.Text))
         .filter((tag) => !keyword || tag.Text.includes(keyword) || (tag.Description || "").includes(keyword))
-        .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"))
-        .slice(0, 50);
+        .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
+    }
+
+    function getTagOptions(target) {
+      return getTagCandidates(target).slice(0, 50);
+    }
+
+    function getRecentTagOptions(target) {
+      const byText = new Map(getTagCandidates(target).map((tag) => [tag.Text, tag]));
+      return recentTags.value.map((text) => byText.get(text)).filter(Boolean).slice(0, 3);
     }
 
     function getTagDescription(tagText) {
@@ -772,6 +783,7 @@ export default {
         return;
       }
       tags.push(tagText);
+      rememberRecentRegistryValue(recentTags, "photoManager.recentTags", tagText, normalizeTagText);
       tagSearch[target] = "";
       closeTagDropdown(target);
       if (target === "viewer") requestEdit("Tags");
@@ -785,7 +797,7 @@ export default {
     function onTagSearchKeydown(event, target) {
       if (event.key === "Enter") {
         event.preventDefault();
-        const first = getTagOptions(target)[0];
+        const first = getRecentTagOptions(target)[0] || getTagOptions(target)[0];
         if (first) addTagToTarget(target, first.Text);
         return;
       }
@@ -934,6 +946,7 @@ export default {
         }))
         .filter((person) => person.Name);
       filterOptions.people = personRegistry.value.map((person) => person.Name);
+      pruneRecentRegistryValues(recentPeople, "photoManager.recentPeople", filterOptions.people);
       if (query.filters.person && !filterOptions.people.includes(query.filters.person)) {
         query.filters.person = "";
       }
@@ -949,14 +962,22 @@ export default {
       return target === "batch" ? batchEdit.people : editDraft.People;
     }
 
-    function getPersonOptions(target) {
+    function getPersonCandidates(target) {
       const keyword = normalizePersonName(personSearch[target]);
       const selected = new Set(selectedPeopleForTarget(target));
       return personRegistry.value
         .filter((person) => !selected.has(person.Name))
         .filter((person) => !keyword || person.Name.includes(keyword) || (person.Description || "").includes(keyword))
-        .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
-        .slice(0, 50);
+        .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
+    }
+
+    function getPersonOptions(target) {
+      return getPersonCandidates(target).slice(0, 50);
+    }
+
+    function getRecentPersonOptions(target) {
+      const byName = new Map(getPersonCandidates(target).map((person) => [person.Name, person]));
+      return recentPeople.value.map((name) => byName.get(name)).filter(Boolean).slice(0, 3);
     }
 
     function getPersonDescription(personName) {
@@ -987,6 +1008,7 @@ export default {
         return;
       }
       people.push(name);
+      rememberRecentRegistryValue(recentPeople, "photoManager.recentPeople", name, normalizePersonName);
       personSearch[target] = "";
       closePersonDropdown(target);
       if (target === "viewer") requestEdit("People");
@@ -995,7 +1017,7 @@ export default {
     function onPersonSearchKeydown(event, target) {
       if (event.key === "Enter") {
         event.preventDefault();
-        const first = getPersonOptions(target)[0];
+        const first = getRecentPersonOptions(target)[0] || getPersonOptions(target)[0];
         if (first) addPersonToTarget(target, first.Name);
         return;
       }
@@ -1169,6 +1191,37 @@ export default {
         ...(location.Path || []),
       ].join(" ");
       return haystack.includes(keyword);
+    }
+
+    function loadRecentRegistryValues(storageKey, normalize) {
+      try {
+        const raw = window.localStorage?.getItem(storageKey);
+        const parsed = JSON.parse(raw || "[]");
+        return Array.isArray(parsed) ? parsed.map(normalize).filter(Boolean).slice(0, 3) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveRecentRegistryValues(storageKey, values) {
+      try {
+        window.localStorage?.setItem(storageKey, JSON.stringify(values.slice(0, 3)));
+      } catch {
+        // Recent registry entries are a convenience cache; ignore storage failures.
+      }
+    }
+
+    function rememberRecentRegistryValue(recentRef, storageKey, rawValue, normalize) {
+      const value = normalize(rawValue);
+      if (!value) return;
+      recentRef.value = [value, ...recentRef.value.filter((item) => item !== value)].slice(0, 3);
+      saveRecentRegistryValues(storageKey, recentRef.value);
+    }
+
+    function pruneRecentRegistryValues(recentRef, storageKey, knownValues) {
+      const known = new Set(knownValues);
+      recentRef.value = recentRef.value.filter((value) => known.has(value)).slice(0, 3);
+      saveRecentRegistryValues(storageKey, recentRef.value);
     }
 
     function loadRecentLocations() {
@@ -2924,10 +2977,12 @@ export default {
       removeBatchPersonAt,
       onBatchTagInputKeydown,
       getTagOptions,
+      getRecentTagOptions,
       getTagDescription,
       getAlbumOptions,
       getAlbumDescription,
       getPersonOptions,
+      getRecentPersonOptions,
       getPersonDescription,
       getLocationOptions,
       getRecentLocationOptions,

@@ -21,7 +21,11 @@
             <span>全部</span>
           </button>
           <template v-for="row in filterRows" :key="'filter_' + row.Key">
-            <div v-if="row.Type === 'section'" class="location-section-label">{{ row.Label }}</div>
+            <div
+              v-if="row.Type === 'section'"
+              class="location-section-label"
+              :class="{ 'registry-section-divider': row.Key.includes('section:all') }"
+            ><span>{{ row.Label }}</span></div>
             <button
               v-else-if="row.Location"
               type="button"
@@ -30,7 +34,7 @@
               :data-tip="getLocationTooltip(row.Location.Name)"
               :data-location-context="getLocationManagerRowContext(row)"
               :data-location-recent="row.Key.startsWith('filter-recent-location:') ? '1' : null"
-              :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }"
+              :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
               @mousedown.prevent="selectLocation(row.Location.Name)"
             >
               <span>{{ row.Label }}</span>
@@ -38,7 +42,7 @@
             <div
               v-else
               class="location-group-row"
-              :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }"
+              :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
             >{{ row.Label }}</div>
           </template>
           <div class="tag-option-empty" v-if="!filterRows.length">没有匹配的地点</div>

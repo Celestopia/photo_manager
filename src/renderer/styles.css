@@ -927,11 +927,27 @@ html, body, #app {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-.location-section-label {
+.location-section-label,
+.registry-section-label {
   padding: 6px 8px 4px;
   color: var(--text-soft);
   font-size: 12px;
   line-height: 1.2;
+}
+.location-section-label > span,
+.registry-section-label > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f3f8ff;
+}
+.registry-section-divider {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(144, 185, 232, 0.65);
 }
 .location-option {
   min-height: 34px;

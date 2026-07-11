@@ -25,6 +25,20 @@
             autocomplete="off"
           />
           <div class="registry-dropdown-options">
+            <template v-if="recentPersonOptions.length">
+              <div class="registry-section-label"><span>最近使用</span></div>
+              <button
+                v-for="person in recentPersonOptions"
+                :key="target + '_recent_person_option_' + person.Name"
+                type="button"
+                class="tag-option"
+                :data-tip="person.Description"
+                @mousedown.prevent="addPersonToTarget(target, person.Name)"
+              >
+                <span>{{ person.Name }}</span>
+              </button>
+              <div class="registry-section-label registry-section-divider"><span>全部人物</span></div>
+            </template>
             <button
               v-for="person in personOptions"
               :key="target + '_person_option_' + person.Name"
@@ -82,6 +96,7 @@ const {
   personDropdown,
   personCreate,
   getPersonOptions,
+  getRecentPersonOptions,
   getPersonDescription,
   openPersonDropdown,
   addPersonToTarget,
@@ -97,6 +112,7 @@ const {
 const target = props.target;
 const selectedPeople = computed(() => (props.target === "batch" ? batchEdit.people : editDraft.People));
 const personOptions = computed(() => getPersonOptions(props.target));
+const recentPersonOptions = computed(() => getRecentPersonOptions(props.target));
 
 function removeSelectedPerson(index) {
   if (props.target === "batch") removeBatchPersonAt(index);

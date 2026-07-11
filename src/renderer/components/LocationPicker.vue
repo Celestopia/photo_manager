@@ -28,7 +28,11 @@
           <div class="location-dropdown-current-context" v-if="locationDropdownContext">{{ locationDropdownContext }}</div>
           <div class="location-dropdown-scroll" ref="locationDropdownRef" @scroll="updateLocationDropdownContext">
             <template v-for="row in locationMenuRows" :key="target + '_' + row.Key">
-              <div v-if="row.Type === 'section'" class="location-section-label">{{ row.Label }}</div>
+              <div
+                v-if="row.Type === 'section'"
+                class="location-section-label"
+                :class="{ 'registry-section-divider': row.Key.includes('section:all') }"
+              ><span>{{ row.Label }}</span></div>
               <button
                 v-else-if="row.Location"
                 type="button"
@@ -37,7 +41,7 @@
                 :data-tip="getLocationTooltip(row.Location.Name)"
                 :data-location-context="getLocationManagerRowContext(row)"
                 :data-location-recent="row.Key.startsWith('recent-location:') ? '1' : null"
-                :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }"
+                :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
                 @mousedown.prevent="setLocationForTarget(target, row.Location.Name)"
               >
                 <span>{{ row.Label }}</span>
@@ -45,7 +49,7 @@
               <div
                 v-else
                 class="location-group-row"
-                :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }"
+                :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
               >{{ row.Label }}</div>
             </template>
             <div class="tag-option-empty" v-if="!locationMenuRows.length">没有匹配的地点</div>
@@ -98,7 +102,7 @@
               class="tag-option location-option"
               :class="{ 'location-group-selectable': row.Type === 'group' }"
               :data-tip="getLocationTooltip(row.Location.Name)"
-              :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }"
+              :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
               @mousedown.prevent="setCreateLocationParent(row.Location.Name)"
             >
               <span>{{ row.Label }}</span>
@@ -106,7 +110,7 @@
             <div
               v-else
               class="location-group-row"
-              :style="{ paddingLeft: 16 + row.Depth * 16 + 'px' }"
+              :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
             >{{ row.Label }}</div>
           </template>
           <div class="tag-option-empty" v-if="!createParentRows.length">没有匹配的父地点</div>
