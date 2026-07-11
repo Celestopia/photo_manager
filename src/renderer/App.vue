@@ -262,16 +262,13 @@ import { reactive, ref, computed, onMounted, onBeforeUnmount, watch, nextTick, p
 import GalleryView from "./components/GalleryView.vue";
 import ViewerView from "./components/ViewerView.vue";
 
-/**
- * Root renderer component in Single File Component format.
- * It is shared by both Electron mode and browser preview mode.
- */
+/** Root renderer component in Single File Component format. */
 const API = window.photoManagerApi;
 if (!API) {
   const root = document.getElementById("app");
   if (root) {
     root.innerHTML =
-      "<div style=\"padding:24px;font-family:Microsoft YaHei, sans-serif;color:#173756;\">初始化失败：未检测到 photoManagerApi。请使用 Electron 启动，或通过 browser.html + 本地HTTP服务启动浏览器预览模式。</div>";
+      "<div style=\"padding:24px;font-family:Microsoft YaHei, sans-serif;color:#173756;\">初始化失败：未检测到 photoManagerApi。请通过 Electron 启动应用。</div>";
   }
   throw new Error("photoManagerApi is not available");
 }
@@ -314,15 +311,9 @@ function formatFileSize(bytes) {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
-// Resolve image source for both filesystem URLs (Electron) and HTTP paths (web preview).
-/**
- * Build a valid image URL for both local file paths (Electron) and web preview HTTP paths.
- */
+/** Convert a local filesystem path into an Electron-compatible file URL. */
 function buildImageUrl(absolutePath) {
   if (!absolutePath) return "";
-  if (absolutePath.startsWith("http://") || absolutePath.startsWith("https://") || absolutePath.startsWith("/")) {
-    return absolutePath;
-  }
   const normalized = absolutePath.replace(/\\/g, "/");
   return `file:///${encodeURI(normalized)}`;
 }

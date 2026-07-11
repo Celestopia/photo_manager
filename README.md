@@ -26,21 +26,7 @@ $env:ELECTRON_RUN_AS_NODE=$null
 npm start
 ```
 
-3. Optional browser preview mode:
-
-```bash
-npm run start:web
-```
-
-Then open `http://localhost:5173/`.
-
-4. Optional renderer dev server (for SFC hot reload):
-
-```bash
-npm run dev:renderer
-```
-
-5. Optional thumbnail cache warmup only:
+3. Optional thumbnail cache warmup only:
 
 ```bash
 npm run build-thumbnails
@@ -67,22 +53,6 @@ The project has three runtime layers:
 - Gallery mode: filter/search/sort/paginate/group by date, thumbnail-first loading.
 - Viewer mode: zoom/pan/mirror/fullscreen/navigation/edit metadata.
 - Calls `photoManagerApi` for data and persistence operations.
-
-## Browser Preview Architecture
-
-Browser preview exists for debugging UI without Electron:
-
-- `scripts/start-web-preview.js`: static server for built renderer and local metadata/workspace files.
-- `dist/renderer/browser.html`: renderer entry for browser mode (built from `src/renderer/browser.html`).
-- `src/renderer/public/browser-api.js`: mock implementation of `photoManagerApi`.
-
-Important difference:
-- Browser mode metadata edits are in-memory only (no write-back to JSONL).
-- Browser mode tag registry edits are also in-memory only.
-- Browser mode album registry edits are also in-memory only.
-- Browser mode person registry edits are also in-memory only.
-- Browser mode location registry edits are also in-memory only.
-- Electron mode writes updates back to the fixed JSONL files under `dataDir`.
 
 ## Metadata and Data Flow
 
@@ -219,16 +189,13 @@ src/
     preload.js       # Secure renderer bridge
   renderer/
     index.html       # Electron renderer entry
-    browser.html     # Browser preview entry
     App.vue          # Main SFC component
     app.js           # Vue mount entry
     components/
       GalleryView.vue # Gallery mode component
       ViewerView.vue  # Viewer mode component
-    public/
-      browser-api.js # Browser-mode API shim
     styles.css       # UI style
-vite.config.mjs      # Vite config for multi-page renderer build
+vite.config.mjs      # Vite config for renderer build
 scripts/
   common.js          # Shared metadata utilities
   thumbnail-cache.js # Shared thumbnail generation/cache utilities

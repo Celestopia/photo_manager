@@ -5,14 +5,12 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "npm run build:renderer && npm run build-thumbnails && node scripts/start-electron.js",
-    "dev:renderer": "vite --config vite.config.mjs",
     "build:renderer": "vite build --config vite.config.mjs",
     "build-thumbnails": "node scripts/build-thumbnails.js",
     "init-metadata": "node scripts/init-metadata.js",
     "update-metadata": "node scripts/update-metadata.js",
     "verify-metadata": "node scripts/verify-metadata.js",
-    "export-metadata-csv": "node scripts/export-metadata-csv.js",
-    "start:web": "npm run build:renderer && npm run build-thumbnails && node scripts/start-web-preview.js"
+    "export-metadata-csv": "node scripts/export-metadata-csv.js"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
