@@ -826,6 +826,7 @@ export default {
       }
       applyTagRegistry(result.tags);
       syncDeletedTagLocally(tag.Text);
+      closeTagManager();
       if (query.filters.tag === tag.Text) {
         query.filters.tag = "";
         await queryGallery(true);
@@ -1033,6 +1034,7 @@ export default {
       }
       applyPersonRegistry(result.people);
       syncDeletedPersonLocally(person.Name);
+      closePersonManager();
       if (query.filters.person === person.Name) {
         query.filters.person = "";
         await queryGallery(true);
@@ -1632,6 +1634,7 @@ export default {
       }
       applyLocationRegistry(result.locations);
       syncDeletedLocationLocally(location.Name);
+      closeLocationManager();
       if (query.filters.location === location.Name) {
         query.filters.location = "";
         await queryGallery(true);
@@ -1848,6 +1851,7 @@ export default {
       }
       applyAlbumRegistry(result.albums);
       syncDeletedAlbumLocally(album.Title);
+      closeAlbumManager();
       if (query.filters.album === album.Title) {
         query.filters.album = "";
         await queryGallery(true);
