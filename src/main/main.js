@@ -21,14 +21,17 @@ const {
 const APP_ROOT = path.resolve(__dirname, "..", "..");
 const CONFIG_PATH = path.join(APP_ROOT, "config.yml");
 const RENDERER_INDEX_PATH = path.join(APP_ROOT, "dist", "renderer", "index.html");
+const DATA_FILE_NAMES = Object.freeze({
+  metadata: "photo_metadata.jsonl",
+  tags: "tag_registry.jsonl",
+  albums: "album_registry.jsonl",
+  people: "person_registry.jsonl",
+  locations: "location_registry.jsonl",
+});
 
 const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
-  metadataFile: "./photo_metadata.jsonl",
-  tagRegistryFile: "./tag_registry.jsonl",
-  albumRegistryFile: "./album_registry.jsonl",
-  personRegistryFile: "./person_registry.jsonl",
-  locationRegistryFile: "./location_registry.jsonl",
+  dataDir: "./data",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -190,6 +193,18 @@ function toAbsolutePath(possibleRelativePath) {
   return path.resolve(APP_ROOT, possibleRelativePath);
 }
 
+function resolveDataDir() {
+  return toAbsolutePath(config?.dataDir || DEFAULT_CONFIG.dataDir);
+}
+
+function resolveDataFile(fileName) {
+  return path.join(resolveDataDir(), fileName);
+}
+
+async function ensureDataDirectory() {
+  await fsp.mkdir(resolveDataDir(), { recursive: true });
+}
+
 /**
  * Append one line into date-partitioned log file under configured log directory.
  */
@@ -210,7 +225,7 @@ function appendLog(message) {
  */
 async function loadMetadataIndex() {
   metadataIndex.clear();
-  const metadataFile = toAbsolutePath(config.metadataFile);
+  const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
 
   if (!fs.existsSync(metadataFile)) {
     return;
@@ -271,7 +286,8 @@ function getTagUsageCounts() {
  * Persist tag registry JSONL using the same temp-file replacement style as metadata.
  */
 async function saveTagRegistryMap() {
-  const registryFile = toAbsolutePath(config.tagRegistryFile || DEFAULT_CONFIG.tagRegistryFile);
+  await ensureDataDirectory();
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.tags);
   const tempFile = `${registryFile}.tmp`;
   const lines = [...tagRegistryIndex.values()]
     .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"))
@@ -310,7 +326,7 @@ function seedRegistryFromMetadata() {
  */
 async function loadTagRegistryIndex() {
   tagRegistryIndex.clear();
-  const registryFile = toAbsolutePath(config.tagRegistryFile || DEFAULT_CONFIG.tagRegistryFile);
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.tags);
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
@@ -391,7 +407,8 @@ function listPersonDefinitions() {
  * Persist person registry JSONL using temp-file replacement.
  */
 async function savePersonRegistryMap() {
-  const registryFile = toAbsolutePath(config.personRegistryFile || DEFAULT_CONFIG.personRegistryFile);
+  await ensureDataDirectory();
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.people);
   const tempFile = `${registryFile}.tmp`;
   const lines = [...personRegistryIndex.values()]
     .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
@@ -430,7 +447,7 @@ function seedPersonRegistryFromMetadata() {
  */
 async function loadPersonRegistryIndex() {
   personRegistryIndex.clear();
-  const registryFile = toAbsolutePath(config.personRegistryFile || DEFAULT_CONFIG.personRegistryFile);
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.people);
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
@@ -579,7 +596,8 @@ function listLocationDefinitions() {
 }
 
 async function saveLocationRegistryMap() {
-  const registryFile = toAbsolutePath(config.locationRegistryFile || DEFAULT_CONFIG.locationRegistryFile);
+  await ensureDataDirectory();
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.locations);
   const tempFile = `${registryFile}.tmp`;
   const lines = [...locationRegistryIndex.values()]
     .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
@@ -655,7 +673,7 @@ function sanitizeLocationParentLinks() {
 
 async function loadLocationRegistryIndex() {
   locationRegistryIndex.clear();
-  const registryFile = toAbsolutePath(config.locationRegistryFile || DEFAULT_CONFIG.locationRegistryFile);
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.locations);
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
@@ -736,7 +754,8 @@ function listAlbumDefinitions() {
  * Persist album registry JSONL using temp-file replacement.
  */
 async function saveAlbumRegistryMap() {
-  const registryFile = toAbsolutePath(config.albumRegistryFile || DEFAULT_CONFIG.albumRegistryFile);
+  await ensureDataDirectory();
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.albums);
   const tempFile = `${registryFile}.tmp`;
   const lines = [...albumRegistryIndex.values()]
     .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"))
@@ -772,7 +791,7 @@ function seedAlbumRegistryFromMetadata() {
  */
 async function loadAlbumRegistryIndex() {
   albumRegistryIndex.clear();
-  const registryFile = toAbsolutePath(config.albumRegistryFile || DEFAULT_CONFIG.albumRegistryFile);
+  const registryFile = resolveDataFile(DATA_FILE_NAMES.albums);
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
@@ -929,7 +948,8 @@ async function warmupThumbnailCache() {
  * write temp file -> rename.
  */
 async function saveMetadataMap() {
-  const metadataFile = toAbsolutePath(config.metadataFile);
+  await ensureDataDirectory();
+  const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
   const tempFile = `${metadataFile}.tmp`;
   const lines = [...metadataIndex.values()].map((item) => JSON.stringify(item));
   await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
@@ -1556,6 +1576,7 @@ function registerIpcHandlers() {
  */
 async function bootstrap() {
   ensureConfig();
+  await ensureDataDirectory();
   await loadMetadataIndex();
   await loadTagRegistryIndex();
   await loadAlbumRegistryIndex();

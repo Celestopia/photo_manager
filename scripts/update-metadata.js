@@ -8,7 +8,7 @@
  * 4) Rewrite JSONL as the current truth snapshot.
  */
 const path = require("node:path");
-const { resolveConfig, absFromConfig, walkFiles, buildMetadata, loadExisting, writeAll, extensionType } = require("./common");
+const { DATA_FILE_NAMES, resolveConfig, absFromConfig, dataFilePath, ensureDataDir, walkFiles, buildMetadata, loadExisting, writeAll, extensionType } = require("./common");
 const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 
 /**
@@ -22,7 +22,8 @@ const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbn
 async function run() {
   const config = resolveConfig();
   const root = absFromConfig(config, config.workspaceRoot);
-  const metadataFile = absFromConfig(config, config.metadataFile);
+  await ensureDataDir(config);
+  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
   const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
   const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);
 

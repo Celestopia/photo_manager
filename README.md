@@ -2,8 +2,8 @@
 
 PhotoManager is a local-first desktop photo manager built with Electron + Vue.
 It is designed for personal usage on Windows and stores everything as local files
-(`config.yml`, `photo_metadata.jsonl`, image files, thumbnail cache, logs).
-Tag definitions are stored separately in `tag_registry.jsonl` so each tag has a clear description and can be reused consistently. Album definitions use the same registered-data approach in `album_registry.jsonl`, while each photo keeps at most one album title in `Customization.Album`. Person definitions are managed in `person_registry.jsonl`; photos store selected person names in `Customization.People`. Primary location names are managed in `location_registry.jsonl`; photos store only `Location.Place` plus optional free-text `Location.Detail`.
+(`config.yml`, the configured `dataDir`, image files, thumbnail cache, logs).
+Photo metadata and all registry definitions use fixed JSONL filenames under `dataDir`. Tags, albums, people, and primary locations are therefore managed as reusable registered data while each photo stores their selected names.
 
 ## Quick Start
 
@@ -52,11 +52,8 @@ The project has three runtime layers:
 
 1. Electron main process (`src/main/main.js`)
 - Loads and merges `config.yml` with defaults.
-- Loads `photo_metadata.jsonl` into memory (`Map<FilePath, Metadata>`).
-- Loads `tag_registry.jsonl` into memory (`Map<Text, TagDefinition>`).
-- Loads `album_registry.jsonl` into memory (`Map<Title, AlbumDefinition>`).
-- Loads `person_registry.jsonl` into memory (`Map<Name, PersonDefinition>`).
-- Loads `location_registry.jsonl` into memory (`Map<Name, LocationDefinition>`), backfilling from legacy location metadata when needed.
+- Resolves the configurable `dataDir` and loads its five fixed JSONL files.
+- Loads photo metadata and tag/album/person/location registries into in-memory maps.
 - Exposes IPC APIs for query/update/tag registry/album registry/person registry/location registry/copy/window control.
 - Creates and monitors BrowserWindow.
 
@@ -85,20 +82,21 @@ Important difference:
 - Browser mode album registry edits are also in-memory only.
 - Browser mode person registry edits are also in-memory only.
 - Browser mode location registry edits are also in-memory only.
-- Electron mode writes updates back to `photo_metadata.jsonl`, `tag_registry.jsonl`, `album_registry.jsonl`, `person_registry.jsonl`, and `location_registry.jsonl`.
+- Electron mode writes updates back to the fixed JSONL files under `dataDir`.
 
 ## Metadata and Data Flow
 
 ### Files
 
 - `config.yml`: runtime configuration.
+- `dataDir`: configurable data directory; relative paths resolve from the project root and absolute paths are used directly.
 - `photo_workspace/`: image root folder.
 - `thumb_cache/`: hash-addressed thumbnail cache (`<SHA256Hash>.webp`).
-- `photo_metadata.jsonl`: one JSON object per line.
-- `tag_registry.jsonl`: one tag definition per line (`Text`, `Description`, `CreatedAt`, `UpdatedAt`).
-- `album_registry.jsonl`: one album definition per line (`Title`, `Description`, `CreatedAt`, `UpdatedAt`).
-- `person_registry.jsonl`: one person definition per line (`Name`, optional `Description`, `CreatedAt`, `UpdatedAt`).
-- `location_registry.jsonl`: one location definition per line (`Name`, optional `Country`/`Province`/`City`/`Parent`/`Description`, `CreatedAt`, `UpdatedAt`).
+- `data/photo_metadata.jsonl`: one JSON object per line.
+- `data/tag_registry.jsonl`: one tag definition per line (`Text`, `Description`, `CreatedAt`, `UpdatedAt`).
+- `data/album_registry.jsonl`: one album definition per line (`Title`, `Description`, `CreatedAt`, `UpdatedAt`).
+- `data/person_registry.jsonl`: one person definition per line (`Name`, optional `Description`, `CreatedAt`, `UpdatedAt`).
+- `data/location_registry.jsonl`: one location definition per line (`Name`, optional `Country`/`Province`/`City`/`Parent`/`Description`, `CreatedAt`, `UpdatedAt`).
 - `logs/YYYY-MM-DD.log`: runtime diagnostics.
 
 ### Startup flow (Electron mode)
@@ -130,14 +128,14 @@ Important difference:
 ### Tag registry flow
 
 1. Renderer loads tag definitions via `tag:list`.
-2. `tag:create` requires non-empty tag text and description, then rewrites `tag_registry.jsonl`.
+2. `tag:create` requires non-empty tag text and description, then rewrites `dataDir/tag_registry.jsonl`.
 3. `tag:update-description` updates a tag description without changing photo metadata.
 4. `tag:delete-global` removes a tag from the registry and from every photo record that uses it.
 
 ### Album registry flow
 
 1. Renderer loads album definitions via `album:list`.
-2. `album:create` requires non-empty album title and description, then rewrites `album_registry.jsonl`.
+2. `album:create` requires non-empty album title and description, then rewrites `dataDir/album_registry.jsonl`.
 3. `album:update-description` updates an album description without changing photo metadata.
 4. `album:delete-global` removes an album from the registry and clears that album field on every photo that uses it.
 
@@ -187,6 +185,15 @@ npm run build-thumbnails
 - Loads existing metadata records.
 - Generates missing thumbnails into `thumb_cache/` using `<SHA256Hash>.webp`.
 - Applies long-image crop strategy (top for very tall images, left for very wide images).
+
+### Changing the data directory
+
+1. Close PhotoManager.
+2. Move all five fixed JSONL files to the new directory.
+3. Update `dataDir` in `config.yml` using a project-relative or absolute path.
+4. Restart the app and run `npm run verify-metadata`.
+
+`npm run export-metadata-csv` writes `photo_metadata.csv` to `dataDir` by default. An explicit output path still overrides this default.
 
 ## Key Design Decisions
 

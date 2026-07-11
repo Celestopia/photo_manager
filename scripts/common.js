@@ -14,14 +14,17 @@ const yaml = require("js-yaml");
 const exifr = require("exifr");
 
 const APP_ROOT = path.resolve(__dirname, "..");
+const DATA_FILE_NAMES = Object.freeze({
+  metadata: "photo_metadata.jsonl",
+  tags: "tag_registry.jsonl",
+  albums: "album_registry.jsonl",
+  people: "person_registry.jsonl",
+  locations: "location_registry.jsonl",
+});
 
 const DEFAULT_CONFIG = {
   workspaceRoot: "./photo_workspace",
-  metadataFile: "./photo_metadata.jsonl",
-  tagRegistryFile: "./tag_registry.jsonl",
-  albumRegistryFile: "./album_registry.jsonl",
-  personRegistryFile: "./person_registry.jsonl",
-  locationRegistryFile: "./location_registry.jsonl",
+  dataDir: "./data",
   logDir: "./logs",
   thumbnail: {
     dir: "./thumb_cache",
@@ -59,6 +62,20 @@ function resolveConfig() {
  */
 function absFromConfig(config, p) {
   return path.isAbsolute(p) ? p : path.resolve(APP_ROOT, p);
+}
+
+function resolveDataDir(config) {
+  return absFromConfig(config, config.dataDir || DEFAULT_CONFIG.dataDir);
+}
+
+function dataFilePath(config, fileName) {
+  return path.join(resolveDataDir(config), fileName);
+}
+
+async function ensureDataDir(config) {
+  const dataDir = resolveDataDir(config);
+  await fsp.mkdir(dataDir, { recursive: true });
+  return dataDir;
 }
 
 // DFS traversal over workspace directory tree.
@@ -278,10 +295,23 @@ async function loadExisting(metadataFile) {
  * Writes to a temporary file first, then renames to avoid partial writes.
  */
 async function writeAll(metadataFile, entries) {
+  await fsp.mkdir(path.dirname(metadataFile), { recursive: true });
   const temp = `${metadataFile}.tmp`;
   const lines = [...entries].map((x) => JSON.stringify(x));
   await fsp.writeFile(temp, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
   await fsp.rename(temp, metadataFile);
 }
 
-module.exports = { resolveConfig, absFromConfig, walkFiles, buildMetadata, loadExisting, writeAll, extensionType };
+module.exports = {
+  DATA_FILE_NAMES,
+  resolveConfig,
+  absFromConfig,
+  resolveDataDir,
+  dataFilePath,
+  ensureDataDir,
+  walkFiles,
+  buildMetadata,
+  loadExisting,
+  writeAll,
+  extensionType,
+};

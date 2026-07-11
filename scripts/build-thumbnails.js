@@ -7,12 +7,12 @@
  * It loads existing metadata records and generates missing thumbnails into
  * the configured cache directory using SHA256 file naming.
  */
-const { resolveConfig, absFromConfig, loadExisting } = require("./common");
+const { DATA_FILE_NAMES, resolveConfig, absFromConfig, dataFilePath, loadExisting } = require("./common");
 const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 
 async function run() {
   const config = resolveConfig();
-  const metadataFile = absFromConfig(config, config.metadataFile);
+  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
   const workspaceRoot = absFromConfig(config, config.workspaceRoot);
   const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
   const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);

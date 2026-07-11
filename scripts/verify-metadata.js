@@ -7,7 +7,7 @@
  * - print missing/tampered diagnostics
  */
 const path = require("node:path");
-const { resolveConfig, absFromConfig, walkFiles, buildMetadata, loadExisting, extensionType } = require("./common");
+const { DATA_FILE_NAMES, resolveConfig, absFromConfig, dataFilePath, walkFiles, buildMetadata, loadExisting, extensionType } = require("./common");
 
 /**
 
@@ -20,7 +20,7 @@ const { resolveConfig, absFromConfig, walkFiles, buildMetadata, loadExisting, ex
 async function run() {
   const config = resolveConfig();
   const root = absFromConfig(config, config.workspaceRoot);
-  const metadataFile = absFromConfig(config, config.metadataFile);
+  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
 
   const existing = await loadExisting(metadataFile);
   const files = await walkFiles(root);

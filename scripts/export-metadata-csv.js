@@ -7,7 +7,7 @@
  */
 const path = require("node:path");
 const fsp = require("node:fs/promises");
-const { resolveConfig, absFromConfig, loadExisting } = require("./common");
+const { DATA_FILE_NAMES, resolveConfig, dataFilePath, ensureDataDir, loadExisting } = require("./common");
 
 // Ordered flattened columns. Left side is intentionally user-facing.
 const COLUMNS = [
@@ -85,8 +85,9 @@ function toCell(value) {
 
 async function run() {
   const config = resolveConfig();
-  const metadataFile = absFromConfig(config, config.metadataFile);
-  const defaultOutput = metadataFile.replace(/\.jsonl$/i, ".csv");
+  await ensureDataDir(config);
+  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
+  const defaultOutput = dataFilePath(config, "photo_metadata.csv");
   const outputFile = process.argv[2]
     ? (path.isAbsolute(process.argv[2]) ? process.argv[2] : path.resolve(process.cwd(), process.argv[2]))
     : defaultOutput;

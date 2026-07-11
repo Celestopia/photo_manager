@@ -18,12 +18,8 @@ photo_workspace/*
 !photo_workspace/.gitkeep
 thumb_cache/*
 !thumb_cache/.gitkeep
-photo_metadata.jsonl
-photo_metadata.csv
-tag_registry.jsonl
-album_registry.jsonl
-person_registry.jsonl
-location_registry.jsonl
+data/*
+!data/.gitkeep
 
 # Temporary files
 *.tmp

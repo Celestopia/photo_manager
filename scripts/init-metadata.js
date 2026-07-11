@@ -8,7 +8,7 @@
  * - Rewrite metadata JSONL from scratch.
  */
 const path = require("node:path");
-const { resolveConfig, absFromConfig, walkFiles, buildMetadata, writeAll, extensionType } = require("./common");
+const { DATA_FILE_NAMES, resolveConfig, absFromConfig, dataFilePath, ensureDataDir, walkFiles, buildMetadata, writeAll, extensionType } = require("./common");
 const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 
 /**
@@ -23,7 +23,8 @@ async function run() {
   // Resolve runtime paths from config.
   const config = resolveConfig();
   const root = absFromConfig(config, config.workspaceRoot);
-  const metadataFile = absFromConfig(config, config.metadataFile);
+  await ensureDataDir(config);
+  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
   const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
   const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);
 
