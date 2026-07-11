@@ -169,6 +169,16 @@ html, body, #app {
 .side-panel dd { margin: 2px 0 0; word-break: break-all; }
 .side-panel label { margin-top: 8px; display: block; color: var(--text-soft); font-size: 13px; }
 .right-panel > label { font-weight: 700; }
+.viewer-field-heading {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.viewer-field-heading label {
+  margin-top: 0;
+  font-weight: 700;
+}
 .right-panel .input:not(.field-textarea) { width: 100%; }
 .field-textarea {
   width: 75%;
@@ -182,37 +192,45 @@ html, body, #app {
   overflow-y: hidden;
   resize: none;
 }
-.location-detail-toggle {
-  width: 100%;
-  min-height: 28px;
-  margin-top: 6px;
-  padding: 2px 0;
+.viewer-detail-toggle {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 6px;
   border: 0;
   background: transparent;
-  color: var(--text-soft);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
+  color: var(--text);
   cursor: pointer;
 }
-.location-detail-chevron {
+.viewer-detail-toggle:hover { background: #edf5ff; border-radius: 4px; }
+.viewer-detail-chevron {
   display: inline-block;
-  width: 12px;
-  color: var(--text);
+  width: 14px;
   font-size: 15px;
   line-height: 1;
   transform-origin: center;
   transition: transform 150ms ease;
 }
-.location-detail-chevron.expanded { transform: rotate(90deg); }
+.viewer-detail-chevron.expanded { transform: rotate(90deg); }
+.viewer-detail-indicator {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2f73b9;
+}
 .location-detail-input {
   display: block;
   width: calc(75% - 18px);
+  margin-top: 6px;
   margin-left: 18px;
 }
+.hidden-description-input { margin-top: 6px; }
 .location-field { position: relative; }
 .location-label-row {
   margin-top: 8px;

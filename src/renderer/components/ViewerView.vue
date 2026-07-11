@@ -56,17 +56,21 @@
     <AlbumPicker target="viewer" placeholder="搜索已有相册" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Album'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Album'">{{ saveNotice.message }}</div>
-    <label>地点</label>
+    <div class="viewer-field-heading">
+      <label>地点</label>
+      <button
+        type="button"
+        class="viewer-detail-toggle"
+        :aria-expanded="locationDetailExpanded"
+        :aria-label="locationDetailExpanded ? '收起位置细节' : '展开位置细节'"
+        :data-tip="locationDetailExpanded ? '收起位置细节' : '展开位置细节'"
+        @click="locationDetailExpanded = !locationDetailExpanded"
+      >
+        <span class="viewer-detail-chevron" :class="{ expanded: locationDetailExpanded }">&gt;</span>
+        <span v-if="editDraft.LocationDetail && !locationDetailExpanded" class="viewer-detail-indicator" aria-hidden="true"></span>
+      </button>
+    </div>
     <LocationPicker target="viewer" placeholder="搜索已有地点" />
-    <button
-      type="button"
-      class="location-detail-toggle"
-      :aria-expanded="locationDetailExpanded"
-      @click="locationDetailExpanded = !locationDetailExpanded"
-    >
-      <span class="location-detail-chevron" :class="{ expanded: locationDetailExpanded }">&gt;</span>
-      <span>位置细节</span>
-    </button>
     <textarea
       v-if="locationDetailExpanded"
       class="input field-textarea location-detail-input"
@@ -85,19 +89,30 @@
     <TagPicker target="viewer" placeholder="搜索已有标签" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Tags'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Tags'">{{ saveNotice.message }}</div>
-    <label>描述</label><textarea class="input textarea" v-model="editDraft.Description" @input="requestEdit('Description')"></textarea>
+    <div class="viewer-field-heading">
+      <label>描述</label>
+      <button
+        type="button"
+        class="viewer-detail-toggle"
+        :aria-expanded="hiddenDescriptionExpanded"
+        :aria-label="hiddenDescriptionExpanded ? '收起隐藏描述' : '展开隐藏描述'"
+        :data-tip="hiddenDescriptionExpanded ? '收起隐藏描述' : '展开隐藏描述'"
+        @click="hiddenDescriptionExpanded = !hiddenDescriptionExpanded"
+      >
+        <span class="viewer-detail-chevron" :class="{ expanded: hiddenDescriptionExpanded }">&gt;</span>
+        <span v-if="editDraft.HiddenDescription && !hiddenDescriptionExpanded" class="viewer-detail-indicator" aria-hidden="true"></span>
+      </button>
+    </div>
+    <textarea class="input textarea" v-model="editDraft.Description" @input="requestEdit('Description')"></textarea>
+    <textarea
+      v-if="hiddenDescriptionExpanded"
+      class="input textarea private-textarea hidden-description-input"
+      v-model="editDraft.HiddenDescription"
+      @input="requestEdit('HiddenDescription')"
+      placeholder="输入隐藏描述"
+    ></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Description'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Description'">{{ saveNotice.message }}</div>
-    <div class="private-desc">
-      <label><input type="checkbox" v-model="showPrivateNote" /> ShowPrivateNote</label>
-      <textarea
-        v-if="showPrivateNote"
-        class="input textarea private-textarea"
-        v-model="editDraft.HiddenDescription"
-        @input="requestEdit('HiddenDescription')"
-        placeholder="输入隐藏描述"
-      ></textarea>
-    </div>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'HiddenDescription'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'HiddenDescription'">{{ saveNotice.message }}</div>
   </aside>
@@ -132,6 +147,7 @@ if (!app) {
 }
 
 const locationDetailExpanded = ref(false);
+const hiddenDescriptionExpanded = ref(false);
 
 const {
   ICONS,
@@ -151,7 +167,6 @@ const {
   activeEditField,
   saveNotice,
   STAR_LEVELS,
-  showPrivateNote,
   viewerImageStyle,
   minZoom,
   maxZoom,
