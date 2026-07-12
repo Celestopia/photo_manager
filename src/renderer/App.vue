@@ -1032,7 +1032,9 @@ export default {
     }
 
     function openTagDropdown(target) {
-      tagDropdown[target] = !tagDropdown[target];
+      const shouldOpen = !tagDropdown[target];
+      closeAllRegistryDropdowns();
+      tagDropdown[target] = shouldOpen;
     }
 
     function closeTagDropdown(target) {
@@ -1085,6 +1087,7 @@ export default {
     }
 
     function openCreateTagMenu(target) {
+      closeAllRegistryDropdowns();
       tagCreate.visible = true;
       tagCreate.target = target;
       tagCreate.text = target === "manager" ? "" : normalizeTagText(tagSearch[target]);
@@ -1120,6 +1123,7 @@ export default {
     }
 
     async function openTagManager() {
+      closeAllRegistryDropdowns();
       await loadTags();
       tagManager.visible = true;
       tagManager.error = "";
@@ -1259,7 +1263,9 @@ export default {
     }
 
     function openPersonDropdown(target) {
-      personDropdown[target] = !personDropdown[target];
+      const shouldOpen = !personDropdown[target];
+      closeAllRegistryDropdowns();
+      personDropdown[target] = shouldOpen;
     }
 
     function closePersonDropdown(target) {
@@ -1307,6 +1313,7 @@ export default {
     }
 
     function openCreatePersonMenu(target) {
+      closeAllRegistryDropdowns();
       personCreate.visible = true;
       personCreate.target = target;
       personCreate.name = target === "manager" ? "" : normalizePersonName(personSearch[target]);
@@ -1342,6 +1349,7 @@ export default {
     }
 
     async function openPersonManager() {
+      closeAllRegistryDropdowns();
       await loadPeople();
       personManager.visible = true;
       personManager.error = "";
@@ -1836,7 +1844,9 @@ export default {
     }
 
     function openLocationDropdown(target) {
-      locationDropdown[target] = !locationDropdown[target];
+      const shouldOpen = !locationDropdown[target];
+      closeAllRegistryDropdowns();
+      locationDropdown[target] = shouldOpen;
     }
 
     function closeLocationDropdown(target) {
@@ -1905,6 +1915,7 @@ export default {
     }
 
     function openCreateLocationMenu(target) {
+      closeAllRegistryDropdowns();
       locationCreate.visible = true;
       locationCreate.target = target;
       locationCreate.name = target === "manager" ? "" : normalizeLocationName(locationSearch[target]);
@@ -1967,6 +1978,7 @@ export default {
     }
 
     async function openLocationManager() {
+      closeAllRegistryDropdowns();
       await loadLocations();
       locationManager.visible = true;
       locationManager.error = "";
@@ -2115,7 +2127,9 @@ export default {
     }
 
     function openAlbumDropdown(target) {
-      albumDropdown[target] = !albumDropdown[target];
+      const shouldOpen = !albumDropdown[target];
+      closeAllRegistryDropdowns();
+      albumDropdown[target] = shouldOpen;
     }
 
     function closeAlbumDropdown(target) {
@@ -2169,6 +2183,7 @@ export default {
     }
 
     function openCreateAlbumMenu(target) {
+      closeAllRegistryDropdowns();
       albumCreate.visible = true;
       albumCreate.target = target;
       albumCreate.title = target === "manager" ? "" : normalizeAlbumTitle(albumSearch[target]);
@@ -2204,6 +2219,7 @@ export default {
     }
 
     async function openAlbumManager() {
+      closeAllRegistryDropdowns();
       await loadAlbums();
       albumManager.visible = true;
       albumManager.error = "";
@@ -2859,12 +2875,16 @@ export default {
 
      */
 
-    function closeTransientPanels() {
-      showContextMenu.value = false;
+    function closeAllRegistryDropdowns() {
       closeAllTagDropdowns();
       closeAllAlbumDropdowns();
       closeAllPersonDropdowns();
       closeAllLocationDropdowns();
+    }
+
+    function closeTransientPanels() {
+      showContextMenu.value = false;
+      closeAllRegistryDropdowns();
     }
 
     /**
