@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
 
   // Clipboard helpers
   copyPath: (absolutePath) => ipcRenderer.invoke("photo:copy-path", absolutePath),
-  copyJson: (item) => ipcRenderer.invoke("photo:copy-json", toSerializable(item)),
+  copyJson: (filePath) => ipcRenderer.invoke("photo:copy-json", filePath),
   copyImage: (filePath) => ipcRenderer.invoke("photo:copy-image", filePath),
   openWithSystem: (filePath) => ipcRenderer.invoke("photo:open-default", filePath),
   showInFolder: (filePath) => ipcRenderer.invoke("photo:show-in-folder", filePath),

@@ -1585,9 +1585,14 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle("photo:copy-json", async (_, item) => {
-    clipboard.writeText(JSON.stringify(item, null, 2));
-    return { ok: true };
+  ipcMain.handle("photo:copy-json", async (_, filePath) => {
+    try {
+      const { item } = resolveIndexedMediaPath(filePath);
+      clipboard.writeText(JSON.stringify(item, null, 2));
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
   });
 
   ipcMain.handle("photo:copy-image", async (_, filePath) => {

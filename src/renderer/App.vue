@@ -2920,10 +2920,15 @@ export default {
 
     async function contextCopyJson() {
       if (!selectedItem.value) return;
-      const result = await API.copyJson(selectedItem.value);
-      if (result?.ok) showToastMessage("已成功复制媒体元信息");
-      else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
-      closeTransientPanels();
+      try {
+        const result = await API.copyJson(selectedItem.value.FilePath);
+        if (result?.ok) showToastMessage("已成功复制媒体元信息");
+        else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
+      } catch (error) {
+        showToastMessage(`复制失败：${error?.message || "未知错误"}`);
+      } finally {
+        closeTransientPanels();
+      }
     }
 
     /**

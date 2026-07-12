@@ -285,7 +285,6 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
       FileType: type,
       FileExtension: ext.replace(".", "").toLowerCase(),
       FileSize: stat.size,
-      ModificationTimeMs: stat.mtimeMs,
       ShootingTimeString: shooting.text,
       ShootingTimeZone: shooting.zone,
       ShootingTimeStamp: shooting.stamp,
@@ -295,6 +294,7 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
       ModificationTimeString: modified.text,
       ModificationTimeZone: modified.zone,
       ModificationTimeStamp: modified.stamp,
+      ModificationTimeMs: stat.mtimeMs,
     },
     GPS: {
       LatitudeRef: type === "video" && videoLocation ? (videoLocation.latitude < 0 ? "S" : "N") : exif?.GPSLatitudeRef || null,
