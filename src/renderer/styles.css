@@ -96,6 +96,12 @@ html, body, #app {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.registry-trigger-arrow {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  pointer-events: none;
+}
 .registry-filter-dropdown {
   left: 0;
   right: auto;
@@ -107,6 +113,18 @@ html, body, #app {
   max-height: 220px;
   overflow-x: hidden;
   overflow-y: auto;
+}
+.registry-filter-dropdown .tag-option:hover,
+.registry-filter-dropdown .tag-option:focus-visible,
+.location-filter-dropdown .tag-option:hover,
+.location-filter-dropdown .tag-option:focus-visible {
+  background: rgba(31, 114, 204, 0.1);
+  color: var(--text);
+}
+.registry-filter-dropdown .tag-option.is-selected,
+.location-filter-dropdown .tag-option.is-selected {
+  background: rgba(31, 114, 204, 0.18);
+  color: #174f84;
 }
 .toolbar-group.location-filter-group {
   align-items: center;
@@ -547,6 +565,15 @@ html, body, #app {
 }
 .tag-option:hover {
   background: #eef6ff;
+}
+.selection-dropdown .tag-option:hover,
+.selection-dropdown .tag-option:focus-visible {
+  background: rgba(31, 114, 204, 0.1);
+  color: var(--text);
+}
+.selection-dropdown .tag-option.is-selected {
+  background: rgba(31, 114, 204, 0.18);
+  color: #174f84;
 }
 .tag-option-empty {
   padding: 10px 8px;
@@ -989,6 +1016,22 @@ html, body, #app {
 }
 .location-option.location-group-selectable {
   font-weight: 600;
+}
+.registry-filter-dropdown,
+.location-filter-dropdown,
+.selection-dropdown {
+  padding: 0;
+}
+.registry-filter-dropdown > .dropdown-search-input,
+.location-filter-dropdown > .dropdown-search-input,
+.selection-dropdown > .dropdown-search-input {
+  width: calc(100% - 16px);
+  margin: 8px 8px 6px;
+}
+.registry-filter-dropdown .tag-option,
+.location-filter-dropdown .tag-option,
+.selection-dropdown .tag-option {
+  border-radius: 0;
 }
 .location-group-row {
   min-height: 30px;

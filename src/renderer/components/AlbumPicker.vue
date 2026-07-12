@@ -16,7 +16,7 @@
           aria-label="将当前媒体移出相册"
           @click.stop="clearAlbumForTarget(target)"
         >×</button>
-        <div class="tag-dropdown searchable-dropdown" v-if="albumDropdown[target]">
+        <div class="tag-dropdown searchable-dropdown selection-dropdown" v-if="albumDropdown[target]">
           <input
             autofocus
             class="input dropdown-search-input"
@@ -31,6 +31,7 @@
               :key="target + '_album_option_' + album.Title"
               type="button"
               class="tag-option"
+              :class="{ 'is-selected': selectedAlbum === album.Title }"
               :data-tip="album.Description"
               @mousedown.prevent="setAlbumForTarget(target, album.Title)"
             >

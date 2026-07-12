@@ -15,7 +15,7 @@
         <span v-if="!selectedPeople.length">{{ placeholder }}</span>
         <span v-else>选择人物</span>
       </button>
-        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown" v-if="personDropdown[target]">
+        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown selection-dropdown" v-if="personDropdown[target]">
           <input
             autofocus
             class="input dropdown-search-input"
@@ -32,6 +32,7 @@
                 :key="target + '_recent_person_option_' + person.Name"
                 type="button"
                 class="tag-option"
+                :class="{ 'is-selected': selectedPeople.includes(person.Name) }"
                 :data-tip="person.Description"
                 @mousedown.prevent="addPersonToTarget(target, person.Name)"
               >
@@ -44,6 +45,7 @@
               :key="target + '_person_option_' + person.Name"
               type="button"
               class="tag-option"
+              :class="{ 'is-selected': selectedPeople.includes(person.Name) }"
               :data-tip="person.Description"
               @mousedown.prevent="addPersonToTarget(target, person.Name)"
             >

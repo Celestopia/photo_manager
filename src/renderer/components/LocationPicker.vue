@@ -16,7 +16,7 @@
           aria-label="将当前媒体设为无地点"
           @click.stop="clearLocationForTarget(target)"
         >×</button>
-        <div class="tag-dropdown location-dropdown" v-if="locationDropdown[target]">
+        <div class="tag-dropdown location-dropdown selection-dropdown" v-if="locationDropdown[target]">
           <input
             autofocus
             class="input dropdown-search-input location-dropdown-search"
@@ -37,7 +37,7 @@
                 v-else-if="row.Location"
                 type="button"
                 class="tag-option location-option"
-                :class="{ 'location-group-selectable': row.Type === 'group' }"
+                :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocation === row.Location.Name }"
                 :data-tip="getLocationTooltip(row.Location.Name)"
                 :data-location-context="getLocationManagerRowContext(row)"
                 :data-location-recent="row.Key.startsWith('recent-location:') ? '1' : null"

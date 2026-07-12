@@ -2,6 +2,7 @@
   <div class="registry-filter-picker" @click.stop>
     <button type="button" class="input registry-trigger" @click="toggleDropdown">
       <span>{{ selectedLabel }}</span>
+      <img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" />
     </button>
     <div class="tag-dropdown registry-filter-dropdown" v-if="dropdownOpen">
       <input
@@ -13,11 +14,12 @@
         @keydown.escape="closeDropdown"
       />
       <div class="registry-dropdown-options">
-        <button type="button" class="tag-option" @mousedown.prevent="selectValue('')"><span>全部</span></button>
+        <button type="button" class="tag-option" :class="{ 'is-selected': selectedValue === '' }" @mousedown.prevent="selectValue('')"><span>全部</span></button>
         <button
           v-if="kind === 'album' && filterOptions.unassignedAlbumCount > 0 && matches('未设置相册')"
           type="button"
           class="tag-option"
+          :class="{ 'is-selected': selectedValue === UNASSIGNED_ALBUM_FILTER }"
           @mousedown.prevent="selectValue(UNASSIGNED_ALBUM_FILTER)"
         ><span>未设置相册</span></button>
         <button
@@ -25,6 +27,7 @@
           :key="`${kind}_${option}`"
           type="button"
           class="tag-option"
+          :class="{ 'is-selected': selectedValue === option }"
           :data-tip="getDescription(option)"
           @mousedown.prevent="selectValue(option)"
         ><span>{{ option }}</span></button>
@@ -46,6 +49,7 @@ const app = inject("appContext");
 if (!app) throw new Error("RegistryFilterPicker must be used under App.vue provider");
 
 const {
+  ICONS,
   query,
   filterOptions,
   UNASSIGNED_ALBUM_FILTER,

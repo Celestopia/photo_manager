@@ -15,7 +15,7 @@
         <span v-if="!selectedTags.length">{{ placeholder }}</span>
         <span v-else>选择标签</span>
       </button>
-        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown" v-if="tagDropdown[target]">
+        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown selection-dropdown" v-if="tagDropdown[target]">
           <input
             autofocus
             class="input dropdown-search-input"
@@ -32,6 +32,7 @@
                 :key="target + '_recent_option_' + tag.Text"
                 type="button"
                 class="tag-option"
+                :class="{ 'is-selected': selectedTags.includes(tag.Text) }"
                 :data-tip="tag.Description"
                 @mousedown.prevent="addTagToTarget(target, tag.Text)"
               >
@@ -44,6 +45,7 @@
               :key="target + '_option_' + tag.Text"
               type="button"
               class="tag-option"
+              :class="{ 'is-selected': selectedTags.includes(tag.Text) }"
               :data-tip="tag.Description"
               @mousedown.prevent="addTagToTarget(target, tag.Text)"
             >

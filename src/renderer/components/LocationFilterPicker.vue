@@ -6,7 +6,7 @@
         class="input location-filter-input registry-trigger"
         :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
         @click="openDropdown"
-      ><span>{{ selectedLocation || '全部' }}</span></button>
+      ><span>{{ selectedLocation || '全部' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
       <div class="tag-dropdown location-dropdown location-filter-dropdown" v-if="dropdownOpen">
         <input
           ref="searchInputRef"
@@ -17,7 +17,7 @@
         />
         <div class="location-dropdown-current-context" v-if="filterDropdownContext">{{ filterDropdownContext }}</div>
         <div class="location-dropdown-scroll" ref="filterDropdownRef" @scroll="updateFilterDropdownContext">
-          <button type="button" class="tag-option location-option" @mousedown.prevent="selectLocation('')">
+          <button type="button" class="tag-option location-option" :class="{ 'is-selected': selectedLocation === '' }" @mousedown.prevent="selectLocation('')">
             <span>全部</span>
           </button>
           <template v-for="row in filterRows" :key="'filter_' + row.Key">
@@ -30,7 +30,7 @@
               v-else-if="row.Location"
               type="button"
               class="tag-option location-option"
-              :class="{ 'location-group-selectable': row.Type === 'group' }"
+              :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocation === row.Location.Name }"
               :data-tip="getLocationTooltip(row.Location.Name)"
               :data-location-context="getLocationManagerRowContext(row)"
               :data-location-recent="row.Key.startsWith('filter-recent-location:') ? '1' : null"
@@ -61,6 +61,7 @@ if (!app) {
 }
 
 const {
+  ICONS,
   query,
   getLocationFilterRows,
   getLocationTooltip,

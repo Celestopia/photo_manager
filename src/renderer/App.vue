@@ -297,6 +297,7 @@ const ICONS = {
   mirror: new URL("./assets/image_mirror.svg", import.meta.url).href,
   restoreView: new URL("./assets/image_restore_view.svg", import.meta.url).href,
   fullscreen: new URL("./assets/image_fullscreen.svg", import.meta.url).href,
+  chevronDown: new URL("./assets/chevron_down.svg", import.meta.url).href,
   previousFrame: new URL("./assets/video_previous_frame.svg", import.meta.url).href,
   nextFrame: new URL("./assets/video_next_frame.svg", import.meta.url).href,
   openSystem: new URL("./assets/open_system.svg", import.meta.url).href,
@@ -1010,9 +1011,11 @@ export default {
       const keyword = normalizeTagText(tagSearch[target]);
       const selected = new Set(selectedTagsForTarget(target));
       return tagRegistry.value
-        .filter((tag) => !selected.has(tag.Text))
         .filter((tag) => !keyword || tag.Text.includes(keyword) || (tag.Description || "").includes(keyword))
-        .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
+        .sort((a, b) => {
+          const selectedOrder = Number(selected.has(b.Text)) - Number(selected.has(a.Text));
+          return selectedOrder || a.Text.localeCompare(b.Text, "zh-CN");
+        });
     }
 
     function getTagOptions(target) {
@@ -1235,9 +1238,11 @@ export default {
       const keyword = normalizePersonName(personSearch[target]);
       const selected = new Set(selectedPeopleForTarget(target));
       return personRegistry.value
-        .filter((person) => !selected.has(person.Name))
         .filter((person) => !keyword || person.Name.includes(keyword) || (person.Description || "").includes(keyword))
-        .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
+        .sort((a, b) => {
+          const selectedOrder = Number(selected.has(b.Name)) - Number(selected.has(a.Name));
+          return selectedOrder || a.Name.localeCompare(b.Name, "zh-CN");
+        });
     }
 
     function getPersonOptions(target) {
@@ -1733,9 +1738,7 @@ export default {
 
     function getLocationCandidates(target) {
       const keyword = normalizeLocationName(locationSearch[target]);
-      const selected = selectedLocationForTarget(target);
       return locationRegistry.value
-        .filter((location) => location.Name !== selected)
         .filter((location) => locationMatchesKeyword(location, keyword))
         .sort(compareLocationsByRegionAndTree);
     }
@@ -1747,7 +1750,12 @@ export default {
     }
 
     function getLocationOptions(target) {
-      return getLocationCandidates(target).slice(0, 50);
+      const candidates = getLocationCandidates(target);
+      const limited = candidates.slice(0, 50);
+      const selected = selectedLocationForTarget(target);
+      const selectedLocation = candidates.find((location) => location.Name === selected);
+      if (selectedLocation && !limited.some((location) => location.Name === selected)) limited.push(selectedLocation);
+      return limited;
     }
 
     function getLocationMenuRows(target) {
@@ -2094,9 +2102,11 @@ export default {
       const keyword = normalizeAlbumTitle(albumSearch[target]);
       const selected = selectedAlbumForTarget(target);
       return albumRegistry.value
-        .filter((album) => album.Title !== selected)
         .filter((album) => !keyword || album.Title.includes(keyword) || (album.Description || "").includes(keyword))
-        .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"))
+        .sort((a, b) => {
+          const selectedOrder = Number(b.Title === selected) - Number(a.Title === selected);
+          return selectedOrder || a.Title.localeCompare(b.Title, "zh-CN");
+        })
         .slice(0, 50);
     }
 
