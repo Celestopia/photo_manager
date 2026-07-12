@@ -41,10 +41,10 @@
       <table class="camera-table">
         <tr><th>品牌</th><td>{{ selectedItem?.Camera?.Make || '-' }}</td></tr>
         <tr><th>型号</th><td>{{ selectedItem?.Camera?.Model || '-' }}</td></tr>
-        <tr><th>焦距</th><td>{{ selectedItem?.Camera?.FocalLength || '-' }}</td></tr>
-        <tr><th>光圈</th><td>{{ selectedItem?.Camera?.Aperture || '-' }}</td></tr>
-        <tr><th>ISO</th><td>{{ selectedItem?.Camera?.ISO || '-' }}</td></tr>
-        <tr><th>快门</th><td>{{ selectedItem?.Camera?.ExposureTime || '-' }}</td></tr>
+        <tr><th>焦距</th><td>{{ formatCameraValue(selectedItem?.Camera?.FocalLength) }}</td></tr>
+        <tr><th>光圈</th><td>{{ formatCameraValue(selectedItem?.Camera?.Aperture) }}</td></tr>
+        <tr><th>ISO</th><td>{{ formatCameraValue(selectedItem?.Camera?.ISO) }}</td></tr>
+        <tr><th>快门</th><td>{{ formatCameraValue(selectedItem?.Camera?.ExposureTime) }}</td></tr>
         <tr><th>闪光灯</th><td>{{ selectedItem?.Camera?.FlashUsed ? '是' : '否' }}</td></tr>
       </table>
     </div>
@@ -223,6 +223,13 @@ if (!app) {
 
 const locationDetailExpanded = ref(false);
 const hiddenDescriptionExpanded = ref(false);
+
+function formatCameraValue(value) {
+  if (value == null || value === "") return "-";
+  if (typeof value !== "number") return value;
+  if (!Number.isFinite(value)) return "-";
+  return Number(value.toFixed(6)).toString();
+}
 
 const {
   ICONS,
