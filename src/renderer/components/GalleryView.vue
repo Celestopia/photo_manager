@@ -48,7 +48,7 @@
             </div>
             <div class="card-caption">
               <div class="title" :title="item.Customization?.Title || item.FilePath.split('/').pop()">{{ item.Customization?.Title || item.FilePath.split('/').pop() }}</div>
-              <div class="meta"><span>评级 {{ item.Customization?.Rating || '-' }}</span><span>{{ mediaDimensions(item) }}<template v-if="isVideo(item)"> · {{ formatDuration(item.Video?.DurationSeconds) }}</template></span></div>
+              <div class="meta"><span>评级 {{ item.Customization?.Rating || '-' }}</span><span>{{ mediaDimensions(item) }}</span></div>
             </div>
           </article>
         </div>
