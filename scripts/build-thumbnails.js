@@ -7,8 +7,9 @@
  * It loads existing metadata records and generates missing thumbnails into
  * the configured cache directory using SHA256 file naming.
  */
-const { DATA_FILE_NAMES, resolveConfig, absFromConfig, dataFilePath, loadExisting } = require("./common");
+const { APP_ROOT, DATA_FILE_NAMES, resolveConfig, absFromConfig, dataFilePath, loadExisting } = require("./common");
 const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
+const { validateMediaTools } = require("./media-tools");
 
 async function run() {
   const config = resolveConfig();
@@ -16,14 +17,16 @@ async function run() {
   const workspaceRoot = absFromConfig(config, config.workspaceRoot);
   const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
   const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);
+  await validateMediaTools(APP_ROOT, config.media);
 
   const existing = await loadExisting(metadataFile);
-  const imageItems = [...existing.values()].filter((item) => item?.FileSystem?.FileType === "image");
-  const stats = await ensureThumbnailsForItems(imageItems, {
+  const mediaItems = [...existing.values()].filter((item) => ["image", "video"].includes(item?.FileSystem?.FileType));
+  const stats = await ensureThumbnailsForItems(mediaItems, {
     workspaceRoot,
     cacheDir: thumbnailDir,
     options: thumbnailConfig,
     maxConcurrency: thumbnailConfig.maxConcurrency,
+    mediaConfig: config.media,
     logger: (message) => console.warn(message),
   });
 

@@ -10,9 +10,33 @@
 </header>
 <main class="viewer-main" :style="ratioStyle">
   <aside class="side-panel left-panel" :class="{ collapsed: !showLeftPanel }">
-    <h3>图像信息</h3>
-    <dl><dt>文件名</dt><dd>{{ selectedItem?.FilePath?.split('/').pop() }}</dd><dt>拍摄日期</dt><dd>{{ selectedItem?.FileSystem?.ShootingTimeString || '-' }}</dd><dt>修改日期</dt><dd>{{ selectedItem?.FileSystem?.ModificationTimeString || '-' }}</dd><dt>大小</dt><dd>{{ selectedItem?.Picture?.Width || 0 }}x{{ selectedItem?.Picture?.Height || 0 }} / {{ formatFileSize(selectedItem?.FileSystem?.FileSize) }}</dd></dl>
-    <div class="camera-table-wrapper">
+    <h3>{{ isSelectedVideo ? '视频信息' : '图像信息' }}</h3>
+    <dl>
+      <dt>文件名</dt><dd>{{ selectedItem?.FilePath?.split('/').pop() }}</dd>
+      <dt>拍摄日期</dt><dd>{{ selectedItem?.FileSystem?.ShootingTimeString || '-' }}</dd>
+      <dt>修改日期</dt><dd>{{ selectedItem?.FileSystem?.ModificationTimeString || '-' }}</dd>
+      <dt>文件大小</dt><dd>{{ formatFileSize(selectedItem?.FileSystem?.FileSize) }}</dd>
+      <dt>分辨率</dt><dd v-if="isSelectedVideo">{{ selectedItem?.Video?.DisplayWidth && selectedItem?.Video?.DisplayHeight ? selectedItem.Video.DisplayWidth + 'x' + selectedItem.Video.DisplayHeight : '-' }}</dd><dd v-else>{{ selectedItem?.Picture?.Width && selectedItem?.Picture?.Height ? selectedItem.Picture.Width + 'x' + selectedItem.Picture.Height : '-' }}</dd>
+      <template v-if="isSelectedVideo">
+        <dt>时长</dt><dd>{{ formatDuration(selectedItem?.Video?.DurationSeconds) }}</dd>
+        <dt>帧率</dt><dd>{{ selectedItem?.Video?.FrameRate != null ? selectedItem.Video.FrameRate + ' fps' : '-' }}</dd>
+      </template>
+    </dl>
+    <div class="camera-table-wrapper" v-if="isSelectedVideo">
+      <h4>视频参数</h4>
+      <table class="camera-table">
+        <tr><th>视频编码</th><td>{{ selectedItem?.Video?.VideoCodec || '-' }}<template v-if="selectedItem?.Video?.VideoProfile"> / {{ selectedItem.Video.VideoProfile }}</template></td></tr>
+        <tr><th>视频码率</th><td>{{ formatBitRate(selectedItem?.Video?.BitRate) }}</td></tr>
+        <tr><th>像素格式</th><td>{{ selectedItem?.Video?.PixelFormat || '-' }}<template v-if="selectedItem?.Video?.BitDepth"> / {{ selectedItem.Video.BitDepth }} bit</template></td></tr>
+        <tr><th>音频</th><td>{{ selectedItem?.Video?.HasAudio ? (selectedItem.Video.AudioCodec || '有音轨') : '无音轨' }}<template v-if="selectedItem?.Video?.AudioBitRate"> / {{ formatBitRate(selectedItem.Video.AudioBitRate) }}</template></td></tr>
+        <tr v-if="selectedItem?.Video?.HasAudio"><th>声道/采样</th><td>{{ selectedItem.Video.AudioChannels || '-' }} 声道 / {{ selectedItem.Video.AudioSampleRate || '-' }} Hz</td></tr>
+        <tr><th>容器</th><td>{{ selectedItem?.Video?.ContainerFormat || '-' }}</td></tr>
+        <tr><th>媒体流</th><td>视频 {{ selectedItem?.Video?.VideoStreamCount || 0 }} / 音频 {{ selectedItem?.Video?.AudioStreamCount || 0 }}</td></tr>
+        <tr><th>旋转</th><td>{{ selectedItem?.Video?.RotationDegrees != null ? selectedItem.Video.RotationDegrees + '°' : '-' }}</td></tr>
+      </table>
+      <div v-if="selectedItem?.Video?.ProbeStatus === 'failed'" class="video-probe-error">{{ selectedItem?.Video?.ProbeError || '视频解析失败' }}</div>
+    </div>
+    <div v-if="!isSelectedVideo" class="camera-table-wrapper">
       <h4>相机参数</h4>
       <table class="camera-table">
         <tr><th>品牌</th><td>{{ selectedItem?.Camera?.Make || '-' }}</td></tr>
@@ -25,12 +49,57 @@
       </table>
     </div>
   </aside>
-  <section class="image-stage" ref="imageStageRef" @wheel="onImageWheel" @mousemove="onDrag" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
+  <section class="image-stage" ref="imageStageRef" @wheel="!isSelectedVideo && onImageWheel($event)" @mousemove="!isSelectedVideo && onDrag($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
     <button class="nav-btn left" @click="switchPhoto(-1)">◀</button>
-    <div class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerImageStyle" /></div>
+    <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerImageStyle" /></div>
+    <div v-else class="video-container" @dblclick.stop.prevent="toggleFullscreen">
+      <video
+        v-if="videoPlaybackMode === 'video'"
+        :key="selectedItem?.FilePath"
+        ref="videoElementRef"
+        class="viewer-video"
+        controls
+        preload="metadata"
+        playsinline
+        :data-file-path="selectedItem?.FilePath"
+        :poster="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder"
+        :src="buildImageUrl(selectedItem?.__absolutePath)"
+        @loadedmetadata="onVideoLoadedMetadata"
+        @error="onVideoPlaybackError"
+        @volumechange="onVideoVolumeChange"
+        @ratechange="onVideoRateChange"
+        @play="onMediaPlaybackStarted"
+        @timeupdate="onMediaTimeUpdate"
+        @seeked="onMediaTimeUpdate"
+      ></video>
+      <div v-else-if="videoPlaybackMode === 'audio'" class="video-fallback-panel">
+        <img :src="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder" alt="视频封面" />
+        <p>{{ videoPlaybackMessage || '当前仅播放音频' }}</p>
+        <audio
+          :key="selectedItem?.FilePath + '_audio'"
+          ref="audioElementRef"
+          controls
+          preload="metadata"
+          :data-file-path="selectedItem?.FilePath"
+          :src="buildImageUrl(selectedItem?.__absolutePath)"
+          @loadedmetadata="onAudioLoadedMetadata"
+          @error="onAudioPlaybackError"
+          @volumechange="onVideoVolumeChange"
+          @ratechange="onVideoRateChange"
+          @play="onMediaPlaybackStarted"
+          @timeupdate="onMediaTimeUpdate"
+          @seeked="onMediaTimeUpdate"
+        ></audio>
+      </div>
+      <div v-else class="video-fallback-panel video-unsupported-panel">
+        <img :src="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder" alt="视频封面" />
+        <p>{{ videoPlaybackMessage || selectedItem?.Video?.ProbeError || '当前播放器无法播放此媒体' }}</p>
+        <div class="video-fallback-actions"><button class="btn btn-primary" @click.stop="openCurrentWithSystem">使用系统播放器打开</button><button class="btn" @click.stop="showCurrentInFolder">在资源管理器中显示</button></div>
+      </div>
+    </div>
     <button class="nav-btn right" @click="switchPhoto(1)">▶</button>
     <div v-if="showContextMenu" class="context-menu" :style="{ left: contextPosition.x + 'px', top: contextPosition.y + 'px' }" @click.stop>
-      <button @click="contextCopyImage">复制到剪贴板</button><button @click="contextCopyPath">复制图片路径</button><button @click="contextCopyJson">复制图片元信息JSON</button>
+      <button v-if="!isSelectedVideo" @click="contextCopyImage">复制到剪贴板</button><button @click="contextCopyPath">复制文件路径</button><button @click="contextCopyJson">复制媒体元信息 JSON</button><button @click="openCurrentWithSystem">使用系统默认程序打开</button><button @click="showCurrentInFolder">在资源管理器中显示</button>
     </div>
   </section>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel }">
@@ -118,8 +187,8 @@
   </aside>
 </main>
 <footer class="viewer-footer">
-  <div class="meta-popup-wrapper"><button class="btn icon-btn" data-tip="显示/隐藏图片信息" @click="toggleLeftPanel"><img class="icon" :src="ICONS.metadataInfo" alt="显示/隐藏图片信息" /></button></div>
-  <div class="viewer-tools">
+  <div class="meta-popup-wrapper"><button class="btn icon-btn" data-tip="显示/隐藏媒体信息" @click="toggleLeftPanel"><img class="icon" :src="ICONS.metadataInfo" alt="显示/隐藏媒体信息" /></button></div>
+  <div class="viewer-tools" v-if="!isSelectedVideo">
     <button class="btn icon-btn" data-tip="放大" @click="zoomIn"><img class="icon" :src="ICONS.zoomIn" alt="放大" /></button>
     <button class="btn icon-btn" data-tip="缩小" @click="zoomOut"><img class="icon" :src="ICONS.zoomOut" alt="缩小" /></button>
     <button class="btn icon-btn" data-tip="顺时针旋转" @click="rotateClockwise"><img class="icon" :src="ICONS.rotateClockwise" alt="顺时针旋转" /></button>
@@ -127,6 +196,12 @@
     <button class="btn icon-btn" data-tip="镜像" @click="toggleMirror"><img class="icon" :src="ICONS.mirror" alt="镜像" /></button>
     <button class="btn icon-btn" data-tip="复原视图" @click="restoreImageState"><img class="icon" :src="ICONS.restoreView" alt="复原视图" /></button>
     <div class="zoom-controls"><input class="input zoom-input" type="number" :min="minZoom" :max="maxZoom" v-model.number="zoomPercent" /><input class="slider" type="range" :min="minZoom" :max="maxZoom" :step="zoomStep" v-model.number="zoomPercent" /><button class="btn icon-btn" data-tip="图像全屏" @click="toggleFullscreen"><img class="icon" :src="ICONS.fullscreen" alt="图像全屏" /></button></div>
+  </div>
+  <div class="viewer-tools video-tools" v-else>
+    <button class="btn icon-btn" data-tip="上一帧" aria-label="上一帧" :disabled="!canStepVideoBackward" @click="stepVideoFrame(-1)"><img class="icon" :src="ICONS.previousFrame" alt="" /></button>
+    <button class="btn icon-btn" data-tip="下一帧" aria-label="下一帧" :disabled="!canStepVideoForward" @click="stepVideoFrame(1)"><img class="icon" :src="ICONS.nextFrame" alt="" /></button>
+    <button class="btn icon-btn" data-tip="媒体全屏" @click="toggleFullscreen"><img class="icon" :src="ICONS.fullscreen" alt="媒体全屏" /></button>
+    <button class="btn icon-btn" data-tip="用系统播放器打开" aria-label="用系统播放器打开" @click="openCurrentWithSystem"><img class="icon" :src="ICONS.openSystem" alt="" /></button>
   </div>
   <div class="right-tools">
     <button class="btn icon-btn" data-tip="显示/隐藏个性化信息" @click="toggleRightPanel"><img class="icon" :src="ICONS.customization" alt="显示/隐藏个性化信息" /></button>
@@ -160,6 +235,13 @@ const {
   showLeftPanel,
   showRightPanel,
   imageStageRef,
+  videoElementRef,
+  audioElementRef,
+  videoPlaybackMode,
+  videoPlaybackMessage,
+  canStepVideoBackward,
+  canStepVideoForward,
+  isSelectedVideo,
   showContextMenu,
   contextPosition,
   editDraft,
@@ -176,6 +258,8 @@ const {
   doWindowAction,
   toggleWindowMaximizeRestore,
   formatFileSize,
+  formatDuration,
+  formatBitRate,
   onImageWheel,
   onDrag,
   endDrag,
@@ -187,6 +271,17 @@ const {
   contextCopyImage,
   contextCopyPath,
   contextCopyJson,
+  openCurrentWithSystem,
+  showCurrentInFolder,
+  onVideoLoadedMetadata,
+  onVideoPlaybackError,
+  onAudioLoadedMetadata,
+  onAudioPlaybackError,
+  onVideoVolumeChange,
+  onVideoRateChange,
+  onMediaPlaybackStarted,
+  onMediaTimeUpdate,
+  stepVideoFrame,
   onFieldTextareaInput,
   confirmEdit,
   cancelEdit,

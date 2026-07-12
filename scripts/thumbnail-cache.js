@@ -10,7 +10,16 @@
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const sharp = require("sharp");
+const {
+  normalizeMediaConfig,
+  calculateVideoThumbnailTime,
+  extractVideoFrame,
+  sanitizeMediaError,
+} = require("./media-tools");
+
+const APP_ROOT = path.resolve(__dirname, "..");
 
 const DEFAULT_THUMBNAIL_CONFIG = {
   dir: "./thumb_cache",
@@ -90,6 +99,32 @@ async function generateThumbnail(sourcePath, targetPath, options) {
     .toFile(targetPath);
 }
 
+async function generateVideoThumbnail(item, sourcePath, targetPath, options, mediaConfig, dependencies = {}) {
+  const extractFrame = dependencies.extractVideoFrame || extractVideoFrame;
+  const renderThumbnail = dependencies.generateThumbnail || generateThumbnail;
+  const tempPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.png`,
+  );
+  const seekTime = calculateVideoThumbnailTime(item?.Video?.DurationSeconds);
+  let completed = false;
+  try {
+    await fsp.mkdir(path.dirname(targetPath), { recursive: true });
+    try {
+      await extractFrame(sourcePath, tempPath, seekTime, APP_ROOT, mediaConfig);
+    } catch (firstError) {
+      if (seekTime <= 0) throw firstError;
+      await fsp.rm(tempPath, { force: true });
+      await extractFrame(sourcePath, tempPath, 0, APP_ROOT, mediaConfig);
+    }
+    await renderThumbnail(tempPath, targetPath, options);
+    completed = true;
+  } finally {
+    await fsp.rm(tempPath, { force: true }).catch(() => {});
+    if (!completed) await fsp.rm(targetPath, { force: true }).catch(() => {});
+  }
+}
+
 /**
  * Ensure one metadata item has a cached thumbnail file.
  * Returns true only when a new thumbnail was generated.
@@ -104,7 +139,7 @@ async function ensureThumbnailForItem(item, params) {
   const hash = item?.SHA256Hash;
   const filePath = item?.FilePath;
   const fileType = item?.FileSystem?.FileType;
-  if (!hash || !filePath || fileType !== "image") return false;
+  if (!hash || !filePath || !["image", "video"].includes(fileType)) return false;
 
   const sourcePath = path.join(workspaceRoot, filePath);
   const targetPath = thumbnailAbsolutePath(cacheDir, hash);
@@ -112,7 +147,16 @@ async function ensureThumbnailForItem(item, params) {
   if (!fs.existsSync(sourcePath)) return false;
 
   await fsp.mkdir(cacheDir, { recursive: true });
-  await generateThumbnail(sourcePath, targetPath, options);
+  try {
+    if (fileType === "video") {
+      await generateVideoThumbnail(item, sourcePath, targetPath, options, params.mediaConfig);
+    } else {
+      await generateThumbnail(sourcePath, targetPath, options);
+    }
+  } catch (error) {
+    await fsp.rm(targetPath, { force: true }).catch(() => {});
+    throw error;
+  }
   return true;
 }
 
@@ -128,37 +172,56 @@ async function ensureThumbnailsForItems(items, params) {
     options,
     maxConcurrency,
     logger,
+    onGenerated,
   } = params;
+  const mediaConfig = normalizeMediaConfig(params.mediaConfig);
 
   let generated = 0;
   let skipped = 0;
   let failed = 0;
-  let index = 0;
-  const workerCount = Math.min(maxConcurrency, Math.max(1, list.length));
   const log = typeof logger === "function" ? logger : () => {};
+  const notifyGenerated = typeof onGenerated === "function" ? onGenerated : () => {};
 
-  async function worker() {
-    while (true) {
-      const currentIndex = index;
-      index += 1;
-      if (currentIndex >= list.length) return;
-      const item = list[currentIndex];
-      try {
-        const didGenerate = await ensureThumbnailForItem(item, {
-          workspaceRoot,
-          cacheDir,
-          options,
-        });
-        if (didGenerate) generated += 1;
-        else skipped += 1;
-      } catch (error) {
-        failed += 1;
-        log(`Thumbnail generation failed for ${item?.FilePath || "unknown"}: ${error.message}`);
+  async function runQueue(queue, concurrency) {
+    let index = 0;
+    const workerCount = Math.min(Math.max(1, concurrency), Math.max(1, queue.length));
+    async function worker() {
+      while (true) {
+        const currentIndex = index;
+        index += 1;
+        if (currentIndex >= queue.length) return;
+        const item = queue[currentIndex];
+        try {
+          const didGenerate = await ensureThumbnailForItem(item, {
+            workspaceRoot,
+            cacheDir,
+            options,
+            mediaConfig,
+          });
+          if (didGenerate) {
+            generated += 1;
+            notifyGenerated(item, thumbnailAbsolutePath(cacheDir, item.SHA256Hash));
+          } else {
+            skipped += 1;
+          }
+        } catch (error) {
+          failed += 1;
+          const sourcePath = item?.FilePath ? path.join(workspaceRoot, item.FilePath) : "";
+          log(`Thumbnail generation failed for ${item?.FilePath || "unknown"}: ${sanitizeMediaError(error, sourcePath)}`);
+        }
       }
     }
+    await Promise.all(new Array(workerCount).fill(0).map(() => worker()));
   }
 
-  await Promise.all(new Array(workerCount).fill(0).map(() => worker()));
+  const imageItems = list.filter((item) => item?.FileSystem?.FileType === "image");
+  const videoItems = list.filter((item) => item?.FileSystem?.FileType === "video");
+  const unsupportedCount = list.length - imageItems.length - videoItems.length;
+  skipped += unsupportedCount;
+  await Promise.all([
+    runQueue(imageItems, maxConcurrency),
+    runQueue(videoItems, mediaConfig.videoThumbnailConcurrency),
+  ]);
   return {
     total: list.length,
     generated,
@@ -172,6 +235,7 @@ module.exports = {
   normalizeThumbnailConfig,
   thumbnailFileNameFromHash,
   thumbnailAbsolutePath,
+  generateVideoThumbnail,
   ensureThumbnailForItem,
   ensureThumbnailsForItems,
 };

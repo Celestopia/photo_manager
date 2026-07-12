@@ -12,8 +12,8 @@
           type="button"
           class="album-clear-btn"
           v-if="selectedAlbum"
-          data-tip="将当前图片移出相册"
-          aria-label="将当前图片移出相册"
+          data-tip="将当前媒体移出相册"
+          aria-label="将当前媒体移出相册"
           @click.stop="clearAlbumForTarget(target)"
         >×</button>
         <div class="tag-dropdown searchable-dropdown" v-if="albumDropdown[target]">

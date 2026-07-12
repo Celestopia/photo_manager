@@ -1,6 +1,6 @@
 # PhotoManager default configuration
 
-workspaceRoot: ./photo_workspace # Root directory of your photo library.
+workspaceRoot: ./photo_workspace # Root directory of your image and video library.
 dataDir: ./data # Directory containing photo metadata and all registry JSONL files. Absolute paths are also supported.
 logDir: ./logs # Directory used for runtime log files.
 
@@ -11,10 +11,16 @@ thumbnail:
   extremeAspectRatio: 4 # Aspect-ratio threshold to treat an image as "extreme" (very tall / very wide). # Example: 4 means ratio >= 4:1 is considered extreme.
   maxConcurrency: 4 # Maximum concurrent workers used when generating thumbnail cache.
 
+media:
+  ffmpegDir: ./tools/ffmpeg/bin # Directory containing ffmpeg.exe and ffprobe.exe. Absolute paths are also supported.
+  probeTimeoutSeconds: 30 # Maximum time allowed for probing one video.
+  thumbnailTimeoutSeconds: 60 # Maximum time allowed for extracting one video thumbnail.
+  videoThumbnailConcurrency: 1 # Maximum number of concurrent FFmpeg thumbnail workers.
+
 ui:
   language: zh-CN # UI language code.
   gallery:
-    pageSize: 120 # Number of photos loaded per page request in gallery view.
+    pageSize: 120 # Number of media items loaded per page request in gallery view.
     minCardWidth: 190 # Minimum card width (px) for responsive gallery layout.
 
   viewer:

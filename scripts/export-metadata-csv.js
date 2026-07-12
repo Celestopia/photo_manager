@@ -23,13 +23,41 @@ const COLUMNS = [
   { header: "MetadataUpdateDate", get: (item) => item?.Customization?.MetadataUpdateDate || "" },
   { header: "Location.Place", get: (item) => item?.Location?.Place || item?.Location?.Site || "" },
   { header: "Location.Detail", get: (item) => item?.Location?.Detail || "" },
+  { header: "FileSystem.FileType", get: (item) => item?.FileSystem?.FileType || "" },
   { header: "FileSystem.ShootingTimeString", get: (item) => item?.FileSystem?.ShootingTimeString || "" },
   { header: "FileSystem.ModificationTimeString", get: (item) => item?.FileSystem?.ModificationTimeString || "" },
   { header: "Picture.Width", get: (item) => item?.Picture?.Width ?? "" },
   { header: "Picture.Height", get: (item) => item?.Picture?.Height ?? "" },
+  { header: "Video.ProbeStatus", get: (item) => item?.Video?.ProbeStatus || "" },
+  { header: "Video.ProbeError", get: (item) => item?.Video?.ProbeError || "" },
+  { header: "Video.DurationSeconds", get: (item) => item?.Video?.DurationSeconds ?? "" },
+  { header: "Video.Width", get: (item) => item?.Video?.Width ?? "" },
+  { header: "Video.Height", get: (item) => item?.Video?.Height ?? "" },
+  { header: "Video.DisplayWidth", get: (item) => item?.Video?.DisplayWidth ?? "" },
+  { header: "Video.DisplayHeight", get: (item) => item?.Video?.DisplayHeight ?? "" },
+  { header: "Video.RotationDegrees", get: (item) => item?.Video?.RotationDegrees ?? "" },
+  { header: "Video.SampleAspectRatio", get: (item) => item?.Video?.SampleAspectRatio || "" },
+  { header: "Video.FrameRate", get: (item) => item?.Video?.FrameRate ?? "" },
+  { header: "Video.FrameRateRatio", get: (item) => item?.Video?.FrameRateRatio || "" },
+  { header: "Video.VideoCodec", get: (item) => item?.Video?.VideoCodec || "" },
+  { header: "Video.VideoProfile", get: (item) => item?.Video?.VideoProfile || "" },
+  { header: "Video.PixelFormat", get: (item) => item?.Video?.PixelFormat || "" },
+  { header: "Video.BitDepth", get: (item) => item?.Video?.BitDepth ?? "" },
+  { header: "Video.BitRate", get: (item) => item?.Video?.BitRate ?? "" },
+  { header: "Video.ContainerFormat", get: (item) => item?.Video?.ContainerFormat || "" },
+  { header: "Video.VideoStreamCount", get: (item) => item?.Video?.VideoStreamCount ?? "" },
+  { header: "Video.AudioStreamCount", get: (item) => item?.Video?.AudioStreamCount ?? "" },
+  { header: "Video.HasAudio", get: (item) => item?.Video?.HasAudio ?? "" },
+  { header: "Video.AudioCodec", get: (item) => item?.Video?.AudioCodec || "" },
+  { header: "Video.AudioChannels", get: (item) => item?.Video?.AudioChannels ?? "" },
+  { header: "Video.AudioSampleRate", get: (item) => item?.Video?.AudioSampleRate ?? "" },
+  { header: "Video.AudioBitRate", get: (item) => item?.Video?.AudioBitRate ?? "" },
+  { header: "Video.ColorSpace", get: (item) => item?.Video?.ColorSpace || "" },
+  { header: "Video.ColorTransfer", get: (item) => item?.Video?.ColorTransfer || "" },
+  { header: "Video.ColorPrimaries", get: (item) => item?.Video?.ColorPrimaries || "" },
   { header: "FileSystem.FileSize", get: (item) => item?.FileSystem?.FileSize ?? "" },
-  { header: "FileSystem.FileType", get: (item) => item?.FileSystem?.FileType || "" },
   { header: "FileSystem.FileExtension", get: (item) => item?.FileSystem?.FileExtension || "" },
+  { header: "FileSystem.ModificationTimeMs", get: (item) => item?.FileSystem?.ModificationTimeMs ?? "" },
   { header: "SHA256Hash", get: (item) => item?.SHA256Hash || "" },
   { header: "GPS.LatitudeRef", get: (item) => item?.GPS?.LatitudeRef || "" },
   { header: "GPS.Latitude", get: (item) => formatValue(item?.GPS?.Latitude) },
@@ -107,7 +135,11 @@ async function run() {
   console.log(`Exported ${items.length} rows to ${outputFile}`);
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
+
+module.exports = { COLUMNS, formatValue, toCell, run };

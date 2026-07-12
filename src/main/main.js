@@ -7,7 +7,7 @@
  * 3) Serve IPC handlers for query/update/copy/window actions.
  * 4) Create and monitor the renderer window.
  */
-const { app, BrowserWindow, ipcMain, clipboard, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, clipboard, nativeImage, shell, dialog } = require("electron");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -17,6 +17,12 @@ const {
   thumbnailAbsolutePath,
   ensureThumbnailsForItems,
 } = require(path.join(__dirname, "..", "..", "scripts", "thumbnail-cache.js"));
+const {
+  DEFAULT_MEDIA_CONFIG,
+  normalizeMediaConfig,
+  validateMediaTools,
+  sanitizeMediaError,
+} = require(path.join(__dirname, "..", "..", "scripts", "media-tools.js"));
 
 const APP_ROOT = path.resolve(__dirname, "..", "..");
 const CONFIG_PATH = path.join(APP_ROOT, "config.yml");
@@ -40,6 +46,7 @@ const DEFAULT_CONFIG = {
     extremeAspectRatio: 4,
     maxConcurrency: 4,
   },
+  media: { ...DEFAULT_MEDIA_CONFIG },
   ui: {
     language: "zh-CN",
     gallery: {
@@ -107,6 +114,7 @@ function ensureConfig() {
         ...DEFAULT_CONFIG.thumbnail,
         ...(parsed?.thumbnail || {}),
       },
+      media: normalizeMediaConfig(parsed?.media),
       ui: {
         ...DEFAULT_CONFIG.ui,
         ...(parsed?.ui || {}),
@@ -843,6 +851,10 @@ function filterAndSort(list, options) {
 
   let output = list.filter((item) => !item?.Customization?.Hidden);
 
+  if (filters.mediaType === "image" || filters.mediaType === "video") {
+    output = output.filter((item) => item?.FileSystem?.FileType === filters.mediaType);
+  }
+
   if (filters.album === UNASSIGNED_ALBUM_FILTER) {
     output = output.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album));
   } else if (filters.album) {
@@ -913,8 +925,23 @@ function enrichItem(item) {
     ...item,
     __absolutePath: absPath,
     __thumbnailPath: thumbPath,
+    __thumbnailAvailable: Boolean(thumbPath && fs.existsSync(thumbPath)),
     __groupDate: (item?.FileSystem?.ShootingTimeString || "").slice(0, 10) || "Unknown",
   };
+}
+
+function resolveIndexedMediaPath(rawFilePath) {
+  const filePath = String(rawFilePath || "").replace(/\\/g, "/");
+  const item = metadataIndex.get(filePath);
+  if (!item) throw new Error("Media record not found");
+  const workspaceRoot = toAbsolutePath(config.workspaceRoot);
+  const absolutePath = path.resolve(workspaceRoot, item.FilePath);
+  const relative = path.relative(workspaceRoot, absolutePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Media path is outside workspace");
+  }
+  if (!fs.existsSync(absolutePath)) throw new Error("Media file not found");
+  return { item, absolutePath };
 }
 
 /**
@@ -928,15 +955,25 @@ async function warmupThumbnailCache() {
   const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
   const workspaceRoot = toAbsolutePath(config.workspaceRoot);
   const thumbnailDir = toAbsolutePath(thumbnailConfig.dir);
-  const imageItems = [...metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "image");
-  if (!imageItems.length) return;
+  const mediaItems = [...metadataIndex.values()].filter((item) => ["image", "video"].includes(item?.FileSystem?.FileType));
+  if (!mediaItems.length) return;
 
-  const stats = await ensureThumbnailsForItems(imageItems, {
+  const stats = await ensureThumbnailsForItems(mediaItems, {
     workspaceRoot,
     cacheDir: thumbnailDir,
     options: thumbnailConfig,
     maxConcurrency: thumbnailConfig.maxConcurrency,
+    mediaConfig: config.media,
     logger: (message) => appendLog(message),
+    onGenerated: (item, thumbnailPath) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.webContents.send("thumbnail:ready", {
+        filePath: item.FilePath,
+        hash: item.SHA256Hash,
+        thumbnailPath,
+        thumbnailAvailable: true,
+      });
+    },
   });
   appendLog(
     `thumbnail-warmup total=${stats.total} generated=${stats.generated} skipped=${stats.skipped} failed=${stats.failed}`,
@@ -976,6 +1013,10 @@ function registerIpcHandlers() {
   ipcMain.handle("gallery:query", async (_, query) => {
     const all = [...metadataIndex.values()].map(enrichItem);
     const filtered = filterAndSort(all, query);
+    const mediaCountBase = filterAndSort(all, {
+      ...query,
+      filters: { ...(query.filters || {}), mediaType: "" },
+    });
 
     const page = Math.max(1, Number(query.page || 1));
     const pageSize = Math.max(1, Number(query.pageSize || config.ui.gallery.pageSize));
@@ -994,6 +1035,11 @@ function registerIpcHandlers() {
     const unassignedAlbumCount = all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length;
     const payload = {
       total: filtered.length,
+      mediaCounts: {
+        all: mediaCountBase.length,
+        images: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "image").length,
+        videos: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "video").length,
+      },
       page,
       pageSize,
       hasMore: start + pageSize < filtered.length,
@@ -1544,12 +1590,50 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle("photo:copy-image", async (_, absolutePath) => {
-    const image = nativeImage.createFromPath(absolutePath);
-    if (image.isEmpty()) {
-      return { ok: false, error: "Image load failed" };
+  ipcMain.handle("photo:copy-image", async (_, filePath) => {
+    try {
+      const resolved = resolveIndexedMediaPath(filePath);
+      if (resolved.item?.FileSystem?.FileType !== "image") return { ok: false, error: "Only images can be copied" };
+      const image = nativeImage.createFromPath(resolved.absolutePath);
+      if (image.isEmpty()) return { ok: false, error: "Image load failed" };
+      clipboard.writeImage(image);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
     }
-    clipboard.writeImage(image);
+  });
+
+  ipcMain.handle("photo:open-default", async (_, filePath) => {
+    try {
+      const { absolutePath } = resolveIndexedMediaPath(filePath);
+      const errorMessage = await shell.openPath(absolutePath);
+      return errorMessage ? { ok: false, error: errorMessage } : { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("photo:show-in-folder", async (_, filePath) => {
+    try {
+      const { absolutePath } = resolveIndexedMediaPath(filePath);
+      shell.showItemInFolder(absolutePath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("photo:report-playback", async (_, payload) => {
+    const filePath = String(payload?.filePath || "").replace(/\\/g, "/");
+    if (!metadataIndex.has(filePath)) return { ok: false };
+    const mode = String(payload?.mode || "unknown").slice(0, 40);
+    const message = String(payload?.message || "").replace(/\s+/g, " ").slice(0, 240);
+    appendLog(`playback-fallback file=${filePath} mode=${mode} message=${message}`);
+    return { ok: true };
+  });
+
+  ipcMain.handle("thumbnail:start-warmup", async () => {
+    warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
     return { ok: true };
   });
 
@@ -1576,14 +1660,24 @@ function registerIpcHandlers() {
  */
 async function bootstrap() {
   ensureConfig();
+  try {
+    const tools = await validateMediaTools(APP_ROOT, config.media);
+    appendLog(`media-tools ${tools.versions.ffmpeg}; ${tools.versions.ffprobe}`);
+  } catch (error) {
+    const mediaConfig = normalizeMediaConfig(config.media);
+    const reason = sanitizeMediaError(error, error?.path || "");
+    const message = `FFmpeg 媒体工具不可用。请确认 ${mediaConfig.ffmpegDir} 中存在可执行的 ffmpeg.exe 和 ffprobe.exe。\n\n${reason}`;
+    appendLog(`media-tools validation failed: ${reason}`);
+    dialog.showErrorBox("PhotoManager 无法启动", message);
+    app.quit();
+    return;
+  }
   await ensureDataDirectory();
   await loadMetadataIndex();
   await loadTagRegistryIndex();
   await loadAlbumRegistryIndex();
   await loadPersonRegistryIndex();
   await loadLocationRegistryIndex();
-  // Start thumbnail warmup as soon as metadata is ready.
-  warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
 
   mainWindow = new BrowserWindow({
     width: 1600,

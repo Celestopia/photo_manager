@@ -12,6 +12,12 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const yaml = require("js-yaml");
 const exifr = require("exifr");
+const {
+  DEFAULT_MEDIA_CONFIG,
+  normalizeMediaConfig,
+  probeVideoFile,
+  failedVideoMetadata,
+} = require("./media-tools");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 const DATA_FILE_NAMES = Object.freeze({
@@ -33,6 +39,7 @@ const DEFAULT_CONFIG = {
     extremeAspectRatio: 4,
     maxConcurrency: 4,
   },
+  media: { ...DEFAULT_MEDIA_CONFIG },
 };
 
 // Load config.yml and guarantee required defaults.
@@ -49,7 +56,12 @@ function resolveConfig() {
 
   try {
     const parsed = yaml.load(fs.readFileSync(configPath, "utf8"));
-    return { ...DEFAULT_CONFIG, ...(parsed || {}) };
+    return {
+      ...DEFAULT_CONFIG,
+      ...(parsed || {}),
+      thumbnail: { ...DEFAULT_CONFIG.thumbnail, ...(parsed?.thumbnail || {}) },
+      media: normalizeMediaConfig(parsed?.media),
+    };
   } catch {
     return { ...DEFAULT_CONFIG };
   }
@@ -148,7 +160,7 @@ function timeInfoFromDate(date) {
  * Build default Customization block for a new metadata record.
  * Rating defaults differ for camera photos (.jpg/.jpeg) versus screenshots.
  */
-function defaultCustomization(ext) {
+function defaultCustomization(ext, type = extensionType(ext)) {
   const isJpg = ext.toLowerCase() === ".jpg" || ext.toLowerCase() === ".jpeg";
   return {
     Title: "",
@@ -157,7 +169,7 @@ function defaultCustomization(ext) {
     People: [],
     Description: "",
     HiddenDescription: "",
-    Rating: isJpg ? 2 : 1,
+    Rating: type === "video" || isJpg ? 2 : 1,
     Hidden: false,
     MetadataUpdateDate: null,
   };
@@ -185,20 +197,48 @@ function dmsToArray(dms) {
   return [Number(dms[0]), Number(dms[1]), Number(dms[2])];
 }
 
+function decimalToDms(value) {
+  const absolute = Math.abs(Number(value));
+  if (!Number.isFinite(absolute)) return null;
+  const degrees = Math.floor(absolute);
+  const minutesRaw = (absolute - degrees) * 60;
+  const minutes = Math.floor(minutesRaw);
+  const seconds = Number(((minutesRaw - minutes) * 60).toFixed(6));
+  return [degrees, minutes, seconds];
+}
+
+function parseMediaDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim().replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+async function inspectMediaFile(filePath, workspaceRoot) {
+  const ext = path.extname(filePath);
+  const type = extensionType(ext);
+  if (!type) return null;
+  const stat = await fsp.stat(filePath);
+  return {
+    filePath,
+    relativePath: path.relative(workspaceRoot, filePath).replace(/\\/g, "/"),
+    ext,
+    type,
+    stat,
+    creation: timeInfoFromDate(stat.birthtime),
+    modified: timeInfoFromDate(stat.mtime),
+  };
+}
+
 /**
  * Build one metadata record from an on-disk file.
  * Reads filesystem stats, hash, and EXIF fields (for images).
  */
-async function buildMetadata(filePath, workspaceRoot) {
-  const ext = path.extname(filePath);
-  const type = extensionType(ext);
-  if (!type) return null;
-
-  const stat = await fsp.stat(filePath);
-  const creation = timeInfoFromDate(stat.birthtime);
-  const modified = timeInfoFromDate(stat.mtime);
-  const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, "/");
-  const hash = await sha256File(filePath);
+async function buildMetadata(filePath, workspaceRoot, options = {}) {
+  const snapshot = options.snapshot || await inspectMediaFile(filePath, workspaceRoot);
+  if (!snapshot) return null;
+  const { ext, type, stat, creation, modified, relativePath } = snapshot;
+  const hash = options.hash || await sha256File(filePath);
 
   let exif = null;
   let width = 0;
@@ -206,11 +246,23 @@ async function buildMetadata(filePath, workspaceRoot) {
   let dpi = null;
   let bitDepth = null;
 
+  let videoProbe = null;
   if (type === "image") {
     try {
       exif = await exifr.parse(filePath, { translateValues: false });
     } catch {
       exif = null;
+    }
+  } else {
+    try {
+      videoProbe = await probeVideoFile(filePath, APP_ROOT, options.mediaConfig || DEFAULT_MEDIA_CONFIG);
+    } catch (error) {
+      videoProbe = {
+        video: failedVideoMetadata(error, filePath),
+        creationTime: null,
+        camera: { make: null, model: null },
+        location: null,
+      };
     }
   }
 
@@ -221,15 +273,19 @@ async function buildMetadata(filePath, workspaceRoot) {
     bitDepth = exif.BitsPerSample || null;
   }
 
-  const shooting = exif?.DateTimeOriginal ? timeInfoFromDate(exif.DateTimeOriginal) : creation;
-
-  return {
+  const videoShootingDate = parseMediaDate(videoProbe?.creationTime);
+  const shooting = type === "video"
+    ? (videoShootingDate ? timeInfoFromDate(videoShootingDate) : modified)
+    : (exif?.DateTimeOriginal ? timeInfoFromDate(exif.DateTimeOriginal) : creation);
+  const videoLocation = videoProbe?.location || null;
+  const output = {
     FilePath: relativePath,
     SHA256Hash: hash,
     FileSystem: {
       FileType: type,
       FileExtension: ext.replace(".", "").toLowerCase(),
       FileSize: stat.size,
+      ModificationTimeMs: stat.mtimeMs,
       ShootingTimeString: shooting.text,
       ShootingTimeZone: shooting.zone,
       ShootingTimeStamp: shooting.stamp,
@@ -240,32 +296,34 @@ async function buildMetadata(filePath, workspaceRoot) {
       ModificationTimeZone: modified.zone,
       ModificationTimeStamp: modified.stamp,
     },
-    Picture: {
-      Width: width,
-      Height: height,
-      dpi,
-      BitDepth: bitDepth,
-    },
     GPS: {
-      LatitudeRef: exif?.GPSLatitudeRef || null,
-      Latitude: dmsToArray(exif?.GPSLatitude),
-      LongitudeRef: exif?.GPSLongitudeRef || null,
-      Longitude: dmsToArray(exif?.GPSLongitude),
-      AltitudeRef: exif?.GPSAltitudeRef ?? null,
-      Altitude: exif?.GPSAltitude ? [Math.round(Number(exif.GPSAltitude) * 100), 100] : null,
+      LatitudeRef: type === "video" && videoLocation ? (videoLocation.latitude < 0 ? "S" : "N") : exif?.GPSLatitudeRef || null,
+      Latitude: type === "video" && videoLocation ? decimalToDms(videoLocation.latitude) : dmsToArray(exif?.GPSLatitude),
+      LongitudeRef: type === "video" && videoLocation ? (videoLocation.longitude < 0 ? "W" : "E") : exif?.GPSLongitudeRef || null,
+      Longitude: type === "video" && videoLocation ? decimalToDms(videoLocation.longitude) : dmsToArray(exif?.GPSLongitude),
+      AltitudeRef: type === "video" && videoLocation && videoLocation.altitude !== null ? (videoLocation.altitude < 0 ? 1 : 0) : exif?.GPSAltitudeRef ?? null,
+      Altitude: type === "video" && videoLocation && videoLocation.altitude !== null
+        ? [Math.round(Math.abs(videoLocation.altitude) * 100), 100]
+        : exif?.GPSAltitude ? [Math.round(Number(exif.GPSAltitude) * 100), 100] : null,
     },
     Location: defaultLocation(),
     Camera: {
-      Make: exif?.Make || null,
-      Model: exif?.Model || null,
+      Make: type === "video" ? videoProbe?.camera?.make || null : exif?.Make || null,
+      Model: type === "video" ? videoProbe?.camera?.model || null : exif?.Model || null,
       FocalLength: exif?.FocalLength || null,
       Aperture: exif?.FNumber || null,
       ISO: exif?.ISO || null,
       ExposureTime: exif?.ExposureTime || null,
       FlashUsed: Boolean(exif?.Flash),
     },
-    Customization: defaultCustomization(ext),
+    Customization: defaultCustomization(ext, type),
   };
+  if (type === "image") {
+    output.Picture = { Width: width, Height: height, dpi, BitDepth: bitDepth };
+  } else {
+    output.Video = videoProbe.video;
+  }
+  return output;
 }
 
 // Load existing JSONL file into FilePath-keyed Map.
@@ -303,6 +361,8 @@ async function writeAll(metadataFile, entries) {
 }
 
 module.exports = {
+  APP_ROOT,
+  DEFAULT_CONFIG,
   DATA_FILE_NAMES,
   resolveConfig,
   absFromConfig,
@@ -310,8 +370,13 @@ module.exports = {
   dataFilePath,
   ensureDataDir,
   walkFiles,
+  inspectMediaFile,
+  sha256File,
   buildMetadata,
   loadExisting,
   writeAll,
   extensionType,
+  timeInfoFromDate,
+  parseMediaDate,
+  defaultCustomization,
 };

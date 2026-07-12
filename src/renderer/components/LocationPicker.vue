@@ -12,8 +12,8 @@
           type="button"
           class="album-clear-btn"
           v-if="selectedLocation"
-          data-tip="将当前图片设为无地点"
-          aria-label="将当前图片设为无地点"
+          data-tip="将当前媒体设为无地点"
+          aria-label="将当前媒体设为无地点"
           @click.stop="clearLocationForTarget(target)"
         >×</button>
         <div class="tag-dropdown location-dropdown" v-if="locationDropdown[target]">

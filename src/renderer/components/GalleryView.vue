@@ -15,6 +15,11 @@
 <main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode && selectedGalleryCount > 0 }">
   <section class="gallery-content">
     <section class="toolbar-row">
+      <div class="toolbar-group media-type-filter" role="group" aria-label="媒体类型">
+        <button type="button" class="btn" :class="{ active: !query.filters.mediaType }" @click="setMediaTypeFilter('')">全部</button>
+        <button type="button" class="btn" :class="{ active: query.filters.mediaType === 'image' }" @click="setMediaTypeFilter('image')">图片</button>
+        <button type="button" class="btn" :class="{ active: query.filters.mediaType === 'video' }" @click="setMediaTypeFilter('video')">视频</button>
+      </div>
       <div class="toolbar-group"><label>相册</label><RegistryFilterPicker kind="album" label="相册" /></div>
       <div class="toolbar-group"><label>标签</label><RegistryFilterPicker kind="tag" label="标签" /></div>
       <div class="toolbar-group"><label>人物</label><RegistryFilterPicker kind="person" label="人物" /></div>
@@ -24,19 +29,27 @@
       <div class="toolbar-group right"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option><option value="filename">文件名</option><option value="rating">评级</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
     </section>
     <section class="gallery-list">
-      <div class="summary">共 {{ total }} 张图片</div>
+      <div class="summary">共 {{ total }} 个媒体</div>
       <template v-for="group in galleryGroups" :key="group.date">
         <h2 class="date-title">{{ group.date }}</h2>
         <div class="photo-grid">
           <article class="photo-card" :class="{ selected: isSelectionMode && isGallerySelected(item.FilePath) }" v-for="item in group.items" :key="item.FilePath" @click="onGalleryCardClick(item)">
             <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.FilePath) }" @click.stop="toggleGallerySelection(item.FilePath)">✓</button>
-            <img
-              :src="resolveGalleryImageSrc(item)"
-              :alt="item.Customization?.Title || item.FilePath"
-              loading="lazy"
-              @error="onGalleryImageError(item, $event)"
-            />
-            <div class="card-caption"><div class="title" :title="item.Customization?.Title || item.FilePath.split('/').pop()">{{ item.Customization?.Title || item.FilePath.split('/').pop() }}</div><div class="meta"><span>评级 {{ item.Customization?.Rating || '-' }}</span><span>{{ item.Picture?.Width || 0 }}x{{ item.Picture?.Height || 0 }}</span></div></div>
+            <div class="card-media">
+              <img
+                :src="resolveGalleryImageSrc(item)"
+                :alt="item.Customization?.Title || item.FilePath"
+                loading="lazy"
+                @error="onGalleryImageError(item, $event)"
+              />
+              <span v-if="isVideo(item)" class="video-play-badge" aria-label="视频">▶</span>
+              <span v-if="isVideo(item) && item.Video?.DurationSeconds != null" class="video-duration-badge">{{ formatDuration(item.Video.DurationSeconds) }}</span>
+              <span v-if="isVideo(item) && item.Video?.ProbeStatus === 'failed'" class="video-error-badge">解析失败</span>
+            </div>
+            <div class="card-caption">
+              <div class="title" :title="item.Customization?.Title || item.FilePath.split('/').pop()">{{ item.Customization?.Title || item.FilePath.split('/').pop() }}</div>
+              <div class="meta"><span>评级 {{ item.Customization?.Rating || '-' }}</span><span>{{ mediaDimensions(item) }}<template v-if="isVideo(item)"> · {{ formatDuration(item.Video?.DurationSeconds) }}</template></span></div>
+            </div>
           </article>
         </div>
       </template>
@@ -45,8 +58,8 @@
   </section>
   <aside class="side-panel batch-panel" v-if="isSelectionMode && selectedGalleryCount > 0">
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
-    <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 张图片</div>
-    <label>批量标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选图片标题" />
+    <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 个媒体</div>
+    <label>批量标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
     <label>设置相册</label>
     <AlbumPicker target="batch" placeholder="搜索已有相册" />
     <label>添加标签</label>
@@ -57,7 +70,7 @@
     <LocationPicker target="batch" placeholder="搜索已有地点" />
     <div class="batch-actions">
       <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges">清空输入</button>
-      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">应用到所选图片</button>
+      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">应用到所选媒体</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>
@@ -102,6 +115,7 @@ const {
   resetAll,
   applySearch,
   applyFilterSort,
+  setMediaTypeFilter,
   enterSelectionMode,
   exitSelectionMode,
   onGalleryCardClick,
@@ -129,11 +143,15 @@ const brokenThumbnailHashes = ref(new Set());
 function resolveGalleryImageSrc(item) {
   const hash = item?.SHA256Hash || "";
   const thumbnailPath = item?.__thumbnailPath || "";
-  if (hash && brokenThumbnailHashes.value.has(hash)) {
+  if (isVideo(item) && (!thumbnailPath || (!item.__thumbnailAvailable && !item.__thumbnailReadyAt) || (hash && brokenThumbnailHashes.value.has(hash) && !item.__thumbnailReadyAt))) {
+    return ICONS.videoPlaceholder;
+  }
+  if (hash && brokenThumbnailHashes.value.has(hash) && !item.__thumbnailReadyAt) {
     return buildImageUrl(item.__absolutePath);
   }
-  if (thumbnailPath) {
-    return buildImageUrl(thumbnailPath);
+  if (thumbnailPath && (item.__thumbnailAvailable || item.__thumbnailReadyAt)) {
+    const source = buildImageUrl(thumbnailPath);
+    return item.__thumbnailReadyAt ? `${source}?v=${item.__thumbnailReadyAt}` : source;
   }
   return buildImageUrl(item.__absolutePath);
 }
@@ -148,9 +166,30 @@ function onGalleryImageError(item, event) {
     next.add(hash);
     brokenThumbnailHashes.value = next;
   }
-  const originalSrc = buildImageUrl(item.__absolutePath);
+  const originalSrc = isVideo(item) ? ICONS.videoPlaceholder : buildImageUrl(item.__absolutePath);
   if (event?.target?.src !== originalSrc) {
     event.target.src = originalSrc;
   }
+}
+
+function isVideo(item) {
+  return item?.FileSystem?.FileType === "video";
+}
+
+function formatDuration(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || value === null || value === undefined) return "-";
+  const total = Math.max(0, Math.floor(numeric));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  if (hours) return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function mediaDimensions(item) {
+  const width = isVideo(item) ? item?.Video?.DisplayWidth : item?.Picture?.Width;
+  const height = isVideo(item) ? item?.Video?.DisplayHeight : item?.Picture?.Height;
+  return width && height ? `${width}x${height}` : "-";
 }
 </script>
