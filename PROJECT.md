@@ -685,8 +685,22 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 
 ### 21.2 `src/main/`
 
-- `main.js`：应用配置、活动图库会话、内存索引、IPC、维护 worker、缩略图后台任务、窗口生命周期和日志。
+- `main.js`：主进程组合根。创建运行时状态，装配各领域服务，协调图库生命周期、索引加载、维护 worker 和缩略图后台任务；不再直接承载成组的 IPC CRUD 或窗口构造细节。
+- `application-runtime.js`：创建单一主进程运行时对象，集中保存活动窗口、活动图库、五类内存索引、维护状态、worker 和缩略图任务状态。每次调用必须返回彼此隔离的新状态，模块不得另建同语义的全局单例。
+- `application-config.js`：读取、规范化、深度合并并保存应用级 `config.yml`。该模块不读取图库数据。
+- `simple-registry-catalog.js`：标签、人物和相册共享的注册表加载、历史引用补齐、使用量统计、排序、写回和引用校验逻辑。
+- `simple-registry-service.js`：标签、人物和相册共享的创建、修改说明、全局删除、备份及内存回滚流程；字段名和删除媒体引用的方式由显式配置传入。
+- `location-domain.js`：不执行 I/O 的地点规范化、父子图、后代集合、路径和循环校验逻辑。
+- `location-catalog.js`：地点注册表加载、历史地点迁移、非法父关系清理、媒体地点结构规范化、使用量统计和持久化协调。
+- `location-registry-service.js`：地点创建、编辑和全局删除。地点保留专门服务，因为删除父节点、解除子节点父关系和清空媒体地点不符合简单注册表模型。
+- `gallery-query.js`：不执行 I/O 的画廊过滤、搜索和排序逻辑；地点筛选通过注入的后代查询实现。
+- `metadata-edit-service.js`：单媒体和批量个性化信息更新、注册表引用校验、保存失败后的内存回滚。
+- `thumbnail-warmup-service.js`：当前图库缩略图 manifest 校验、后台补齐、会话取消检测和 renderer 完成事件。
+- `ipc-handlers.js`：显式注册 renderer 可访问的 IPC 白名单，将参数转交领域服务，并封装剪贴板、系统打开和资源管理器定位等 Electron 能力。它不拥有活动图库状态。
+- `window-manager.js`：BrowserWindow 创建、渲染器诊断、最大化状态通知、维护期间关闭拦截和初始化取消确认。
 - `preload.js`：`contextIsolation` 下唯一允许的 renderer bridge。
+
+主进程依赖方向固定为：`main.js` 负责装配，`ipc-handlers.js` 调用领域服务，领域服务通过显式 getter/setter 访问 `application-runtime.js` 中的活动会话和索引，底层再调用 `scripts/library-*` 持久化工具。领域模块不能反向导入 IPC 注册器或主窗口。
 
 ### 21.3 `src/renderer/`
 
@@ -713,6 +727,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 - FFprobe 字段规范化、日期/GPS/设备映射、超时和错误清理。
 - 增量更新的复用、变更、移动、副本和失败保留。
 - 视频逐帧和键盘状态规则。
+- 主进程配置合并、运行时隔离、地点层级、画廊组合筛选和通用注册表统计。
 
 提交前最低验证：
 
