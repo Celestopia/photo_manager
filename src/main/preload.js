@@ -19,6 +19,29 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   // App/runtime config
   getConfig: () => ipcRenderer.invoke("app:get-config"),
 
+  // Library lifecycle
+  getLibraryState: () => ipcRenderer.invoke("library:get-state"),
+  recheckMediaTools: () => ipcRenderer.invoke("library:recheck-media-tools"),
+  chooseLibraryDirectory: () => ipcRenderer.invoke("library:choose-directory"),
+  inspectLibrary: (libraryPath) => ipcRenderer.invoke("library:inspect", libraryPath),
+  cancelLibraryScan: () => ipcRenderer.invoke("library:cancel-scan"),
+  openLibrary: (payload) => ipcRenderer.invoke("library:open", toSerializable(payload)),
+  initializeLibrary: (payload) => ipcRenderer.invoke("library:initialize", toSerializable(payload)),
+  cancelLibraryInitialization: () => ipcRenderer.invoke("library:cancel-initialization"),
+  cleanupFailedInitialization: (libraryPath) => ipcRenderer.invoke("library:cleanup-failed-initialization", libraryPath),
+  closeLibrary: () => ipcRenderer.invoke("library:close"),
+  updateLibraryInfo: (payload) => ipcRenderer.invoke("library:update-info", toSerializable(payload)),
+  openLibraryRoot: () => ipcRenderer.invoke("library:open-root"),
+  openLibraryManagerDir: () => ipcRenderer.invoke("library:open-manager-dir"),
+  openLibraryLogDir: () => ipcRenderer.invoke("library:open-log-dir"),
+  getMaintenanceState: () => ipcRenderer.invoke("maintenance:get-state"),
+  startMaintenance: (payload) => ipcRenderer.invoke("maintenance:start", toSerializable(payload)),
+  showMaintenanceOutput: () => ipcRenderer.invoke("maintenance:show-output"),
+  onLibraryStateChanged: (listener) => subscribe("library:state-changed", listener),
+  onLibraryProgress: (listener) => subscribe("library:progress", listener),
+  onMaintenanceProgress: (listener) => subscribe("maintenance:progress", listener),
+  onMaintenanceCompleted: (listener) => subscribe("maintenance:completed", listener),
+
   // Gallery data query
   queryGallery: (query) => ipcRenderer.invoke("gallery:query", toSerializable(query)),
 
@@ -51,7 +74,8 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   deletePersonGlobally: (payload) => ipcRenderer.invoke("person:delete-global", toSerializable(payload)),
 
   // Clipboard helpers
-  copyPath: (absolutePath) => ipcRenderer.invoke("photo:copy-path", absolutePath),
+  copyPath: (filePath) => ipcRenderer.invoke("photo:copy-path", filePath),
+  copyText: (value) => ipcRenderer.invoke("clipboard:write-text", String(value ?? "")),
   copyJson: (filePath) => ipcRenderer.invoke("photo:copy-json", filePath),
   copyImage: (filePath) => ipcRenderer.invoke("photo:copy-image", filePath),
   openWithSystem: (filePath) => ipcRenderer.invoke("photo:open-default", filePath),
@@ -75,3 +99,10 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
     return () => ipcRenderer.removeListener("window:state-changed", wrapped);
   },
 });
+
+function subscribe(channel, listener) {
+  if (typeof listener !== "function") return () => {};
+  const wrapped = (_, payload) => listener(toSerializable(payload || {}));
+  ipcRenderer.on(channel, wrapped);
+  return () => ipcRenderer.removeListener(channel, wrapped);
+}

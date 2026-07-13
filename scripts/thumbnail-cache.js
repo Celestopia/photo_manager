@@ -22,7 +22,6 @@ const {
 const APP_ROOT = path.resolve(__dirname, "..");
 
 const DEFAULT_THUMBNAIL_CONFIG = {
-  dir: "./thumb_cache",
   size: 320,
   webpQuality: 80,
   extremeAspectRatio: 4,
@@ -143,7 +142,7 @@ async function ensureThumbnailForItem(item, params) {
 
   const sourcePath = path.join(workspaceRoot, filePath);
   const targetPath = thumbnailAbsolutePath(cacheDir, hash);
-  if (fs.existsSync(targetPath)) return false;
+  if (fs.existsSync(targetPath) && !params.force) return false;
   if (!fs.existsSync(sourcePath)) return false;
 
   await fsp.mkdir(cacheDir, { recursive: true });
@@ -173,6 +172,9 @@ async function ensureThumbnailsForItems(items, params) {
     maxConcurrency,
     logger,
     onGenerated,
+    onProgress,
+    isCancelled,
+    force = false,
   } = params;
   const mediaConfig = normalizeMediaConfig(params.mediaConfig);
 
@@ -181,12 +183,15 @@ async function ensureThumbnailsForItems(items, params) {
   let failed = 0;
   const log = typeof logger === "function" ? logger : () => {};
   const notifyGenerated = typeof onGenerated === "function" ? onGenerated : () => {};
+  const notifyProgress = typeof onProgress === "function" ? onProgress : () => {};
+  const cancelled = typeof isCancelled === "function" ? isCancelled : () => false;
 
   async function runQueue(queue, concurrency) {
     let index = 0;
     const workerCount = Math.min(Math.max(1, concurrency), Math.max(1, queue.length));
     async function worker() {
       while (true) {
+        if (cancelled()) return;
         const currentIndex = index;
         index += 1;
         if (currentIndex >= queue.length) return;
@@ -197,6 +202,7 @@ async function ensureThumbnailsForItems(items, params) {
             cacheDir,
             options,
             mediaConfig,
+            force,
           });
           if (didGenerate) {
             generated += 1;
@@ -208,15 +214,25 @@ async function ensureThumbnailsForItems(items, params) {
           failed += 1;
           const sourcePath = item?.FilePath ? path.join(workspaceRoot, item.FilePath) : "";
           log(`Thumbnail generation failed for ${item?.FilePath || "unknown"}: ${sanitizeMediaError(error, sourcePath)}`);
+        } finally {
+          notifyProgress({ total: list.length, processed: generated + skipped + failed, generated, skipped, failed, current: item?.FilePath || "" });
         }
       }
     }
     await Promise.all(new Array(workerCount).fill(0).map(() => worker()));
   }
 
-  const imageItems = list.filter((item) => item?.FileSystem?.FileType === "image");
-  const videoItems = list.filter((item) => item?.FileSystem?.FileType === "video");
-  const unsupportedCount = list.length - imageItems.length - videoItems.length;
+  const unique = [];
+  const seenHashes = new Set();
+  for (const item of list) {
+    if (!item?.SHA256Hash || seenHashes.has(item.SHA256Hash)) continue;
+    seenHashes.add(item.SHA256Hash);
+    unique.push(item);
+  }
+  const imageItems = unique.filter((item) => item?.FileSystem?.FileType === "image");
+  const videoItems = unique.filter((item) => item?.FileSystem?.FileType === "video");
+  const unsupportedCount = unique.length - imageItems.length - videoItems.length;
+  skipped += list.length - unique.length;
   skipped += unsupportedCount;
   await Promise.all([
     runQueue(imageItems, maxConcurrency),

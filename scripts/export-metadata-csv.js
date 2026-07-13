@@ -6,8 +6,11 @@
  * - Technical fields (filesystem / GPS / camera) stay on the right.
  */
 const path = require("node:path");
-const fsp = require("node:fs/promises");
-const { DATA_FILE_NAMES, resolveConfig, dataFilePath, ensureDataDir, loadExisting } = require("./common");
+const { loadExisting } = require("./common");
+const { parseLibraryArgument, writeTextAtomic } = require("./library-core");
+const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
+const { createOperationReporter } = require("./operation-progress");
+const { readTransactionJournal } = require("./library-transaction");
 
 // Ordered flattened columns. Left side is intentionally user-facing.
 const COLUMNS = [
@@ -26,6 +29,8 @@ const COLUMNS = [
   { header: "FileSystem.FileType", get: (item) => item?.FileSystem?.FileType || "" },
   { header: "FileSystem.ShootingTimeString", get: (item) => item?.FileSystem?.ShootingTimeString || "" },
   { header: "FileSystem.ModificationTimeString", get: (item) => item?.FileSystem?.ModificationTimeString || "" },
+  { header: "Picture.ProbeStatus", get: (item) => item?.Picture?.ProbeStatus || "" },
+  { header: "Picture.ProbeError", get: (item) => item?.Picture?.ProbeError || "" },
   { header: "Picture.Width", get: (item) => item?.Picture?.Width ?? "" },
   { header: "Picture.Height", get: (item) => item?.Picture?.Height ?? "" },
   { header: "Video.ProbeStatus", get: (item) => item?.Video?.ProbeStatus || "" },
@@ -111,16 +116,21 @@ function toCell(value) {
 
  */
 
-async function run() {
-  const config = resolveConfig();
-  await ensureDataDir(config);
-  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
-  const defaultOutput = dataFilePath(config, "photo_metadata.csv");
-  const outputFile = process.argv[2]
-    ? (path.isAbsolute(process.argv[2]) ? process.argv[2] : path.resolve(process.cwd(), process.argv[2]))
-    : defaultOutput;
+async function run(options = {}) {
+  const paths = options.paths || parseLibraryArgument();
+  const { emit, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
+  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
+  const authorization = await authorizeLibraryOperation(paths, manifest, options);
+  const outputIndex = process.argv.indexOf("--output");
+  const rawOutput = options.outputFile || (outputIndex >= 0 ? process.argv[outputIndex + 1] : "");
+  const outputFile = rawOutput
+    ? (path.isAbsolute(rawOutput) ? rawOutput : path.resolve(process.cwd(), rawOutput))
+    : path.join(paths.dataDir, "photo_metadata.csv");
 
-  const map = await loadExisting(metadataFile);
+  try {
+  if (await readTransactionJournal(paths)) throw new Error("A pending library transaction must be recovered by opening the library before export");
+  const map = await loadExisting(paths.metadataFile);
+  validateMetadataPaths(paths, map.values());
   const items = [...map.values()];
 
   const lines = [];
@@ -131,13 +141,19 @@ async function run() {
 
   // Prefix BOM for better UTF-8 compatibility in spreadsheet apps on Windows.
   const csvText = `\uFEFF${lines.join("\r\n")}\r\n`;
-  await fsp.writeFile(outputFile, csvText, "utf8");
-  console.log(`Exported ${items.length} rows to ${outputFile}`);
+  await writeTextAtomic(outputFile, csvText);
+  emit({ phase: "complete", processed: items.length, total: items.length, message: "CSV 导出完成" });
+  return { rows: items.length, outputFile, warnings, errors };
+  } finally {
+    await authorization.release();
+  }
 }
 
 if (require.main === module) {
-  run().catch((error) => {
-    console.error(error);
+  run({ logger: console }).then((result) => {
+    console.log(`Exported ${result.rows} rows to ${result.outputFile}`);
+  }).catch((error) => {
+    console.error(error.message);
     process.exit(1);
   });
 }

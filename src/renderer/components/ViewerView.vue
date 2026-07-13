@@ -22,6 +22,7 @@
         <dt>帧率</dt><dd>{{ selectedItem?.Video?.FrameRate != null ? selectedItem.Video.FrameRate + ' fps' : '-' }}</dd>
       </template>
     </dl>
+    <div v-if="!isSelectedVideo && selectedItem?.Picture?.ProbeStatus === 'failed'" class="video-probe-error">{{ selectedItem?.Picture?.ProbeError || '图片解析失败' }}</div>
     <div class="camera-table-wrapper" v-if="isSelectedVideo">
       <h4>视频参数</h4>
       <table class="camera-table">

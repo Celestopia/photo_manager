@@ -8,18 +8,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Runtime logs
-logs/*
-!logs/.gitkeep
 *.log
 
-# Local photo library and generated metadata (machine/user specific)
-photo_workspace/*
-!photo_workspace/.gitkeep
-thumb_cache/*
-!thumb_cache/.gitkeep
-data/*
-!data/.gitkeep
+# Local development library (all library-owned data lives under .photo_manager/)
+/photo_workspace/
 
 # Temporary files
 *.tmp

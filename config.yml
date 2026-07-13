@@ -1,11 +1,7 @@
-# PhotoManager default configuration
-
-workspaceRoot: ./photo_workspace # Root directory of your image and video library.
-dataDir: ./data # Directory containing photo metadata and all registry JSONL files. Absolute paths are also supported.
-logDir: ./logs # Directory used for runtime log files.
+# PhotoManager application-level configuration.
+# Library roots are selected in the application; each library stores its own data under .photo_manager/.
 
 thumbnail:
-  dir: ./thumb_cache # Thumbnail cache directory. Files are stored as <SHA256Hash>.webp.
   size: 320 # Target thumbnail square size in pixels (width = height = size).
   webpQuality: 80 # WebP encoding quality for thumbnails (1-100).
   extremeAspectRatio: 4 # Aspect-ratio threshold to treat an image as "extreme" (very tall / very wide). # Example: 4 means ratio >= 4:1 is considered extreme.
@@ -16,6 +12,9 @@ media:
   probeTimeoutSeconds: 30 # Maximum time allowed for probing one video.
   thumbnailTimeoutSeconds: 60 # Maximum time allowed for extracting one video thumbnail.
   videoThumbnailConcurrency: 1 # Maximum number of concurrent FFmpeg thumbnail workers.
+
+backup:
+  retentionCount: 10 # Maximum number of library data snapshots retained per library (minimum 1).
 
 ui:
   language: zh-CN # UI language code.

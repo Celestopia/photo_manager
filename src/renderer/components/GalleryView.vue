@@ -45,6 +45,7 @@
               <span v-if="isVideo(item)" class="video-play-badge" aria-label="视频">▶</span>
               <span v-if="isVideo(item) && item.Video?.DurationSeconds != null" class="video-duration-badge">{{ formatDuration(item.Video.DurationSeconds) }}</span>
               <span v-if="isVideo(item) && item.Video?.ProbeStatus === 'failed'" class="video-error-badge">解析失败</span>
+              <span v-if="!isVideo(item) && item.Picture?.ProbeStatus === 'failed'" class="video-error-badge">解析失败</span>
             </div>
             <div class="card-caption">
               <div class="title" :title="item.Customization?.Title || item.FilePath.split('/').pop()">{{ item.Customization?.Title || item.FilePath.split('/').pop() }}</div>
@@ -74,6 +75,7 @@
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>
+  <GallerySettingsMenu />
 </main>
 </template>
 
@@ -85,6 +87,7 @@ import LocationPicker from "./LocationPicker.vue";
 import LocationFilterPicker from "./LocationFilterPicker.vue";
 import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
+import GallerySettingsMenu from "./GallerySettingsMenu.vue";
 
 const app = inject("appContext");
 if (!app) {
@@ -143,6 +146,7 @@ const brokenThumbnailHashes = ref(new Set());
 function resolveGalleryImageSrc(item) {
   const hash = item?.SHA256Hash || "";
   const thumbnailPath = item?.__thumbnailPath || "";
+  if (!isVideo(item) && item?.Picture?.ProbeStatus === "failed") return ICONS.imagePlaceholder;
   if (isVideo(item) && (!thumbnailPath || (!item.__thumbnailAvailable && !item.__thumbnailReadyAt) || (hash && brokenThumbnailHashes.value.has(hash) && !item.__thumbnailReadyAt))) {
     return ICONS.videoPlaceholder;
   }
@@ -166,7 +170,7 @@ function onGalleryImageError(item, event) {
     next.add(hash);
     brokenThumbnailHashes.value = next;
   }
-  const originalSrc = isVideo(item) ? ICONS.videoPlaceholder : buildImageUrl(item.__absolutePath);
+  const originalSrc = isVideo(item) ? ICONS.videoPlaceholder : (item?.Picture?.ProbeStatus === "failed" ? ICONS.imagePlaceholder : buildImageUrl(item.__absolutePath));
   if (event?.target?.src !== originalSrc) {
     event.target.src = originalSrc;
   }

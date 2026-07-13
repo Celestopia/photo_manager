@@ -1,7 +1,53 @@
 <template>
   <div class="app-shell">
-    <GalleryView v-if="view === 'gallery'" />
-    <ViewerView v-else />
+    <LibraryEntryView v-if="view === 'library-entry'" />
+    <GalleryView v-else-if="view === 'gallery'" />
+    <ViewerView v-else-if="view === 'viewer'" />
+    <div class="tag-modal-backdrop" v-if="initializationConfirm.visible" @click="closeInitializationConfirm">
+      <section class="library-confirm-modal" @click.stop>
+        <header class="tag-manager-header"><h3>初始化新图库</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeInitializationConfirm">×</button></header>
+        <div class="library-confirm-body">
+          <p>你选择的目录尚未初始化为照片管理器图库。继续后，应用会递归遍历该目录及其中的普通隐藏目录，读取所有受支持的图片和视频，并为每个可读取的媒体计算完整 SHA-256、读取图片 EXIF 与技术信息、使用 FFprobe 探测视频。应用将在图库根目录创建 <code>.photo_manager</code>，用于保存元数据、标签/相册/人物/地点注册表、缩略图缓存、日志、备份和临时文件。</p>
+          <p>初始化不会移动、重命名、修改或删除原始媒体文件，但大型图库可能需要较长时间，并会产生持续的磁盘读取和视频探测负载。初始化期间请不要断开移动硬盘、关闭计算机、修改目录权限或移动正在处理的文件。你可以取消初始化；取消后，本轮创建的全部未完成管理数据都会被删除。该目录必须是一个独立的图库根目录，不能位于其它图库中，也不能包含嵌套图库。</p>
+          <div class="library-confirm-summary"><strong>{{ initializationConfirm.name }}</strong><span>{{ initializationConfirm.path }}</span><span>发现 {{ initializationConfirm.mediaCount }} 个支持的媒体文件</span></div>
+          <label class="library-confirm-check"><input type="checkbox" v-model="initializationConfirm.acknowledged" />我已了解应用将遍历整个目录并创建图库管理数据。</label>
+          <div class="tag-create-actions"><button class="btn" @click="closeInitializationConfirm">取消</button><button class="btn btn-primary" :disabled="!initializationConfirm.acknowledged" @click="confirmInitializeLibrary">开始初始化</button></div>
+        </div>
+      </section>
+    </div>
+    <div class="tag-modal-backdrop" v-if="libraryInfo.visible" @click="closeLibraryInfo">
+      <section class="library-info-modal" @click.stop>
+        <header class="tag-manager-header"><h3>图库信息</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeLibraryInfo">×</button></header>
+        <div class="library-info-grid">
+          <label>图库名称</label><input class="input" v-model="libraryInfo.name" maxlength="100" />
+          <label>完整路径</label><div class="library-info-value">{{ libraryState.active?.root }}</div>
+          <label>图库 UUID</label><div class="library-info-value">{{ libraryState.active?.libraryId }}</div>
+          <label>创建时间</label><div class="library-info-value">{{ libraryState.active?.createdAt }}</div>
+          <label>更新时间</label><div class="library-info-value">{{ libraryState.active?.updatedAt }}</div>
+          <label>媒体数量</label><div class="library-info-value">{{ libraryState.active?.mediaCount || 0 }}（图片 {{ libraryState.active?.imageCount || 0 }} / 视频 {{ libraryState.active?.videoCount || 0 }}）</div>
+        </div>
+        <div class="library-info-actions"><button class="btn" @click="openLibraryRoot">打开图库目录</button><button class="btn" @click="openLibraryManagerDir">打开图库数据目录</button><span class="grow"></span><button class="btn" @click="closeLibraryInfo">取消</button><button class="btn btn-primary" @click="saveLibraryInfo">保存</button></div>
+      </section>
+    </div>
+    <div class="tag-modal-backdrop" v-if="maintenanceDialog.visible" @click="maintenanceDialog.running ? null : closeMaintenanceDialog()">
+      <section class="maintenance-modal" @click.stop>
+        <header class="tag-manager-header"><h3>{{ maintenanceDialogTitle }}</h3><button v-if="!maintenanceDialog.running" class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeMaintenanceDialog">×</button></header>
+        <div v-if="!maintenanceDialog.running && !maintenanceDialog.completed" class="maintenance-options">
+          <p class="maintenance-description">{{ maintenanceDialogDescription }}</p>
+          <label v-if="maintenanceDialog.operation === 'verify'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.reprobe" />重新使用 FFprobe 检查视频（耗时较长）</label>
+          <label v-if="maintenanceDialog.operation === 'thumbnails'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.force" />强制重新生成全部缩略图</label>
+          <p v-if="maintenanceDialog.operation === 'export'">CSV 将写入当前图库的 <code>.photo_manager/data/photo_metadata.csv</code>。</p>
+          <div class="tag-create-actions"><button class="btn" @click="closeMaintenanceDialog">取消</button><button class="btn btn-primary" @click="startMaintenanceOperation">开始</button></div>
+        </div>
+        <div v-else class="maintenance-progress">
+          <strong>{{ maintenanceDialog.progress.message || (maintenanceDialog.completed ? '任务已完成' : '正在处理') }}</strong>
+          <progress v-if="maintenanceDialog.progress.total" :value="maintenanceDialog.progress.processed || 0" :max="maintenanceDialog.progress.total"></progress>
+          <div class="library-progress-path" v-if="maintenanceDialog.progress.current">{{ maintenanceDialog.progress.current }}</div>
+          <pre v-if="maintenanceDialog.reportText">{{ maintenanceDialog.reportText }}</pre>
+          <div class="tag-create-actions" v-if="maintenanceDialog.completed"><button class="btn" @click="copyMaintenanceReport">复制报告</button><button class="btn" @click="openLibraryLogDir">打开日志</button><button v-if="maintenanceDialog.operation === 'export' && !maintenanceDialog.error" class="btn" @click="showMaintenanceOutput">定位 CSV</button><button class="btn btn-primary" @click="closeMaintenanceDialog">关闭</button></div>
+        </div>
+      </section>
+    </div>
     <div class="copy-toast" v-if="toast.visible">{{ toast.message }}</div>
     <div
       class="dynamic-tooltip"
@@ -261,6 +307,7 @@
 import { reactive, ref, computed, onMounted, onBeforeUnmount, watch, nextTick, provide } from "vue";
 import GalleryView from "./components/GalleryView.vue";
 import ViewerView from "./components/ViewerView.vue";
+import LibraryEntryView from "./components/LibraryEntryView.vue";
 import { calculateFrameStepTarget, resolveHorizontalArrowAction } from "./video-playback.mjs";
 
 /** Root renderer component in Single File Component format. */
@@ -303,6 +350,7 @@ const ICONS = {
   openSystem: new URL("./assets/open_system.svg", import.meta.url).href,
   customization: new URL("./assets/customization.svg", import.meta.url).href,
   videoPlaceholder: new URL("./assets/video_placeholder.svg", import.meta.url).href,
+  imagePlaceholder: new URL("./assets/image_placeholder.svg", import.meta.url).href,
 };
 
 // Human-readable file-size formatter for side panels.
@@ -372,11 +420,38 @@ export default {
   components: {
     GalleryView,
     ViewerView,
+    LibraryEntryView,
   },
   setup() {
     // --- Core view / query state ---
     const config = ref(null);
-    const view = ref("gallery");
+    const view = ref("library-entry");
+    const libraryState = ref({ state: "closed", active: null, lastLibraryPath: "", mediaTools: { available: false, error: "" }, maintenance: { running: false } });
+    const entry = reactive({
+      busy: false,
+      cancellable: false,
+      operation: "",
+      progress: {},
+      error: "",
+      libraryName: "",
+      libraryPath: "",
+      canRetry: false,
+    });
+    const initializationConfirm = reactive({ visible: false, path: "", name: "", mediaCount: 0, acknowledged: false });
+    const gallerySettingsOpen = ref(false);
+    const libraryInfo = reactive({ visible: false, name: "" });
+    const maintenanceDialog = reactive({
+      visible: false,
+      operation: "",
+      running: false,
+      completed: false,
+      reprobe: false,
+      force: false,
+      progress: {},
+      result: null,
+      error: "",
+      reportText: "",
+    });
 
     const query = reactive({
       page: 1,
@@ -397,9 +472,9 @@ export default {
     const albumRegistry = ref([]);
     const personRegistry = ref([]);
     const locationRegistry = ref([]);
-    const recentTags = ref(loadRecentRegistryValues("photoManager.recentTags", normalizeTagText));
-    const recentPeople = ref(loadRecentRegistryValues("photoManager.recentPeople", normalizePersonName));
-    const recentLocations = ref(loadRecentLocations());
+    const recentTags = ref([]);
+    const recentPeople = ref([]);
+    const recentLocations = ref([]);
     const tagSearch = reactive({ viewer: "", batch: "" });
     const albumSearch = reactive({ viewer: "", batch: "" });
     const personSearch = reactive({ viewer: "", batch: "" });
@@ -492,6 +567,18 @@ export default {
     const videoMuted = ref(readStoredBoolean("photoManager.videoMuted", false));
     const videoPlaybackRate = ref(readStoredNumber("photoManager.videoPlaybackRate", 1, 0.25, 4));
     const isSelectedVideo = computed(() => selectedItem.value?.FileSystem?.FileType === "video");
+    const maintenanceDialogTitle = computed(() => ({
+      update: "更新元数据",
+      verify: "检查元数据",
+      thumbnails: "生成缩略图",
+      export: "导出元数据 CSV",
+    }[maintenanceDialog.operation] || "图库维护"));
+    const maintenanceDialogDescription = computed(() => ({
+      update: "重新扫描当前图库中的受支持媒体，识别新增、删除、移动或内容发生变化的文件，并更新元数据。",
+      verify: "以只读方式核对图库文件与现有元数据是否匹配。此操作只生成检查报告，不修改媒体文件、注册表或元数据。",
+      thumbnails: "检查当前图库的缩略图缓存，并为缺失或过期的图片、视频封面重新生成缩略图。",
+      export: "将当前图库的文件信息、元数据和个性化信息导出为 CSV 文件。",
+    }[maintenanceDialog.operation] || ""));
     const canStepVideoBackward = computed(() => (
       isSelectedVideo.value
       && videoPlaybackMode.value === "video"
@@ -519,6 +606,10 @@ export default {
     let tooltipTarget = null;
     let removeWindowStateListener = null;
     let removeThumbnailReadyListener = null;
+    let removeLibraryStateListener = null;
+    let removeLibraryProgressListener = null;
+    let removeMaintenanceProgressListener = null;
+    let removeMaintenanceCompletedListener = null;
 
     // --- Editable draft model ---
     const editDraft = reactive({
@@ -589,6 +680,326 @@ export default {
       query.pageSize = config.value?.ui?.gallery?.pageSize || 120;
       showLeftPanel.value = config.value?.ui?.viewer?.panels?.showLeft ?? true;
       showRightPanel.value = config.value?.ui?.viewer?.panels?.showRight ?? true;
+    }
+
+    function setEntryError(message) {
+      entry.error = String(message || "未知错误");
+      entry.busy = false;
+      entry.cancellable = false;
+    }
+
+    function applyLibraryState(state) {
+      libraryState.value = state || libraryState.value;
+      if (state?.active) {
+        entry.libraryName = state.active.name || "";
+        entry.libraryPath = state.active.root || "";
+      }
+    }
+
+    function resetLibraryUiState() {
+      releaseCurrentMedia();
+      query.page = 1;
+      Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "" });
+      Object.assign(query.search, { field: "title", value: "" });
+      galleryGroups.value = [];
+      orderedItems.value = [];
+      total.value = 0;
+      hasMore.value = false;
+      Object.assign(mediaCounts, { all: 0, images: 0, videos: 0 });
+      Object.assign(filterOptions, { albums: [], tags: [], people: [], locations: [], unassignedAlbumCount: 0 });
+      tagRegistry.value = [];
+      albumRegistry.value = [];
+      personRegistry.value = [];
+      locationRegistry.value = [];
+      recentTags.value = [];
+      recentPeople.value = [];
+      recentLocations.value = [];
+      gallerySelection.value = new Set();
+      isSelectionMode.value = false;
+      selectedItem.value = null;
+      selectedGlobalIndex.value = -1;
+      Object.assign(tagSearch, { viewer: "", batch: "" });
+      Object.assign(albumSearch, { viewer: "", batch: "" });
+      Object.assign(personSearch, { viewer: "", batch: "" });
+      Object.assign(locationSearch, { viewer: "", batch: "" });
+      Object.assign(batchEdit, { title: "", album: "", tags: [], people: [], locationPlace: "" });
+      Object.assign(batchStatus, { visible: false, tone: "info", message: "" });
+      editingDirty.value = false;
+      activeEditField.value = "";
+      closeTransientPanels();
+      closeCreateTagMenu();
+      closeCreateAlbumMenu();
+      closeCreatePersonMenu();
+      closeCreateLocationMenu();
+      Object.assign(tagManager, { visible: false, search: "", editingText: "", editDescription: "", error: "" });
+      Object.assign(albumManager, { visible: false, search: "", editingTitle: "", editDescription: "", error: "" });
+      Object.assign(personManager, { visible: false, search: "", editingName: "", editDescription: "", error: "" });
+      Object.assign(locationManager, {
+        visible: false,
+        search: "",
+        editingName: "",
+        editCountry: "",
+        editProvince: "",
+        editCity: "",
+        editParent: "",
+        editDescription: "",
+        error: "",
+      });
+      locationManagerContext.value = "";
+      gallerySettingsOpen.value = false;
+    }
+
+    async function enterOpenedLibrary(state) {
+      applyLibraryState(state);
+      resetLibraryUiState();
+      loadLibraryRecentValues();
+      await loadTags();
+      await loadAlbums();
+      await loadPeople();
+      await loadLocations();
+      await queryGallery(true);
+      view.value = "gallery";
+      entry.busy = false;
+      entry.cancellable = false;
+      entry.error = "";
+      entry.canRetry = false;
+      API.startThumbnailWarmup().catch((error) => console.error("Thumbnail warmup failed", error));
+    }
+
+    async function openLibraryPath(libraryPath, options = {}) {
+      entry.busy = true;
+      entry.cancellable = false;
+      entry.operation = "open";
+      entry.error = "";
+      entry.libraryPath = libraryPath;
+      const result = await API.openLibrary({ path: libraryPath, force: Boolean(options.force) });
+      if (!result?.ok && result?.code === "LIBRARY_LOCKED" && result?.lockState?.forceAllowed && !options.force) {
+        const lock = result.lockState.lock || {};
+        const confirmed = window.confirm(`图库存在可能已经失效的锁。\n\n主机：${lock.HostName || "未知"}\n进程：${lock.ProcessId || "未知"}\n启动时间：${lock.ApplicationStartedAt || "未知"}\n\n强制解锁可能导致并发写入和数据损坏。确认继续吗？`);
+        if (confirmed) return openLibraryPath(libraryPath, { force: true });
+      }
+      if (!result?.ok) {
+        entry.canRetry = true;
+        setEntryError(result?.error || "无法打开图库");
+        return false;
+      }
+      await enterOpenedLibrary(result.library);
+      return true;
+    }
+
+    async function retryLastLibrary() {
+      const libraryPath = entry.libraryPath || libraryState.value.lastLibraryPath;
+      if (libraryPath) await openLibraryPath(libraryPath);
+    }
+
+    async function chooseLibrary() {
+      entry.error = "";
+      const selection = await API.chooseLibraryDirectory();
+      if (!selection?.ok) return;
+      entry.libraryPath = selection.path;
+      entry.libraryName = selection.path.split(/[\\/]/).filter(Boolean).pop() || selection.path;
+      entry.busy = true;
+      entry.cancellable = true;
+      entry.operation = "quick-scan";
+      entry.progress = { phase: "quick-scan", processed: 0 };
+      const inspected = await API.inspectLibrary(selection.path);
+      entry.busy = false;
+      entry.cancellable = false;
+      if (!inspected?.ok) {
+        if (inspected?.code === "OPERATION_CANCELLED") {
+          entry.error = "";
+          entry.operation = "";
+          return;
+        }
+        setEntryError(inspected?.error || "无法检查所选目录");
+        return;
+      }
+      const inspection = inspected.inspection;
+      if (inspection.kind === "existing") {
+        entry.libraryName = inspection.manifest?.name || entry.libraryName;
+        await openLibraryPath(inspection.root);
+        return;
+      }
+      if (inspection.kind === "failed-initialization") {
+        const clean = window.confirm(`该目录包含一次失败的图库初始化：\n\n${inspection.marker?.Error || "未知错误"}\n\n失败日志会保留到你确认重试为止。是否删除本次失败的管理数据，并立即重新扫描该目录以重试初始化？`);
+        if (clean) {
+          const cleaned = await API.cleanupFailedInitialization(inspection.root);
+          if (!cleaned?.ok) {
+            setEntryError(cleaned?.error || "清理失败");
+            return;
+          }
+          entry.busy = true;
+          entry.cancellable = true;
+          entry.operation = "quick-scan";
+          entry.progress = { phase: "quick-scan", processed: 0 };
+          const rescanned = await API.inspectLibrary(inspection.root);
+          entry.busy = false;
+          entry.cancellable = false;
+          if (!rescanned?.ok || rescanned.inspection?.kind !== "uninitialized") {
+            setEntryError(rescanned?.error || "无法重新扫描图库目录");
+            return;
+          }
+          initializationConfirm.visible = true;
+          initializationConfirm.path = rescanned.inspection.root;
+          initializationConfirm.name = rescanned.inspection.name;
+          initializationConfirm.mediaCount = rescanned.inspection.mediaCount || 0;
+          initializationConfirm.acknowledged = false;
+        }
+        return;
+      }
+      initializationConfirm.visible = true;
+      initializationConfirm.path = inspection.root;
+      initializationConfirm.name = inspection.name;
+      initializationConfirm.mediaCount = inspection.mediaCount || 0;
+      initializationConfirm.acknowledged = false;
+    }
+
+    function closeInitializationConfirm() {
+      initializationConfirm.visible = false;
+      initializationConfirm.acknowledged = false;
+    }
+
+    async function confirmInitializeLibrary() {
+      const payload = { path: initializationConfirm.path, name: initializationConfirm.name };
+      closeInitializationConfirm();
+      entry.busy = true;
+      entry.cancellable = true;
+      entry.operation = "initialize";
+      entry.error = "";
+      entry.progress = { phase: "validate", processed: 0 };
+      const result = await API.initializeLibrary(payload);
+      if (!result?.ok) {
+        if (result?.code === "OPERATION_CANCELLED") {
+          entry.busy = false;
+          entry.cancellable = false;
+          entry.operation = "";
+          entry.error = "";
+          return;
+        }
+        entry.canRetry = false;
+        setEntryError(result?.error || "图库初始化失败");
+        return;
+      }
+      await enterOpenedLibrary(result.library);
+    }
+
+    async function cancelLibraryOperation() {
+      const confirmed = window.confirm("确定取消当前操作吗？初始化取消后，本轮创建的全部未完成管理数据都会被删除。");
+      if (!confirmed) return;
+      if (entry.operation === "quick-scan") await API.cancelLibraryScan();
+      if (entry.operation === "initialize") await API.cancelLibraryInitialization();
+    }
+
+    async function recheckMediaTools() {
+      entry.busy = true;
+      const state = await API.recheckMediaTools();
+      libraryState.value = { ...libraryState.value, mediaTools: state };
+      entry.busy = false;
+      if (!state.available) entry.error = state.error;
+      else entry.error = "";
+    }
+
+    function toggleGallerySettings() {
+      gallerySettingsOpen.value = !gallerySettingsOpen.value;
+    }
+
+    function openLibraryInfo() {
+      gallerySettingsOpen.value = false;
+      libraryInfo.name = libraryState.value.active?.name || "";
+      libraryInfo.visible = true;
+    }
+
+    function closeLibraryInfo() { libraryInfo.visible = false; }
+
+    async function saveLibraryInfo() {
+      const result = await API.updateLibraryInfo({ name: libraryInfo.name });
+      if (!result?.ok) {
+        showToastMessage(`保存失败：${result?.error || "未知错误"}`);
+        return;
+      }
+      libraryState.value = { ...libraryState.value, active: result.library };
+      libraryInfo.visible = false;
+      showToastMessage("图库名称已更新");
+    }
+
+    async function openLibraryRoot() { await API.openLibraryRoot(); }
+    async function openLibraryManagerDir() { await API.openLibraryManagerDir(); }
+    async function openLibraryLogDir() { await API.openLibraryLogDir(); }
+
+    function openMaintenanceDialog(operation) {
+      gallerySettingsOpen.value = false;
+      Object.assign(maintenanceDialog, {
+        visible: true,
+        operation,
+        running: false,
+        completed: false,
+        reprobe: false,
+        force: false,
+        progress: {},
+        result: null,
+        error: "",
+        reportText: "",
+      });
+    }
+
+    function closeMaintenanceDialog() {
+      if (!maintenanceDialog.running) maintenanceDialog.visible = false;
+    }
+
+    async function startMaintenanceOperation(overwrite = false) {
+      maintenanceDialog.running = true;
+      maintenanceDialog.completed = false;
+      maintenanceDialog.progress = { phase: "starting", message: "正在启动任务" };
+      const result = await API.startMaintenance({
+        operation: maintenanceDialog.operation,
+        reprobe: maintenanceDialog.reprobe,
+        force: maintenanceDialog.force,
+        overwrite,
+      });
+      if (!result?.ok && result?.code === "OUTPUT_EXISTS" && !overwrite) {
+        maintenanceDialog.running = false;
+        if (window.confirm("photo_metadata.csv 已存在。是否覆盖现有文件？")) await startMaintenanceOperation(true);
+        return;
+      }
+      maintenanceDialog.running = false;
+      maintenanceDialog.completed = true;
+      maintenanceDialog.result = result?.result || null;
+      maintenanceDialog.error = result?.ok ? "" : result?.error || "任务失败";
+      maintenanceDialog.reportText = JSON.stringify(result?.ok ? result.result : { error: maintenanceDialog.error }, null, 2);
+      if (result?.ok && maintenanceDialog.operation === "update") {
+        await loadTags(); await loadAlbums(); await loadPeople(); await loadLocations(); await queryGallery(true);
+      }
+      if (result?.ok && maintenanceDialog.operation === "thumbnails") await queryGallery(true);
+    }
+
+    async function copyMaintenanceReport() {
+      await API.copyText(maintenanceDialog.reportText || "");
+      showToastMessage("维护报告已复制");
+    }
+
+    async function showMaintenanceOutput() {
+      const result = await API.showMaintenanceOutput();
+      if (!result?.ok) showToastMessage(`无法定位 CSV：${result?.error || "未知错误"}`);
+    }
+
+    async function returnToLibraryEntry() {
+      gallerySettingsOpen.value = false;
+      if (editingDirty.value) {
+        showToastMessage("请先保存或放弃当前修改");
+        return;
+      }
+      if (!window.confirm("确定退出当前图库吗？图库会被安全关闭并释放占用锁，随后返回图库入口；原始媒体和 .photo_manager 中的数据不会被删除。")) return;
+      const result = await API.closeLibrary();
+      if (!result?.ok) {
+        showToastMessage(`无法关闭图库：${result?.error || "未知错误"}`);
+        return;
+      }
+      resetLibraryUiState();
+      applyLibraryState(result.library);
+      view.value = "library-entry";
+      entry.busy = false;
+      entry.error = "";
+      entry.canRetry = false;
     }
 
     // Reset transform each time we enter viewer or switch image.
@@ -991,7 +1402,7 @@ export default {
         }))
         .filter((tag) => tag.Text);
       filterOptions.tags = tagRegistry.value.map((tag) => tag.Text);
-      pruneRecentRegistryValues(recentTags, "photoManager.recentTags", filterOptions.tags);
+      pruneRecentRegistryValues(recentTags, recentStorageKey("Tags"), filterOptions.tags);
       if (query.filters.tag && !filterOptions.tags.includes(query.filters.tag)) {
         query.filters.tag = "";
       }
@@ -1057,7 +1468,7 @@ export default {
         return;
       }
       tags.push(tagText);
-      rememberRecentRegistryValue(recentTags, "photoManager.recentTags", tagText, normalizeTagText);
+      rememberRecentRegistryValue(recentTags, recentStorageKey("Tags"), tagText, normalizeTagText);
       tagSearch[target] = "";
       closeTagDropdown(target);
       if (target === "viewer") requestEdit("Tags");
@@ -1123,6 +1534,7 @@ export default {
     }
 
     async function openTagManager() {
+      gallerySettingsOpen.value = false;
       closeAllRegistryDropdowns();
       await loadTags();
       tagManager.visible = true;
@@ -1222,7 +1634,7 @@ export default {
         }))
         .filter((person) => person.Name);
       filterOptions.people = personRegistry.value.map((person) => person.Name);
-      pruneRecentRegistryValues(recentPeople, "photoManager.recentPeople", filterOptions.people);
+      pruneRecentRegistryValues(recentPeople, recentStorageKey("People"), filterOptions.people);
       if (query.filters.person && !filterOptions.people.includes(query.filters.person)) {
         query.filters.person = "";
       }
@@ -1288,7 +1700,7 @@ export default {
         return;
       }
       people.push(name);
-      rememberRecentRegistryValue(recentPeople, "photoManager.recentPeople", name, normalizePersonName);
+      rememberRecentRegistryValue(recentPeople, recentStorageKey("People"), name, normalizePersonName);
       personSearch[target] = "";
       closePersonDropdown(target);
       if (target === "viewer") requestEdit("People");
@@ -1349,6 +1761,7 @@ export default {
     }
 
     async function openPersonManager() {
+      gallerySettingsOpen.value = false;
       closeAllRegistryDropdowns();
       await loadPeople();
       personManager.visible = true;
@@ -1485,6 +1898,17 @@ export default {
       }
     }
 
+    function recentStorageKey(kind) {
+      const libraryId = libraryState.value.active?.libraryId || "closed";
+      return `photoManager.library.${libraryId}.recent${kind}`;
+    }
+
+    function loadLibraryRecentValues() {
+      recentTags.value = loadRecentRegistryValues(recentStorageKey("Tags"), normalizeTagText);
+      recentPeople.value = loadRecentRegistryValues(recentStorageKey("People"), normalizePersonName);
+      recentLocations.value = loadRecentLocations();
+    }
+
     function saveRecentRegistryValues(storageKey, values) {
       try {
         window.localStorage?.setItem(storageKey, JSON.stringify(values.slice(0, 3)));
@@ -1508,7 +1932,7 @@ export default {
 
     function loadRecentLocations() {
       try {
-        const raw = window.localStorage?.getItem("photoManager.recentLocations");
+        const raw = window.localStorage?.getItem(recentStorageKey("Locations"));
         const parsed = JSON.parse(raw || "[]");
         return Array.isArray(parsed) ? parsed.map(normalizeLocationName).filter(Boolean).slice(0, 3) : [];
       } catch {
@@ -1518,7 +1942,7 @@ export default {
 
     function saveRecentLocations() {
       try {
-        window.localStorage?.setItem("photoManager.recentLocations", JSON.stringify(recentLocations.value.slice(0, 3)));
+        window.localStorage?.setItem(recentStorageKey("Locations"), JSON.stringify(recentLocations.value.slice(0, 3)));
       } catch {
         // Recent locations are a convenience cache; ignore storage failures.
       }
@@ -1978,6 +2402,7 @@ export default {
     }
 
     async function openLocationManager() {
+      gallerySettingsOpen.value = false;
       closeAllRegistryDropdowns();
       await loadLocations();
       locationManager.visible = true;
@@ -2219,6 +2644,7 @@ export default {
     }
 
     async function openAlbumManager() {
+      gallerySettingsOpen.value = false;
       closeAllRegistryDropdowns();
       await loadAlbums();
       albumManager.visible = true;
@@ -2884,6 +3310,7 @@ export default {
 
     function closeTransientPanels() {
       showContextMenu.value = false;
+      gallerySettingsOpen.value = false;
       closeAllRegistryDropdowns();
     }
 
@@ -2926,7 +3353,7 @@ export default {
 
     async function contextCopyPath() {
       if (!selectedItem.value) return;
-      const result = await API.copyPath(selectedItem.value.__absolutePath);
+      const result = await API.copyPath(selectedItem.value.FilePath);
       if (result?.ok) showToastMessage("已成功复制文件路径");
       else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
       closeTransientPanels();
@@ -3216,16 +3643,9 @@ export default {
     );
 
     onMounted(async () => {
-      // Initial render flow: config -> first gallery query -> global listeners.
+      // Initial render flow: application config -> library state -> optional last-library open.
       await loadConfig();
-      await loadTags();
-      await loadAlbums();
-      await loadPeople();
-      await loadLocations();
-      await queryGallery(true);
       await refreshWindowState();
-      await nextTick();
-      autoGrowAllFieldTextareas();
       if (typeof API.onWindowStateChanged === "function") {
         removeWindowStateListener = API.onWindowStateChanged((state) => {
           isWindowMaximized.value = Boolean(state?.isMaximized);
@@ -3234,9 +3654,38 @@ export default {
       if (typeof API.onThumbnailReady === "function") {
         removeThumbnailReadyListener = API.onThumbnailReady(markThumbnailReady);
       }
-      if (typeof API.startThumbnailWarmup === "function") {
-        API.startThumbnailWarmup().catch((error) => console.error("Thumbnail warmup failed", error));
+      if (typeof API.onLibraryStateChanged === "function") {
+        removeLibraryStateListener = API.onLibraryStateChanged(applyLibraryState);
       }
+      if (typeof API.onLibraryProgress === "function") {
+        removeLibraryProgressListener = API.onLibraryProgress((progress) => {
+          entry.progress = progress || {};
+        });
+      }
+      if (typeof API.onMaintenanceProgress === "function") {
+        removeMaintenanceProgressListener = API.onMaintenanceProgress((progress) => {
+          maintenanceDialog.progress = progress || {};
+          if (progress?.level && progress?.message) {
+            const previous = maintenanceDialog.reportText ? `${maintenanceDialog.reportText}\n` : "";
+            maintenanceDialog.reportText = `${previous}[${progress.level}] ${progress.message}`;
+          }
+        });
+      }
+      if (typeof API.onMaintenanceCompleted === "function") {
+        removeMaintenanceCompletedListener = API.onMaintenanceCompleted(() => {});
+      }
+      const initialState = await API.getLibraryState();
+      applyLibraryState(initialState);
+      if (initialState?.active) {
+        await enterOpenedLibrary(initialState);
+      } else if (initialState?.lastLibraryPath && initialState?.mediaTools?.available) {
+        entry.libraryPath = initialState.lastLibraryPath;
+        entry.libraryName = initialState.lastLibraryPath.split(/[\\/]/).filter(Boolean).pop() || initialState.lastLibraryPath;
+        entry.canRetry = true;
+        await openLibraryPath(initialState.lastLibraryPath);
+      }
+      await nextTick();
+      autoGrowAllFieldTextareas();
       window.addEventListener("keydown", onGlobalKeydown);
       window.addEventListener("mousemove", onDrag);
       window.addEventListener("mouseup", endDrag);
@@ -3262,6 +3711,10 @@ export default {
       document.removeEventListener("click", closeTransientPanels);
       if (typeof removeWindowStateListener === "function") removeWindowStateListener();
       if (typeof removeThumbnailReadyListener === "function") removeThumbnailReadyListener();
+      if (typeof removeLibraryStateListener === "function") removeLibraryStateListener();
+      if (typeof removeLibraryProgressListener === "function") removeLibraryProgressListener();
+      if (typeof removeMaintenanceProgressListener === "function") removeMaintenanceProgressListener();
+      if (typeof removeMaintenanceCompletedListener === "function") removeMaintenanceCompletedListener();
       if (toastTimer) clearTimeout(toastTimer);
       if (saveNoticeTimer) clearTimeout(saveNoticeTimer);
       if (tooltipTimer) clearTimeout(tooltipTimer);
@@ -3271,6 +3724,14 @@ export default {
       ICONS,
       WINDOW_ACTIONS,
       view,
+      libraryState,
+      entry,
+      initializationConfirm,
+      gallerySettingsOpen,
+      libraryInfo,
+      maintenanceDialog,
+      maintenanceDialogTitle,
+      maintenanceDialogDescription,
       query,
       galleryGroups,
       total,
@@ -3352,6 +3813,25 @@ export default {
       formatDuration,
       formatBitRate,
       buildImageUrl,
+      chooseLibrary,
+      retryLastLibrary,
+      recheckMediaTools,
+      cancelLibraryOperation,
+      closeInitializationConfirm,
+      confirmInitializeLibrary,
+      toggleGallerySettings,
+      openLibraryInfo,
+      closeLibraryInfo,
+      saveLibraryInfo,
+      openLibraryRoot,
+      openLibraryManagerDir,
+      openLibraryLogDir,
+      openMaintenanceDialog,
+      closeMaintenanceDialog,
+      startMaintenanceOperation,
+      copyMaintenanceReport,
+      showMaintenanceOutput,
+      returnToLibraryEntry,
       enterSelectionMode,
       exitSelectionMode,
       onGalleryCardClick,

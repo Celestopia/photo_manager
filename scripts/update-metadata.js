@@ -4,13 +4,10 @@
  * for changed files and new paths that may represent moves.
  */
 const path = require("node:path");
+const fsp = require("node:fs/promises");
 const {
   APP_ROOT,
-  DATA_FILE_NAMES,
   resolveConfig,
-  absFromConfig,
-  dataFilePath,
-  ensureDataDir,
   walkFiles,
   inspectMediaFile,
   sha256File,
@@ -19,8 +16,12 @@ const {
   writeAll,
   extensionType,
 } = require("./common");
-const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 const { validateMediaTools } = require("./media-tools");
+const { parseLibraryArgument, writeLibraryManifest } = require("./library-core");
+const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
+const { createLibraryBackup } = require("./library-backup");
+const { recoverPendingTransaction } = require("./library-transaction");
+const { createOperationReporter } = require("./operation-progress");
 
 function isUnchangedRecord(existing, snapshot) {
   return Boolean(
@@ -29,6 +30,7 @@ function isUnchangedRecord(existing, snapshot) {
     && Number(existing?.FileSystem?.FileSize) === Number(snapshot.stat.size)
     && Number.isFinite(Number(existing?.FileSystem?.ModificationTimeMs))
     && Number(existing.FileSystem.ModificationTimeMs) === Number(snapshot.stat.mtimeMs)
+    && (snapshot.type !== "image" || ["ok", "failed"].includes(existing?.Picture?.ProbeStatus))
   );
 }
 
@@ -65,14 +67,17 @@ function cloneMovedRecord(existing, snapshot, hash) {
   return moved;
 }
 
-async function synchronizeMetadata({ config, root, existing, files, logger = console, dependencies = {} }) {
+async function synchronizeMetadata({ config, root, existing, files, logger = console, dependencies = {}, onProgress = null }) {
   const inspectFile = dependencies.inspectMediaFile || inspectMediaFile;
   const hashFile = dependencies.sha256File || sha256File;
   const buildFileMetadata = dependencies.buildMetadata || buildMetadata;
   const snapshots = [];
   const failedPaths = new Set();
-  for (const absFile of [...files].sort((a, b) => a.localeCompare(b, "zh-CN"))) {
+  const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
+  for (let fileIndex = 0; fileIndex < sortedFiles.length; fileIndex += 1) {
+    const absFile = sortedFiles[fileIndex];
     if (!extensionType(path.extname(absFile))) continue;
+    onProgress?.({ phase: "inspect", processed: fileIndex, total: sortedFiles.length, current: path.relative(root, absFile).replace(/\\/g, "/") });
     try {
       const snapshot = await inspectFile(absFile, root);
       if (snapshot) snapshots.push(snapshot);
@@ -103,7 +108,9 @@ async function synchronizeMetadata({ config, root, existing, files, logger = con
     failed: failedPaths.size,
     skipped: [...failedPaths].filter((filePath) => !existing.has(filePath)).length,
   };
-  for (const snapshot of snapshots) {
+  for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex += 1) {
+    const snapshot = snapshots[snapshotIndex];
+    onProgress?.({ phase: "metadata", processed: snapshotIndex, total: snapshots.length, current: snapshot.relativePath });
     const direct = existing.get(snapshot.relativePath);
     if (isUnchangedRecord(direct, snapshot)) {
       next.set(snapshot.relativePath, direct);
@@ -158,45 +165,86 @@ async function synchronizeMetadata({ config, root, existing, files, logger = con
     const previous = existing.get(failedPath);
     if (previous) next.set(failedPath, previous);
   }
+  const duplicateHashes = new Map();
+  for (const item of next.values()) {
+    if (!item.SHA256Hash) continue;
+    if (!duplicateHashes.has(item.SHA256Hash)) duplicateHashes.set(item.SHA256Hash, []);
+    duplicateHashes.get(item.SHA256Hash).push(item.FilePath);
+  }
+  for (const [hash, filePaths] of duplicateHashes) {
+    if (filePaths.length > 1) logger.warn(`Duplicate SHA-256 ${hash}: ${filePaths.sort().join(", ")}`);
+  }
   return { next, stats };
 }
 
-async function run() {
-  const config = resolveConfig();
-  const root = absFromConfig(config, config.workspaceRoot);
-  await ensureDataDir(config);
+async function run(options = {}) {
+  const config = options.config || resolveConfig();
+  const paths = options.paths || parseLibraryArgument();
+  const { emit, logger, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
   await validateMediaTools(APP_ROOT, config.media);
-  const metadataFile = dataFilePath(config, DATA_FILE_NAMES.metadata);
-  const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
-  const thumbnailDir = absFromConfig(config, thumbnailConfig.dir);
-  const existing = await loadExisting(metadataFile);
-  const files = await walkFiles(root);
-  const result = await synchronizeMetadata({ config, root, existing, files });
-  const nextEntries = [...result.next.values()];
-  await writeAll(metadataFile, nextEntries);
-
-  const thumbnailStats = await ensureThumbnailsForItems(nextEntries, {
-    workspaceRoot: root,
-    cacheDir: thumbnailDir,
-    options: thumbnailConfig,
-    maxConcurrency: thumbnailConfig.maxConcurrency,
-    mediaConfig: config.media,
-    logger: (message) => console.warn(message),
-  });
-  const imageCount = nextEntries.filter((item) => item?.FileSystem?.FileType === "image").length;
-  const videoCount = nextEntries.filter((item) => item?.FileSystem?.FileType === "video").length;
-  const probeFailures = nextEntries.filter((item) => item?.Video?.ProbeStatus === "failed").length;
-  console.log(
-    `Updated metadata: total=${nextEntries.length}, images=${imageCount}, videos=${videoCount}, reused=${result.stats.reused}, hashed=${result.stats.hashed}, rebuilt=${result.stats.rebuilt}, moved=${result.stats.moved}, failed=${result.stats.failed}, skipped=${result.stats.skipped}, probeFailed=${probeFailures}`,
-  );
-  console.log(
-    `Thumbnail cache: generated=${thumbnailStats.generated}, skipped=${thumbnailStats.skipped}, failed=${thumbnailStats.failed}`,
-  );
+  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
+  const authorization = await authorizeLibraryOperation(paths, manifest, options);
+  try {
+    await recoverPendingTransaction(paths);
+    emit({ phase: "backup", message: "备份图库数据" });
+    await createLibraryBackup(paths, {
+      kind: "update",
+      reason: "metadata-update",
+      retentionCount: config.backup.retentionCount,
+    });
+    const existing = await loadExisting(paths.metadataFile);
+    validateMetadataPaths(paths, existing.values());
+    const files = await walkFiles(paths.root, { onProgress: (progress) => emit(progress) });
+    const result = await synchronizeMetadata({
+      config,
+      root: paths.root,
+      existing,
+      files,
+      logger,
+      onProgress: (progress) => emit(progress),
+    });
+    const nextEntries = [...result.next.values()];
+    emit({ phase: "commit", processed: nextEntries.length, total: nextEntries.length, message: "原子写入元数据" });
+    await writeAll(paths.metadataFile, nextEntries);
+    const retainedHashes = new Set(nextEntries.map((item) => item?.SHA256Hash).filter(Boolean));
+    const staleHashes = new Set(
+      [...existing.values()]
+        .map((item) => item?.SHA256Hash)
+        .filter((hash) => hash && !retainedHashes.has(hash)),
+    );
+    let thumbnailsRemoved = 0;
+    for (const hash of staleHashes) {
+      try {
+        await fsp.rm(path.join(paths.thumbnailDir, `${hash}.webp`), { force: true });
+        thumbnailsRemoved += 1;
+      } catch (error) {
+        logger.warn(`Failed to remove stale thumbnail ${hash}: ${error.message}`);
+      }
+    }
+    manifest.updatedAt = new Date().toISOString();
+    await writeLibraryManifest(paths, manifest);
+    const summary = {
+      ...result.stats,
+      total: nextEntries.length,
+      images: nextEntries.filter((item) => item?.FileSystem?.FileType === "image").length,
+      videos: nextEntries.filter((item) => item?.FileSystem?.FileType === "video").length,
+      probeFailed: nextEntries.filter((item) => item?.Video?.ProbeStatus === "failed" || item?.Picture?.ProbeStatus === "failed").length,
+      thumbnailsRemoved,
+      warnings,
+      errors,
+    };
+    emit({ phase: "complete", processed: summary.total, total: summary.total, message: "元数据更新完成" });
+    return summary;
+  } finally {
+    await authorization.release();
+  }
 }
 
 if (require.main === module) {
-  run().catch((error) => {
-    console.error(error);
+  run({ logger: console }).then((result) => {
+    console.log(`Updated metadata: total=${result.total}, images=${result.images}, videos=${result.videos}, reused=${result.reused}, hashed=${result.hashed}, rebuilt=${result.rebuilt}, moved=${result.moved}, failed=${result.failed}, skipped=${result.skipped}, probeFailed=${result.probeFailed}`);
+  }).catch((error) => {
+    console.error(error.message);
     process.exit(1);
   });
 }

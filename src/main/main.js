@@ -12,6 +12,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const yaml = require("js-yaml");
+const { fork } = require("node:child_process");
 const {
   normalizeThumbnailConfig,
   thumbnailAbsolutePath,
@@ -23,30 +24,51 @@ const {
   validateMediaTools,
   sanitizeMediaError,
 } = require(path.join(__dirname, "..", "..", "scripts", "media-tools.js"));
+const {
+  DATA_FILE_NAMES,
+  resolveLibraryPaths,
+  readLibraryManifest,
+  writeLibraryManifest,
+  normalizeLibraryName,
+  readJsonlStrict,
+  writeJsonlAtomic,
+  writeTextAtomic,
+  assertPathInsideLibrary,
+  findNestedManagerDirectory,
+  findParentManagerDirectory,
+} = require(path.join(__dirname, "..", "..", "scripts", "library-core.js"));
+const { validateExistingLibrary } = require(path.join(__dirname, "..", "..", "scripts", "library-access.js"));
+const {
+  acquireLibraryLock,
+  releaseLibraryLock,
+  inspectLibraryLock,
+} = require(path.join(__dirname, "..", "..", "scripts", "library-lock.js"));
+const { createLibraryBackup } = require(path.join(__dirname, "..", "..", "scripts", "library-backup.js"));
+const {
+  recoverPendingTransaction,
+  commitJsonlTransaction,
+} = require(path.join(__dirname, "..", "..", "scripts", "library-transaction.js"));
+const {
+  buildThumbnailManifest,
+  thumbnailManifestMatches,
+} = require(path.join(__dirname, "..", "..", "scripts", "build-thumbnails.js"));
+const {
+  walkFiles,
+  extensionType,
+} = require(path.join(__dirname, "..", "..", "scripts", "common.js"));
 
 const APP_ROOT = path.resolve(__dirname, "..", "..");
 const CONFIG_PATH = path.join(APP_ROOT, "config.yml");
 const RENDERER_INDEX_PATH = path.join(APP_ROOT, "dist", "renderer", "index.html");
-const DATA_FILE_NAMES = Object.freeze({
-  metadata: "photo_metadata.jsonl",
-  tags: "tag_registry.jsonl",
-  albums: "album_registry.jsonl",
-  people: "person_registry.jsonl",
-  locations: "location_registry.jsonl",
-});
-
 const DEFAULT_CONFIG = {
-  workspaceRoot: "./photo_workspace",
-  dataDir: "./data",
-  logDir: "./logs",
   thumbnail: {
-    dir: "./thumb_cache",
     size: 320,
     webpQuality: 80,
     extremeAspectRatio: 4,
     maxConcurrency: 4,
   },
   media: { ...DEFAULT_MEDIA_CONFIG },
+  backup: { retentionCount: 10 },
   ui: {
     language: "zh-CN",
     gallery: {
@@ -81,6 +103,16 @@ let albumRegistryIndex = new Map();
 let personRegistryIndex = new Map();
 let locationRegistryIndex = new Map();
 let thumbnailWarmupStarted = false;
+let thumbnailWarmupToken = null;
+let activeLibrary = null;
+let mediaToolsState = { available: false, error: "尚未检查媒体工具", versions: null };
+let maintenanceState = { running: false, operation: "", progress: null, report: null };
+let activeWorker = null;
+let activeWorkerOperation = "";
+let pendingAppClose = false;
+let appState = { lastLibraryPath: "" };
+let applicationStartedAt = new Date().toISOString();
+let quickScanState = null;
 const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
 const DEFAULT_ALBUM_DESCRIPTION = "待补充：请填写该相册的明确含义。";
 const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
@@ -108,13 +140,14 @@ function ensureConfig() {
     const raw = fs.readFileSync(CONFIG_PATH, "utf8");
     const parsed = yaml.load(raw);
     config = {
-      ...DEFAULT_CONFIG,
-      ...parsed,
       thumbnail: {
         ...DEFAULT_CONFIG.thumbnail,
         ...(parsed?.thumbnail || {}),
       },
       media: normalizeMediaConfig(parsed?.media),
+      backup: {
+        retentionCount: Math.max(1, Math.trunc(Number(parsed?.backup?.retentionCount) || DEFAULT_CONFIG.backup.retentionCount)),
+      },
       ui: {
         ...DEFAULT_CONFIG.ui,
         ...(parsed?.ui || {}),
@@ -191,26 +224,17 @@ async function saveConfig() {
   await fsp.writeFile(CONFIG_PATH, raw, "utf8");
 }
 
-/**
- * Resolve project-relative path to absolute path.
- */
-function toAbsolutePath(possibleRelativePath) {
-  if (path.isAbsolute(possibleRelativePath)) {
-    return possibleRelativePath;
-  }
-  return path.resolve(APP_ROOT, possibleRelativePath);
-}
-
 function resolveDataDir() {
-  return toAbsolutePath(config?.dataDir || DEFAULT_CONFIG.dataDir);
+  if (!activeLibrary) {
+    const error = new Error("No library is open");
+    error.code = "LIBRARY_NOT_OPEN";
+    throw error;
+  }
+  return activeLibrary.paths.dataDir;
 }
 
 function resolveDataFile(fileName) {
   return path.join(resolveDataDir(), fileName);
-}
-
-async function ensureDataDirectory() {
-  await fsp.mkdir(resolveDataDir(), { recursive: true });
 }
 
 /**
@@ -218,7 +242,7 @@ async function ensureDataDirectory() {
  */
 function appendLog(message) {
   try {
-    const logDir = toAbsolutePath(config?.logDir || DEFAULT_CONFIG.logDir);
+    const logDir = activeLibrary?.paths?.logDir || path.join(app.getPath("userData"), "logs");
     fs.mkdirSync(logDir, { recursive: true });
     const dayKey = new Date().toISOString().slice(0, 10);
     fs.appendFileSync(path.join(logDir, `${dayKey}.log`), `[${new Date().toISOString()}] ${message}\n`);
@@ -227,30 +251,74 @@ function appendLog(message) {
   }
 }
 
+function appendOperationLog(operation, root, message) {
+  if (operation !== "initialize") {
+    appendLog(message);
+    return;
+  }
+  try {
+    const paths = resolveLibraryPaths(root);
+    if (!fs.existsSync(paths.managerDir)) {
+      appendLog(message);
+      return;
+    }
+    fs.mkdirSync(paths.logDir, { recursive: true });
+    const dayKey = new Date().toISOString().slice(0, 10);
+    fs.appendFileSync(path.join(paths.logDir, `${dayKey}.log`), `[${new Date().toISOString()}] ${message}\n`);
+  } catch {
+    appendLog(message);
+  }
+}
+
+function appStateFile() {
+  return path.join(app.getPath("userData"), "state.json");
+}
+
+async function loadAppState() {
+  try {
+    const parsed = JSON.parse(await fsp.readFile(appStateFile(), "utf8"));
+    appState = { lastLibraryPath: typeof parsed?.lastLibraryPath === "string" ? parsed.lastLibraryPath : "" };
+  } catch {
+    appState = { lastLibraryPath: "" };
+  }
+}
+
+async function saveAppState() {
+  await fsp.mkdir(path.dirname(appStateFile()), { recursive: true });
+  const temp = `${appStateFile()}.tmp`;
+  await fsp.writeFile(temp, `${JSON.stringify(appState, null, 2)}\n`, "utf8");
+  await fsp.rename(temp, appStateFile());
+}
+
+function requireOpenLibrary({ writable = false } = {}) {
+  if (!activeLibrary || activeLibrary.state !== "open") {
+    const error = new Error("No library is open");
+    error.code = "LIBRARY_NOT_OPEN";
+    throw error;
+  }
+  if (writable && maintenanceState.running) {
+    const error = new Error("The library is read-only while maintenance is running");
+    error.code = "MAINTENANCE_RUNNING";
+    throw error;
+  }
+  return activeLibrary;
+}
+
 /**
  * Read metadata JSONL into an in-memory Map keyed by FilePath.
- * Invalid lines are skipped so a partially broken metadata file does not block startup.
+ * Strict parsing deliberately rejects malformed or duplicate records so an
+ * inconsistent library never opens as if it were healthy.
  */
 async function loadMetadataIndex() {
   metadataIndex.clear();
   const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
-
-  if (!fs.existsSync(metadataFile)) {
-    return;
-  }
-
-  const content = await fsp.readFile(metadataFile, "utf8");
-  const lines = content.split(/\r?\n/).filter(Boolean);
-
-  for (const line of lines) {
-    try {
-      const item = JSON.parse(line);
-      if (item?.FilePath) {
-        metadataIndex.set(item.FilePath, item);
-      }
-    } catch (error) {
-      appendLog(`Skip invalid metadata line: ${error.message}`);
-    }
+  const entries = await readJsonlStrict(metadataFile, {
+    label: DATA_FILE_NAMES.metadata,
+    keyOf: (item) => item?.FilePath,
+  });
+  for (const item of entries) {
+    assertPathInsideLibrary(activeLibrary.paths, path.join(activeLibrary.paths.root, item.FilePath));
+    metadataIndex.set(item.FilePath, item);
   }
 }
 
@@ -259,6 +327,29 @@ async function loadMetadataIndex() {
  */
 function normalizeTagText(value) {
   return String(value ?? "").trim();
+}
+
+async function prepareLibraryWrite(reason, { immediate = false } = {}) {
+  const library = activeLibrary;
+  if (!library || !["opening", "open"].includes(library.state)) throw new Error("No writable library session is active");
+  if (maintenanceState.running) throw new Error("The library is read-only while maintenance is running");
+  await createLibraryBackup(library.paths, {
+    kind: immediate ? "immediate" : "daily",
+    reason,
+    retentionCount: config.backup.retentionCount,
+  });
+}
+
+async function touchLibraryManifest() {
+  if (!activeLibrary) return;
+  const nextManifest = { ...activeLibrary.manifest, updatedAt: new Date().toISOString() };
+  try {
+    activeLibrary.manifest = await writeLibraryManifest(activeLibrary.paths, nextManifest);
+  } catch (error) {
+    // The JSONL commit is already durable at this point. updatedAt is advisory,
+    // so a manifest timestamp failure must not make memory diverge from disk.
+    appendLog(`library manifest timestamp update failed: ${error.message}`);
+  }
 }
 
 /**
@@ -293,15 +384,11 @@ function getTagUsageCounts() {
 /**
  * Persist tag registry JSONL using the same temp-file replacement style as metadata.
  */
-async function saveTagRegistryMap() {
-  await ensureDataDirectory();
+async function saveTagRegistryMap(options = {}) {
+  if (options.backup !== false) await prepareLibraryWrite("tag-registry-write");
   const registryFile = resolveDataFile(DATA_FILE_NAMES.tags);
-  const tempFile = `${registryFile}.tmp`;
-  const lines = [...tagRegistryIndex.values()]
-    .sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"))
-    .map((tag) => JSON.stringify(tag));
-  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
-  await fsp.rename(tempFile, registryFile);
+  await writeJsonlAtomic(registryFile, [...tagRegistryIndex.values()].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN")));
+  await touchLibraryManifest();
 }
 
 /**
@@ -338,24 +425,18 @@ async function loadTagRegistryIndex() {
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
-    const content = await fsp.readFile(registryFile, "utf8");
-    const lines = content.split(/\r?\n/).filter(Boolean);
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        const text = normalizeTagText(parsed?.Text);
-        if (!text) continue;
-        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
-        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
-        tagRegistryIndex.set(text, {
-          Text: text,
-          Description: normalizeTagText(parsed?.Description) || DEFAULT_TAG_DESCRIPTION,
-          CreatedAt: createdAt,
-          UpdatedAt: updatedAt,
-        });
-      } catch (error) {
-        appendLog(`Skip invalid tag registry line: ${error.message}`);
-      }
+    const entries = await readJsonlStrict(registryFile, { label: DATA_FILE_NAMES.tags, keyOf: (item) => item?.Text });
+    for (const parsed of entries) {
+      const text = normalizeTagText(parsed.Text);
+      if (!text || tagRegistryIndex.has(text)) throw new Error(`Invalid or duplicate tag key: ${text || "<empty>"}`);
+      const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+      const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+      tagRegistryIndex.set(text, {
+        Text: text,
+        Description: normalizeTagText(parsed?.Description),
+        CreatedAt: createdAt,
+        UpdatedAt: updatedAt,
+      });
     }
   }
 
@@ -414,15 +495,11 @@ function listPersonDefinitions() {
 /**
  * Persist person registry JSONL using temp-file replacement.
  */
-async function savePersonRegistryMap() {
-  await ensureDataDirectory();
+async function savePersonRegistryMap(options = {}) {
+  if (options.backup !== false) await prepareLibraryWrite("person-registry-write");
   const registryFile = resolveDataFile(DATA_FILE_NAMES.people);
-  const tempFile = `${registryFile}.tmp`;
-  const lines = [...personRegistryIndex.values()]
-    .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
-    .map((person) => JSON.stringify(person));
-  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
-  await fsp.rename(tempFile, registryFile);
+  await writeJsonlAtomic(registryFile, [...personRegistryIndex.values()].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")));
+  await touchLibraryManifest();
 }
 
 /**
@@ -459,24 +536,18 @@ async function loadPersonRegistryIndex() {
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
-    const content = await fsp.readFile(registryFile, "utf8");
-    const lines = content.split(/\r?\n/).filter(Boolean);
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        const name = normalizePersonName(parsed?.Name);
-        if (!name) continue;
-        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
-        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
-        personRegistryIndex.set(name, {
-          Name: name,
-          Description: normalizePersonName(parsed?.Description),
-          CreatedAt: createdAt,
-          UpdatedAt: updatedAt,
-        });
-      } catch (error) {
-        appendLog(`Skip invalid person registry line: ${error.message}`);
-      }
+    const entries = await readJsonlStrict(registryFile, { label: DATA_FILE_NAMES.people, keyOf: (item) => item?.Name });
+    for (const parsed of entries) {
+      const name = normalizePersonName(parsed.Name);
+      if (!name || personRegistryIndex.has(name)) throw new Error(`Invalid or duplicate person key: ${name || "<empty>"}`);
+      const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+      const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+      personRegistryIndex.set(name, {
+        Name: name,
+        Description: normalizePersonName(parsed?.Description),
+        CreatedAt: createdAt,
+        UpdatedAt: updatedAt,
+      });
     }
   }
 
@@ -603,15 +674,11 @@ function listLocationDefinitions() {
     .sort((a, b) => a.Path.join("/").localeCompare(b.Path.join("/"), "zh-CN"));
 }
 
-async function saveLocationRegistryMap() {
-  await ensureDataDirectory();
+async function saveLocationRegistryMap(options = {}) {
+  if (options.backup !== false) await prepareLibraryWrite("location-registry-write");
   const registryFile = resolveDataFile(DATA_FILE_NAMES.locations);
-  const tempFile = `${registryFile}.tmp`;
-  const lines = [...locationRegistryIndex.values()]
-    .sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"))
-    .map((location) => JSON.stringify(location));
-  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
-  await fsp.rename(tempFile, registryFile);
+  await writeJsonlAtomic(registryFile, [...locationRegistryIndex.values()].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")));
+  await touchLibraryManifest();
 }
 
 function upsertLocationFromMetadata(name, sourceLocation, now) {
@@ -685,37 +752,39 @@ async function loadLocationRegistryIndex() {
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
-    const content = await fsp.readFile(registryFile, "utf8");
-    const lines = content.split(/\r?\n/).filter(Boolean);
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        const name = normalizeLocationName(parsed?.Name);
-        if (!name) continue;
-        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
-        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
-        locationRegistryIndex.set(name, {
-          Name: name,
-          Country: normalizeLocationField(parsed?.Country),
-          Province: normalizeLocationField(parsed?.Province),
-          City: normalizeLocationField(parsed?.City),
-          Parent: normalizeLocationName(parsed?.Parent),
-          Description: normalizeLocationField(parsed?.Description),
-          CreatedAt: createdAt,
-          UpdatedAt: updatedAt,
-        });
-      } catch (error) {
-        appendLog(`Skip invalid location registry line: ${error.message}`);
-      }
+    const entries = await readJsonlStrict(registryFile, { label: DATA_FILE_NAMES.locations, keyOf: (item) => item?.Name });
+    for (const parsed of entries) {
+      const name = normalizeLocationName(parsed.Name);
+      if (!name || locationRegistryIndex.has(name)) throw new Error(`Invalid or duplicate location key: ${name || "<empty>"}`);
+      const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+      const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+      locationRegistryIndex.set(name, {
+        Name: name,
+        Country: normalizeLocationField(parsed?.Country),
+        Province: normalizeLocationField(parsed?.Province),
+        City: normalizeLocationField(parsed?.City),
+        Parent: normalizeLocationName(parsed?.Parent),
+        Description: normalizeLocationField(parsed?.Description),
+        CreatedAt: createdAt,
+        UpdatedAt: updatedAt,
+      });
     }
   }
 
   const normalized = normalizeAllMetadataLocations();
   const parentFixes = sanitizeLocationParentLinks();
-  if (!fileExists || normalized.registryAdded > 0 || parentFixes > 0) {
+  const registryChanged = !fileExists || normalized.registryAdded > 0 || parentFixes > 0;
+  if (registryChanged && normalized.metadataChanged > 0) {
+    await prepareLibraryWrite("location-registry-migration");
+    await saveRegistryAndMetadataTransaction(
+      DATA_FILE_NAMES.locations,
+      [...locationRegistryIndex.values()].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")),
+      "location-registry-migration",
+      true,
+    );
+  } else if (registryChanged) {
     await saveLocationRegistryMap();
-  }
-  if (normalized.metadataChanged > 0) {
+  } else if (normalized.metadataChanged > 0) {
     await saveMetadataMap();
   }
 }
@@ -761,15 +830,11 @@ function listAlbumDefinitions() {
 /**
  * Persist album registry JSONL using temp-file replacement.
  */
-async function saveAlbumRegistryMap() {
-  await ensureDataDirectory();
+async function saveAlbumRegistryMap(options = {}) {
+  if (options.backup !== false) await prepareLibraryWrite("album-registry-write");
   const registryFile = resolveDataFile(DATA_FILE_NAMES.albums);
-  const tempFile = `${registryFile}.tmp`;
-  const lines = [...albumRegistryIndex.values()]
-    .sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"))
-    .map((album) => JSON.stringify(album));
-  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
-  await fsp.rename(tempFile, registryFile);
+  await writeJsonlAtomic(registryFile, [...albumRegistryIndex.values()].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN")));
+  await touchLibraryManifest();
 }
 
 /**
@@ -803,24 +868,18 @@ async function loadAlbumRegistryIndex() {
   const fileExists = fs.existsSync(registryFile);
 
   if (fileExists) {
-    const content = await fsp.readFile(registryFile, "utf8");
-    const lines = content.split(/\r?\n/).filter(Boolean);
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        const title = normalizeAlbumTitle(parsed?.Title);
-        if (!title) continue;
-        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
-        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
-        albumRegistryIndex.set(title, {
-          Title: title,
-          Description: normalizeAlbumTitle(parsed?.Description) || DEFAULT_ALBUM_DESCRIPTION,
-          CreatedAt: createdAt,
-          UpdatedAt: updatedAt,
-        });
-      } catch (error) {
-        appendLog(`Skip invalid album registry line: ${error.message}`);
-      }
+    const entries = await readJsonlStrict(registryFile, { label: DATA_FILE_NAMES.albums, keyOf: (item) => item?.Title });
+    for (const parsed of entries) {
+      const title = normalizeAlbumTitle(parsed.Title);
+      if (!title || albumRegistryIndex.has(title)) throw new Error(`Invalid or duplicate album key: ${title || "<empty>"}`);
+      const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
+      const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
+      albumRegistryIndex.set(title, {
+        Title: title,
+        Description: normalizeAlbumTitle(parsed?.Description) || DEFAULT_ALBUM_DESCRIPTION,
+        CreatedAt: createdAt,
+        UpdatedAt: updatedAt,
+      });
     }
   }
 
@@ -916,11 +975,9 @@ function filterAndSort(list, options) {
  * - date grouping key for gallery sections
  */
 function enrichItem(item) {
-  const workspaceRoot = toAbsolutePath(config.workspaceRoot);
-  const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
-  const thumbnailDir = toAbsolutePath(thumbnailConfig.dir);
-  const absPath = path.join(workspaceRoot, item.FilePath);
-  const thumbPath = item?.SHA256Hash ? thumbnailAbsolutePath(thumbnailDir, item.SHA256Hash) : "";
+  const library = requireOpenLibrary();
+  const absPath = assertPathInsideLibrary(library.paths, path.join(library.paths.root, item.FilePath));
+  const thumbPath = item?.SHA256Hash ? thumbnailAbsolutePath(library.paths.thumbnailDir, item.SHA256Hash) : "";
   return {
     ...item,
     __absolutePath: absPath,
@@ -934,12 +991,8 @@ function resolveIndexedMediaPath(rawFilePath) {
   const filePath = String(rawFilePath || "").replace(/\\/g, "/");
   const item = metadataIndex.get(filePath);
   if (!item) throw new Error("Media record not found");
-  const workspaceRoot = toAbsolutePath(config.workspaceRoot);
-  const absolutePath = path.resolve(workspaceRoot, item.FilePath);
-  const relative = path.relative(workspaceRoot, absolutePath);
-  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("Media path is outside workspace");
-  }
+  const library = requireOpenLibrary();
+  const absolutePath = assertPathInsideLibrary(library.paths, path.join(library.paths.root, item.FilePath));
   if (!fs.existsSync(absolutePath)) throw new Error("Media file not found");
   return { item, absolutePath };
 }
@@ -949,48 +1002,373 @@ function resolveIndexedMediaPath(rawFilePath) {
  * Gallery rendering can still fall back to original image paths while cache fills.
  */
 async function warmupThumbnailCache() {
-  if (thumbnailWarmupStarted) return;
+  if (thumbnailWarmupStarted || maintenanceState.running || !activeLibrary) return;
   thumbnailWarmupStarted = true;
-
+  const sessionId = activeLibrary.sessionId;
+  const token = { sessionId, cancelled: false };
+  thumbnailWarmupToken = token;
   const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
-  const workspaceRoot = toAbsolutePath(config.workspaceRoot);
-  const thumbnailDir = toAbsolutePath(thumbnailConfig.dir);
+  const workspaceRoot = activeLibrary.paths.root;
+  const thumbnailDir = activeLibrary.paths.thumbnailDir;
   const mediaItems = [...metadataIndex.values()].filter((item) => ["image", "video"].includes(item?.FileSystem?.FileType));
-  if (!mediaItems.length) return;
+  if (!mediaItems.length) {
+    thumbnailWarmupToken = null;
+    thumbnailWarmupStarted = false;
+    return;
+  }
 
-  const stats = await ensureThumbnailsForItems(mediaItems, {
-    workspaceRoot,
-    cacheDir: thumbnailDir,
-    options: thumbnailConfig,
-    maxConcurrency: thumbnailConfig.maxConcurrency,
-    mediaConfig: config.media,
-    logger: (message) => appendLog(message),
-    onGenerated: (item, thumbnailPath) => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      mainWindow.webContents.send("thumbnail:ready", {
-        filePath: item.FilePath,
-        hash: item.SHA256Hash,
-        thumbnailPath,
-        thumbnailAvailable: true,
-      });
-    },
-  });
-  appendLog(
-    `thumbnail-warmup total=${stats.total} generated=${stats.generated} skipped=${stats.skipped} failed=${stats.failed}`,
-  );
+  const expectedManifest = buildThumbnailManifest(thumbnailConfig);
+  let storedManifest = null;
+  try { storedManifest = JSON.parse(await fsp.readFile(activeLibrary.paths.thumbnailManifestFile, "utf8")); } catch { storedManifest = null; }
+  const force = !thumbnailManifestMatches(storedManifest, expectedManifest);
+
+  try {
+    const stats = await ensureThumbnailsForItems(mediaItems, {
+      workspaceRoot,
+      cacheDir: thumbnailDir,
+      options: thumbnailConfig,
+      maxConcurrency: thumbnailConfig.maxConcurrency,
+      mediaConfig: config.media,
+      force,
+      logger: (message) => appendLog(message),
+      onGenerated: (item, thumbnailPath) => {
+        if (token.cancelled || !activeLibrary || activeLibrary.sessionId !== sessionId || !mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send("thumbnail:ready", {
+          filePath: item.FilePath,
+          hash: item.SHA256Hash,
+          thumbnailPath,
+          thumbnailAvailable: true,
+        });
+      },
+      isCancelled: () => token.cancelled || activeLibrary?.sessionId !== sessionId,
+    });
+    appendLog(
+      `thumbnail-warmup total=${stats.total} generated=${stats.generated} skipped=${stats.skipped} failed=${stats.failed}`,
+    );
+    if (stats.failed === 0 && activeLibrary?.sessionId === sessionId) {
+      await writeTextAtomic(activeLibrary.paths.thumbnailManifestFile, `${JSON.stringify(expectedManifest, null, 2)}\n`);
+    }
+  } finally {
+    if (thumbnailWarmupToken === token) {
+      thumbnailWarmupToken = null;
+      thumbnailWarmupStarted = false;
+    }
+  }
 }
 
 /**
  * Persist full metadata Map back to JSONL using atomic replace:
  * write temp file -> rename.
  */
-async function saveMetadataMap() {
-  await ensureDataDirectory();
+async function saveMetadataMap(options = {}) {
+  if (options.backup !== false) await prepareLibraryWrite(options.reason || "metadata-write", { immediate: Boolean(options.immediate) });
   const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
-  const tempFile = `${metadataFile}.tmp`;
-  const lines = [...metadataIndex.values()].map((item) => JSON.stringify(item));
-  await fsp.writeFile(tempFile, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
-  await fsp.rename(tempFile, metadataFile);
+  await writeJsonlAtomic(metadataFile, metadataIndex.values());
+  await touchLibraryManifest();
+}
+
+async function saveRegistryAndMetadataTransaction(registryFileName, registryEntries, reason, includeMetadata) {
+  const library = activeLibrary;
+  if (!library || !["opening", "open"].includes(library.state)) throw new Error("No writable library session is active");
+  if (maintenanceState.running) throw new Error("The library is read-only while maintenance is running");
+  const changes = [{
+    filePath: resolveDataFile(registryFileName),
+    entries: registryEntries,
+  }];
+  if (includeMetadata) {
+    changes.push({
+      filePath: resolveDataFile(DATA_FILE_NAMES.metadata),
+      entries: metadataIndex.values(),
+    });
+  }
+  await commitJsonlTransaction(library.paths, changes, { reason });
+  await touchLibraryManifest();
+}
+
+function clearLibraryIndexes() {
+  metadataIndex.clear();
+  tagRegistryIndex.clear();
+  albumRegistryIndex.clear();
+  personRegistryIndex.clear();
+  locationRegistryIndex.clear();
+}
+
+function emitLibraryState(extra = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("library:state-changed", toSerializable(getLibraryState(extra)));
+}
+
+function getLibraryState(extra = {}) {
+  return {
+    state: activeLibrary?.state || "closed",
+    active: activeLibrary ? {
+      root: activeLibrary.paths.root,
+      name: activeLibrary.manifest.name,
+      libraryId: activeLibrary.manifest.libraryId,
+      createdAt: activeLibrary.manifest.createdAt,
+      updatedAt: activeLibrary.manifest.updatedAt,
+      mediaCount: metadataIndex.size,
+      imageCount: [...metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "image").length,
+      videoCount: [...metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "video").length,
+    } : null,
+    lastLibraryPath: appState.lastLibraryPath,
+    mediaTools: mediaToolsState,
+    maintenance: maintenanceState,
+    ...extra,
+  };
+}
+
+async function checkMediaTools() {
+  try {
+    const tools = await validateMediaTools(APP_ROOT, config.media);
+    mediaToolsState = { available: true, error: "", versions: tools.versions };
+    appendLog(`media-tools ${tools.versions.ffmpeg}; ${tools.versions.ffprobe}`);
+  } catch (error) {
+    const reason = sanitizeMediaError(error, error?.path || "");
+    mediaToolsState = { available: false, error: reason, versions: null };
+    appendLog(`media-tools validation failed: ${reason}`);
+  }
+  emitLibraryState();
+  return mediaToolsState;
+}
+
+async function loadAllLibraryIndexes() {
+  await loadMetadataIndex();
+  await loadTagRegistryIndex();
+  await loadAlbumRegistryIndex();
+  await loadPersonRegistryIndex();
+  await loadLocationRegistryIndex();
+  const hashes = new Map();
+  for (const item of metadataIndex.values()) {
+    if (!item.SHA256Hash) continue;
+    if (!hashes.has(item.SHA256Hash)) hashes.set(item.SHA256Hash, []);
+    hashes.get(item.SHA256Hash).push(item.FilePath);
+  }
+  for (const [hash, filePaths] of hashes) {
+    if (filePaths.length > 1) appendLog(`duplicate-sha256 hash=${hash} files=${filePaths.sort().join("|")}`);
+  }
+}
+
+async function openLibrary(rawRoot, options = {}) {
+  if (!mediaToolsState.available) {
+    const error = new Error(`FFmpeg 媒体工具不可用：${mediaToolsState.error}`);
+    error.code = "MEDIA_TOOLS_UNAVAILABLE";
+    throw error;
+  }
+  if (maintenanceState.running) {
+    const error = new Error("A maintenance operation is running");
+    error.code = "MAINTENANCE_RUNNING";
+    throw error;
+  }
+  if (activeWorker) {
+    const error = new Error("A library operation is already running");
+    error.code = "MAINTENANCE_RUNNING";
+    throw error;
+  }
+  if (activeLibrary) await closeLibrary({ preserveLastPath: true });
+  const paths = resolveLibraryPaths(rawRoot);
+  emitLibraryState({ state: "opening", openingPath: paths.root });
+  let lock = null;
+  try {
+    const marker = fs.existsSync(paths.initializationFile)
+      ? JSON.parse(await fsp.readFile(paths.initializationFile, "utf8"))
+      : null;
+    if (marker && marker.Status !== "committed") {
+      const error = new Error(marker.Error || "The previous library initialization did not complete");
+      error.code = "LIBRARY_INITIALIZATION_FAILED";
+      error.initialization = marker;
+      throw error;
+    }
+    const manifest = await validateExistingLibrary(paths, {
+      onProgress: (progress) => mainWindow?.webContents.send("library:progress", toSerializable(progress)),
+    });
+    lock = await acquireLibraryLock(paths, manifest, {
+      force: Boolean(options.force),
+      applicationStartedAt,
+    });
+    activeLibrary = { state: "opening", sessionId: lock.SessionId, paths, manifest, lock };
+    const recovery = await recoverPendingTransaction(paths);
+    if (recovery.recovered) appendLog(`library-transaction ${recovery.action} reason=${recovery.reason || "unknown"}`);
+    await loadAllLibraryIndexes();
+    if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
+    activeLibrary.state = "open";
+    thumbnailWarmupStarted = false;
+    appState.lastLibraryPath = paths.root;
+    await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
+    emitLibraryState();
+    return getLibraryState();
+  } catch (error) {
+    if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
+    activeLibrary = null;
+    clearLibraryIndexes();
+    emitLibraryState({ error: error.message });
+    throw error;
+  }
+}
+
+async function closeLibrary(options = {}) {
+  if (maintenanceState.running) {
+    const error = new Error("Cannot close the library while maintenance is running");
+    error.code = "MAINTENANCE_RUNNING";
+    throw error;
+  }
+  if (!activeLibrary) return getLibraryState();
+  activeLibrary.state = "closing";
+  emitLibraryState();
+  const closing = activeLibrary;
+  if (thumbnailWarmupToken?.sessionId === closing.sessionId) thumbnailWarmupToken.cancelled = true;
+  thumbnailWarmupToken = null;
+  activeLibrary = null;
+  thumbnailWarmupStarted = false;
+  clearLibraryIndexes();
+  await releaseLibraryLock(closing.paths, closing.sessionId).catch((error) => appendLog(`lock-release failed: ${error.message}`));
+  if (!options.preserveLastPath) {
+    // Returning to the entry screen intentionally keeps lastLibraryPath for the next launch.
+  }
+  emitLibraryState();
+  return getLibraryState();
+}
+
+async function inspectLibraryDirectory(rawRoot) {
+  if (!mediaToolsState.available) {
+    const error = new Error(`FFmpeg 媒体工具不可用：${mediaToolsState.error}`);
+    error.code = "MEDIA_TOOLS_UNAVAILABLE";
+    throw error;
+  }
+  const paths = resolveLibraryPaths(rawRoot);
+  const stat = await fsp.stat(paths.root).catch(() => null);
+  if (!stat?.isDirectory()) throw new Error("The selected library directory does not exist");
+  const linkStat = await fsp.lstat(paths.root);
+  if (linkStat.isSymbolicLink()) throw new Error("不能把符号链接目录用作图库根目录");
+  const parentManager = findParentManagerDirectory(paths.root);
+  if (parentManager) throw new Error(`所选目录位于另一个图库内部：${parentManager}`);
+  if (fs.existsSync(paths.managerDir)) {
+    if (fs.existsSync(paths.initializationFile)) {
+      const marker = JSON.parse(await fsp.readFile(paths.initializationFile, "utf8"));
+      if (marker?.Status !== "committed") {
+        const lockState = await inspectLibraryLock(paths);
+        if (lockState.active) {
+          const error = new Error("该目录正在由另一个进程初始化，不能打开或清理");
+          error.code = "LIBRARY_LOCKED";
+          throw error;
+        }
+        return {
+          kind: "failed-initialization",
+          root: paths.root,
+          marker: {
+            ...marker,
+            Error: marker?.Error || "上一次图库初始化在完成前中断。",
+          },
+        };
+      }
+    }
+    const manifest = await readLibraryManifest(paths);
+    return { kind: "existing", root: paths.root, manifest };
+  }
+  quickScanState = { cancelled: false };
+  try {
+    const files = await walkFiles(paths.root, {
+      isCancelled: () => quickScanState?.cancelled,
+      onProgress: ({ visitedDirectories, current }) => mainWindow?.webContents.send("library:progress", {
+        phase: "quick-scan",
+        processed: visitedDirectories,
+        current: path.relative(paths.root, current).replace(/\\/g, "/") || ".",
+      }),
+    });
+    return {
+      kind: "uninitialized",
+      root: paths.root,
+      name: path.basename(paths.root),
+      mediaCount: files.filter((file) => extensionType(path.extname(file))).length,
+    };
+  } finally {
+    quickScanState = null;
+  }
+}
+
+function runOperationWorker(operation, root, options = {}) {
+  if (activeWorker) {
+    const error = new Error("Another library operation is already running");
+    error.code = "MAINTENANCE_RUNNING";
+    return Promise.reject(error);
+  }
+  const workerPath = path.join(APP_ROOT, "scripts", "maintenance-worker.js");
+  const worker = fork(workerPath, [operation, root, JSON.stringify(options)], {
+    cwd: APP_ROOT,
+    windowsHide: true,
+    env: {
+      ...process.env,
+      PHOTO_MANAGER_LIBRARY_SESSION: operation === "initialize" ? "" : activeLibrary?.sessionId || "",
+    },
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+  });
+  activeWorker = worker;
+  activeWorkerOperation = operation;
+  return new Promise((resolve, reject) => {
+    let result = null;
+    let failure = null;
+    worker.stdout?.on("data", (chunk) => appendOperationLog(operation, root, `worker-${operation} ${String(chunk).trim()}`));
+    worker.stderr?.on("data", (chunk) => appendOperationLog(operation, root, `worker-${operation}-stderr ${String(chunk).trim()}`));
+    worker.on("message", (message) => {
+      if (message?.type === "progress" || message?.type === "log") {
+        maintenanceState.progress = message;
+        if (message.message) appendOperationLog(operation, root, `worker-${operation} ${message.level || "info"}: ${message.message}`);
+        mainWindow?.webContents.send(operation === "initialize" ? "library:progress" : "maintenance:progress", toSerializable(message));
+      }
+      if (message?.type === "result") result = message.result;
+      if (message?.type === "failure") failure = message.error;
+    });
+    worker.on("error", reject);
+    worker.on("exit", (code) => {
+      activeWorker = null;
+      activeWorkerOperation = "";
+      if (pendingAppClose) {
+        pendingAppClose = false;
+        setImmediate(() => {
+          mainWindow?.destroy();
+          app.quit();
+        });
+      }
+      if (code === 0 && result) resolve(result);
+      else {
+        const error = new Error(failure?.message || `${operation} worker exited with code ${code}`);
+        error.code = failure?.code || "OPERATION_FAILED";
+        reject(error);
+      }
+    });
+  });
+}
+
+async function runMaintenanceOperation(operation, options = {}) {
+  const library = requireOpenLibrary({ writable: true });
+  if (thumbnailWarmupToken?.sessionId === library.sessionId) thumbnailWarmupToken.cancelled = true;
+  thumbnailWarmupToken = null;
+  maintenanceState = { running: true, operation, progress: null, report: null };
+  thumbnailWarmupStarted = false;
+  let updateCompleted = false;
+  emitLibraryState();
+  try {
+    const result = await runOperationWorker(operation, library.paths.root, options);
+    maintenanceState.report = result;
+    if (operation === "update") {
+      // The child process has released its operation lock. Clear the read-only
+      // flag before reloading because legacy registry backfill may persist data.
+      maintenanceState.running = false;
+      await loadAllLibraryIndexes();
+      updateCompleted = true;
+    }
+    mainWindow?.webContents.send("maintenance:completed", { ok: true, operation, result });
+    return { ok: true, result };
+  } catch (error) {
+    appendLog(`maintenance-${operation} failed: ${error.stack || error.message}`);
+    mainWindow?.webContents.send("maintenance:completed", { ok: false, operation, error: error.message });
+    return { ok: false, error: error.message, code: error.code };
+  } finally {
+    maintenanceState.running = false;
+    maintenanceState.operation = "";
+    emitLibraryState();
+    if (updateCompleted) warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
+  }
 }
 
 /**
@@ -1001,7 +1379,13 @@ function registerIpcHandlers() {
   ipcMain.handle("app:get-config", async () => toSerializable(config));
   ipcMain.handle("app:update-config", async (_, patch) => {
     try {
-      config = deepMerge(config, patch || {});
+      const allowedPatch = {};
+      for (const key of ["thumbnail", "media", "backup", "ui"]) {
+        if (patch?.[key] !== undefined) allowedPatch[key] = patch[key];
+      }
+      config = deepMerge(config, allowedPatch);
+      config.media = normalizeMediaConfig(config.media);
+      config.backup.retentionCount = Math.max(1, Math.trunc(Number(config.backup.retentionCount) || 10));
       await saveConfig();
       return { ok: true, config: toSerializable(config) };
     } catch (error) {
@@ -1010,7 +1394,136 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle("library:get-state", async () => toSerializable(getLibraryState()));
+  ipcMain.handle("library:recheck-media-tools", async () => toSerializable(await checkMediaTools()));
+  ipcMain.handle("library:choose-directory", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: "选择图库根目录",
+      properties: ["openDirectory"],
+    });
+    return result.canceled || !result.filePaths[0] ? { ok: false, canceled: true } : { ok: true, path: result.filePaths[0] };
+  });
+  ipcMain.handle("library:inspect", async (_, rawRoot) => {
+    try {
+      return { ok: true, inspection: await inspectLibraryDirectory(rawRoot) };
+    } catch (error) {
+      return { ok: false, error: error.message, code: error.code };
+    }
+  });
+  ipcMain.handle("library:cancel-scan", async () => {
+    if (quickScanState) quickScanState.cancelled = true;
+    return { ok: true };
+  });
+  ipcMain.handle("library:open", async (_, payload) => {
+    try {
+      return { ok: true, library: await openLibrary(payload?.path, { force: Boolean(payload?.force) }) };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message,
+        code: error.code,
+        lockState: error.lockState ? toSerializable(error.lockState) : null,
+        initialization: error.initialization || null,
+      };
+    }
+  });
+  ipcMain.handle("library:initialize", async (_, payload) => {
+    if (activeLibrary) return { ok: false, error: "Close the active library before initializing another one" };
+    try {
+      const paths = resolveLibraryPaths(payload?.path);
+      const result = await runOperationWorker("initialize", paths.root, { name: payload?.name || path.basename(paths.root) });
+      const library = await openLibrary(paths.root);
+      return { ok: true, result, library };
+    } catch (error) {
+      return { ok: false, error: error.message, code: error.code };
+    }
+  });
+  ipcMain.handle("library:cancel-initialization", async () => {
+    if (!activeWorker) return { ok: false, error: "No initialization is running" };
+    activeWorker.send({ type: "cancel" });
+    return { ok: true };
+  });
+  ipcMain.handle("library:cleanup-failed-initialization", async (_, rawRoot) => {
+    try {
+      const paths = resolveLibraryPaths(rawRoot);
+      const marker = JSON.parse(await fsp.readFile(paths.initializationFile, "utf8"));
+      if (!["failed", "initializing"].includes(marker?.Status)) throw new Error("No incomplete initialization marker was found");
+      const lockState = await inspectLibraryLock(paths);
+      if (lockState.active) throw new Error("The library initialization process is still active");
+      await fsp.rm(paths.managerDir, { recursive: true, force: true });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+  ipcMain.handle("library:close", async () => {
+    try {
+      return { ok: true, library: await closeLibrary() };
+    } catch (error) {
+      return { ok: false, error: error.message, code: error.code };
+    }
+  });
+  ipcMain.handle("library:update-info", async (_, payload) => {
+    try {
+      const library = requireOpenLibrary({ writable: true });
+      await prepareLibraryWrite("library-name-update", { immediate: true });
+      const nextManifest = {
+        ...library.manifest,
+        name: normalizeLibraryName(payload?.name),
+        updatedAt: new Date().toISOString(),
+      };
+      library.manifest = await writeLibraryManifest(library.paths, nextManifest);
+      emitLibraryState();
+      return { ok: true, library: getLibraryState().active };
+    } catch (error) {
+      return { ok: false, error: error.message, code: error.code };
+    }
+  });
+  ipcMain.handle("library:open-root", async () => {
+    try {
+      const library = requireOpenLibrary();
+      const error = await shell.openPath(library.paths.root);
+      return error ? { ok: false, error } : { ok: true };
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  ipcMain.handle("library:open-manager-dir", async () => {
+    try {
+      const library = requireOpenLibrary();
+      const error = await shell.openPath(library.paths.managerDir);
+      return error ? { ok: false, error } : { ok: true };
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  ipcMain.handle("library:open-log-dir", async () => {
+    try {
+      const library = requireOpenLibrary();
+      const error = await shell.openPath(library.paths.logDir);
+      return error ? { ok: false, error } : { ok: true };
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  ipcMain.handle("maintenance:show-output", async () => {
+    try {
+      const library = requireOpenLibrary();
+      const outputFile = path.join(library.paths.dataDir, "photo_metadata.csv");
+      if (!fs.existsSync(outputFile)) return { ok: false, error: "导出的 CSV 文件不存在" };
+      shell.showItemInFolder(outputFile);
+      return { ok: true };
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  ipcMain.handle("maintenance:get-state", async () => toSerializable(maintenanceState));
+  ipcMain.handle("maintenance:start", async (_, payload) => {
+    const operation = String(payload?.operation || "");
+    if (!["update", "verify", "thumbnails", "export"].includes(operation)) return { ok: false, error: "Unknown maintenance operation" };
+    if (operation === "export" && fs.existsSync(activeLibrary?.paths ? path.join(activeLibrary.paths.dataDir, "photo_metadata.csv") : "") && !payload?.overwrite) {
+      return { ok: false, code: "OUTPUT_EXISTS", error: "photo_metadata.csv already exists" };
+    }
+    return runMaintenanceOperation(operation, {
+      reprobe: Boolean(payload?.reprobe),
+      force: Boolean(payload?.force),
+    });
+  });
+
   ipcMain.handle("gallery:query", async (_, query) => {
+    requireOpenLibrary();
     const all = [...metadataIndex.values()].map(enrichItem);
     const filtered = filterAndSort(all, query);
     const mediaCountBase = filterAndSort(all, {
@@ -1055,9 +1568,10 @@ function registerIpcHandlers() {
     return toSerializable(payload);
   });
 
-  ipcMain.handle("tag:list", async () => toSerializable({ ok: true, tags: listTagDefinitions() }));
+  ipcMain.handle("tag:list", async () => { requireOpenLibrary(); return toSerializable({ ok: true, tags: listTagDefinitions() }); });
 
   ipcMain.handle("tag:create", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const text = normalizeTagText(payload?.text ?? payload?.Text);
     const description = normalizeTagText(payload?.description ?? payload?.Description);
     if (!text) {
@@ -1081,6 +1595,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tag:update-description", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const text = normalizeTagText(payload?.text ?? payload?.Text);
     const description = normalizeTagText(payload?.description ?? payload?.Description);
     const current = tagRegistryIndex.get(text);
@@ -1105,11 +1620,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tag:delete-global", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const text = normalizeTagText(payload?.text ?? payload?.Text);
     const current = tagRegistryIndex.get(text);
     if (!text || !current) {
       return { ok: false, error: "Tag not found" };
     }
+    try { await prepareLibraryWrite("tag-global-delete", { immediate: true }); }
+    catch (error) { return { ok: false, error: error.message }; }
 
     const previousRegistry = new Map(tagRegistryIndex);
     const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
@@ -1131,8 +1649,12 @@ function registerIpcHandlers() {
     }
 
     try {
-      await saveTagRegistryMap();
-      if (updatedCount) await saveMetadataMap();
+      await saveRegistryAndMetadataTransaction(
+        DATA_FILE_NAMES.tags,
+        [...tagRegistryIndex.values()].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN")),
+        "tag-global-delete",
+        updatedCount > 0,
+      );
       return toSerializable({ ok: true, deleted: text, updatedCount, tags: listTagDefinitions() });
     } catch (error) {
       tagRegistryIndex = previousRegistry;
@@ -1142,9 +1664,10 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("person:list", async () => toSerializable({ ok: true, people: listPersonDefinitions() }));
+  ipcMain.handle("person:list", async () => { requireOpenLibrary(); return toSerializable({ ok: true, people: listPersonDefinitions() }); });
 
   ipcMain.handle("person:create", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const name = normalizePersonName(payload?.name ?? payload?.Name);
     const description = normalizePersonName(payload?.description ?? payload?.Description);
     if (!name) {
@@ -1168,6 +1691,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("person:update-description", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const name = normalizePersonName(payload?.name ?? payload?.Name);
     const description = normalizePersonName(payload?.description ?? payload?.Description);
     const current = personRegistryIndex.get(name);
@@ -1192,11 +1716,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("person:delete-global", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const name = normalizePersonName(payload?.name ?? payload?.Name);
     const current = personRegistryIndex.get(name);
     if (!name || !current) {
       return { ok: false, error: "Person not found" };
     }
+    try { await prepareLibraryWrite("person-global-delete", { immediate: true }); }
+    catch (error) { return { ok: false, error: error.message }; }
 
     const previousRegistry = new Map(personRegistryIndex);
     const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
@@ -1217,8 +1744,12 @@ function registerIpcHandlers() {
     }
 
     try {
-      await savePersonRegistryMap();
-      if (updatedCount) await saveMetadataMap();
+      await saveRegistryAndMetadataTransaction(
+        DATA_FILE_NAMES.people,
+        [...personRegistryIndex.values()].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")),
+        "person-global-delete",
+        updatedCount > 0,
+      );
       return toSerializable({ ok: true, deleted: name, updatedCount, people: listPersonDefinitions() });
     } catch (error) {
       personRegistryIndex = previousRegistry;
@@ -1228,9 +1759,10 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("location:list", async () => toSerializable({ ok: true, locations: listLocationDefinitions() }));
+  ipcMain.handle("location:list", async () => { requireOpenLibrary(); return toSerializable({ ok: true, locations: listLocationDefinitions() }); });
 
   ipcMain.handle("location:create", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const name = normalizeLocationName(payload?.name ?? payload?.Name);
     if (!name) {
       return { ok: false, error: "Location name is required" };
@@ -1266,6 +1798,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("location:update", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const name = normalizeLocationName(payload?.name ?? payload?.Name);
     const current = locationRegistryIndex.get(name);
     if (!name || !current) {
@@ -1298,11 +1831,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("location:delete-global", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const name = normalizeLocationName(payload?.name ?? payload?.Name);
     const current = locationRegistryIndex.get(name);
     if (!name || !current) {
       return { ok: false, error: "Location not found" };
     }
+    try { await prepareLibraryWrite("location-global-delete", { immediate: true }); }
+    catch (error) { return { ok: false, error: error.message }; }
 
     const previousRegistry = new Map(locationRegistryIndex);
     const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
@@ -1329,8 +1865,12 @@ function registerIpcHandlers() {
     }
 
     try {
-      await saveLocationRegistryMap();
-      if (updatedCount) await saveMetadataMap();
+      await saveRegistryAndMetadataTransaction(
+        DATA_FILE_NAMES.locations,
+        [...locationRegistryIndex.values()].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")),
+        "location-global-delete",
+        updatedCount > 0,
+      );
       return toSerializable({ ok: true, deleted: name, updatedCount, orphanedChildren, locations: listLocationDefinitions() });
     } catch (error) {
       locationRegistryIndex = previousRegistry;
@@ -1340,9 +1880,10 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("album:list", async () => toSerializable({ ok: true, albums: listAlbumDefinitions() }));
+  ipcMain.handle("album:list", async () => { requireOpenLibrary(); return toSerializable({ ok: true, albums: listAlbumDefinitions() }); });
 
   ipcMain.handle("album:create", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
     const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
     if (!title || !description) {
@@ -1366,6 +1907,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("album:update-description", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
     const description = normalizeAlbumTitle(payload?.description ?? payload?.Description);
     const current = albumRegistryIndex.get(title);
@@ -1390,11 +1932,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("album:delete-global", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const title = normalizeAlbumTitle(payload?.title ?? payload?.Title);
     const current = albumRegistryIndex.get(title);
     if (!title || !current) {
       return { ok: false, error: "Album not found" };
     }
+    try { await prepareLibraryWrite("album-global-delete", { immediate: true }); }
+    catch (error) { return { ok: false, error: error.message }; }
 
     const previousRegistry = new Map(albumRegistryIndex);
     const previousMetadata = new Map([...metadataIndex.entries()].map(([key, value]) => [key, structuredClone(value)]));
@@ -1414,8 +1959,12 @@ function registerIpcHandlers() {
     }
 
     try {
-      await saveAlbumRegistryMap();
-      if (updatedCount) await saveMetadataMap();
+      await saveRegistryAndMetadataTransaction(
+        DATA_FILE_NAMES.albums,
+        [...albumRegistryIndex.values()].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN")),
+        "album-global-delete",
+        updatedCount > 0,
+      );
       return toSerializable({ ok: true, deleted: title, updatedCount, albums: listAlbumDefinitions() });
     } catch (error) {
       albumRegistryIndex = previousRegistry;
@@ -1426,12 +1975,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("photo:update-customization", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const { filePath, customization, location } = payload;
     const current = metadataIndex.get(filePath);
 
     if (!current) {
       return { ok: false, error: "Metadata item not found" };
     }
+    const previous = structuredClone(current);
 
     if (Object.prototype.hasOwnProperty.call(customization || {}, "Tags")) {
       const validation = normalizeRegisteredTags(customization.Tags);
@@ -1483,12 +2034,14 @@ function registerIpcHandlers() {
       await saveMetadataMap();
       return toSerializable({ ok: true, item: enrichItem(current) });
     } catch (error) {
+      metadataIndex.set(filePath, previous);
       appendLog(`Failed to write metadata: ${error.message}`);
       return { ok: false, error: "Failed to write metadata" };
     }
   });
 
   ipcMain.handle("photo:batch-update", async (_, payload) => {
+    requireOpenLibrary({ writable: true });
     const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
     const addTags = Array.isArray(payload?.addTags) ? payload.addTags : [];
     const addPeople = Array.isArray(payload?.addPeople) ? payload.addPeople : [];
@@ -1525,6 +2078,7 @@ function registerIpcHandlers() {
       normalizedLocationPatch = locationValidation.location;
     }
     const updatedItems = [];
+    const previousItems = new Map();
     const requestedCount = filePaths.length;
     let missingCount = 0;
 
@@ -1534,6 +2088,7 @@ function registerIpcHandlers() {
         missingCount += 1;
         continue;
       }
+      previousItems.set(filePath, structuredClone(current));
 
       const currentTags = Array.isArray(current?.Customization?.Tags) ? current.Customization.Tags : [];
       const mergedTags = [...currentTags];
@@ -1575,13 +2130,24 @@ function registerIpcHandlers() {
         items: updatedItems,
       });
     } catch (error) {
+      for (const [filePath, previous] of previousItems) metadataIndex.set(filePath, previous);
       appendLog(`Failed to batch-write metadata: ${error.message}`);
       return { ok: false, error: "Failed to write metadata" };
     }
   });
 
-  ipcMain.handle("photo:copy-path", async (_, absolutePath) => {
-    clipboard.writeText(absolutePath);
+  ipcMain.handle("photo:copy-path", async (_, filePath) => {
+    try {
+      const { absolutePath } = resolveIndexedMediaPath(filePath);
+      clipboard.writeText(absolutePath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("clipboard:write-text", async (_, value) => {
+    clipboard.writeText(String(value ?? ""));
     return { ok: true };
   });
 
@@ -1657,32 +2223,15 @@ function registerIpcHandlers() {
 
 /**
  * App bootstrap sequence:
- * 1) load config
- * 2) load metadata index
- * 3) create BrowserWindow
- * 4) bind renderer diagnostics hooks
- * 5) load renderer entry HTML
+ * 1) load app-level config and last-library state
+ * 2) validate media tools without opening a library
+ * 3) create BrowserWindow and bind diagnostics
+ * 4) load the renderer entry; renderer may then request last-library open
  */
 async function bootstrap() {
   ensureConfig();
-  try {
-    const tools = await validateMediaTools(APP_ROOT, config.media);
-    appendLog(`media-tools ${tools.versions.ffmpeg}; ${tools.versions.ffprobe}`);
-  } catch (error) {
-    const mediaConfig = normalizeMediaConfig(config.media);
-    const reason = sanitizeMediaError(error, error?.path || "");
-    const message = `FFmpeg 媒体工具不可用。请确认 ${mediaConfig.ffmpegDir} 中存在可执行的 ffmpeg.exe 和 ffprobe.exe。\n\n${reason}`;
-    appendLog(`media-tools validation failed: ${reason}`);
-    dialog.showErrorBox("PhotoManager 无法启动", message);
-    app.quit();
-    return;
-  }
-  await ensureDataDirectory();
-  await loadMetadataIndex();
-  await loadTagRegistryIndex();
-  await loadAlbumRegistryIndex();
-  await loadPersonRegistryIndex();
-  await loadLocationRegistryIndex();
+  await loadAppState();
+  await checkMediaTools();
 
   mainWindow = new BrowserWindow({
     width: 1600,
@@ -1735,6 +2284,33 @@ async function bootstrap() {
   mainWindow.on("unmaximize", emitWindowState);
   mainWindow.on("enter-full-screen", emitWindowState);
   mainWindow.on("leave-full-screen", emitWindowState);
+  mainWindow.on("close", (event) => {
+    if (maintenanceState.running) {
+      event.preventDefault();
+      dialog.showMessageBoxSync(mainWindow, {
+        type: "warning",
+        title: "维护任务仍在运行",
+        message: "当前图库维护任务不能取消。请等待任务完成后再关闭应用。",
+        buttons: ["确定"],
+      });
+      return;
+    }
+    if (activeWorker && activeWorkerOperation === "initialize") {
+      event.preventDefault();
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: "warning",
+        title: "取消图库初始化",
+        message: "图库仍在初始化。关闭应用将取消初始化并删除本轮创建的全部未完成数据。是否继续？",
+        buttons: ["继续初始化", "取消初始化并关闭"],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (choice === 1) {
+        pendingAppClose = true;
+        activeWorker.send({ type: "cancel" });
+      }
+    }
+  });
 
   if (fs.existsSync(RENDERER_INDEX_PATH)) {
     await mainWindow.loadFile(RENDERER_INDEX_PATH);
@@ -1751,7 +2327,10 @@ async function bootstrap() {
 }
 
 // Standard Electron lifecycle.
-app.whenReady().then(async () => {
+const singleInstanceLock = app.requestSingleInstanceLock();
+if (!singleInstanceLock) {
+  app.quit();
+} else app.whenReady().then(async () => {
   registerIpcHandlers();
   await bootstrap();
 
@@ -1762,8 +2341,28 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+app.on("before-quit", () => {
+  if (activeLibrary) {
+    const closing = activeLibrary;
+    activeLibrary = null;
+    try {
+      const current = JSON.parse(fs.readFileSync(closing.paths.lockFile, "utf8"));
+      if (current?.SessionId === closing.sessionId) fs.rmSync(closing.paths.lockFile, { force: true });
+    } catch {
+      // Best-effort synchronous cleanup during application shutdown.
+    }
   }
 });

@@ -12,6 +12,13 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const yaml = require("js-yaml");
 const exifr = require("exifr");
+const sharp = require("sharp");
+const {
+  DATA_FILE_NAMES,
+  MANAGER_DIR_NAME,
+  readJsonlStrict,
+  writeJsonlAtomic,
+} = require("./library-core");
 const {
   DEFAULT_MEDIA_CONFIG,
   normalizeMediaConfig,
@@ -20,26 +27,15 @@ const {
 } = require("./media-tools");
 
 const APP_ROOT = path.resolve(__dirname, "..");
-const DATA_FILE_NAMES = Object.freeze({
-  metadata: "photo_metadata.jsonl",
-  tags: "tag_registry.jsonl",
-  albums: "album_registry.jsonl",
-  people: "person_registry.jsonl",
-  locations: "location_registry.jsonl",
-});
-
 const DEFAULT_CONFIG = {
-  workspaceRoot: "./photo_workspace",
-  dataDir: "./data",
-  logDir: "./logs",
   thumbnail: {
-    dir: "./thumb_cache",
     size: 320,
     webpQuality: 80,
     extremeAspectRatio: 4,
     maxConcurrency: 4,
   },
   media: { ...DEFAULT_MEDIA_CONFIG },
+  backup: { retentionCount: 10 },
 };
 
 // Load config.yml and guarantee required defaults.
@@ -58,54 +54,51 @@ function resolveConfig() {
     const parsed = yaml.load(fs.readFileSync(configPath, "utf8"));
     return {
       ...DEFAULT_CONFIG,
-      ...(parsed || {}),
       thumbnail: { ...DEFAULT_CONFIG.thumbnail, ...(parsed?.thumbnail || {}) },
       media: normalizeMediaConfig(parsed?.media),
+      backup: {
+        retentionCount: Math.max(1, Math.trunc(Number(parsed?.backup?.retentionCount) || DEFAULT_CONFIG.backup.retentionCount)),
+      },
     };
   } catch {
     return { ...DEFAULT_CONFIG };
   }
 }
 
-// Resolve project-relative path from config into absolute path.
+// DFS traversal over one selected library directory tree.
 /**
- * Resolve a config path to absolute filesystem path.
- * Supports both already-absolute and project-relative inputs.
- */
-function absFromConfig(config, p) {
-  return path.isAbsolute(p) ? p : path.resolve(APP_ROOT, p);
-}
-
-function resolveDataDir(config) {
-  return absFromConfig(config, config.dataDir || DEFAULT_CONFIG.dataDir);
-}
-
-function dataFilePath(config, fileName) {
-  return path.join(resolveDataDir(config), fileName);
-}
-
-async function ensureDataDir(config) {
-  const dataDir = resolveDataDir(config);
-  await fsp.mkdir(dataDir, { recursive: true });
-  return dataDir;
-}
-
-// DFS traversal over workspace directory tree.
-/**
- * Traverse workspace directories and collect all file paths.
+ * Traverse a library directory and collect all ordinary file paths.
  * The result is used by init/update/verify metadata workflows.
  */
-async function walkFiles(root) {
+async function walkFiles(root, options = {}) {
   const output = [];
-  const stack = [root];
+  const resolvedRoot = path.resolve(root);
+  const stack = [resolvedRoot];
+  let visitedDirectories = 0;
 
   while (stack.length) {
+    if (options.isCancelled?.()) {
+      const error = new Error("Operation cancelled");
+      error.code = "OPERATION_CANCELLED";
+      throw error;
+    }
     const current = stack.pop();
     const entries = await fsp.readdir(current, { withFileTypes: true });
+    visitedDirectories += 1;
+    options.onProgress?.({ phase: "scan", visitedDirectories, current });
 
     for (const e of entries) {
       const full = path.join(current, e.name);
-      if (e.isDirectory()) stack.push(full);
+      if (e.isSymbolicLink()) continue;
+      if (e.isDirectory()) {
+        if (e.name === MANAGER_DIR_NAME) {
+          if (path.resolve(current) === resolvedRoot) continue;
+          const error = new Error(`Nested PhotoManager library detected: ${full}`);
+          error.code = "NESTED_LIBRARY";
+          throw error;
+        }
+        stack.push(full);
+      }
       else if (e.isFile()) output.push(full);
     }
   }
@@ -245,9 +238,23 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
   let height = 0;
   let dpi = null;
   let bitDepth = null;
+  let pictureProbeStatus = "ok";
+  let pictureProbeError = null;
 
   let videoProbe = null;
   if (type === "image") {
+    try {
+      const imageMetadata = await sharp(filePath, { failOn: "error" }).metadata();
+      width = imageMetadata.width || 0;
+      height = imageMetadata.height || 0;
+      dpi = imageMetadata.density || null;
+    } catch (error) {
+      pictureProbeStatus = "failed";
+      pictureProbeError = String(error?.message || "Image decode failed")
+        .replaceAll(filePath, "<media>")
+        .replace(/[\r\n]+/g, " ")
+        .slice(0, 500);
+    }
     try {
       exif = await exifr.parse(filePath, { translateValues: false });
     } catch {
@@ -267,9 +274,9 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
   }
 
   if (exif) {
-    width = exif.ExifImageWidth || exif.ImageWidth || 0;
-    height = exif.ExifImageHeight || exif.ImageHeight || 0;
-    dpi = exif.XResolution || null;
+    width ||= exif.ExifImageWidth || exif.ImageWidth || 0;
+    height ||= exif.ExifImageHeight || exif.ImageHeight || 0;
+    dpi ||= exif.XResolution || null;
     bitDepth = exif.BitsPerSample || null;
   }
 
@@ -319,7 +326,14 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
     Customization: defaultCustomization(ext, type),
   };
   if (type === "image") {
-    output.Picture = { Width: width, Height: height, dpi, BitDepth: bitDepth };
+    output.Picture = {
+      ProbeStatus: pictureProbeStatus,
+      ProbeError: pictureProbeError,
+      Width: pictureProbeStatus === "ok" ? width || null : null,
+      Height: pictureProbeStatus === "ok" ? height || null : null,
+      dpi: pictureProbeStatus === "ok" ? dpi : null,
+      BitDepth: pictureProbeStatus === "ok" ? bitDepth : null,
+    };
   } else {
     output.Video = videoProbe.video;
   }
@@ -329,21 +343,17 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
 // Load existing JSONL file into FilePath-keyed Map.
 /**
  * Read existing JSONL metadata file into a FilePath-keyed map.
- * Invalid JSON lines are ignored to keep maintenance scripts robust.
+ * Invalid or duplicate JSONL records reject the operation.
  */
 async function loadExisting(metadataFile) {
   if (!fs.existsSync(metadataFile)) return new Map();
-  const content = await fsp.readFile(metadataFile, "utf8");
-  const lines = content.split(/\r?\n/).filter(Boolean);
+  const lines = await readJsonlStrict(metadataFile, {
+    required: false,
+    label: path.basename(metadataFile),
+    keyOf: (item) => item?.FilePath,
+  });
   const map = new Map();
-  for (const line of lines) {
-    try {
-      const item = JSON.parse(line);
-      if (item?.FilePath) map.set(item.FilePath, item);
-    } catch {
-      // Ignore broken lines.
-    }
-  }
+  for (const item of lines) map.set(item.FilePath, item);
   return map;
 }
 
@@ -353,11 +363,7 @@ async function loadExisting(metadataFile) {
  * Writes to a temporary file first, then renames to avoid partial writes.
  */
 async function writeAll(metadataFile, entries) {
-  await fsp.mkdir(path.dirname(metadataFile), { recursive: true });
-  const temp = `${metadataFile}.tmp`;
-  const lines = [...entries].map((x) => JSON.stringify(x));
-  await fsp.writeFile(temp, `${lines.join("\n")}${lines.length ? "\n" : ""}`, "utf8");
-  await fsp.rename(temp, metadataFile);
+  await writeJsonlAtomic(metadataFile, entries);
 }
 
 module.exports = {
@@ -365,10 +371,6 @@ module.exports = {
   DEFAULT_CONFIG,
   DATA_FILE_NAMES,
   resolveConfig,
-  absFromConfig,
-  resolveDataDir,
-  dataFilePath,
-  ensureDataDir,
   walkFiles,
   inspectMediaFile,
   sha256File,
