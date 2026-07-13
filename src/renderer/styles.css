@@ -1127,7 +1127,7 @@ html, body, #app {
   align-items: center;
 }
 .location-option.location-group-selectable {
-  font-weight: 600;
+  font-weight: 700;
 }
 .registry-filter-dropdown,
 .location-filter-dropdown,
@@ -1151,6 +1151,7 @@ html, body, #app {
   align-items: center;
   color: var(--text-soft);
   font-size: 14px;
+  font-weight: 700;
   line-height: 1.25;
   border-radius: 8px;
   overflow-wrap: anywhere;

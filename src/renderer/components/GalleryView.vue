@@ -1,6 +1,6 @@
 <template>
 <header class="topbar">
-  <div class="left-tools"><button class="btn" @click="resetAll">还原</button></div>
+  <div class="left-tools"><button class="btn icon-btn" data-tip="还原画廊状态" aria-label="还原画廊状态" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
   <div class="search-panel">
     <select v-model="query.search.field" class="input"><option value="title">标题</option><option value="filename">文件名</option><option value="description">描述</option></select>
     <input class="input grow" v-model="query.search.value" placeholder="输入搜索内容" @keydown.enter="applySearch" />
