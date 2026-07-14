@@ -720,7 +720,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 - `components/dialogs/`：跨一级页面存在的图库、维护任务、注册表管理和全局反馈弹窗。弹窗关闭或提交时调用所属 context 的动作，不自行写注册表。
 - `constants/ui-constants.mjs`：图标、评级、特殊筛选值和窗口动作等静态常量。
 - `video-playback.mjs`：逐帧目标和方向键状态规则的纯函数；播放器 DOM 生命周期仍由 `use-video-playback.js` 管理。
-- `styles.css`：全局设计系统、三视图布局、下拉菜单和 modal。本轮刻意不拆分 CSS；后续若拆分，应按视图/组件边界迁移，不得改变选择器优先级和视觉行为。
+- `styles.css` 与 `styles/`：全局样式入口及按职责拆分的样式模块。入口只声明稳定的导入顺序，具体规则由对应模块持有。
 
 依赖方向固定为：
 
@@ -783,7 +783,37 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 - `dialogs/*ManagerDialog.vue`：四类注册表管理与嵌套创建弹窗。
 - `dialogs/UiFeedbackOverlay.vue`：全局 toast、字段保存确认和动态 tooltip。
 
-#### 21.3.5 修改和扩展规则
+#### 21.3.5 样式架构
+
+renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或 CSS Modules。多个页面共享标题栏、按钮、注册表选择器和弹窗结构，全局设计令牌与稳定级联更适合当前单窗口应用；强行把这些选择器复制到 SFC 会造成重复和覆盖顺序不透明。
+
+`styles.css` 是唯一加载入口，`index.html` 不直接引用 `styles/` 下的任何文件。入口中的 `@import` 顺序属于渲染契约，当前顺序完整保留了拆分前单文件样式表的级联结果：
+
+| 模块 | 职责 |
+| --- | --- |
+| `styles/tokens.css` | 颜色、边框、圆角和阴影等全局设计令牌 |
+| `styles/library.css` | 图库入口、初始化/图库信息/维护任务，以及图库级设置菜单 |
+| `styles/base.css` | reset、应用外壳、标题栏、按钮、图标和输入框等共享基础控件 |
+| `styles/gallery.css` | 画廊工具栏、筛选器、媒体卡片、选择模式和批量编辑 |
+| `styles/viewer-fields.css` | 查看器三栏布局、元数据面板和可折叠字段细节 |
+| `styles/registry-controls.css` | 相册、地点、人物和标签的受控选择器、chip、下拉菜单及创建 popover |
+| `styles/customization.css` | 评级、隐藏描述和字段保存反馈 |
+| `styles/viewer-media.css` | 图片/视频舞台、媒体导航、右键菜单和查看器底栏 |
+| `styles/registry-overlays.css` | 注册表管理/创建弹窗以及地点层级列表的后置样式 |
+| `styles/feedback.css` | 位于普通页面和弹窗之上的全局动态 tooltip |
+| `styles/responsive.css` | 影响多个一级视图的最终响应式覆盖，必须保持最后导入 |
+
+样式修改遵循以下边界：
+
+1. 设计令牌只在 `tokens.css` 定义，功能模块使用变量，不在多个文件重复声明同语义颜色。
+2. 按实际拥有该 DOM 的页面或控件选择模块；跨页面基础控件放入 `base.css`，不能因为某个页面首先使用就放入该页面文件。
+3. 注册表的通用选择控件放入 `registry-controls.css`，管理弹窗和需要后置覆盖层级的规则放入 `registry-overlays.css`。四类注册表不得分别复制同一套 dropdown 样式。
+4. 只影响单一模块的媒体查询可以留在所属文件；同时改变画廊、查看器等多个一级布局的断点放入 `responsive.css`。
+5. 不从 SFC 单独导入这些全局模块。所有页面经 `styles.css` 获得同一顺序，避免组件挂载先后改变级联结果或重复打包。
+6. 不随意调整 `styles.css` 中的 import 顺序。确需改变优先级时，应明确记录被覆盖的选择器，并通过构建产物或视觉回归确认不是无意的样式变化。
+7. 新模块必须对应新的稳定视觉职责；只有少量规则时优先并入现有所有者，避免重新形成大量无法理解顺序的碎片文件。
+
+#### 21.3.6 修改和扩展规则
 
 1. 新增确定性算法时先放入 `domain/` 或已有纯函数模块，并补 `node:test`；不要把可测试算法藏在 SFC 的 `setup()` 中。
 2. 新增状态时先确定唯一所有者。状态应放入最接近其生命周期的 composable；只有纯 DOM 展示状态才留在组件内部。

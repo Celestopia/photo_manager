@@ -1,0 +1,16 @@
+/* Shared design tokens. */
+
+:root {
+  --bg: #eaf3ff;
+  --bg-card: #ffffff;
+  --bg-card-soft: #f6faff;
+  --line: #b8d3f3;
+  --text: #173756;
+  --text-soft: #4d6d8f;
+  --accent: #1f72cc;
+  --accent-hover: #1458a0;
+  --danger: #cc3344;
+  --radius: 14px;
+  --shadow: 0 10px 24px rgba(36, 90, 150, 0.16);
+}
+
