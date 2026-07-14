@@ -29,7 +29,7 @@
       <div class="toolbar-group right"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option><option value="filename">文件名</option><option value="rating">评级</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
     </section>
     <section class="gallery-list">
-      <div class="summary">共 {{ total }} 个媒体</div>
+      <div class="summary">{{ loading ? '正在加载媒体...' : `共 ${total} 个媒体` }}</div>
       <template v-for="group in galleryGroups" :key="group.date">
         <h2 class="date-title">{{ group.date }}</h2>
         <div class="photo-grid">
@@ -55,7 +55,6 @@
         </div>
       </template>
     </section>
-    <footer class="gallery-footer"><button class="btn" :disabled="!hasMore || loading" @click="loadMore">{{ loading ? '加载中...' : hasMore ? '加载更多' : '已加载全部' }}</button></footer>
   </section>
   <aside class="side-panel batch-panel" v-if="isSelectionMode && selectedGalleryCount > 0">
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
@@ -105,7 +104,6 @@ const {
   batchStatus,
   total,
   galleryGroups,
-  hasMore,
   loading,
   batchHasChanges,
   canApplyBatchEdit,
@@ -128,7 +126,6 @@ const {
   selectAllGalleryPhotos,
   clearBatchEditInputs,
   applyBatchEdit,
-  loadMore,
   buildImageUrl,
   doWindowAction,
   toggleWindowMaximizeRestore,

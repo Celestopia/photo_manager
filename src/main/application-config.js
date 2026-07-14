@@ -19,7 +19,7 @@ function deepMerge(base, patch) {
 }
 
 function normalizeConfig(parsed, defaults, normalizeMediaConfig) {
-  return {
+  const normalized = {
     thumbnail: {
       ...defaults.thumbnail,
       ...(parsed?.thumbnail || {}),
@@ -53,6 +53,8 @@ function normalizeConfig(parsed, defaults, normalizeMediaConfig) {
       },
     },
   };
+  delete normalized.ui.gallery?.pageSize;
+  return normalized;
 }
 
 function loadConfig(configPath, defaults, normalizeMediaConfig) {
@@ -80,6 +82,7 @@ function applyConfigPatch(current, patch, normalizeMediaConfig) {
   const next = deepMerge(current, allowedPatch);
   next.media = normalizeMediaConfig(next.media);
   next.backup.retentionCount = Math.max(1, Math.trunc(Number(next.backup.retentionCount) || 10));
+  delete next.ui?.gallery?.pageSize;
   return next;
 }
 

@@ -19,7 +19,6 @@ backup:
 ui:
   language: zh-CN # UI language code.
   gallery:
-    pageSize: 120 # Number of media items loaded per page request in gallery view.
     minCardWidth: 190 # Minimum card width (px) for responsive gallery layout.
 
   viewer:

@@ -12,15 +12,16 @@ test("application config patches preserve nested settings and normalize bounded 
     thumbnail: { size: 320, webpQuality: 80 },
     media: { ffmpegDir: "tools" },
     backup: { retentionCount: 10 },
-    ui: { gallery: { pageSize: 120 }, viewer: { zoom: { minPercent: 10, maxPercent: 1000 } } },
+    ui: { gallery: { minCardWidth: 190 }, viewer: { zoom: { minPercent: 10, maxPercent: 1000 } } },
   };
   const result = applyConfigPatch(current, {
     backup: { retentionCount: 0 },
-    ui: { viewer: { zoom: { maxPercent: 800 } } },
+    ui: { gallery: { pageSize: 999 }, viewer: { zoom: { maxPercent: 800 } } },
   }, (media) => media);
   assert.equal(result.backup.retentionCount, 10);
   assert.deepEqual(result.ui.viewer.zoom, { minPercent: 10, maxPercent: 800 });
-  assert.equal(result.ui.gallery.pageSize, 120);
+  assert.equal(result.ui.gallery.minCardWidth, 190);
+  assert.equal(Object.hasOwn(result.ui.gallery, "pageSize"), false);
 });
 
 test("application runtime creates isolated mutable library sessions", () => {
@@ -65,6 +66,33 @@ test("gallery query composes descendant location filters with sorting", () => {
     sortOrder: "asc",
   });
   assert.deepEqual(result.map((item) => item.FilePath), ["b.jpg"]);
+});
+
+test("gallery query groups the complete result without a page-size cutoff", () => {
+  const service = createGalleryQueryService({
+    getLocationDescendants: () => [],
+    normalizeAlbumTitle: (value) => String(value || "").trim(),
+    normalizeLocationName,
+    unassignedAlbumFilter: "__UNASSIGNED__",
+  });
+  const items = Array.from({ length: 150 }, (_, index) => ({
+    FilePath: `media-${String(index).padStart(3, "0")}.jpg`,
+    __groupDate: index < 125 ? "2026-01-02" : "2026-01-01",
+    FileSystem: { ShootingTimeString: index < 125 ? "2026-01-02" : "2026-01-01" },
+    Customization: { Rating: 2 },
+  }));
+  const sorted = service.filterAndSort(items, {
+    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
+    search: { field: "", value: "" },
+    sortBy: "shootingTime",
+    sortOrder: "desc",
+  });
+  const groups = service.groupByDate(sorted);
+  assert.equal(groups.flatMap((group) => group.items).length, 150);
+  assert.deepEqual(groups.map((group) => [group.date, group.items.length]), [
+    ["2026-01-02", 125],
+    ["2026-01-01", 25],
+  ]);
 });
 
 test("simple registry catalog deduplicates values and reports usage", () => {

@@ -304,7 +304,7 @@
 </template>
 
 <script>
-import { reactive, ref, computed, onMounted, onBeforeUnmount, watch, nextTick, provide } from "vue";
+import { reactive, ref, shallowRef, triggerRef, computed, onMounted, onBeforeUnmount, watch, nextTick, provide } from "vue";
 import GalleryView from "./components/GalleryView.vue";
 import ViewerView from "./components/ViewerView.vue";
 import LibraryEntryView from "./components/LibraryEntryView.vue";
@@ -454,19 +454,18 @@ export default {
     });
 
     const query = reactive({
-      page: 1,
-      pageSize: 120,
       sortBy: "shootingTime",
       sortOrder: "desc",
       filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
       search: { field: "title", value: "" },
     });
 
-    const galleryGroups = ref([]);
+    const galleryGroups = shallowRef([]);
     const total = ref(0);
     const mediaCounts = reactive({ all: 0, images: 0, videos: 0 });
-    const hasMore = ref(false);
     const loading = ref(false);
+    const galleryItemIndex = new Map();
+    let latestGalleryQueryId = 0;
     const filterOptions = reactive({ albums: [], tags: [], people: [], locations: [], unassignedAlbumCount: 0 });
     const tagRegistry = ref([]);
     const albumRegistry = ref([]);
@@ -497,7 +496,7 @@ export default {
     // --- Selection state ---
     const selectedItem = ref(null);
     const selectedGlobalIndex = ref(-1);
-    const orderedItems = ref([]);
+    const orderedItems = shallowRef([]);
     const isSelectionMode = ref(false);
     const gallerySelection = ref(new Set());
     const batchEdit = reactive({
@@ -666,7 +665,7 @@ export default {
 
     /**
 
-     * Load runtime config through bridge API and initialize UI defaults such as page size and panel visibility.
+     * Load runtime config through bridge API and initialize viewer panel defaults.
 
      */
 
@@ -675,9 +674,8 @@ export default {
     // Configuration and Viewer Draft Initialization
     // ============================================================================
     async function loadConfig() {
-      // Load runtime config once; gallery page size can be customized by config.yml.
+      // Load runtime config once for application-level viewer preferences.
       config.value = await API.getConfig();
-      query.pageSize = config.value?.ui?.gallery?.pageSize || 120;
       showLeftPanel.value = config.value?.ui?.viewer?.panels?.showLeft ?? true;
       showRightPanel.value = config.value?.ui?.viewer?.panels?.showRight ?? true;
     }
@@ -698,13 +696,14 @@ export default {
 
     function resetLibraryUiState() {
       releaseCurrentMedia();
-      query.page = 1;
+      latestGalleryQueryId += 1;
+      loading.value = false;
       Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "" });
       Object.assign(query.search, { field: "title", value: "" });
       galleryGroups.value = [];
       orderedItems.value = [];
+      galleryItemIndex.clear();
       total.value = 0;
-      hasMore.value = false;
       Object.assign(mediaCounts, { all: 0, images: 0, videos: 0 });
       Object.assign(filterOptions, { albums: [], tags: [], people: [], locations: [], unassignedAlbumCount: 0 });
       tagRegistry.value = [];
@@ -757,7 +756,7 @@ export default {
       await loadAlbums();
       await loadPeople();
       await loadLocations();
-      await queryGallery(true);
+      await queryGallery();
       view.value = "gallery";
       entry.busy = false;
       entry.cancellable = false;
@@ -967,9 +966,9 @@ export default {
       maintenanceDialog.error = result?.ok ? "" : result?.error || "任务失败";
       maintenanceDialog.reportText = JSON.stringify(result?.ok ? result.result : { error: maintenanceDialog.error }, null, 2);
       if (result?.ok && maintenanceDialog.operation === "update") {
-        await loadTags(); await loadAlbums(); await loadPeople(); await loadLocations(); await queryGallery(true);
+        await loadTags(); await loadAlbums(); await loadPeople(); await loadLocations(); await queryGallery();
       }
-      if (result?.ok && maintenanceDialog.operation === "thumbnails") await queryGallery(true);
+      if (result?.ok && maintenanceDialog.operation === "thumbnails") await queryGallery();
     }
 
     async function copyMaintenanceReport() {
@@ -1596,9 +1595,11 @@ export default {
       editDraft.Tags = editDraft.Tags.filter((tag) => tag !== tagText);
       batchEdit.tags = batchEdit.tags.filter((tag) => tag !== tagText);
       orderedItems.value = orderedItems.value.map((item) => stripTagFromItem(item, tagText));
+      rebuildGalleryItemIndex();
       for (const group of galleryGroups.value) {
-        group.items = group.items.map((item) => stripTagFromItem(item, tagText));
+        group.items = group.items.map((item) => galleryItemIndex.get(item.FilePath) || item);
       }
+      triggerRef(galleryGroups);
     }
 
     async function deleteTagGlobally(tag) {
@@ -1614,7 +1615,7 @@ export default {
       syncDeletedTagLocally(tag.Text);
       if (query.filters.tag === tag.Text) {
         query.filters.tag = "";
-        await queryGallery(true);
+        await queryGallery();
       }
       showToastMessage(`已全局删除标签“${tag.Text}”`);
     }
@@ -1823,9 +1824,11 @@ export default {
       editDraft.People = editDraft.People.filter((person) => person !== personName);
       batchEdit.people = batchEdit.people.filter((person) => person !== personName);
       orderedItems.value = orderedItems.value.map((item) => stripPersonFromItem(item, personName));
+      rebuildGalleryItemIndex();
       for (const group of galleryGroups.value) {
-        group.items = group.items.map((item) => stripPersonFromItem(item, personName));
+        group.items = group.items.map((item) => galleryItemIndex.get(item.FilePath) || item);
       }
+      triggerRef(galleryGroups);
     }
 
     async function deletePersonGlobally(person) {
@@ -1841,7 +1844,7 @@ export default {
       syncDeletedPersonLocally(person.Name);
       if (query.filters.person === person.Name) {
         query.filters.person = "";
-        await queryGallery(true);
+        await queryGallery();
       }
       showToastMessage(`已全局删除人物“${person.Name}”`);
     }
@@ -2478,9 +2481,11 @@ export default {
       }
       if (batchEdit.locationPlace === locationName) batchEdit.locationPlace = "";
       orderedItems.value = orderedItems.value.map((item) => clearLocationFromItem(item, locationName));
+      rebuildGalleryItemIndex();
       for (const group of galleryGroups.value) {
-        group.items = group.items.map((item) => clearLocationFromItem(item, locationName));
+        group.items = group.items.map((item) => galleryItemIndex.get(item.FilePath) || item);
       }
+      triggerRef(galleryGroups);
     }
 
     async function deleteLocationGlobally(location) {
@@ -2497,7 +2502,7 @@ export default {
       syncDeletedLocationLocally(location.Name);
       if (query.filters.location === location.Name) {
         query.filters.location = "";
-        await queryGallery(true);
+        await queryGallery();
       }
       showToastMessage(`已全局删除地点“${location.Name}”`);
     }
@@ -2705,9 +2710,11 @@ export default {
       if (editDraft.Album === albumTitle) editDraft.Album = "";
       if (batchEdit.album === albumTitle) batchEdit.album = "";
       orderedItems.value = orderedItems.value.map((item) => clearAlbumFromItem(item, albumTitle));
+      rebuildGalleryItemIndex();
       for (const group of galleryGroups.value) {
-        group.items = group.items.map((item) => clearAlbumFromItem(item, albumTitle));
+        group.items = group.items.map((item) => galleryItemIndex.get(item.FilePath) || item);
       }
+      triggerRef(galleryGroups);
     }
 
     async function deleteAlbumGlobally(album) {
@@ -2723,7 +2730,7 @@ export default {
       syncDeletedAlbumLocally(album.Title);
       if (query.filters.album === album.Title) {
         query.filters.album = "";
-        await queryGallery(true);
+        await queryGallery();
       }
       showToastMessage(`已全局删除相册“${album.Title}”`);
     }
@@ -2803,7 +2810,7 @@ export default {
 
     /**
 
-     * Select every currently loaded gallery item in selection mode.
+     * Select every media item in the complete current gallery result.
 
      */
 
@@ -2815,7 +2822,7 @@ export default {
 
     /**
 
-     * Drop selected items that are no longer present after query/filter/page refresh.
+     * Drop selected items that are no longer present after a query or filter refresh.
 
      */
 
@@ -2888,6 +2895,8 @@ export default {
       for (const group of galleryGroups.value) {
         group.items = group.items.map((item) => byPath.get(item.FilePath) || item);
       }
+      rebuildGalleryItemIndex();
+      triggerRef(galleryGroups);
     }
 
     /**
@@ -3032,23 +3041,27 @@ export default {
 
     /**
 
-     * Fetch gallery page from backend based on current search/filter/sort/pagination settings.
+     * Fetch the complete gallery result for the current search, filter, and sort settings.
 
      */
 
     
     // ============================================================================
-    // Gallery Query, Search, Filter, Sort, and Pagination
+    // Complete Gallery Query, Search, Filter, and Sort
     // ============================================================================
-    async function queryGallery(reset = false) {
-      if (loading.value) return;
+    function rebuildGalleryItemIndex() {
+      galleryItemIndex.clear();
+      for (const item of orderedItems.value) {
+        if (item?.FilePath) galleryItemIndex.set(item.FilePath, item);
+      }
+    }
+
+    async function queryGallery() {
+      const requestId = ++latestGalleryQueryId;
       loading.value = true;
       try {
-        if (reset) query.page = 1;
         // Send plain objects instead of reactive proxies over IPC.
         const safeQuery = {
-          page: query.page,
-          pageSize: query.pageSize,
           sortBy: query.sortBy,
           sortOrder: query.sortOrder,
           filters: {
@@ -3064,68 +3077,52 @@ export default {
           },
         };
         const res = await API.queryGallery(safeQuery);
-        total.value = res.total;
+        if (requestId !== latestGalleryQueryId) return false;
+        total.value = Number(res?.total || 0);
         mediaCounts.all = Number(res?.mediaCounts?.all || 0);
         mediaCounts.images = Number(res?.mediaCounts?.images || 0);
         mediaCounts.videos = Number(res?.mediaCounts?.videos || 0);
-        hasMore.value = res.hasMore;
         filterOptions.albums = Array.isArray(res?.filterOptions?.albums) ? res.filterOptions.albums : [];
         filterOptions.unassignedAlbumCount = Number(res?.filterOptions?.unassignedAlbumCount || 0);
         filterOptions.tags = Array.isArray(res?.filterOptions?.tags) ? res.filterOptions.tags : [];
         filterOptions.people = Array.isArray(res?.filterOptions?.people) ? res.filterOptions.people : [];
         applyLocationRegistry(Array.isArray(res?.filterOptions?.locations) ? res.filterOptions.locations : []);
 
-        if (query.page === 1) {
-          // First page replaces existing gallery snapshot.
-          galleryGroups.value = res.groups;
-        } else {
-          // Subsequent pages append by date group.
-          for (const incomingGroup of res.groups) {
-            const existing = galleryGroups.value.find((g) => g.date === incomingGroup.date);
-            if (existing) existing.items.push(...incomingGroup.items);
-            else galleryGroups.value.push(incomingGroup);
-          }
-        }
-
+        galleryGroups.value = Array.isArray(res?.groups) ? res.groups : [];
         orderedItems.value = galleryGroups.value.flatMap((g) => g.items);
+        rebuildGalleryItemIndex();
         syncGallerySelectionWithLoadedItems();
+        return true;
+      } catch (error) {
+        if (requestId === latestGalleryQueryId) {
+          showToastMessage(`加载画廊失败：${error?.message || "未知错误"}`);
+        }
+        return false;
       } finally {
-        loading.value = false;
+        if (requestId === latestGalleryQueryId) loading.value = false;
       }
     }
 
     /**
 
-     * Load next gallery page when user clicks the load-more button.
+     * Re-query the complete gallery using current search form values.
 
      */
 
-    async function loadMore() {
-      if (!hasMore.value || loading.value) return;
-      query.page += 1;
-      await queryGallery(false);
-    }
-
+    async function applySearch() { await queryGallery(); }
     /**
-
-     * Re-query gallery from first page using current search form values.
-
+     * Re-query the complete gallery after filter or sort controls change.
      */
-
-    async function applySearch() { await queryGallery(true); }
-    /**
-     * Re-query gallery from first page after filter/sort controls changed.
-     */
-    async function applyFilterSort() { await queryGallery(true); }
+    async function applyFilterSort() { await queryGallery(); }
 
     async function setMediaTypeFilter(type) {
       query.filters.mediaType = type === "image" || type === "video" ? type : "";
-      await queryGallery(true);
+      await queryGallery();
     }
 
     // Restore default query + filter + sort state.
     /**
-     * Restore gallery query controls to default state and reload first page data.
+     * Restore gallery query controls to defaults and reload the complete result.
      */
     async function resetAll() {
       query.filters.mediaType = "";
@@ -3138,7 +3135,7 @@ export default {
       query.sortBy = "shootingTime";
       query.sortOrder = "desc";
       exitSelectionMode();
-      await queryGallery(true);
+      await queryGallery();
     }
 
     /**
@@ -3463,12 +3460,7 @@ export default {
       if (result.ok) {
         // Keep local caches in sync with server response.
         selectedItem.value = result.item;
-        const inOrdered = orderedItems.value.findIndex((x) => x.FilePath === result.item.FilePath);
-        if (inOrdered >= 0) orderedItems.value[inOrdered] = result.item;
-        for (const group of galleryGroups.value) {
-          const idx = group.items.findIndex((x) => x.FilePath === result.item.FilePath);
-          if (idx >= 0) { group.items[idx] = result.item; break; }
-        }
+        syncUpdatedItemsIntoGallery([result.item]);
         setDraftFromItem(result.item, true);
         activeEditField.value = saveField;
         showSaveNotice("已修改", saveField);
@@ -3606,10 +3598,9 @@ export default {
         item.__thumbnailReadyAt = readyAt;
       };
       update(selectedItem.value);
-      for (const item of orderedItems.value) update(item);
-      for (const group of galleryGroups.value) {
-        for (const item of group.items) update(item);
-      }
+      update(galleryItemIndex.get(filePath));
+      triggerRef(orderedItems);
+      triggerRef(galleryGroups);
     }
 
     // Dirty-check editable fields to show/hide confirm/cancel controls.
@@ -3736,7 +3727,6 @@ export default {
       galleryGroups,
       total,
       mediaCounts,
-      hasMore,
       loading,
       filterOptions,
       tagRegistry,
@@ -3921,7 +3911,6 @@ export default {
       deleteLocationGlobally,
       clearBatchEditInputs,
       applyBatchEdit,
-      loadMore,
       applySearch,
       applyFilterSort,
       setMediaTypeFilter,

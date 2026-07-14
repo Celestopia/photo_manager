@@ -70,7 +70,7 @@ The library root can be moved as a unit. `library.yml` contains a UUID that iden
 
 ## Using the App
 
-The gallery mixes images and videos on one shooting-time timeline. It supports media-type, album, tag, person, and hierarchical-location filters, plus text search and batch editing.
+The gallery mixes images and videos on one shooting-time timeline. It supports media-type, album, tag, person, and hierarchical-location filters, plus text search and batch editing. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
 
 The viewer shares title, rating, album, location, people, tags, description, and hidden-description fields across both media types. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu.
 

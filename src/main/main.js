@@ -92,7 +92,6 @@ const DEFAULT_CONFIG = {
   ui: {
     language: "zh-CN",
     gallery: {
-      pageSize: 120,
       minCardWidth: 190,
     },
     viewer: {
@@ -378,7 +377,7 @@ function normalizeRegisteredAlbum(rawAlbum) {
   return { album: validation.value, unknown: validation.unknown };
 }
 
-const { filterAndSort } = createGalleryQueryService({
+const { filterAndSort, groupByDate } = createGalleryQueryService({
   getLocationDescendants,
   normalizeAlbumTitle,
   normalizeLocationName,
@@ -748,15 +747,6 @@ function queryGallery(query) {
     ...query,
     filters: { ...(query.filters || {}), mediaType: "" },
   });
-  const page = Math.max(1, Number(query.page || 1));
-  const pageSize = Math.max(1, Number(query.pageSize || config.ui.gallery.pageSize));
-  const start = (page - 1) * pageSize;
-  const pageItems = filtered.slice(start, start + pageSize);
-  const grouped = new Map();
-  for (const item of pageItems) {
-    if (!grouped.has(item.__groupDate)) grouped.set(item.__groupDate, []);
-    grouped.get(item.__groupDate).push(item);
-  }
   const unassignedAlbumCount = all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length;
   return {
     total: filtered.length,
@@ -765,10 +755,7 @@ function queryGallery(query) {
       images: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "image").length,
       videos: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "video").length,
     },
-    page,
-    pageSize,
-    hasMore: start + pageSize < filtered.length,
-    groups: [...grouped.entries()].map(([date, items]) => ({ date, items })),
+    groups: groupByDate(filtered),
     filterOptions: {
       albums: [...state.albumRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
       unassignedAlbumCount,

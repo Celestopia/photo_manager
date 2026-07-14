@@ -58,7 +58,17 @@ function createGalleryQueryService({
     return output;
   }
 
-  return { filterAndSort };
+  function groupByDate(list) {
+    const grouped = new Map();
+    for (const item of list) {
+      const date = item?.__groupDate || "未知日期";
+      if (!grouped.has(date)) grouped.set(date, []);
+      grouped.get(date).push(item);
+    }
+    return [...grouped.entries()].map(([date, items]) => ({ date, items }));
+  }
+
+  return { filterAndSort, groupByDate };
 }
 
 module.exports = { createGalleryQueryService };
