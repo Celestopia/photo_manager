@@ -74,8 +74,10 @@
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>
-  <GallerySettingsMenu />
 </main>
+<footer class="gallery-footer">
+  <GallerySettingsMenu />
+</footer>
 </template>
 
 <script setup>

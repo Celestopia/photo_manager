@@ -792,9 +792,9 @@ renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或
 | 模块 | 职责 |
 | --- | --- |
 | `styles/tokens.css` | 颜色、边框、圆角和阴影等全局设计令牌 |
-| `styles/library.css` | 图库入口、初始化/图库信息/维护任务，以及图库级设置菜单 |
+| `styles/library.css` | 图库入口以及初始化、图库信息和维护任务弹窗 |
 | `styles/base.css` | reset、应用外壳、标题栏、按钮、图标和输入框等共享基础控件 |
-| `styles/gallery.css` | 画廊工具栏、筛选器、媒体卡片、选择模式和批量编辑 |
+| `styles/gallery.css` | 画廊工具栏、筛选器、媒体卡片、选择模式、批量编辑、底栏和图库设置菜单 |
 | `styles/viewer-fields.css` | 查看器三栏布局、元数据面板和可折叠字段细节 |
 | `styles/registry-controls.css` | 相册、地点、人物和标签的受控选择器、chip、下拉菜单及创建 popover |
 | `styles/customization.css` | 评级、隐藏描述和字段保存反馈 |
