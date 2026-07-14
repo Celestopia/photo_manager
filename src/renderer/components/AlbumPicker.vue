@@ -64,13 +64,14 @@
 
 <script setup>
 import { computed, inject } from "vue";
+import { ALBUM_CONTEXT } from "../context/renderer-contexts.js";
 
 const props = defineProps({
   target: { type: String, required: true },
   placeholder: { type: String, default: "搜索相册" },
 });
 
-const app = inject("appContext");
+const app = inject(ALBUM_CONTEXT);
 if (!app) {
   throw new Error("AlbumPicker must be used under App.vue provider");
 }

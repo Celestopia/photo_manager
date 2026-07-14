@@ -129,6 +129,7 @@
 
 <script setup>
 import { computed, inject, nextTick, ref, watch } from "vue";
+import { LOCATION_CONTEXT } from "../context/renderer-contexts.js";
 
 const props = defineProps({
   target: { type: String, required: true },
@@ -136,7 +137,7 @@ const props = defineProps({
   searchPlaceholder: { type: String, default: "搜索地点" },
 });
 
-const app = inject("appContext");
+const app = inject(LOCATION_CONTEXT);
 if (!app) {
   throw new Error("LocationPicker must be used under App.vue provider");
 }

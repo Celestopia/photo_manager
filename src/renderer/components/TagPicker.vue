@@ -78,13 +78,14 @@
 
 <script setup>
 import { computed, inject } from "vue";
+import { TAG_CONTEXT } from "../context/renderer-contexts.js";
 
 const props = defineProps({
   target: { type: String, required: true },
   placeholder: { type: String, default: "搜索标签" },
 });
 
-const app = inject("appContext");
+const app = inject(TAG_CONTEXT);
 if (!app) {
   throw new Error("TagPicker must be used under App.vue provider");
 }

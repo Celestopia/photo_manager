@@ -54,8 +54,9 @@
 
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { LOCATION_CONTEXT } from "../context/renderer-contexts.js";
 
-const app = inject("appContext");
+const app = inject(LOCATION_CONTEXT);
 if (!app) {
   throw new Error("LocationFilterPicker must be used under App.vue provider");
 }

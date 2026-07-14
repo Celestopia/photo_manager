@@ -80,6 +80,7 @@
 
 <script setup>
 import { inject, ref } from "vue";
+import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
@@ -88,7 +89,7 @@ import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import GallerySettingsMenu from "./GallerySettingsMenu.vue";
 
-const app = inject("appContext");
+const app = inject(GALLERY_CONTEXT);
 if (!app) {
   throw new Error("GalleryView must be used under App.vue provider");
 }

@@ -22,7 +22,8 @@
 
 <script setup>
 import { inject } from "vue";
-const app = inject("appContext");
+import { SETTINGS_CONTEXT } from "../context/renderer-contexts.js";
+const app = inject(SETTINGS_CONTEXT);
 if (!app) throw new Error("GallerySettingsMenu must be used under App.vue provider");
 const {
   ICONS,

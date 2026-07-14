@@ -39,13 +39,14 @@
 
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { GALLERY_FILTER_CONTEXT } from "../context/renderer-contexts.js";
 
 const props = defineProps({
   kind: { type: String, required: true },
   label: { type: String, required: true },
 });
 
-const app = inject("appContext");
+const app = inject(GALLERY_FILTER_CONTEXT);
 if (!app) throw new Error("RegistryFilterPicker must be used under App.vue provider");
 
 const {

@@ -212,12 +212,13 @@
 
 <script setup>
 import { inject, ref } from "vue";
+import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
 import TagPicker from "./TagPicker.vue";
 
-const app = inject("appContext");
+const app = inject(VIEWER_CONTEXT);
 if (!app) {
   throw new Error("ViewerView must be used under App.vue provider");
 }

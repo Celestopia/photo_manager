@@ -47,8 +47,9 @@
 
 <script setup>
 import { computed, inject } from "vue";
+import { LIBRARY_CONTEXT } from "../context/renderer-contexts.js";
 
-const app = inject("appContext");
+const app = inject(LIBRARY_CONTEXT);
 if (!app) throw new Error("LibraryEntryView must be used under App.vue provider");
 
 const {

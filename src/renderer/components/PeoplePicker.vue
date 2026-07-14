@@ -78,6 +78,7 @@
 
 <script setup>
 import { computed, inject } from "vue";
+import { PERSON_CONTEXT } from "../context/renderer-contexts.js";
 
 const props = defineProps({
   target: { type: String, required: true },
@@ -85,7 +86,7 @@ const props = defineProps({
   searchPlaceholder: { type: String, default: "搜索人物" },
 });
 
-const app = inject("appContext");
+const app = inject(PERSON_CONTEXT);
 if (!app) {
   throw new Error("PeoplePicker must be used under App.vue provider");
 }

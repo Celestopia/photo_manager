@@ -707,15 +707,91 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 
 ### 21.3 `src/renderer/`
 
-- `App.vue`：跨视图状态、完整画廊结果、注册表状态、编辑草稿、媒体播放、modal 和全局交互协调；使用请求序号丢弃过期画廊响应，并以 `FilePath` 索引同步缩略图完成事件。
-- `LibraryEntryView.vue`：选择图库、媒体工具错误、进度和重试。
+渲染层采用“声明式根组件 + 应用组合根 + 领域 composable + 纯函数 + 展示组件”的结构。这里的拆分以状态所有权和生命周期边界为依据，不以模板行数机械拆分。
+
+#### 21.3.1 分层和依赖方向
+
+- `App.vue`：声明式外壳。只负责在入口、画廊和查看器三个一级页面之间切换，并挂载全局 dialog/feedback 组件；不得重新承载业务状态、IPC 调用或文档级事件监听。
+- `application/use-renderer-application.js`：renderer composition root。实例化 composable，以显式 ref 和 callback 连接跨领域协作，集中组装组件需要的窄上下文，并在 Vue 挂载/卸载阶段启动和释放各模块。该文件可以较长，但内容应是依赖装配，不应复制领域算法或注册表 CRUD。
+- `context/renderer-contexts.js`：所有 `provide`/`inject` 键的唯一声明位置。页面和控件只注入自己需要的上下文，不允许恢复一个包含全部 renderer 状态的巨型 context。
+- `composables/`：有状态的前端领域控制器。每个 composable 拥有一组内聚状态、相关 IPC 调用和该领域产生的副作用，并通过参数显式接收其它领域能力。
+- `domain/`：不依赖 Vue、DOM、Electron 和 IPC 的确定性函数。格式化、地点层级构造等逻辑放在这里，以便直接使用 `node:test` 测试。
+- `components/`：页面和可复用交互控件。组件负责模板、DOM 事件转发和局部展示判断，不直接建立第二份业务状态。
+- `components/dialogs/`：跨一级页面存在的图库、维护任务、注册表管理和全局反馈弹窗。弹窗关闭或提交时调用所属 context 的动作，不自行写注册表。
+- `constants/ui-constants.mjs`：图标、评级、特殊筛选值和窗口动作等静态常量。
+- `video-playback.mjs`：逐帧目标和方向键状态规则的纯函数；播放器 DOM 生命周期仍由 `use-video-playback.js` 管理。
+- `styles.css`：全局设计系统、三视图布局、下拉菜单和 modal。本轮刻意不拆分 CSS；后续若拆分，应按视图/组件边界迁移，不得改变选择器优先级和视觉行为。
+
+依赖方向固定为：
+
+```text
+App.vue
+  -> application/use-renderer-application.js
+       -> composables/*
+            -> domain/*、video-playback.mjs、preload API
+       -> context/renderer-contexts.js
+
+components/* -> context/renderer-contexts.js -> composition root 提供的能力
+```
+
+组件不能反向导入 composition root；纯函数不能导入 Vue 或组件；composable 不能创建或导入页面组件。跨 composable 协作必须在 composition root 中通过 ref、getter 或 callback 显式连接，以便看出数据流和副作用来源。
+
+#### 21.3.2 状态和副作用所有权
+
+| 模块 | 所有状态与职责 | 所有的全局资源 |
+| --- | --- | --- |
+| `use-library-session.js` | 当前一级视图、活动图库摘要、入口页选择/初始化状态、图库信息、设置菜单和维护任务 | 图库初始化与维护进度 IPC 订阅 |
+| `use-gallery-query.js` | 完整查询条件、日期分组、顺序媒体集合、统计、筛选项和 `FilePath` 索引 | `thumbnail:ready` IPC 订阅；请求序号用于丢弃过期响应 |
+| `use-gallery-selection.js` | 选择模式、完整结果上的选中集合、批量编辑草稿和批量结果 | 无文档级监听器 |
+| `use-media-viewer.js` | 当前媒体索引、查看器左右面板、私密描述、右键菜单、媒体导航和上下文操作 | 文档点击、键盘快捷键和窗口失焦处理 |
+| `use-media-editor.js` | 单媒体个性化草稿、dirty 状态、活动编辑字段、保存确认和文本域自适应 | 无常驻全局监听器 |
+| `use-image-transform.js` | 图片缩放、平移、旋转、镜像和拖动 | 文档 `mousemove`/`mouseup` |
+| `use-video-playback.js` | video/audio 元素、播放/音频降级状态、逐帧、时长、音量、静音和倍速偏好 | 媒体元素事件；偏好写入 `localStorage` |
+| `use-tag-registry.js` | 标签列表、选择器、创建面板和管理面板 | 标签 IPC，不拥有其它注册表状态 |
+| `use-album-registry.js` | 单值相册列表、选择器、创建面板和管理面板 | 相册 IPC |
+| `use-person-registry.js` | 人物列表、选择器、创建面板和管理面板 | 人物 IPC |
+| `use-location-registry.js` | 地点列表、树形选择器、创建/编辑/管理面板和滚动上下文 | 地点列表滚动观察及地点 IPC |
+| `use-recent-registry-history.js` | 按图库 UUID 隔离的最近标签、人物和地点 | 对 `localStorage` 中该图库命名空间的读写 |
+| `use-window-controls.js` | 最大化状态及标题栏按钮行为 | 窗口状态 IPC 订阅 |
+| `use-ui-feedback.js` | toast、保存确认和动态 tooltip | 文档 tooltip 指针事件和计时器 |
+
+每个安装全局监听器或 IPC listener 的模块都必须同时暴露幂等的 `dispose()`，并由 composition root 在 `onBeforeUnmount` 调用。切换图库时只重置图库相关状态；销毁 renderer 时才释放文档级监听器。新增监听器应放进实际拥有该交互状态的 composable，不能集中堆到 `App.vue`。
+
+#### 21.3.3 上下文边界
+
+当前上下文按消费面拆分：
+
+- `LIBRARY_CONTEXT`：入口页和图库生命周期弹窗。
+- `GALLERY_CONTEXT`：画廊结果、选择模式和批量编辑。
+- `GALLERY_FILTER_CONTEXT`：顶部筛选控件需要的查询值和候选项。
+- `VIEWER_CONTEXT`：媒体查看器、技术信息、编辑草稿、图片变换和视频播放。
+- `SETTINGS_CONTEXT`：画廊右下角设置菜单及其入口动作。
+- `TAG_CONTEXT`、`ALBUM_CONTEXT`、`PERSON_CONTEXT`、`LOCATION_CONTEXT`：各注册表的选择、创建和管理能力。
+- `UI_FEEDBACK_CONTEXT`：toast、保存提示和 tooltip 的只读展示状态。
+
+上下文对象可以共享 composition root 中的同一个 ref，但组件不得替换 context 或复制其状态。给某个组件增加能力时，优先扩充其已有窄 context；只有出现新的独立消费边界时才新增 context。不要因为传参方便而把所有 composable 返回值合并后整体 `provide`。
+
+#### 21.3.4 页面和组件职责
+
+- `LibraryEntryView.vue`：选择图库、媒体工具错误、初始化/加载进度和重试。
 - `GalleryView.vue`：不分页的混合媒体画廊和覆盖完整查询结果的批量编辑；卡片缩略图使用浏览器原生懒加载。
-- `ViewerView.vue`：媒体查看器和技术信息。
-- `GallerySettingsMenu.vue`：图库设置入口。
+- `ViewerView.vue`：图片/视频媒体区域、左右信息面板、查看器工具栏和技术信息；个性化保存由 editor composable 完成。
+- `GallerySettingsMenu.vue`：图库设置入口，只发起管理面板和维护任务动作。
 - `AlbumPicker.vue`、`PeoplePicker.vue`、`TagPicker.vue`、`LocationPicker.vue`：查看器/批量选择控件。
 - `RegistryFilterPicker.vue`、`LocationFilterPicker.vue`：画廊筛选控件。
-- `video-playback.mjs`：逐帧目标和方向键状态规则的纯函数。
-- `styles.css`：全局设计系统、三视图布局、下拉菜单和 modal。
+- `dialogs/LibraryDialogs.vue`：初始化确认、图库信息和维护任务弹窗。
+- `dialogs/*ManagerDialog.vue`：四类注册表管理与嵌套创建弹窗。
+- `dialogs/UiFeedbackOverlay.vue`：全局 toast、字段保存确认和动态 tooltip。
+
+#### 21.3.5 修改和扩展规则
+
+1. 新增确定性算法时先放入 `domain/` 或已有纯函数模块，并补 `node:test`；不要把可测试算法藏在 SFC 的 `setup()` 中。
+2. 新增状态时先确定唯一所有者。状态应放入最接近其生命周期的 composable；只有纯 DOM 展示状态才留在组件内部。
+3. 一个操作跨图库、画廊、查看器或注册表时，在 composition root 注入 callback 协调刷新。composable 不直接导入另一个 composable，也不依赖隐式全局变量。
+4. 组件需要新动作时通过对应窄 context 暴露；避免跨多层模板透传大量 props，也避免巨型 context。
+5. IPC 调用只能经 `window.photoManagerApi` 的 preload 白名单。composable 可以调用 API，但组件不应拼装持久化 payload 或假设主进程内部索引结构。
+6. `shallowRef` 用于完整画廊结果这类主进程已规范化的大集合，避免对每条媒体记录建立不必要的深层代理；编辑时使用独立 draft，不原地修改查询结果。
+7. 行为保持型重构必须先锁定纯逻辑测试，再执行 `npm test` 和 `npm run build:renderer`；涉及播放器、下拉菜单或图库切换时还需手工验证监听器不会重复安装。
 
 ## 22. 测试与验收
 
