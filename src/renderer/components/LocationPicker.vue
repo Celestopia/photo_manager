@@ -5,6 +5,7 @@
         <button
           type="button"
           class="input album-input registry-trigger"
+          :class="{ 'is-placeholder': !selectedLocation }"
           :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
           @click="openLocationDropdown(target)"
         ><span>{{ selectedLocation || placeholder }}</span></button>

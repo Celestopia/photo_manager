@@ -66,14 +66,14 @@
   <aside class="side-panel batch-panel" v-if="isSelectionMode && selectedGalleryCount > 0">
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
     <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 个媒体</div>
-    <label>批量标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
-    <label>设置相册</label>
+    <label>批量设置标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
+    <label>批量设置相册</label>
     <AlbumPicker target="batch" placeholder="搜索已有相册" />
-    <label>添加标签</label>
+    <label>批量添加标签</label>
     <TagPicker target="batch" placeholder="搜索已有标签" />
-    <label>添加人物</label>
+    <label>批量添加人物</label>
     <PeoplePicker target="batch" placeholder="搜索已有人物" />
-    <label>设置地点</label>
+    <label>批量设置地点</label>
     <LocationPicker target="batch" placeholder="搜索已有地点" />
     <div class="batch-actions">
       <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges">清空输入</button>
@@ -186,8 +186,20 @@ function closeDetailsOnScroll(event) {
   closeGalleryDetailsMenu();
 }
 
-function closeDetailsOnKeydown(event) {
-  if (event.key === "Escape") closeGalleryDetailsMenu();
+function handleGalleryKeydown(event) {
+  if (event.key !== "Escape" || event.repeat) return;
+  if (galleryDetailsMenu.visible) {
+    closeGalleryDetailsMenu();
+    return;
+  }
+
+  const target = event.target;
+  const isEditableTarget = ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName) || target?.isContentEditable;
+  const hasModalOverlay = Boolean(document.querySelector(".tag-modal-backdrop"));
+  if (isEditableTarget || hasModalOverlay || !isSelectionMode.value || selectedGalleryCount.value <= 0) return;
+
+  event.preventDefault();
+  exitSelectionMode();
 }
 
 onMounted(() => {
@@ -195,7 +207,7 @@ onMounted(() => {
   document.addEventListener("contextmenu", closeGalleryDetailsMenu);
   document.addEventListener("scroll", closeDetailsOnScroll, true);
   window.addEventListener("resize", closeGalleryDetailsMenu);
-  window.addEventListener("keydown", closeDetailsOnKeydown);
+  window.addEventListener("keydown", handleGalleryKeydown);
   window.addEventListener("gallery-transient-open", closeDetailsFromOtherSurface);
 });
 
@@ -204,7 +216,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("contextmenu", closeGalleryDetailsMenu);
   document.removeEventListener("scroll", closeDetailsOnScroll, true);
   window.removeEventListener("resize", closeGalleryDetailsMenu);
-  window.removeEventListener("keydown", closeDetailsOnKeydown);
+  window.removeEventListener("keydown", handleGalleryKeydown);
   window.removeEventListener("gallery-transient-open", closeDetailsFromOtherSurface);
 });
 

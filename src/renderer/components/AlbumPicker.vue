@@ -5,6 +5,7 @@
         <button
           type="button"
           class="input album-input registry-trigger"
+          :class="{ 'is-placeholder': !selectedAlbum }"
           :data-tip="selectedAlbum ? getAlbumDescription(selectedAlbum) : ''"
           @click="openAlbumDropdown(target)"
         ><span>{{ selectedAlbum || placeholder }}</span></button>

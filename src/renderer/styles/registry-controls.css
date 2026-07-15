@@ -79,7 +79,15 @@
   min-height: 34px;
   padding-right: 30px;
 }
-.album-input.registry-trigger { justify-content: flex-start; }
+.album-input.registry-trigger {
+  justify-content: flex-start;
+  font: inherit;
+}
+.album-input.registry-trigger.is-placeholder {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 400;
+}
 .album-clear-btn {
   position: absolute;
   right: 8px;
