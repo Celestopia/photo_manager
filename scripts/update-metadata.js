@@ -22,6 +22,7 @@ const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPath
 const { createLibraryBackup } = require("./library-backup");
 const { recoverPendingTransaction } = require("./library-transaction");
 const { createOperationReporter } = require("./operation-progress");
+const { assertCustomization } = require("../src/shared/customization-schema");
 
 function isUnchangedRecord(existing, snapshot) {
   return Boolean(
@@ -68,6 +69,7 @@ function cloneMovedRecord(existing, snapshot, hash) {
 }
 
 async function synchronizeMetadata({ config, root, existing, files, logger = console, dependencies = {}, onProgress = null }) {
+  for (const item of existing.values()) assertCustomization(item.Customization, item.FilePath);
   const inspectFile = dependencies.inspectMediaFile || inspectMediaFile;
   const hashFile = dependencies.sha256File || sha256File;
   const buildFileMetadata = dependencies.buildMetadata || buildMetadata;

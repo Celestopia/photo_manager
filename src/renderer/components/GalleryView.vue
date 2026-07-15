@@ -67,6 +67,8 @@
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
     <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 个媒体</div>
     <label>批量设置标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
+    <label>批量设置隐私等级</label>
+    <PrivacyLevelPicker v-model="batchEdit.privacy" aria-label="批量设置隐私等级" />
     <label>批量设置相册</label>
     <AlbumPicker target="batch" placeholder="搜索已有相册" />
     <label>批量添加标签</label>
@@ -104,6 +106,7 @@ import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import GallerySettingsMenu from "./GallerySettingsMenu.vue";
 import GalleryMediaDetailsMenu from "./GalleryMediaDetailsMenu.vue";
+import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 
 const GALLERY_DETAILS_SURFACE = Symbol("gallery-media-details");
 

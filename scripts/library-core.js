@@ -10,7 +10,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const yaml = require("js-yaml");
 
-const LIBRARY_SCHEMA_VERSION = 1;
+const LIBRARY_SCHEMA_VERSION = 2;
 const MANAGER_DIR_NAME = ".photo_manager";
 const DATA_FILE_NAMES = Object.freeze({
   metadata: "photo_metadata.jsonl",
@@ -93,14 +93,11 @@ function createLibraryManifest(root, name = path.basename(path.resolve(root))) {
 
 function validateLibraryManifest(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("library.yml must contain an object");
-  if (value.schemaVersion !== LIBRARY_SCHEMA_VERSION) {
-    throw new Error(`Unsupported library schema version: ${value.schemaVersion ?? "missing"}`);
-  }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.libraryId || ""))) {
     throw new Error("library.yml contains an invalid libraryId");
   }
   const manifest = {
-    schemaVersion: LIBRARY_SCHEMA_VERSION,
+    schemaVersion: Number.isInteger(value.schemaVersion) ? value.schemaVersion : LIBRARY_SCHEMA_VERSION,
     libraryId: String(value.libraryId),
     name: normalizeLibraryName(value.name),
     createdAt: String(value.createdAt || ""),

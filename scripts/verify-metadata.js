@@ -13,6 +13,7 @@ const { parseLibraryArgument } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
 const { readTransactionJournal } = require("./library-transaction");
+const { assertCustomization } = require("../src/shared/customization-schema");
 
 function approximatelyEqual(a, b, tolerance = 0.1) {
   if (a === null || a === undefined || b === null || b === undefined) return a == null && b == null;
@@ -43,7 +44,16 @@ async function run(options = {}) {
     probeFailed: 0,
     probeChanged: 0,
     readFailed: 0,
+    privacyInvalid: 0,
     };
+  for (const item of existing.values()) {
+    try {
+      assertCustomization(item.Customization, item.FilePath);
+    } catch (error) {
+      counts.privacyInvalid += 1;
+      logger.warn(`[PRIVACY] ${error.message}`);
+    }
+  }
   for (let index = 0; index < files.length; index += 1) {
     const absFile = files[index];
     const relativePath = path.relative(paths.root, absFile).replace(/\\/g, "/");
@@ -114,7 +124,7 @@ async function run(options = {}) {
 
 if (require.main === module) {
   run({ logger: console }).then((counts) => {
-    console.log(`Verify done: checked=${counts.checked}, missing=${counts.missing}, extra=${counts.extra}, tampered=${counts.tampered}, typeMismatch=${counts.typeMismatch}, probeFailed=${counts.probeFailed}, probeChanged=${counts.probeChanged}, readFailed=${counts.readFailed}`);
+    console.log(`Verify done: checked=${counts.checked}, missing=${counts.missing}, extra=${counts.extra}, tampered=${counts.tampered}, typeMismatch=${counts.typeMismatch}, probeFailed=${counts.probeFailed}, probeChanged=${counts.probeChanged}, readFailed=${counts.readFailed}, privacyInvalid=${counts.privacyInvalid}`);
   }).catch((error) => {
     console.error(error.message);
     process.exit(1);

@@ -15,6 +15,7 @@ export function useMediaEditor({
   const editDraft = reactive({
     Title: "",
     Rating: 1,
+    Privacy: 1,
     Album: "",
     LocationPlace: "",
     LocationDetail: "",
@@ -40,6 +41,7 @@ export function useMediaEditor({
   function setDraftFromItem(item, keepActiveField = false) {
     editDraft.Title = item?.Customization?.Title || "";
     editDraft.Rating = Number(item?.Customization?.Rating || 1);
+    editDraft.Privacy = Number(item?.Customization?.Privacy ?? 1);
     editDraft.Album = item?.Customization?.Album || "";
     editDraft.LocationPlace = item?.Location?.Place || item?.Location?.Site || "";
     editDraft.LocationDetail = item?.Location?.Detail || "";
@@ -77,6 +79,13 @@ export function useMediaEditor({
     requestEdit("Rating");
   }
 
+  function setPrivacy(privacyValue) {
+    const normalized = Number(privacyValue);
+    if (!Number.isInteger(normalized) || normalized < 1 || normalized > 5 || normalized === editDraft.Privacy) return;
+    editDraft.Privacy = normalized;
+    requestEdit("Privacy");
+  }
+
   function onFieldTextareaInput(event, field) {
     autoGrowFieldTextarea(event.target);
     requestEdit(field);
@@ -96,6 +105,7 @@ export function useMediaEditor({
       customization: {
         Title: editDraft.Title,
         Rating: Math.min(5, Math.max(1, Number(editDraft.Rating || 1))),
+        Privacy: editDraft.Privacy,
         Album: editDraft.Album,
         Tags: [...editDraft.Tags],
         People: [...editDraft.People],
@@ -123,6 +133,7 @@ export function useMediaEditor({
     Object.assign(editDraft, {
       Title: "",
       Rating: 1,
+      Privacy: 1,
       Album: "",
       LocationPlace: "",
       LocationDetail: "",
@@ -137,6 +148,7 @@ export function useMediaEditor({
     () => [
       editDraft.Title,
       editDraft.Rating,
+      editDraft.Privacy,
       editDraft.Album,
       editDraft.LocationPlace,
       editDraft.LocationDetail,
@@ -152,6 +164,7 @@ export function useMediaEditor({
       editingDirty.value =
         editDraft.Title !== (selectedItem.value?.Customization?.Title || "")
         || Number(editDraft.Rating || 1) !== Number(selectedItem.value?.Customization?.Rating || 1)
+        || editDraft.Privacy !== selectedItem.value?.Customization?.Privacy
         || editDraft.Album !== (selectedItem.value?.Customization?.Album || "")
         || editDraft.LocationPlace !== (selectedItem.value?.Location?.Place || selectedItem.value?.Location?.Site || "")
         || editDraft.LocationDetail !== (selectedItem.value?.Location?.Detail || "")
@@ -171,6 +184,7 @@ export function useMediaEditor({
     removeTagAt,
     removePersonAt,
     setRating,
+    setPrivacy,
     autoGrowFieldTextarea,
     autoGrowAllFieldTextareas,
     onFieldTextareaInput,

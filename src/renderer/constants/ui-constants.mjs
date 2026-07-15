@@ -7,6 +7,7 @@ export const WINDOW_ACTIONS = Object.freeze({
 
 export const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
 export const STAR_LEVELS = Object.freeze([1, 2, 3, 4, 5]);
+export const PRIVACY_LEVELS = Object.freeze([1, 2, 3, 4, 5]);
 
 export const ICONS = Object.freeze({
   gallery: new URL("../assets/gallery.svg", import.meta.url).href,
@@ -30,4 +31,5 @@ export const ICONS = Object.freeze({
   customization: new URL("../assets/customization.svg", import.meta.url).href,
   videoPlaceholder: new URL("../assets/video_placeholder.svg", import.meta.url).href,
   imagePlaceholder: new URL("../assets/image_placeholder.svg", import.meta.url).href,
+  privacyPattern: new URL("../assets/privacy_pattern.svg", import.meta.url).href,
 });

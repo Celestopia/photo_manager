@@ -163,7 +163,7 @@ function defaultCustomization(ext, type = extensionType(ext)) {
     Description: "",
     HiddenDescription: "",
     Rating: type === "video" || isJpg ? 2 : 1,
-    Hidden: false,
+    Privacy: 1,
     MetadataUpdateDate: null,
   };
 }

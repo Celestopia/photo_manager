@@ -8,7 +8,7 @@ function createGalleryQueryService({
 }) {
   function filterAndSort(list, options) {
     const { filters, search, sortBy, sortOrder } = options;
-    let output = list.filter((item) => !item?.Customization?.Hidden);
+    let output = [...list];
 
     if (filters.mediaType === "image" || filters.mediaType === "video") {
       output = output.filter((item) => item?.FileSystem?.FileType === filters.mediaType);

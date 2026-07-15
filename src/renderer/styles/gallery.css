@@ -138,8 +138,11 @@
 .batch-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .batch-panel-header h3 { margin: 0; }
 .batch-panel-summary { color: var(--text-soft); font-size: 13px; margin-bottom: 4px; }
-.batch-apply-btn { margin-top: 8px; }
-.batch-actions { display: flex; gap: 8px; margin-top: 8px; }
+.batch-actions { display: flex; align-items: stretch; gap: 8px; margin-top: 8px; }
+.batch-actions .btn {
+  margin-top: 0;
+  font: inherit;
+}
 .batch-status {
   margin-top: 8px;
   padding: 8px 10px;

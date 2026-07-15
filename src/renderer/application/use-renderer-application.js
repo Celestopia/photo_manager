@@ -277,6 +277,7 @@ export function useRendererApplication() {
       removeTagAt,
       removePersonAt,
       setRating,
+      setPrivacy,
       autoGrowFieldTextarea,
       autoGrowAllFieldTextareas,
       onFieldTextareaInput,
@@ -675,7 +676,7 @@ export function useRendererApplication() {
       openCurrentWithSystem, showCurrentInFolder, onVideoLoadedMetadata, onVideoPlaybackError,
       onAudioLoadedMetadata, onAudioPlaybackError, onVideoVolumeChange, onVideoRateChange,
       onMediaPlaybackStarted, onMediaTimeUpdate, stepVideoFrame, onFieldTextareaInput,
-      confirmEdit, cancelEdit, setRating, requestEdit, toggleLeftPanel, zoomIn, zoomOut,
+      confirmEdit, cancelEdit, setRating, setPrivacy, requestEdit, toggleLeftPanel, zoomIn, zoomOut,
       rotateClockwise, rotateCounterclockwise, toggleMirror, restoreImageState, toggleRightPanel,
     };
     const uiFeedbackContext = { toast, dynamicTooltip, dynamicTooltipRef };

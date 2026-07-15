@@ -1,3 +1,5 @@
+const { assertPrivacy } = require("../shared/customization-schema.js");
+
 function createMetadataEditService(options) {
   const {
     getMetadata,
@@ -19,6 +21,14 @@ function createMetadataEditService(options) {
     const current = metadata.get(filePath);
     if (!current) return { ok: false, error: "Metadata item not found" };
     const previous = structuredClone(current);
+
+    if (Object.prototype.hasOwnProperty.call(customization || {}, "Privacy")) {
+      try {
+        assertPrivacy(customization.Privacy);
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    }
 
     if (Object.prototype.hasOwnProperty.call(customization || {}, "Tags")) {
       const validation = normalizeRegisteredTags(customization.Tags);
@@ -70,6 +80,14 @@ function createMetadataEditService(options) {
     const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? payload.locationPatch : {};
     const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? payload.customizationPatch : {};
     if (!filePaths.length) return { ok: false, error: "No target file paths" };
+
+    if (Object.prototype.hasOwnProperty.call(customizationPatch, "Privacy")) {
+      try {
+        assertPrivacy(customizationPatch.Privacy);
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    }
 
     const tagValidation = normalizeRegisteredTags([...new Set(addTags.map((value) => String(value || "").trim()).filter(Boolean))]);
     if (tagValidation.unknown.length) return { ok: false, error: `Unknown tag: ${tagValidation.unknown.join(", ")}` };

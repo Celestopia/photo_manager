@@ -49,6 +49,7 @@ test("bundled FFmpeg probes a generated MP4 and creates a WebP thumbnail", { tim
     assert.match(tools.versions.ffmpeg, /8\.1\.2/);
     assert.equal(item.FileSystem.FileType, "video");
     assert.equal(item.Customization.Rating, 2);
+    assert.equal(item.Customization.Privacy, 1);
     assert.equal(item.Video.ProbeStatus, "ok");
     assert.equal(item.Video.VideoCodec, "h264");
     assert.equal(item.Video.AudioCodec, "aac");
@@ -81,6 +82,7 @@ test("a damaged video still produces an editable failed-probe metadata record", 
     assert.equal(item.Video.ProbeStatus, "failed");
     assert.equal(item.Video.DurationSeconds, null);
     assert.equal(item.Customization.Rating, 2);
+    assert.equal(item.Customization.Privacy, 1);
     assert.equal(item.FileSystem.ShootingTimeStamp, Math.floor(modified.getTime() / 1000));
   } finally {
     await fsp.rm(tempRoot, { recursive: true, force: true });

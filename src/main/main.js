@@ -33,6 +33,7 @@ const { registerIpcHandlers: registerMainIpcHandlers } = require("./ipc-handlers
 const { createMainWindow } = require("./window-manager.js");
 const { createApplicationRuntime } = require("./application-runtime.js");
 const { createThumbnailWarmupService } = require("./thumbnail-warmup-service.js");
+const { assertCustomization } = require("../shared/customization-schema.js");
 const {
   normalizeThumbnailConfig,
   thumbnailAbsolutePath,
@@ -223,6 +224,7 @@ async function loadMetadataIndex() {
   });
   for (const item of entries) {
     assertPathInsideLibrary(state.activeLibrary.paths, path.join(state.activeLibrary.paths.root, item.FilePath));
+    assertCustomization(item.Customization, item.FilePath);
     state.metadataIndex.set(item.FilePath, item);
   }
 }

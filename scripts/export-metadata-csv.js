@@ -11,18 +11,19 @@ const { parseLibraryArgument, writeTextAtomic } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
 const { readTransactionJournal } = require("./library-transaction");
+const { assertCustomization } = require("../src/shared/customization-schema");
 
 // Ordered flattened columns. Left side is intentionally user-facing.
 const COLUMNS = [
   { header: "FilePath", get: (item) => item?.FilePath || "" },
   { header: "Title", get: (item) => item?.Customization?.Title || "" },
   { header: "Rating", get: (item) => item?.Customization?.Rating ?? "" },
+  { header: "Privacy", get: (item) => item?.Customization?.Privacy ?? "" },
   { header: "Album", get: (item) => item?.Customization?.Album || "" },
   { header: "Tags", get: (item) => (item?.Customization?.Tags || []).join(" | ") },
   { header: "People", get: (item) => (item?.Customization?.People || []).join(" | ") },
   { header: "Description", get: (item) => item?.Customization?.Description || "" },
   { header: "HiddenDescription", get: (item) => item?.Customization?.HiddenDescription || "" },
-  { header: "Hidden", get: (item) => item?.Customization?.Hidden ?? false },
   { header: "MetadataUpdateDate", get: (item) => item?.Customization?.MetadataUpdateDate || "" },
   { header: "Location.Place", get: (item) => item?.Location?.Place || item?.Location?.Site || "" },
   { header: "Location.Detail", get: (item) => item?.Location?.Detail || "" },
@@ -132,6 +133,7 @@ async function run(options = {}) {
   const map = await loadExisting(paths.metadataFile);
   validateMetadataPaths(paths, map.values());
   const items = [...map.values()];
+  for (const item of items) assertCustomization(item.Customization, item.FilePath);
 
   const lines = [];
   lines.push(COLUMNS.map((column) => toCell(column.header)).join(","));

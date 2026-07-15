@@ -72,7 +72,9 @@ The library root can be moved as a unit. `library.yml` contains a UUID that iden
 
 The gallery mixes images and videos on one shooting-time timeline. It supports media-type, album, tag, person, and hierarchical-location filters, plus text search and batch editing. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
 
-The viewer shares title, rating, album, location, people, tags, description, and hidden-description fields across both media types. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu.
+The viewer shares title, rating, privacy level, album, location, people, tags, description, and hidden-description fields across both media types. Privacy is an integer from 1 (lowest privacy requirement) to 5 (highest) and defaults to 1. Its controls are collapsed below rating by default and remain expanded or collapsed while browsing between media. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu.
+
+Selection mode can batch-set title, privacy level, album, and primary location, and batch-add people and tags. Privacy is descriptive metadata only: every level remains visible in the local gallery and CSV export, and it does not restrict clipboard or system-open actions.
 
 The gallery's bottom-right settings menu provides:
 
@@ -128,7 +130,7 @@ Library paths and internal data directories are intentionally not configurable. 
 
 ## Data Safety
 
-- JSONL is loaded strictly; invalid JSON, duplicate keys, missing fixed files, or an invalid manifest reject the entire library.
+- JSONL is loaded strictly; invalid JSON, duplicate keys, missing fixed files, an invalid manifest, or a Privacy value outside integer levels 1-5 rejects the entire library.
 - Individual files are written through temporary-file replacement.
 - User data writes create automatic library backups first.
 - Global registry deletion uses a recoverable multi-file transaction because it can change both a registry and media metadata.
@@ -146,4 +148,4 @@ npm run verify-metadata -- --library "D:\Media\Example Library"
 git diff --check
 ```
 
-The automated suite covers library boundaries, strict JSONL, locks, backups, transaction rollback, FFmpeg integration, metadata normalization, incremental updates, CSV export, thumbnails, and video keyboard/frame behavior.
+The automated suite covers library boundaries, strict JSONL, Privacy validation and editing, locks, backups, transaction rollback, FFmpeg integration, metadata normalization, incremental updates, CSV export, thumbnails, and video keyboard/frame behavior.

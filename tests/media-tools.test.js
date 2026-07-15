@@ -112,6 +112,8 @@ test("keeps absent numeric fields null and preserves media rating defaults", () 
   assert.equal(defaultCustomization(".mp4").Rating, 2);
   assert.equal(defaultCustomization(".jpg").Rating, 2);
   assert.equal(defaultCustomization(".png").Rating, 1);
+  assert.equal(defaultCustomization(".mp4").Privacy, 1);
+  assert.equal(defaultCustomization(".jpg").Privacy, 1);
 });
 
 test("parses zoned and local media dates with the expected semantics", () => {

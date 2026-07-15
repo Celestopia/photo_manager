@@ -95,6 +95,27 @@ test("gallery query groups the complete result without a page-size cutoff", () =
   ]);
 });
 
+test("gallery query includes every privacy level", () => {
+  const service = createGalleryQueryService({
+    getLocationDescendants: () => [],
+    normalizeAlbumTitle: (value) => String(value || "").trim(),
+    normalizeLocationName,
+    unassignedAlbumFilter: "__UNASSIGNED__",
+  });
+  const items = [1, 2, 3, 4, 5].map((privacy) => ({
+    FilePath: `privacy-${privacy}.jpg`,
+    FileSystem: { ShootingTimeString: "2026-01-01" },
+    Customization: { Rating: 2, Privacy: privacy },
+  }));
+  const result = service.filterAndSort(items, {
+    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
+    search: { field: "", value: "" },
+    sortBy: "filename",
+    sortOrder: "asc",
+  });
+  assert.equal(result.length, 5);
+});
+
 test("simple registry catalog deduplicates values and reports usage", () => {
   const registry = new Map([
     ["美食", { Text: "美食", Description: "", CreatedAt: "now", UpdatedAt: "now" }],

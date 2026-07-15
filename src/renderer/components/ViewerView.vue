@@ -108,7 +108,19 @@
     <label>标题</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" rows="1"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Title'">{{ saveNotice.message }}</div>
-    <label>评级</label>
+    <div class="viewer-field-heading">
+      <label>评级</label>
+      <button
+        type="button"
+        class="viewer-detail-toggle"
+        :aria-expanded="privacyExpanded"
+        :aria-label="privacyExpanded ? '收起隐私等级' : '展开隐私等级'"
+        :data-tip="privacyExpanded ? '收起隐私等级' : '展开隐私等级'"
+        @click="privacyExpanded = !privacyExpanded"
+      >
+        <span class="viewer-detail-chevron" :class="{ expanded: privacyExpanded }">&gt;</span>
+      </button>
+    </div>
     <div class="rating-stars" role="radiogroup" aria-label="评级">
       <button
         v-for="star in STAR_LEVELS"
@@ -122,6 +134,12 @@
     </div>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Rating'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Rating'">{{ saveNotice.message }}</div>
+    <template v-if="privacyExpanded">
+      <label>隐私等级</label>
+      <PrivacyLevelPicker :model-value="editDraft.Privacy" @update:model-value="setPrivacy" />
+    </template>
+    <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Privacy'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
+    <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Privacy'">{{ saveNotice.message }}</div>
     <label>相册</label>
     <AlbumPicker target="viewer" placeholder="搜索已有相册" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Album'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
@@ -217,6 +235,7 @@ import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
 import TagPicker from "./TagPicker.vue";
+import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 
 const app = inject(VIEWER_CONTEXT);
 if (!app) {
@@ -225,6 +244,7 @@ if (!app) {
 
 const locationDetailExpanded = ref(false);
 const hiddenDescriptionExpanded = ref(false);
+const privacyExpanded = ref(false);
 
 function formatCameraValue(value) {
   if (value == null || value === "") return "-";
@@ -295,6 +315,7 @@ const {
   confirmEdit,
   cancelEdit,
   setRating,
+  setPrivacy,
   requestEdit,
   toggleLeftPanel,
   zoomIn,

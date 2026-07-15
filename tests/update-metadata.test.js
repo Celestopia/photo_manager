@@ -18,6 +18,10 @@ function snapshot() {
   };
 }
 
+function customization(values = {}) {
+  return { Privacy: 1, ...values };
+}
+
 test("unchanged detection requires type, size, and millisecond mtime", () => {
   const item = { FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 } };
   assert.equal(isUnchangedRecord(item, snapshot()), true);
@@ -26,8 +30,8 @@ test("unchanged detection requires type, size, and millisecond mtime", () => {
 });
 
 test("rebuilt records preserve user-authored customization and location", () => {
-  const built = { Customization: { Title: "" }, Location: { Place: "" } };
-  const old = { Customization: { Title: "Saved", Category: "legacy" }, Location: { Place: "Beijing", Detail: "A" } };
+  const built = { Customization: customization({ Title: "" }), Location: { Place: "" } };
+  const old = { Customization: customization({ Title: "Saved", Category: "legacy" }), Location: { Place: "Beijing", Detail: "A" } };
   const result = preserveUserFields(built, old);
   assert.equal(result.Customization.Title, "Saved");
   assert.equal(Object.hasOwn(result.Customization, "Category"), false);
@@ -40,7 +44,7 @@ test("moved records retain media metadata while refreshing path and file stats",
     SHA256Hash: "hash",
     FileSystem: { FileType: "video", ShootingTimeString: "2025-01-01 10:00:00" },
     Video: { DurationSeconds: 10 },
-    Customization: { Title: "Saved" },
+    Customization: customization({ Title: "Saved", Privacy: 4 }),
   };
   const moved = cloneMovedRecord(old, snapshot(), "hash");
   assert.equal(moved.FilePath, "new/video.mp4");
@@ -48,6 +52,7 @@ test("moved records retain media metadata while refreshing path and file stats",
   assert.equal(moved.FileSystem.ShootingTimeString, "2025-01-01 10:00:00");
   assert.equal(moved.Video.DurationSeconds, 10);
   assert.equal(moved.Customization.Title, "Saved");
+  assert.equal(moved.Customization.Privacy, 4);
 });
 
 function quietLogger() {
@@ -59,6 +64,7 @@ test("incremental sync reuses unchanged records without hashing or probing", asy
     FilePath: "new/video.mp4",
     SHA256Hash: "same",
     FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 },
+    Customization: customization(),
   };
   let expensiveCalls = 0;
   const result = await synchronizeMetadata({
@@ -84,7 +90,7 @@ test("incremental sync treats a missing old path with the same hash as a move", 
     SHA256Hash: "same",
     FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 },
     Video: { DurationSeconds: 10 },
-    Customization: { Title: "Moved title" },
+    Customization: customization({ Title: "Moved title", Privacy: 3 }),
   };
   const result = await synchronizeMetadata({
     config: { media: {} },
@@ -100,6 +106,7 @@ test("incremental sync treats a missing old path with the same hash as a move", 
   });
   assert.equal(result.stats.moved, 1);
   assert.equal(result.next.get("new/video.mp4").Customization.Title, "Moved title");
+  assert.equal(result.next.get("new/video.mp4").Customization.Privacy, 3);
 });
 
 test("incremental sync does not inherit customization for a live duplicate", async () => {
@@ -107,7 +114,7 @@ test("incremental sync does not inherit customization for a live duplicate", asy
     FilePath: "old/video.mp4",
     SHA256Hash: "same",
     FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 },
-    Customization: { Title: "Original title" },
+    Customization: customization({ Title: "Original title" }),
   };
   const snapshots = {
     "C:\\library\\old\\video.mp4": { ...snapshot(), relativePath: "old/video.mp4" },
@@ -126,7 +133,7 @@ test("incremental sync does not inherit customization for a live duplicate", asy
         FilePath: options.snapshot.relativePath,
         SHA256Hash: options.hash,
         FileSystem: { FileType: "video" },
-        Customization: { Title: "" },
+        Customization: customization({ Title: "" }),
         Location: { Place: "", Detail: "" },
       }),
     },
@@ -142,7 +149,7 @@ test("incremental sync does not reuse technical metadata across media types", as
     SHA256Hash: "same",
     FileSystem: { FileType: "image", FileSize: 1000, ModificationTimeMs: 12345 },
     Picture: { Width: 100, Height: 100 },
-    Customization: { Title: "Old image" },
+    Customization: customization({ Title: "Old image" }),
   };
   const result = await synchronizeMetadata({
     config: { media: {} },
@@ -158,7 +165,7 @@ test("incremental sync does not reuse technical metadata across media types", as
         SHA256Hash: options.hash,
         FileSystem: { FileType: "video" },
         Video: { ProbeStatus: "ok" },
-        Customization: { Title: "" },
+        Customization: customization({ Title: "" }),
         Location: { Place: "", Detail: "" },
       }),
     },
@@ -174,7 +181,7 @@ test("incremental sync retains direct metadata after a temporary rebuild failure
     FilePath: "new/video.mp4",
     SHA256Hash: "old",
     FileSystem: { FileType: "video", FileSize: 999, ModificationTimeMs: 1 },
-    Customization: { Title: "Keep me" },
+    Customization: customization({ Title: "Keep me" }),
   };
   const result = await synchronizeMetadata({
     config: { media: {} },

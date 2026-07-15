@@ -16,12 +16,13 @@ export function useGallerySelection({
 }) {
   const isSelectionMode = ref(false);
   const gallerySelection = ref(new Set());
-  const batchEdit = reactive({ title: "", album: "", tags: [], people: [], locationPlace: "" });
+  const batchEdit = reactive({ title: "", privacy: null, album: "", tags: [], people: [], locationPlace: "" });
   const batchStatus = reactive({ visible: false, tone: "info", message: "" });
 
   const selectedGalleryCount = computed(() => gallerySelection.value.size);
   const batchHasChanges = computed(() => (
     Boolean(batchEdit.title.trim())
+    || batchEdit.privacy !== null
     || Boolean(batchEdit.album.trim())
     || batchEdit.tags.length > 0
     || batchEdit.people.length > 0
@@ -86,7 +87,7 @@ export function useGallerySelection({
   }
 
   function clearBatchEditInputs({ keepStatus = false } = {}) {
-    Object.assign(batchEdit, { title: "", album: "", tags: [], people: [], locationPlace: "" });
+    Object.assign(batchEdit, { title: "", privacy: null, album: "", tags: [], people: [], locationPlace: "" });
     resetBatchPickers?.();
     if (!keepStatus) {
       batchStatus.visible = false;
@@ -133,6 +134,7 @@ export function useGallerySelection({
     if (batchEdit.locationPlace.trim()) locationPatch.Place = batchEdit.locationPlace.trim();
     const customizationPatch = {};
     if (batchEdit.title.trim()) customizationPatch.Title = batchEdit.title.trim();
+    if (batchEdit.privacy !== null) customizationPatch.Privacy = batchEdit.privacy;
     if (batchEdit.album.trim()) customizationPatch.Album = batchEdit.album.trim();
     const addTags = [...new Set(batchEdit.tags.map((value) => value.trim()).filter(Boolean))];
     const addPeople = [...new Set(batchEdit.people.map((value) => value.trim()).filter(Boolean))];

@@ -17,6 +17,13 @@ test("CSV schema exports all normalized video fields", () => {
   }
 });
 
+test("CSV places Privacy immediately after Rating", () => {
+  const headers = COLUMNS.map((column) => column.header);
+  assert.equal(headers[headers.indexOf("Rating") + 1], "Privacy");
+  const privacyColumn = COLUMNS.find((column) => column.header === "Privacy");
+  assert.equal(privacyColumn.get({ Customization: { Privacy: 4 } }), 4);
+});
+
 test("CSV cells quote commas and double quotes", () => {
   assert.equal(toCell('a,"b"'), '"a,""b"""');
 });
