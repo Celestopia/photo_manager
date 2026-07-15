@@ -30,7 +30,10 @@ test("local media paths are encoded as file URLs", () => {
   );
 });
 
-test("gallery image details use the fixed compact field sequence", () => {
+test("gallery image details resolve registry IDs into compact display text", () => {
+  const locationId = "00000000-0000-4000-8000-000000000001";
+  const campusTagId = "00000000-0000-4000-8000-000000000002";
+  const buildingTagId = "00000000-0000-4000-8000-000000000003";
   const rows = buildGalleryMediaDetailRows({
     FilePath: "旅行/IMG_0001.jpg",
     FileSystem: {
@@ -40,8 +43,11 @@ test("gallery image details use the fixed compact field sequence", () => {
       ModificationTimeString: "2026-07-14 10:21:00",
     },
     Picture: { Width: 4096, Height: 3072 },
-    Location: { Place: "清华大学", Detail: "不在菜单中显示" },
-    Customization: { Tags: ["校园", "建筑"] },
+    Location: { LocationId: locationId, Detail: "不在菜单中显示" },
+    Customization: { TagIds: [campusTagId, buildingTagId] },
+  }, {
+    getLocationName: (id) => id === locationId ? "清华大学" : "",
+    getTagText: (id) => ({ [campusTagId]: "校园", [buildingTagId]: "建筑" })[id] || "",
   });
 
   assert.deepEqual(
@@ -67,8 +73,8 @@ test("gallery video details add frame rate and duration before location", () => 
     FilePath: "VID_0001.mp4",
     FileSystem: { FileType: "video", FileSize: 1024 },
     Video: { DisplayWidth: 1920, DisplayHeight: 1080, FrameRate: 29.97003, DurationSeconds: 65.8 },
-    Location: { Place: "" },
-    Customization: { Tags: [] },
+    Location: { LocationId: null },
+    Customization: { TagIds: [] },
   });
 
   assert.deepEqual(
@@ -83,29 +89,35 @@ test("gallery video details add frame rate and duration before location", () => 
 });
 
 test("location hierarchy keeps child locations immediately after their parent", () => {
+  const campusId = "00000000-0000-4000-8000-000000000001";
+  const diningId = "00000000-0000-4000-8000-000000000002";
+  const outsideId = "00000000-0000-4000-8000-000000000003";
   const rows = buildLocationHierarchyRows([
     {
+      LocationId: outsideId,
       Name: "清华大学东南门外餐厅",
       Country: "中国",
       Province: "",
       City: "北京",
-      Parent: "",
+      ParentId: null,
       Path: ["清华大学东南门外餐厅"],
     },
     {
+      LocationId: diningId,
       Name: "清华大学观畴园食堂",
       Country: "中国",
       Province: "",
       City: "北京",
-      Parent: "清华大学",
+      ParentId: campusId,
       Path: ["清华大学", "清华大学观畴园食堂"],
     },
     {
+      LocationId: campusId,
       Name: "清华大学",
       Country: "中国",
       Province: "",
       City: "北京",
-      Parent: "",
+      ParentId: null,
       Path: ["清华大学"],
     },
   ]);
@@ -121,19 +133,21 @@ test("location hierarchy keeps child locations immediately after their parent", 
 test("location hierarchy emits administrative rows and stable manager context", () => {
   const rows = buildLocationHierarchyRows([
     {
+      LocationId: "00000000-0000-4000-8000-000000000001",
       Name: "南京",
       Country: "中国",
       Province: "江苏",
       City: "南京",
-      Parent: "",
+      ParentId: null,
       Path: ["南京"],
     },
     {
+      LocationId: "00000000-0000-4000-8000-000000000002",
       Name: "五一广场",
       Country: "中国",
       Province: "湖南",
       City: "长沙",
-      Parent: "",
+      ParentId: null,
       Path: ["五一广场"],
     },
   ]);

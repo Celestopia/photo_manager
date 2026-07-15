@@ -32,7 +32,7 @@ export function locationMatchesKeyword(location, keyword) {
     location.Country,
     location.Province,
     location.City,
-    location.Parent,
+    location.ParentId,
     location.Description,
     getLocationRegionLabel(location),
     getLocationPathLabel(location),
@@ -75,22 +75,22 @@ function compareLocationRowsByPath(a, b) {
   return (a.Label || "").localeCompare(b.Label || "", "zh-CN");
 }
 
-function buildLocationTreeRows(locationRows, baseDepth, representedLocationName = "", contextParts = []) {
-  const byName = new Map(locationRows.map((row) => [row.Location.Name, row]));
+function buildLocationTreeRows(locationRows, baseDepth, representedLocationId = "", contextParts = []) {
+  const byId = new Map(locationRows.map((row) => [row.Location.LocationId, row]));
   const children = new Map();
   const roots = [];
   for (const row of locationRows) {
-    const parentName = normalizeLocationName(row.Location?.Parent);
-    if (parentName && parentName !== representedLocationName && byName.has(parentName)) {
-      if (!children.has(parentName)) children.set(parentName, []);
-      children.get(parentName).push(row);
+    const parentId = normalizeLocationName(row.Location?.ParentId);
+    if (parentId && parentId !== representedLocationId && byId.has(parentId)) {
+      if (!children.has(parentId)) children.set(parentId, []);
+      children.get(parentId).push(row);
     } else {
       roots.push(row);
     }
   }
   const output = [];
   const visit = (row, depth, ancestryParts = []) => {
-    const childRows = [...(children.get(row.Location.Name) || [])].sort(compareLocationRowsByPath);
+    const childRows = [...(children.get(row.Location.LocationId) || [])].sort(compareLocationRowsByPath);
     const rowContextParts = [...contextParts, ...ancestryParts, row.Label].filter(Boolean);
     output.push({ ...row, Depth: depth, HasChildren: childRows.length > 0, ContextParts: rowContextParts });
     for (const child of childRows) visit(child, depth + 1, [...ancestryParts, row.Label]);
@@ -131,13 +131,13 @@ export function buildLocationHierarchyRows(locations) {
     const lastSpec = groupPath[groupPath.length - 1];
     if (isLocationRepresentedByGroup(location, lastSpec)) {
       parent.Location = location;
-      parent.Key = `group-location:${location.Name}`;
+      parent.Key = `group-location:${location.LocationId}`;
       continue;
     }
     const reducedPath = getReducedLocationPath(location, groupPath);
     parent.Locations.push({
       Type: "location",
-      Key: `location:${location.Name}`,
+      Key: `location:${location.LocationId}`,
       Label: location.Name,
       Depth: parent.Depth + reducedPath.length,
       Location: location,
@@ -148,7 +148,7 @@ export function buildLocationHierarchyRows(locations) {
 
   const rows = [];
   const flatten = (node, contextParts = []) => {
-    rows.push(...buildLocationTreeRows(node.Locations, node.Depth, node.Location?.Name, contextParts));
+    rows.push(...buildLocationTreeRows(node.Locations, node.Depth, node.Location?.LocationId, contextParts));
     const groups = [...node.Groups.values()].sort((a, b) => (a.Order - b.Order) || a.Label.localeCompare(b.Label, "zh-CN"));
     for (const group of groups) {
       const groupContextParts = [...contextParts, group.Label].filter(Boolean);

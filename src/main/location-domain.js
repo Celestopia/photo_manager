@@ -1,3 +1,5 @@
+const { assertOptionalUuidV4 } = require("../shared/identity-schema.js");
+
 function normalizeLocationName(value) {
   return String(value ?? "").trim();
 }
@@ -9,7 +11,7 @@ function normalizeLocationField(value) {
 function normalizeLocationObject(rawLocation) {
   const source = rawLocation && typeof rawLocation === "object" ? rawLocation : {};
   return {
-    Place: normalizeLocationName(source.Place ?? source.Site),
+    LocationId: assertOptionalUuidV4(source.LocationId, "LocationId"),
     Detail: normalizeLocationField(source.Detail),
   };
 }
@@ -18,24 +20,21 @@ function createLocationDomain(getRegistryIndex) {
   function getLocationChildrenMap() {
     const registry = getRegistryIndex();
     const children = new Map();
+    for (const locationId of registry.keys()) children.set(locationId, []);
     for (const location of registry.values()) {
-      if (!children.has(location.Name)) children.set(location.Name, []);
+      if (!location.ParentId || !registry.has(location.ParentId)) continue;
+      children.get(location.ParentId).push(location.LocationId);
     }
-    for (const location of registry.values()) {
-      const parent = normalizeLocationName(location.Parent);
-      if (!parent || !registry.has(parent)) continue;
-      if (!children.has(parent)) children.set(parent, []);
-      children.get(parent).push(location.Name);
+    for (const ids of children.values()) {
+      ids.sort((a, b) => registry.get(a).Name.localeCompare(registry.get(b).Name, "zh-CN"));
     }
-    for (const names of children.values()) names.sort((a, b) => a.localeCompare(b, "zh-CN"));
     return children;
   }
 
-  function getLocationDescendants(name) {
-    const root = normalizeLocationName(name);
+  function getLocationDescendants(locationId) {
     const children = getLocationChildrenMap();
     const output = [];
-    const stack = [...(children.get(root) || [])];
+    const stack = [...(children.get(locationId) || [])];
     const seen = new Set();
     while (stack.length) {
       const current = stack.pop();
@@ -47,34 +46,34 @@ function createLocationDomain(getRegistryIndex) {
     return output;
   }
 
-  function buildLocationPath(name) {
+  function buildLocationPath(locationId) {
     const registry = getRegistryIndex();
     const parts = [];
     const seen = new Set();
-    let current = normalizeLocationName(name);
+    let current = locationId;
     while (current && registry.has(current) && !seen.has(current)) {
       seen.add(current);
-      parts.unshift(current);
-      current = normalizeLocationName(registry.get(current)?.Parent);
+      const location = registry.get(current);
+      parts.unshift(location.Name);
+      current = location.ParentId;
     }
     return parts;
   }
 
-  function getLocationDepth(name) {
-    return Math.max(0, buildLocationPath(name).length - 1);
+  function getLocationDepth(locationId) {
+    return Math.max(0, buildLocationPath(locationId).length - 1);
   }
 
-  function validateLocationParent(name, parent) {
+  function validateLocationParent(locationId, rawParentId) {
     const registry = getRegistryIndex();
-    const normalizedName = normalizeLocationName(name);
-    const normalizedParent = normalizeLocationName(parent);
-    if (!normalizedParent) return { ok: true, parent: "" };
-    if (!registry.has(normalizedParent)) return { ok: false, error: "Parent location not found" };
-    if (normalizedParent === normalizedName) return { ok: false, error: "Location cannot be its own parent" };
-    if (normalizedName && getLocationDescendants(normalizedName).includes(normalizedParent)) {
+    const parentId = assertOptionalUuidV4(rawParentId, "ParentId");
+    if (!parentId) return { ok: true, parentId: null };
+    if (!registry.has(parentId)) return { ok: false, error: "Parent location not found" };
+    if (parentId === locationId) return { ok: false, error: "Location cannot be its own parent" };
+    if (locationId && getLocationDescendants(locationId).includes(parentId)) {
       return { ok: false, error: "Parent cannot be a descendant location" };
     }
-    return { ok: true, parent: normalizedParent };
+    return { ok: true, parentId };
   }
 
   return {

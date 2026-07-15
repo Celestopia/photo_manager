@@ -5,14 +5,14 @@
         <button
           type="button"
           class="input album-input registry-trigger"
-          :class="{ 'is-placeholder': !selectedAlbum }"
-          :data-tip="selectedAlbum ? getAlbumDescription(selectedAlbum) : ''"
+          :class="{ 'is-placeholder': !selectedAlbumId }"
+          :data-tip="selectedAlbumId ? getAlbumDescription(selectedAlbumId) : ''"
           @click="openAlbumDropdown(target)"
-        ><span>{{ selectedAlbum || placeholder }}</span></button>
+        ><span>{{ selectedAlbumTitle || placeholder }}</span></button>
         <button
           type="button"
           class="album-clear-btn"
-          v-if="selectedAlbum"
+          v-if="selectedAlbumId"
           data-tip="将当前媒体移出相册"
           aria-label="将当前媒体移出相册"
           @click.stop="clearAlbumForTarget(target)"
@@ -29,12 +29,12 @@
           <div class="registry-dropdown-options">
             <button
               v-for="album in albumOptions"
-              :key="target + '_album_option_' + album.Title"
+              :key="target + '_album_option_' + album.AlbumId"
               type="button"
               class="tag-option"
-              :class="{ 'is-selected': selectedAlbum === album.Title }"
+              :class="{ 'is-selected': selectedAlbumId === album.AlbumId }"
               :data-tip="album.Description"
-              @mousedown.prevent="setAlbumForTarget(target, album.Title)"
+              @mousedown.prevent="setAlbumForTarget(target, album.AlbumId)"
             >
               <span>{{ album.Title }}</span>
             </button>
@@ -86,6 +86,7 @@ const {
   albumCreate,
   getAlbumOptions,
   getAlbumDescription,
+  getAlbumTitle,
   openAlbumDropdown,
   setAlbumForTarget,
   clearAlbumForTarget,
@@ -97,6 +98,7 @@ const {
 } = app;
 
 const target = props.target;
-const selectedAlbum = computed(() => (props.target === "batch" ? batchEdit.album : editDraft.Album));
+const selectedAlbumId = computed(() => (props.target === "batch" ? batchEdit.albumId : editDraft.AlbumId));
+const selectedAlbumTitle = computed(() => getAlbumTitle(selectedAlbumId.value));
 const albumOptions = computed(() => getAlbumOptions(props.target));
 </script>

@@ -23,6 +23,11 @@ const { createLibraryBackup } = require("./library-backup");
 const { recoverPendingTransaction } = require("./library-transaction");
 const { createOperationReporter } = require("./operation-progress");
 const { assertCustomization } = require("../src/shared/customization-schema");
+const {
+  assertUuidV4,
+  createUniqueEntityId,
+} = require("../src/shared/identity-schema.js");
+const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
 function isUnchangedRecord(existing, snapshot) {
   return Boolean(
@@ -37,6 +42,7 @@ function isUnchangedRecord(existing, snapshot) {
 
 function preserveUserFields(built, existing) {
   if (!existing) return built;
+  built.MediaId = existing.MediaId;
   built.Customization = existing.Customization || built.Customization;
   built.Location = { ...(built.Location || {}), ...(existing.Location || {}) };
   if (built.Customization && Object.prototype.hasOwnProperty.call(built.Customization, "Category")) {
@@ -68,8 +74,27 @@ function cloneMovedRecord(existing, snapshot, hash) {
   return moved;
 }
 
-async function synchronizeMetadata({ config, root, existing, files, logger = console, dependencies = {}, onProgress = null }) {
+async function synchronizeMetadata({
+  config,
+  root,
+  existing,
+  files,
+  logger = console,
+  dependencies = {},
+  onProgress = null,
+  reservedEntityIds = [],
+}) {
   for (const item of existing.values()) assertCustomization(item.Customization, item.FilePath);
+  const usedEntityIds = new Set(reservedEntityIds);
+  for (const item of existing.values()) usedEntityIds.add(assertUuidV4(item.MediaId, `MediaId for ${item.FilePath}`));
+  function registerNewMediaId(item) {
+    const id = assertUuidV4(item?.MediaId, `MediaId for ${item?.FilePath || "new metadata record"}`);
+    if (usedEntityIds.has(id)) {
+      item.MediaId = createUniqueEntityId((candidate) => usedEntityIds.has(candidate));
+    }
+    usedEntityIds.add(item.MediaId);
+    return item;
+  }
   const inspectFile = dependencies.inspectMediaFile || inspectMediaFile;
   const hashFile = dependencies.sha256File || sha256File;
   const buildFileMetadata = dependencies.buildMetadata || buildMetadata;
@@ -143,11 +168,11 @@ async function synchronizeMetadata({ config, root, existing, files, logger = con
         next.set(snapshot.relativePath, cloneMovedRecord(movedFrom, snapshot, hash));
         stats.moved += 1;
       } else {
-        const built = await buildFileMetadata(snapshot.filePath, root, {
+        const built = registerNewMediaId(await buildFileMetadata(snapshot.filePath, root, {
           snapshot,
           hash,
           mediaConfig: config.media,
-        });
+        }));
         next.set(snapshot.relativePath, built);
         stats.rebuilt += 1;
       }
@@ -195,6 +220,8 @@ async function run(options = {}) {
       retentionCount: config.backup.retentionCount,
     });
     const existing = await loadExisting(paths.metadataFile);
+    const registries = await loadRegistryIndexes(paths);
+    validateMetadataMap(existing, registries);
     validateMetadataPaths(paths, existing.values());
     const files = await walkFiles(paths.root, { onProgress: (progress) => emit(progress) });
     const result = await synchronizeMetadata({
@@ -204,7 +231,14 @@ async function run(options = {}) {
       files,
       logger,
       onProgress: (progress) => emit(progress),
+      reservedEntityIds: [
+        ...registries.tags.byId.keys(),
+        ...registries.albums.byId.keys(),
+        ...registries.people.byId.keys(),
+        ...registries.locations.byId.keys(),
+      ],
     });
+    validateMetadataMap(result.next, registries);
     const nextEntries = [...result.next.values()];
     emit({ phase: "commit", processed: nextEntries.length, total: nextEntries.length, message: "原子写入元数据" });
     await writeAll(paths.metadataFile, nextEntries);

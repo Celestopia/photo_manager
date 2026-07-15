@@ -7,6 +7,13 @@ const {
   synchronizeMetadata,
 } = require("../scripts/update-metadata");
 
+const MEDIA_IDS = {
+  current: "00000000-0000-4000-8000-000000000001",
+  moved: "00000000-0000-4000-8000-000000000002",
+  duplicate: "00000000-0000-4000-8000-000000000003",
+  image: "00000000-0000-4000-8000-000000000004",
+};
+
 function snapshot() {
   return {
     relativePath: "new/video.mp4",
@@ -19,7 +26,13 @@ function snapshot() {
 }
 
 function customization(values = {}) {
-  return { Privacy: 1, ...values };
+  return {
+    Privacy: 1,
+    AlbumId: null,
+    TagIds: [],
+    PersonIds: [],
+    ...values,
+  };
 }
 
 test("unchanged detection requires type, size, and millisecond mtime", () => {
@@ -30,16 +43,27 @@ test("unchanged detection requires type, size, and millisecond mtime", () => {
 });
 
 test("rebuilt records preserve user-authored customization and location", () => {
-  const built = { Customization: customization({ Title: "" }), Location: { Place: "" } };
-  const old = { Customization: customization({ Title: "Saved", Category: "legacy" }), Location: { Place: "Beijing", Detail: "A" } };
+  const locationId = "00000000-0000-4000-8000-000000000010";
+  const built = {
+    MediaId: MEDIA_IDS.duplicate,
+    Customization: customization({ Title: "" }),
+    Location: { LocationId: null, Detail: "" },
+  };
+  const old = {
+    MediaId: MEDIA_IDS.current,
+    Customization: customization({ Title: "Saved", Category: "legacy" }),
+    Location: { LocationId: locationId, Detail: "A" },
+  };
   const result = preserveUserFields(built, old);
+  assert.equal(result.MediaId, MEDIA_IDS.current);
   assert.equal(result.Customization.Title, "Saved");
   assert.equal(Object.hasOwn(result.Customization, "Category"), false);
-  assert.deepEqual(result.Location, { Place: "Beijing", Detail: "A" });
+  assert.deepEqual(result.Location, { LocationId: locationId, Detail: "A" });
 });
 
 test("moved records retain media metadata while refreshing path and file stats", () => {
   const old = {
+    MediaId: MEDIA_IDS.moved,
     FilePath: "old/video.mp4",
     SHA256Hash: "hash",
     FileSystem: { FileType: "video", ShootingTimeString: "2025-01-01 10:00:00" },
@@ -47,6 +71,7 @@ test("moved records retain media metadata while refreshing path and file stats",
     Customization: customization({ Title: "Saved", Privacy: 4 }),
   };
   const moved = cloneMovedRecord(old, snapshot(), "hash");
+  assert.equal(moved.MediaId, MEDIA_IDS.moved);
   assert.equal(moved.FilePath, "new/video.mp4");
   assert.equal(moved.FileSystem.ModificationTimeMs, 12345);
   assert.equal(moved.FileSystem.ShootingTimeString, "2025-01-01 10:00:00");
@@ -61,6 +86,7 @@ function quietLogger() {
 
 test("incremental sync reuses unchanged records without hashing or probing", async () => {
   const current = {
+    MediaId: MEDIA_IDS.current,
     FilePath: "new/video.mp4",
     SHA256Hash: "same",
     FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 },
@@ -86,6 +112,7 @@ test("incremental sync reuses unchanged records without hashing or probing", asy
 
 test("incremental sync treats a missing old path with the same hash as a move", async () => {
   const old = {
+    MediaId: MEDIA_IDS.moved,
     FilePath: "old/video.mp4",
     SHA256Hash: "same",
     FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 },
@@ -105,12 +132,14 @@ test("incremental sync treats a missing old path with the same hash as a move", 
     },
   });
   assert.equal(result.stats.moved, 1);
+  assert.equal(result.next.get("new/video.mp4").MediaId, MEDIA_IDS.moved);
   assert.equal(result.next.get("new/video.mp4").Customization.Title, "Moved title");
   assert.equal(result.next.get("new/video.mp4").Customization.Privacy, 3);
 });
 
 test("incremental sync does not inherit customization for a live duplicate", async () => {
   const old = {
+    MediaId: MEDIA_IDS.current,
     FilePath: "old/video.mp4",
     SHA256Hash: "same",
     FileSystem: { FileType: "video", FileSize: 1000, ModificationTimeMs: 12345 },
@@ -130,21 +159,25 @@ test("incremental sync does not inherit customization for a live duplicate", asy
       inspectMediaFile: async (filePath) => ({ ...snapshots[filePath], filePath }),
       sha256File: async () => "same",
       buildMetadata: async (_filePath, _root, options) => ({
+        MediaId: MEDIA_IDS.duplicate,
         FilePath: options.snapshot.relativePath,
         SHA256Hash: options.hash,
         FileSystem: { FileType: "video" },
         Customization: customization({ Title: "" }),
-        Location: { Place: "", Detail: "" },
+        Location: { LocationId: null, Detail: "" },
       }),
     },
   });
   assert.equal(result.stats.reused, 1);
   assert.equal(result.stats.rebuilt, 1);
+  assert.equal(result.next.get("old/video.mp4").MediaId, MEDIA_IDS.current);
+  assert.equal(result.next.get("new/video.mp4").MediaId, MEDIA_IDS.duplicate);
   assert.equal(result.next.get("new/video.mp4").Customization.Title, "");
 });
 
 test("incremental sync does not reuse technical metadata across media types", async () => {
   const oldImage = {
+    MediaId: MEDIA_IDS.image,
     FilePath: "old/file.jpg",
     SHA256Hash: "same",
     FileSystem: { FileType: "image", FileSize: 1000, ModificationTimeMs: 12345 },
@@ -161,12 +194,13 @@ test("incremental sync does not reuse technical metadata across media types", as
       inspectMediaFile: async (filePath) => ({ ...snapshot(), filePath }),
       sha256File: async () => "same",
       buildMetadata: async (_filePath, _root, options) => ({
+        MediaId: MEDIA_IDS.duplicate,
         FilePath: options.snapshot.relativePath,
         SHA256Hash: options.hash,
         FileSystem: { FileType: "video" },
         Video: { ProbeStatus: "ok" },
         Customization: customization({ Title: "" }),
-        Location: { Place: "", Detail: "" },
+        Location: { LocationId: null, Detail: "" },
       }),
     },
   });
@@ -178,6 +212,7 @@ test("incremental sync does not reuse technical metadata across media types", as
 
 test("incremental sync retains direct metadata after a temporary rebuild failure", async () => {
   const current = {
+    MediaId: MEDIA_IDS.current,
     FilePath: "new/video.mp4",
     SHA256Hash: "old",
     FileSystem: { FileType: "video", FileSize: 999, ModificationTimeMs: 1 },

@@ -34,6 +34,8 @@ const { createMainWindow } = require("./window-manager.js");
 const { createApplicationRuntime } = require("./application-runtime.js");
 const { createThumbnailWarmupService } = require("./thumbnail-warmup-service.js");
 const { assertCustomization } = require("../shared/customization-schema.js");
+const { createUniqueEntityId } = require("../shared/identity-schema.js");
+const { validateMediaEntries } = require("../shared/library-data-schema.js");
 const {
   normalizeThumbnailConfig,
   thumbnailAbsolutePath,
@@ -118,9 +120,17 @@ const state = createApplicationRuntime();
 let config = null;
 let appState = { lastLibraryPath: "" };
 let applicationStartedAt = new Date().toISOString();
-const DEFAULT_TAG_DESCRIPTION = "待补充：请填写该标签的明确含义。";
-const DEFAULT_ALBUM_DESCRIPTION = "待补充：请填写该相册的明确含义。";
 const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
+
+function createRuntimeEntityId() {
+  return createUniqueEntityId((id) => (
+    state.metadataIndex.has(id)
+    || state.tagRegistryIndex.has(id)
+    || state.albumRegistryIndex.has(id)
+    || state.personRegistryIndex.has(id)
+    || state.locationRegistryIndex.has(id)
+  ));
+}
 
 /**
  * Force value into plain JSON-serializable structure.
@@ -211,22 +221,30 @@ function requireOpenLibrary({ writable = false } = {}) {
 }
 
 /**
- * Read metadata JSONL into an in-memory Map keyed by FilePath.
+ * Read metadata JSONL into an in-memory Map keyed by MediaId.
  * Strict parsing deliberately rejects malformed or duplicate records so an
  * inconsistent library never opens as if it were healthy.
  */
 async function loadMetadataIndex() {
   state.metadataIndex.clear();
+  state.mediaPathIndex.clear();
   const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
   const entries = await readJsonlStrict(metadataFile, {
     label: DATA_FILE_NAMES.metadata,
-    keyOf: (item) => item?.FilePath,
+    keyOf: (item) => item?.MediaId,
+  });
+  const validated = validateMediaEntries(entries, {
+    tags: state.tagRegistryIndex,
+    albums: state.albumRegistryIndex,
+    people: state.personRegistryIndex,
+    locations: state.locationRegistryIndex,
   });
   for (const item of entries) {
     assertPathInsideLibrary(state.activeLibrary.paths, path.join(state.activeLibrary.paths.root, item.FilePath));
     assertCustomization(item.Customization, item.FilePath);
-    state.metadataIndex.set(item.FilePath, item);
+    state.metadataIndex.set(item.MediaId, item);
   }
+  state.mediaPathIndex = validated.byPath;
 }
 
 /**
@@ -268,13 +286,13 @@ async function touchLibraryManifest() {
 }
 
 const tagCatalog = createSimpleRegistryCatalog({
+  idKey: "TagId",
   definitionKey: "Text",
   invalidKeyLabel: "tag key",
   dataFileName: DATA_FILE_NAMES.tags,
-  defaultDescription: DEFAULT_TAG_DESCRIPTION,
   backupReason: "tag-registry-write",
   normalize: normalizeTagText,
-  extractReferences: (item) => Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [],
+  extractReferences: (item) => Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [],
   getRegistry: () => state.tagRegistryIndex,
   getMetadata: () => state.metadataIndex,
   resolveDataFile,
@@ -284,13 +302,13 @@ const tagCatalog = createSimpleRegistryCatalog({
   writeJsonlAtomic,
 });
 const personCatalog = createSimpleRegistryCatalog({
+  idKey: "PersonId",
   definitionKey: "Name",
   invalidKeyLabel: "person key",
   dataFileName: DATA_FILE_NAMES.people,
-  defaultDescription: "",
   backupReason: "person-registry-write",
   normalize: normalizePersonName,
-  extractReferences: (item) => Array.isArray(item?.Customization?.People) ? item.Customization.People : [],
+  extractReferences: (item) => Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [],
   getRegistry: () => state.personRegistryIndex,
   getMetadata: () => state.metadataIndex,
   resolveDataFile,
@@ -300,16 +318,16 @@ const personCatalog = createSimpleRegistryCatalog({
   writeJsonlAtomic,
 });
 const albumCatalog = createSimpleRegistryCatalog({
+  idKey: "AlbumId",
   definitionKey: "Title",
   invalidKeyLabel: "album key",
   dataFileName: DATA_FILE_NAMES.albums,
-  defaultDescription: DEFAULT_ALBUM_DESCRIPTION,
   backupReason: "album-registry-write",
   normalize: normalizeAlbumTitle,
-  normalizeLoadedDescription: (value) => normalizeAlbumTitle(value) || DEFAULT_ALBUM_DESCRIPTION,
+  normalizeLoadedDescription: normalizeAlbumTitle,
   extractReferences: (item) => {
-    const album = item?.Customization?.Album;
-    return album ? [album] : [];
+    const albumId = item?.Customization?.AlbumId;
+    return albumId ? [albumId] : [];
   },
   getRegistry: () => state.albumRegistryIndex,
   getMetadata: () => state.metadataIndex,
@@ -330,20 +348,16 @@ const locationCatalog = createLocationCatalog({
   dataFileName: DATA_FILE_NAMES.locations,
   getRegistry: () => state.locationRegistryIndex,
   getMetadata: () => state.metadataIndex,
-  normalizeName: normalizeLocationName,
   normalizeField: normalizeLocationField,
   normalizeObject: normalizeLocationObject,
   getChildrenMap: getLocationChildrenMap,
   getDepth: getLocationDepth,
   buildPath: buildLocationPath,
-  validateParent: validateLocationParent,
   resolveDataFile,
   prepareLibraryWrite,
   touchLibraryManifest,
   readJsonlStrict,
   writeJsonlAtomic,
-  saveTransaction: saveRegistryAndMetadataTransaction,
-  saveMetadata: saveMetadataMap,
 });
 
 const listTagDefinitions = tagCatalog.listDefinitions;
@@ -366,23 +380,21 @@ const normalizeRegisteredLocation = locationCatalog.normalizeRegistered;
 
 function normalizeRegisteredTags(rawTags) {
   const validation = tagCatalog.validateMany(rawTags);
-  return { tags: validation.values, unknown: validation.unknown };
+  return { tagIds: validation.values, unknown: validation.unknown };
 }
 
 function normalizeRegisteredPeople(rawPeople) {
   const validation = personCatalog.validateMany(rawPeople);
-  return { people: validation.values, unknown: validation.unknown };
+  return { personIds: validation.values, unknown: validation.unknown };
 }
 
 function normalizeRegisteredAlbum(rawAlbum) {
   const validation = albumCatalog.validateOne(rawAlbum);
-  return { album: validation.value, unknown: validation.unknown };
+  return { albumId: validation.value, unknown: validation.unknown };
 }
 
 const { filterAndSort, groupByDate } = createGalleryQueryService({
   getLocationDescendants,
-  normalizeAlbumTitle,
-  normalizeLocationName,
   unassignedAlbumFilter: UNASSIGNED_ALBUM_FILTER,
 });
 
@@ -404,9 +416,9 @@ function enrichItem(item) {
   };
 }
 
-function resolveIndexedMediaPath(rawFilePath) {
-  const filePath = String(rawFilePath || "").replace(/\\/g, "/");
-  const item = state.metadataIndex.get(filePath);
+function resolveIndexedMediaPath(rawMediaId) {
+  const mediaId = String(rawMediaId || "").trim();
+  const item = state.metadataIndex.get(mediaId);
   if (!item) throw new Error("Media record not found");
   const library = requireOpenLibrary();
   const absolutePath = assertPathInsideLibrary(library.paths, path.join(library.paths.root, item.FilePath));
@@ -457,6 +469,7 @@ async function saveRegistryAndMetadataTransaction(registryFileName, registryEntr
 
 function clearLibraryIndexes() {
   state.metadataIndex.clear();
+  state.mediaPathIndex.clear();
   state.tagRegistryIndex.clear();
   state.albumRegistryIndex.clear();
   state.personRegistryIndex.clear();
@@ -503,11 +516,11 @@ async function checkMediaTools() {
 }
 
 async function loadAllLibraryIndexes() {
-  await loadMetadataIndex();
   await loadTagRegistryIndex();
   await loadAlbumRegistryIndex();
   await loadPersonRegistryIndex();
   await loadLocationRegistryIndex();
+  await loadMetadataIndex();
   const hashes = new Map();
   for (const item of state.metadataIndex.values()) {
     if (!item.SHA256Hash) continue;
@@ -749,7 +762,7 @@ function queryGallery(query) {
     ...query,
     filters: { ...(query.filters || {}), mediaType: "" },
   });
-  const unassignedAlbumCount = all.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album)).length;
+  const unassignedAlbumCount = all.filter((item) => !item?.Customization?.AlbumId).length;
   return {
     total: filtered.length,
     mediaCounts: {
@@ -759,10 +772,10 @@ function queryGallery(query) {
     },
     groups: groupByDate(filtered),
     filterOptions: {
-      albums: [...state.albumRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+      albums: listAlbumDefinitions(),
       unassignedAlbumCount,
-      tags: [...state.tagRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
-      people: [...state.personRegistryIndex.keys()].sort((a, b) => a.localeCompare(b, "zh-CN")),
+      tags: listTagDefinitions(),
+      people: listPersonDefinitions(),
       locations: listLocationDefinitions(),
     },
   };
@@ -776,11 +789,13 @@ function createDomainServices() {
     prepareLibraryWrite,
     saveTransaction: saveRegistryAndMetadataTransaction,
     appendLog,
+    createId: createRuntimeEntityId,
   };
   const tagService = createSimpleRegistryService({
     ...commonRegistryOptions,
     kind: "Tag",
     keyLabel: "Tag text",
+    idKey: "TagId",
     definitionKey: "Text",
     responseItemKey: "tag",
     responseListKey: "tags",
@@ -788,19 +803,21 @@ function createDomainServices() {
     descriptionRequired: false,
     normalize: normalizeTagText,
     readKey: (payload) => payload?.text ?? payload?.Text,
+    readId: (payload) => payload?.tagId ?? payload?.TagId,
     readDescription: (payload) => payload?.description ?? payload?.Description,
     getRegistry: () => state.tagRegistryIndex,
     setRegistry: (next) => { state.tagRegistryIndex = next; },
     saveRegistry: saveTagRegistryMap,
     listDefinitions: listTagDefinitions,
     getUsageCounts: getTagUsageCounts,
+    findByLabel: tagCatalog.findByLabel,
     sortEntries: (values) => [...values].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN")),
-    mutateMetadataOnDelete: (item, text) => {
-      const tags = Array.isArray(item?.Customization?.Tags) ? item.Customization.Tags : [];
-      if (!tags.includes(text)) return false;
+    mutateMetadataOnDelete: (item, tagId) => {
+      const tagIds = Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [];
+      if (!tagIds.includes(tagId)) return false;
       item.Customization = {
         ...(item.Customization || {}),
-        Tags: tags.filter((tag) => tag !== text),
+        TagIds: tagIds.filter((id) => id !== tagId),
         MetadataUpdateDate: new Date().toISOString(),
       };
       delete item.Customization.Category;
@@ -811,6 +828,7 @@ function createDomainServices() {
     ...commonRegistryOptions,
     kind: "Person",
     keyLabel: "Person name",
+    idKey: "PersonId",
     definitionKey: "Name",
     responseItemKey: "person",
     responseListKey: "people",
@@ -818,19 +836,21 @@ function createDomainServices() {
     descriptionRequired: false,
     normalize: normalizePersonName,
     readKey: (payload) => payload?.name ?? payload?.Name,
+    readId: (payload) => payload?.personId ?? payload?.PersonId,
     readDescription: (payload) => payload?.description ?? payload?.Description,
     getRegistry: () => state.personRegistryIndex,
     setRegistry: (next) => { state.personRegistryIndex = next; },
     saveRegistry: savePersonRegistryMap,
     listDefinitions: listPersonDefinitions,
     getUsageCounts: getPersonUsageCounts,
+    findByLabel: personCatalog.findByLabel,
     sortEntries: (values) => [...values].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")),
-    mutateMetadataOnDelete: (item, name) => {
-      const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
-      if (!people.includes(name)) return false;
+    mutateMetadataOnDelete: (item, personId) => {
+      const personIds = Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [];
+      if (!personIds.includes(personId)) return false;
       item.Customization = {
         ...(item.Customization || {}),
-        People: people.filter((person) => person !== name),
+        PersonIds: personIds.filter((id) => id !== personId),
         MetadataUpdateDate: new Date().toISOString(),
       };
       delete item.Customization.Category;
@@ -841,6 +861,7 @@ function createDomainServices() {
     ...commonRegistryOptions,
     kind: "Album",
     keyLabel: "Album title",
+    idKey: "AlbumId",
     definitionKey: "Title",
     responseItemKey: "album",
     responseListKey: "albums",
@@ -848,18 +869,20 @@ function createDomainServices() {
     descriptionRequired: true,
     normalize: normalizeAlbumTitle,
     readKey: (payload) => payload?.title ?? payload?.Title,
+    readId: (payload) => payload?.albumId ?? payload?.AlbumId,
     readDescription: (payload) => payload?.description ?? payload?.Description,
     getRegistry: () => state.albumRegistryIndex,
     setRegistry: (next) => { state.albumRegistryIndex = next; },
     saveRegistry: saveAlbumRegistryMap,
     listDefinitions: listAlbumDefinitions,
     getUsageCounts: getAlbumUsageCounts,
+    findByLabel: albumCatalog.findByLabel,
     sortEntries: (values) => [...values].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN")),
-    mutateMetadataOnDelete: (item, title) => {
-      if (normalizeAlbumTitle(item?.Customization?.Album) !== title) return false;
+    mutateMetadataOnDelete: (item, albumId) => {
+      if (item?.Customization?.AlbumId !== albumId) return false;
       item.Customization = {
         ...(item.Customization || {}),
-        Album: "",
+        AlbumId: null,
         MetadataUpdateDate: new Date().toISOString(),
       };
       delete item.Customization.Category;
@@ -877,6 +900,8 @@ function createDomainServices() {
     getDepth: getLocationDepth,
     buildPath: buildLocationPath,
     listDefinitions: listLocationDefinitions,
+    findDuplicate: locationCatalog.findDuplicate,
+    sortEntries: locationCatalog.sortEntries,
     saveRegistry: saveLocationRegistryMap,
   });
   const metadataEditService = createMetadataEditService({

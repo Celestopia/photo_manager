@@ -16,7 +16,7 @@ export function useGallerySelection({
 }) {
   const isSelectionMode = ref(false);
   const gallerySelection = ref(new Set());
-  const batchEdit = reactive({ title: "", rating: null, privacy: null, album: "", tags: [], people: [], locationPlace: "" });
+  const batchEdit = reactive({ title: "", rating: null, privacy: null, albumId: null, tagIds: [], personIds: [], locationId: null });
   const batchStatus = reactive({ visible: false, tone: "info", message: "" });
 
   const selectedGalleryCount = computed(() => gallerySelection.value.size);
@@ -24,10 +24,10 @@ export function useGallerySelection({
     Boolean(batchEdit.title.trim())
     || batchEdit.rating !== null
     || batchEdit.privacy !== null
-    || Boolean(batchEdit.album.trim())
-    || batchEdit.tags.length > 0
-    || batchEdit.people.length > 0
-    || Boolean(batchEdit.locationPlace.trim())
+    || Boolean(batchEdit.albumId)
+    || batchEdit.tagIds.length > 0
+    || batchEdit.personIds.length > 0
+    || Boolean(batchEdit.locationId)
   ));
   const canApplyBatchEdit = computed(() => selectedGalleryCount.value > 0 && batchHasChanges.value);
 
@@ -43,20 +43,20 @@ export function useGallerySelection({
 
   function onGalleryCardClick(item) {
     if (isSelectionMode.value) {
-      toggleGallerySelection(item.FilePath);
+      toggleGallerySelection(item.MediaId);
       return;
     }
     openViewer?.(item);
   }
 
-  function isGallerySelected(filePath) {
-    return gallerySelection.value.has(filePath);
+  function isGallerySelected(mediaId) {
+    return gallerySelection.value.has(mediaId);
   }
 
-  function toggleGallerySelection(filePath) {
+  function toggleGallerySelection(mediaId) {
     const next = new Set(gallerySelection.value);
-    if (next.has(filePath)) next.delete(filePath);
-    else next.add(filePath);
+    if (next.has(mediaId)) next.delete(mediaId);
+    else next.add(mediaId);
     gallerySelection.value = next;
   }
 
@@ -66,19 +66,19 @@ export function useGallerySelection({
 
   function selectAllGalleryPhotos() {
     if (!isSelectionMode.value) return;
-    const all = orderedItems.value.map((item) => item.FilePath).filter(Boolean);
+    const all = orderedItems.value.map((item) => item.MediaId).filter(Boolean);
     gallerySelection.value = new Set(all);
   }
 
   function syncGallerySelectionWithLoadedItems() {
-    const available = new Set(orderedItems.value.map((item) => item.FilePath));
-    const next = new Set([...gallerySelection.value].filter((filePath) => available.has(filePath)));
+    const available = new Set(orderedItems.value.map((item) => item.MediaId));
+    const next = new Set([...gallerySelection.value].filter((mediaId) => available.has(mediaId)));
     if (next.size !== gallerySelection.value.size) gallerySelection.value = next;
   }
 
   function addBatchTag() {
     const first = getBatchTagOptions?.()[0];
-    if (first) addBatchTagOption?.(first.Text);
+    if (first) addBatchTagOption?.(first.TagId);
   }
 
   function setBatchStatus(tone, message) {
@@ -88,7 +88,7 @@ export function useGallerySelection({
   }
 
   function clearBatchEditInputs({ keepStatus = false } = {}) {
-    Object.assign(batchEdit, { title: "", rating: null, privacy: null, album: "", tags: [], people: [], locationPlace: "" });
+    Object.assign(batchEdit, { title: "", rating: null, privacy: null, albumId: null, tagIds: [], personIds: [], locationId: null });
     resetBatchPickers?.();
     if (!keepStatus) {
       batchStatus.visible = false;
@@ -103,21 +103,21 @@ export function useGallerySelection({
   }
 
   function syncUpdatedItemsIntoGallery(updatedItems) {
-    const byPath = new Map(updatedItems.map((item) => [item.FilePath, item]));
-    orderedItems.value = orderedItems.value.map((item) => byPath.get(item.FilePath) || item);
+    const byId = new Map(updatedItems.map((item) => [item.MediaId, item]));
+    orderedItems.value = orderedItems.value.map((item) => byId.get(item.MediaId) || item);
     for (const group of galleryGroups.value) {
-      group.items = group.items.map((item) => byPath.get(item.FilePath) || item);
+      group.items = group.items.map((item) => byId.get(item.MediaId) || item);
     }
     rebuildGalleryItemIndex();
     triggerRef(galleryGroups);
   }
 
   function removeBatchTagAt(index) {
-    if (index >= 0 && index < batchEdit.tags.length) batchEdit.tags.splice(index, 1);
+    if (index >= 0 && index < batchEdit.tagIds.length) batchEdit.tagIds.splice(index, 1);
   }
 
   function removeBatchPersonAt(index) {
-    if (index >= 0 && index < batchEdit.people.length) batchEdit.people.splice(index, 1);
+    if (index >= 0 && index < batchEdit.personIds.length) batchEdit.personIds.splice(index, 1);
   }
 
   function onBatchTagInputKeydown(event) {
@@ -125,27 +125,27 @@ export function useGallerySelection({
   }
 
   async function applyBatchEdit() {
-    const filePaths = [...gallerySelection.value];
-    if (!filePaths.length) {
+    const mediaIds = [...gallerySelection.value];
+    if (!mediaIds.length) {
       showToastMessage("请先选择媒体");
       return;
     }
 
     const locationPatch = {};
-    if (batchEdit.locationPlace.trim()) locationPatch.Place = batchEdit.locationPlace.trim();
+    if (batchEdit.locationId) locationPatch.LocationId = batchEdit.locationId;
     const customizationPatch = {};
     if (batchEdit.title.trim()) customizationPatch.Title = batchEdit.title.trim();
     if (batchEdit.rating !== null) customizationPatch.Rating = batchEdit.rating;
     if (batchEdit.privacy !== null) customizationPatch.Privacy = batchEdit.privacy;
-    if (batchEdit.album.trim()) customizationPatch.Album = batchEdit.album.trim();
-    const addTags = [...new Set(batchEdit.tags.map((value) => value.trim()).filter(Boolean))];
-    const addPeople = [...new Set(batchEdit.people.map((value) => value.trim()).filter(Boolean))];
-    if (!addTags.length && !addPeople.length && !Object.keys(locationPatch).length && !Object.keys(customizationPatch).length) {
+    if (batchEdit.albumId) customizationPatch.AlbumId = batchEdit.albumId;
+    const addTagIds = [...new Set(batchEdit.tagIds.filter(Boolean))];
+    const addPersonIds = [...new Set(batchEdit.personIds.filter(Boolean))];
+    if (!addTagIds.length && !addPersonIds.length && !Object.keys(locationPatch).length && !Object.keys(customizationPatch).length) {
       showToastMessage("请先填写要批量修改的内容");
       return;
     }
 
-    const result = await api.batchUpdateMetadata({ filePaths, addTags, addPeople, locationPatch, customizationPatch });
+    const result = await api.batchUpdateMetadata({ mediaIds, addTagIds, addPersonIds, locationPatch, customizationPatch });
     if (!result?.ok) {
       const message = `批量修改失败：${result?.error || "未知错误"}`;
       showToastMessage(message);
@@ -158,7 +158,7 @@ export function useGallerySelection({
     await refreshRegistries?.();
     const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
     const missingCount = Number(result.missingCount || 0);
-    const requestedCount = Number(result.requestedCount || filePaths.length || 0);
+    const requestedCount = Number(result.requestedCount || mediaIds.length || 0);
     const detail = missingCount > 0
       ? `批量修改完成：成功 ${updatedCount} 个，失败 ${missingCount} 个（请求 ${requestedCount} 个）`
       : `批量修改完成：成功 ${updatedCount} 个媒体`;

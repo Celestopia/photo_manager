@@ -1,10 +1,14 @@
-const fs = require("node:fs");
+const {
+  assertOptionalUuidV4,
+  assertUuidV4,
+} = require("../shared/identity-schema.js");
+const { validateSimpleRegistryEntries } = require("../shared/library-data-schema.js");
 
 function createSimpleRegistryCatalog(options) {
   const {
+    idKey,
     definitionKey,
     dataFileName,
-    defaultDescription,
     invalidKeyLabel = definitionKey,
     backupReason,
     normalize,
@@ -24,10 +28,9 @@ function createSimpleRegistryCatalog(options) {
   function getUsageCounts() {
     const counts = new Map();
     for (const item of getMetadata().values()) {
-      for (const rawValue of extractReferences(item)) {
-        const value = normalize(rawValue);
-        if (!value) continue;
-        counts.set(value, (counts.get(value) || 0) + 1);
+      for (const id of extractReferences(item)) {
+        if (!id) continue;
+        counts.set(id, (counts.get(id) || 0) + 1);
       }
     }
     return counts;
@@ -37,7 +40,7 @@ function createSimpleRegistryCatalog(options) {
     const usage = getUsageCounts();
     return sortDefinitions(getRegistry().values()).map((definition) => ({
       ...definition,
-      UsageCount: usage.get(definition[definitionKey]) || 0,
+      UsageCount: usage.get(definition[idKey]) || 0,
     }));
   }
 
@@ -47,65 +50,56 @@ function createSimpleRegistryCatalog(options) {
     await touchLibraryManifest();
   }
 
-  function seedFromMetadata() {
-    const registry = getRegistry();
-    const now = new Date().toISOString();
-    let added = 0;
-    for (const item of getMetadata().values()) {
-      for (const rawValue of extractReferences(item)) {
-        const value = normalize(rawValue);
-        if (!value || registry.has(value)) continue;
-        registry.set(value, {
-          [definitionKey]: value,
-          Description: defaultDescription,
-          CreatedAt: now,
-          UpdatedAt: now,
-        });
-        added += 1;
-      }
-    }
-    return added;
-  }
-
   async function load() {
     const registry = getRegistry();
     registry.clear();
-    const registryFile = resolveDataFile(dataFileName);
-    const fileExists = fs.existsSync(registryFile);
-    if (fileExists) {
-      const entries = await readJsonlStrict(registryFile, {
-        label: dataFileName,
-        keyOf: (item) => item?.[definitionKey],
+    const entries = await readJsonlStrict(resolveDataFile(dataFileName), {
+      label: dataFileName,
+      keyOf: (item) => item?.[idKey],
+    });
+    validateSimpleRegistryEntries(entries, {
+      idKey,
+      labelKey: definitionKey,
+      kind: invalidKeyLabel,
+    });
+    for (const parsed of entries) {
+      const id = assertUuidV4(parsed[idKey], `${idKey} in ${dataFileName}`);
+      registry.set(id, {
+        [idKey]: id,
+        [definitionKey]: normalize(parsed[definitionKey]),
+        Description: normalizeLoadedDescription(parsed.Description),
+        CreatedAt: parsed.CreatedAt,
+        UpdatedAt: parsed.UpdatedAt,
       });
-      for (const parsed of entries) {
-        const value = normalize(parsed?.[definitionKey]);
-        if (!value || registry.has(value)) throw new Error(`Invalid or duplicate ${invalidKeyLabel}: ${value || "<empty>"}`);
-        const createdAt = typeof parsed?.CreatedAt === "string" ? parsed.CreatedAt : new Date().toISOString();
-        const updatedAt = typeof parsed?.UpdatedAt === "string" ? parsed.UpdatedAt : createdAt;
-        registry.set(value, {
-          [definitionKey]: value,
-          Description: normalizeLoadedDescription(parsed?.Description),
-          CreatedAt: createdAt,
-          UpdatedAt: updatedAt,
-        });
-      }
     }
-    const added = seedFromMetadata();
-    if (!fileExists || added > 0) await save();
   }
 
   function validateMany(rawValues) {
     const values = Array.isArray(rawValues) ? rawValues : [];
-    const normalized = [...new Set(values.map(normalize).filter(Boolean))];
-    return { values: normalized, unknown: normalized.filter((value) => !getRegistry().has(value)) };
+    const ids = [];
+    const seen = new Set();
+    for (const rawValue of values) {
+      const id = String(rawValue || "").trim();
+      if (!id) continue;
+      assertUuidV4(id, idKey);
+      if (!seen.has(id)) ids.push(id);
+      seen.add(id);
+    }
+    return { values: ids, unknown: ids.filter((id) => !getRegistry().has(id)) };
   }
 
   function validateOne(rawValue) {
-    const value = normalize(rawValue);
+    const value = assertOptionalUuidV4(rawValue, idKey);
     return { value, unknown: value && !getRegistry().has(value) ? [value] : [] };
   }
 
+  function findByLabel(rawLabel) {
+    const label = normalize(rawLabel);
+    return [...getRegistry().values()].find((definition) => definition[definitionKey] === label) || null;
+  }
+
   return {
+    findByLabel,
     getUsageCounts,
     listDefinitions,
     load,

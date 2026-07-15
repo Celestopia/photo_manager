@@ -10,14 +10,14 @@
       </header>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="tagManager.search" placeholder="搜索标签或说明" /></div>
       <div class="tag-manager-list">
-        <article class="tag-manager-item" v-for="tag in managerFilteredTags" :key="'manager_' + tag.Text">
+        <article class="tag-manager-item" v-for="tag in managerFilteredTags" :key="'manager_' + tag.TagId">
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ tag.Text }}</strong><span>{{ tag.UsageCount || 0 }} 个媒体</span></div>
-            <textarea v-if="tagManager.editingText === tag.Text" class="input tag-manager-description-input" v-model="tagManager.editDescription" placeholder="可留空"></textarea>
+            <textarea v-if="tagManager.editingId === tag.TagId" class="input tag-manager-description-input" v-model="tagManager.editDescription" placeholder="可留空"></textarea>
             <p v-else>{{ tag.Description || '无说明' }}</p>
-            <div class="tag-manager-error" v-if="tagManager.error && tagManager.editingText === tag.Text">{{ tagManager.error }}</div>
+            <div class="tag-manager-error" v-if="tagManager.error && tagManager.editingId === tag.TagId">{{ tagManager.error }}</div>
           </div>
-          <div class="tag-manager-actions" v-if="tagManager.editingText === tag.Text"><button class="btn btn-primary" @click="saveTagDescription">保存</button><button class="btn" @click="cancelTagDescriptionEdit">取消</button></div>
+          <div class="tag-manager-actions" v-if="tagManager.editingId === tag.TagId"><button class="btn btn-primary" @click="saveTagDescription">保存</button><button class="btn" @click="cancelTagDescriptionEdit">取消</button></div>
           <div class="tag-manager-actions" v-else><button class="btn" @click="startTagDescriptionEdit(tag)">编辑说明</button><button class="btn danger-text" @click="deleteTagGlobally(tag)">全局删除</button></div>
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredTags.length">没有匹配的标签</div>

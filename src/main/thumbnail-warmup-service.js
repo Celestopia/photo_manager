@@ -49,7 +49,7 @@ function createThumbnailWarmupService(options) {
         onGenerated: (item, thumbnailPath) => {
           if (token.cancelled || !state.activeLibrary || state.activeLibrary.sessionId !== sessionId || !state.mainWindow || state.mainWindow.isDestroyed()) return;
           state.mainWindow.webContents.send("thumbnail:ready", {
-            filePath: item.FilePath,
+            mediaId: item.MediaId,
             hash: item.SHA256Hash,
             thumbnailPath,
             thumbnailAvailable: true,

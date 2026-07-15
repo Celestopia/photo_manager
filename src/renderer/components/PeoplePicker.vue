@@ -4,15 +4,15 @@
       <div class="tag-editor controlled-tag-editor">
       <span
         class="tag-chip"
-        v-for="(person, index) in selectedPeople"
-        :key="target + '_' + person + '_' + index"
-        :data-tip="getPersonDescription(person)"
+        v-for="(personId, index) in selectedPersonIds"
+        :key="target + '_' + personId"
+        :data-tip="getPersonDescription(personId)"
       >
-        <span>{{ person }}</span>
+        <span>{{ getPersonName(personId) }}</span>
         <button type="button" class="tag-remove" @click.stop="removeSelectedPerson(index)">×</button>
       </span>
       <button type="button" class="tag-editor-trigger" @click="openPersonDropdown(target)">
-        <span v-if="!selectedPeople.length">{{ placeholder }}</span>
+        <span v-if="!selectedPersonIds.length">{{ placeholder }}</span>
         <span v-else>选择人物</span>
       </button>
         <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown selection-dropdown" v-if="personDropdown[target]">
@@ -29,12 +29,12 @@
               <div class="registry-section-label"><span>最近使用</span></div>
               <button
                 v-for="person in recentPersonOptions"
-                :key="target + '_recent_person_option_' + person.Name"
+                :key="target + '_recent_person_option_' + person.PersonId"
                 type="button"
                 class="tag-option"
-                :class="{ 'is-selected': selectedPeople.includes(person.Name) }"
+                :class="{ 'is-selected': selectedPersonIds.includes(person.PersonId) }"
                 :data-tip="person.Description"
-                @mousedown.prevent="addPersonToTarget(target, person.Name)"
+                @mousedown.prevent="addPersonToTarget(target, person.PersonId)"
               >
                 <span>{{ person.Name }}</span>
               </button>
@@ -42,12 +42,12 @@
             </template>
             <button
               v-for="person in personOptions"
-              :key="target + '_person_option_' + person.Name"
+              :key="target + '_person_option_' + person.PersonId"
               type="button"
               class="tag-option"
-              :class="{ 'is-selected': selectedPeople.includes(person.Name) }"
+              :class="{ 'is-selected': selectedPersonIds.includes(person.PersonId) }"
               :data-tip="person.Description"
-              @mousedown.prevent="addPersonToTarget(target, person.Name)"
+              @mousedown.prevent="addPersonToTarget(target, person.PersonId)"
             >
               <span>{{ person.Name }}</span>
             </button>
@@ -101,6 +101,7 @@ const {
   getPersonOptions,
   getRecentPersonOptions,
   getPersonDescription,
+  getPersonName,
   openPersonDropdown,
   addPersonToTarget,
   onPersonSearchKeydown,
@@ -113,7 +114,7 @@ const {
 } = app;
 
 const target = props.target;
-const selectedPeople = computed(() => (props.target === "batch" ? batchEdit.people : editDraft.People));
+const selectedPersonIds = computed(() => (props.target === "batch" ? batchEdit.personIds : editDraft.PersonIds));
 const personOptions = computed(() => getPersonOptions(props.target));
 const recentPersonOptions = computed(() => getRecentPersonOptions(props.target));
 

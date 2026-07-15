@@ -198,7 +198,7 @@ export function useRendererApplication() {
       showToastMessage,
       openViewer: (item) => openViewer(item),
       getBatchTagOptions: () => getTagOptions("batch"),
-      addBatchTagOption: (tagText) => addTagToTarget("batch", tagText),
+      addBatchTagOption: (tagId) => addTagToTarget("batch", tagId),
       handleBatchTagKeydown: (event) => onTagSearchKeydown(event, "batch"),
       resetBatchPickers: () => {
         tagSearch.batch = "";
@@ -317,6 +317,7 @@ export function useRendererApplication() {
       getTagOptions,
       getRecentTagOptions,
       getTagDescription,
+      getTagText,
       openTagDropdown,
       closeTagDropdown,
       closeAllTagDropdowns,
@@ -364,6 +365,7 @@ export function useRendererApplication() {
       getPersonOptions,
       getRecentPersonOptions,
       getPersonDescription,
+      getPersonName,
       openPersonDropdown,
       closePersonDropdown,
       closeAllPersonDropdowns,
@@ -410,6 +412,7 @@ export function useRendererApplication() {
       loadAlbums,
       getAlbumOptions,
       getAlbumDescription,
+      getAlbumTitle,
       openAlbumDropdown,
       closeAlbumDropdown,
       closeAllAlbumDropdowns,
@@ -455,6 +458,7 @@ export function useRendererApplication() {
       applyLocationRegistry,
       loadLocations,
       getLocationTreeLabel,
+      getLocationName,
       getLocationTooltip,
       getLocationManagerRowContext,
       updateLocationManagerContext,
@@ -625,6 +629,7 @@ export function useRendererApplication() {
     const tagContext = {
       ICONS, editDraft, batchEdit, tagSearch, tagDropdown, tagCreate, tagManager,
       managerFilteredTags, getTagOptions, getRecentTagOptions, getTagDescription,
+      getTagText,
       openTagDropdown, closeTagDropdown, addTagToTarget, onTagSearchKeydown,
       openCreateTagMenu, closeCreateTagMenu, createTagAndSelect, openTagManager,
       closeTagManager, removeTagAt, removeBatchTagAt, startTagDescriptionEdit,
@@ -633,6 +638,7 @@ export function useRendererApplication() {
     const albumContext = {
       ICONS, editDraft, batchEdit, albumSearch, albumDropdown, albumCreate, albumManager,
       managerFilteredAlbums, getAlbumOptions, getAlbumDescription, openAlbumDropdown,
+      getAlbumTitle,
       closeAlbumDropdown, setAlbumForTarget, clearAlbumForTarget, onAlbumSearchKeydown,
       openCreateAlbumMenu, closeCreateAlbumMenu, createAlbumAndSelect, openAlbumManager,
       closeAlbumManager, startAlbumDescriptionEdit, cancelAlbumDescriptionEdit,
@@ -641,6 +647,7 @@ export function useRendererApplication() {
     const personContext = {
       ICONS, editDraft, batchEdit, personSearch, personDropdown, personCreate, personManager,
       managerFilteredPeople, getPersonOptions, getRecentPersonOptions, getPersonDescription,
+      getPersonName,
       openPersonDropdown, closePersonDropdown, addPersonToTarget, onPersonSearchKeydown,
       openCreatePersonMenu, closeCreatePersonMenu, createPersonAndSelect, openPersonManager,
       closePersonManager, removePersonAt, removeBatchPersonAt, startPersonDescriptionEdit,
@@ -650,6 +657,7 @@ export function useRendererApplication() {
       ICONS, query, editDraft, batchEdit, locationSearch, locationDropdown, locationCreate,
       locationManager, locationManagerListRef, locationManagerContext, managerLocationRows,
       getLocationMenuRows, getLocationFilterRows,
+      getLocationName,
       setLocationFilter, getLocationParentOptions, getLocationParentRows, getLocationTooltip,
       getLocationTreeLabel, getLocationManagerRowContext,
       updateLocationManagerContext, openLocationDropdown, closeLocationDropdown,

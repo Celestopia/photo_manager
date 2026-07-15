@@ -56,13 +56,13 @@
     <div v-else class="video-container" @dblclick.stop.prevent="toggleFullscreen">
       <video
         v-if="videoPlaybackMode === 'video'"
-        :key="selectedItem?.FilePath"
+        :key="selectedItem?.MediaId"
         ref="videoElementRef"
         class="viewer-video"
         controls
         preload="metadata"
         playsinline
-        :data-file-path="selectedItem?.FilePath"
+        :data-media-id="selectedItem?.MediaId"
         :poster="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder"
         :src="buildImageUrl(selectedItem?.__absolutePath)"
         @loadedmetadata="onVideoLoadedMetadata"
@@ -77,11 +77,11 @@
         <img :src="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder" alt="视频封面" />
         <p>{{ videoPlaybackMessage || '当前仅播放音频' }}</p>
         <audio
-          :key="selectedItem?.FilePath + '_audio'"
+          :key="selectedItem?.MediaId + '_audio'"
           ref="audioElementRef"
           controls
           preload="metadata"
-          :data-file-path="selectedItem?.FilePath"
+          :data-media-id="selectedItem?.MediaId"
           :src="buildImageUrl(selectedItem?.__absolutePath)"
           @loadedmetadata="onAudioLoadedMetadata"
           @error="onAudioPlaybackError"

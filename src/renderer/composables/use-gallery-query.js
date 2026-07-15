@@ -28,7 +28,7 @@ export function useGalleryQuery({
   function rebuildGalleryItemIndex() {
     galleryItemIndex.clear();
     for (const item of orderedItems.value) {
-      if (item?.FilePath) galleryItemIndex.set(item.FilePath, item);
+      if (item?.MediaId) galleryItemIndex.set(item.MediaId, item);
     }
   }
 
@@ -106,17 +106,17 @@ export function useGalleryQuery({
   }
 
   function markThumbnailReady(payload) {
-    const filePath = String(payload?.filePath || "");
-    if (!filePath) return;
+    const mediaId = String(payload?.mediaId || "");
+    if (!mediaId) return;
     const readyAt = Date.now();
     const update = (item) => {
-      if (!item || item.FilePath !== filePath) return;
+      if (!item || item.MediaId !== mediaId) return;
       item.__thumbnailPath = payload.thumbnailPath || item.__thumbnailPath;
       item.__thumbnailAvailable = true;
       item.__thumbnailReadyAt = readyAt;
     };
     update(selectedItem.value);
-    update(galleryItemIndex.get(filePath));
+    update(galleryItemIndex.get(mediaId));
     triggerRef(orderedItems);
     triggerRef(galleryGroups);
   }

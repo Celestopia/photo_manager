@@ -16,11 +16,11 @@ export function useMediaEditor({
     Title: "",
     Rating: 1,
     Privacy: 1,
-    Album: "",
-    LocationPlace: "",
+    AlbumId: null,
+    LocationId: null,
     LocationDetail: "",
-    Tags: [],
-    People: [],
+    TagIds: [],
+    PersonIds: [],
     Description: "",
     HiddenDescription: "",
   });
@@ -42,11 +42,11 @@ export function useMediaEditor({
     editDraft.Title = item?.Customization?.Title || "";
     editDraft.Rating = Number(item?.Customization?.Rating || 1);
     editDraft.Privacy = Number(item?.Customization?.Privacy ?? 1);
-    editDraft.Album = item?.Customization?.Album || "";
-    editDraft.LocationPlace = item?.Location?.Place || item?.Location?.Site || "";
+    editDraft.AlbumId = item?.Customization?.AlbumId || null;
+    editDraft.LocationId = item?.Location?.LocationId || null;
     editDraft.LocationDetail = item?.Location?.Detail || "";
-    editDraft.Tags = [...(item?.Customization?.Tags || [])];
-    editDraft.People = [...(item?.Customization?.People || [])];
+    editDraft.TagIds = [...(item?.Customization?.TagIds || [])];
+    editDraft.PersonIds = [...(item?.Customization?.PersonIds || [])];
     editDraft.Description = item?.Customization?.Description || "";
     editDraft.HiddenDescription = item?.Customization?.HiddenDescription || "";
     resetViewerPickers?.();
@@ -61,14 +61,14 @@ export function useMediaEditor({
   }
 
   function removeTagAt(index) {
-    if (index < 0 || index >= editDraft.Tags.length) return;
-    editDraft.Tags.splice(index, 1);
+    if (index < 0 || index >= editDraft.TagIds.length) return;
+    editDraft.TagIds.splice(index, 1);
     requestEdit("Tags");
   }
 
   function removePersonAt(index) {
-    if (index < 0 || index >= editDraft.People.length) return;
-    editDraft.People.splice(index, 1);
+    if (index < 0 || index >= editDraft.PersonIds.length) return;
+    editDraft.PersonIds.splice(index, 1);
     requestEdit("People");
   }
 
@@ -101,18 +101,18 @@ export function useMediaEditor({
     if (!selectedItem.value) return;
     const saveField = activeEditField.value || "Title";
     const payload = {
-      filePath: selectedItem.value.FilePath,
+      mediaId: selectedItem.value.MediaId,
       customization: {
         Title: editDraft.Title,
         Rating: Math.min(5, Math.max(1, Number(editDraft.Rating || 1))),
         Privacy: editDraft.Privacy,
-        Album: editDraft.Album,
-        Tags: [...editDraft.Tags],
-        People: [...editDraft.People],
+        AlbumId: editDraft.AlbumId,
+        TagIds: [...editDraft.TagIds],
+        PersonIds: [...editDraft.PersonIds],
         Description: editDraft.Description,
         HiddenDescription: editDraft.HiddenDescription,
       },
-      location: { Place: editDraft.LocationPlace, Detail: editDraft.LocationDetail },
+      location: { LocationId: editDraft.LocationId, Detail: editDraft.LocationDetail },
     };
     const result = await api.updateCustomization(payload);
     if (result.ok) {
@@ -134,11 +134,11 @@ export function useMediaEditor({
       Title: "",
       Rating: 1,
       Privacy: 1,
-      Album: "",
-      LocationPlace: "",
+      AlbumId: null,
+      LocationId: null,
       LocationDetail: "",
-      Tags: [],
-      People: [],
+      TagIds: [],
+      PersonIds: [],
       Description: "",
       HiddenDescription: "",
     });
@@ -149,27 +149,27 @@ export function useMediaEditor({
       editDraft.Title,
       editDraft.Rating,
       editDraft.Privacy,
-      editDraft.Album,
-      editDraft.LocationPlace,
+      editDraft.AlbumId,
+      editDraft.LocationId,
       editDraft.LocationDetail,
-      editDraft.Tags.join("\u0001"),
-      editDraft.People.join("\u0001"),
+      editDraft.TagIds.join("\u0001"),
+      editDraft.PersonIds.join("\u0001"),
       editDraft.Description,
       editDraft.HiddenDescription,
     ],
     () => {
       if (view.value !== "viewer") return;
-      const compareTags = (selectedItem.value?.Customization?.Tags || []).join("\u0001");
-      const comparePeople = (selectedItem.value?.Customization?.People || []).join("\u0001");
+      const compareTags = (selectedItem.value?.Customization?.TagIds || []).join("\u0001");
+      const comparePeople = (selectedItem.value?.Customization?.PersonIds || []).join("\u0001");
       editingDirty.value =
         editDraft.Title !== (selectedItem.value?.Customization?.Title || "")
         || Number(editDraft.Rating || 1) !== Number(selectedItem.value?.Customization?.Rating || 1)
         || editDraft.Privacy !== selectedItem.value?.Customization?.Privacy
-        || editDraft.Album !== (selectedItem.value?.Customization?.Album || "")
-        || editDraft.LocationPlace !== (selectedItem.value?.Location?.Place || selectedItem.value?.Location?.Site || "")
+        || editDraft.AlbumId !== (selectedItem.value?.Customization?.AlbumId || null)
+        || editDraft.LocationId !== (selectedItem.value?.Location?.LocationId || null)
         || editDraft.LocationDetail !== (selectedItem.value?.Location?.Detail || "")
-        || editDraft.Tags.join("\u0001") !== compareTags
-        || editDraft.People.join("\u0001") !== comparePeople
+        || editDraft.TagIds.join("\u0001") !== compareTags
+        || editDraft.PersonIds.join("\u0001") !== comparePeople
         || editDraft.Description !== (selectedItem.value?.Customization?.Description || "")
         || editDraft.HiddenDescription !== (selectedItem.value?.Customization?.HiddenDescription || "");
     },

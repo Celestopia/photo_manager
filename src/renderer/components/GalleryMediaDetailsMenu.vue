@@ -20,8 +20,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, reactive, ref, watch } from "vue";
 import { buildGalleryMediaDetailRows } from "../domain/gallery-media-details.mjs";
+import { LOCATION_CONTEXT, TAG_CONTEXT } from "../context/renderer-contexts.js";
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -30,7 +31,12 @@ const props = defineProps({
 });
 
 const menuRef = ref(null);
-const rows = computed(() => buildGalleryMediaDetailRows(props.item));
+const tagContext = inject(TAG_CONTEXT);
+const locationContext = inject(LOCATION_CONTEXT);
+const rows = computed(() => buildGalleryMediaDetailRows(props.item, {
+  getTagText: tagContext?.getTagText,
+  getLocationName: locationContext?.getLocationName,
+}));
 const position = reactive({ left: 0, top: 0, ready: false });
 
 async function updatePosition() {
@@ -52,7 +58,7 @@ async function updatePosition() {
 }
 
 watch(
-  () => [props.item?.FilePath, props.x, props.y],
+  () => [props.item?.MediaId, props.x, props.y],
   updatePosition,
   { immediate: true, flush: "post" },
 );

@@ -100,13 +100,13 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   function currentPlaybackElement(event, elementRef) {
     const element = event?.currentTarget || elementRef.value;
     if (!element) return null;
-    const eventFilePath = String(element.dataset?.filePath || "");
-    const selectedFilePath = String(selectedItem.value?.FilePath || "");
-    return eventFilePath && eventFilePath === selectedFilePath ? element : null;
+    const eventMediaId = String(element.dataset?.mediaId || "");
+    const selectedMediaId = String(selectedItem.value?.MediaId || "");
+    return eventMediaId && eventMediaId === selectedMediaId ? element : null;
   }
 
   function reportPlaybackFallback(mode, message) {
-    api.reportPlaybackIssue?.({ filePath: selectedItem.value?.FilePath, mode, message });
+    api.reportPlaybackIssue?.({ mediaId: selectedItem.value?.MediaId, mode, message });
   }
 
   function onVideoLoadedMetadata(event) {
@@ -238,14 +238,14 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
 
   async function openCurrentWithSystem() {
     if (!selectedItem.value) return;
-    const result = await api.openWithSystem(selectedItem.value.FilePath);
+    const result = await api.openWithSystem(selectedItem.value.MediaId);
     if (!result?.ok) showToastMessage(`打开失败：${result?.error || "未知错误"}`);
     onExternalAction?.();
   }
 
   async function showCurrentInFolder() {
     if (!selectedItem.value) return;
-    const result = await api.showInFolder(selectedItem.value.FilePath);
+    const result = await api.showInFolder(selectedItem.value.MediaId);
     if (!result?.ok) showToastMessage(`定位失败：${result?.error || "未知错误"}`);
     onExternalAction?.();
   }

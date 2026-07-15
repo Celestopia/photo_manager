@@ -24,20 +24,20 @@
                 <div class="location-manager-title-text"><strong>{{ row.Label }}</strong><small v-if="row.Location.Description">{{ row.Location.Description }}</small></div>
                 <span>{{ row.Location.UsageCount || 0 }} 个媒体</span>
               </div>
-              <div v-if="locationManager.editingName === row.Location.Name" class="location-manager-edit">
+              <div v-if="locationManager.editingId === row.Location.LocationId" class="location-manager-edit">
                 <label>国家</label><input class="input" v-model="locationManager.editCountry" />
                 <label>省</label><input class="input" v-model="locationManager.editProvince" />
                 <label>市</label><input class="input" v-model="locationManager.editCity" />
                 <label>父节点</label>
-                <select class="input" v-model="locationManager.editParent">
-                  <option value="">无父节点</option>
-                  <option v-for="option in getLocationParentOptions('', row.Location.Name)" :key="'manager_parent_' + row.Location.Name + '_' + option.Name" :value="option.Name">{{ getLocationTreeLabel(option) }}</option>
+                <select class="input" v-model="locationManager.editParentId">
+                  <option :value="null">无父节点</option>
+                  <option v-for="option in getLocationParentOptions('', row.Location.LocationId)" :key="'manager_parent_' + row.Location.LocationId + '_' + option.LocationId" :value="option.LocationId">{{ getLocationTreeLabel(option) }}</option>
                 </select>
                 <label>说明</label><textarea class="input tag-manager-description-input" v-model="locationManager.editDescription" placeholder="可留空"></textarea>
               </div>
-              <div class="tag-manager-error" v-if="locationManager.error && locationManager.editingName === row.Location.Name">{{ locationManager.error }}</div>
+              <div class="tag-manager-error" v-if="locationManager.error && locationManager.editingId === row.Location.LocationId">{{ locationManager.error }}</div>
             </div>
-            <div class="tag-manager-actions" v-if="locationManager.editingName === row.Location.Name"><button class="btn btn-primary" @click="saveLocationEdit">保存</button><button class="btn" @click="cancelLocationEdit">取消</button></div>
+            <div class="tag-manager-actions" v-if="locationManager.editingId === row.Location.LocationId"><button class="btn btn-primary" @click="saveLocationEdit">保存</button><button class="btn" @click="cancelLocationEdit">取消</button></div>
             <div class="tag-manager-actions" v-else><button class="btn" @click="startLocationEdit(row.Location)">编辑</button><button class="btn danger-text" @click="deleteLocationGlobally(row.Location)">全局删除</button></div>
           </article>
         </template>
@@ -56,13 +56,13 @@
         <label>市</label><input class="input" v-model="locationCreate.city" />
         <label>父节点</label>
         <div class="album-input-wrap">
-          <button type="button" class="input registry-trigger location-parent-trigger" @click="locationCreate.parentDropdown = !locationCreate.parentDropdown"><span>{{ locationCreate.parent || '选择父地点，可留空' }}</span></button>
-          <button type="button" class="album-clear-btn" v-if="locationCreate.parent" data-tip="清空父节点" @click.stop="clearCreateLocationParent">×</button>
+          <button type="button" class="input registry-trigger location-parent-trigger" @click="locationCreate.parentDropdown = !locationCreate.parentDropdown"><span>{{ getLocationName(locationCreate.parentId) || '选择父地点，可留空' }}</span></button>
+          <button type="button" class="album-clear-btn" v-if="locationCreate.parentId" data-tip="清空父节点" @click.stop="clearCreateLocationParent">×</button>
           <div class="tag-dropdown location-dropdown" v-if="locationCreate.parentDropdown">
             <input autofocus class="input dropdown-search-input location-dropdown-search" v-model="locationCreate.parentSearch" placeholder="搜索父地点" @keydown.escape="locationCreate.parentDropdown = false" />
             <div class="location-dropdown-scroll">
               <template v-for="row in getLocationParentRows(locationCreate.parentSearch)" :key="'manager_create_parent_' + row.Key">
-                <button v-if="row.Location" type="button" class="tag-option location-option" :class="{ 'location-group-selectable': row.Type === 'group' }" :data-tip="getLocationTooltip(row.Location.Name)" :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }" @mousedown.prevent="setCreateLocationParent(row.Location.Name)"><span>{{ row.Label }}</span></button>
+                <button v-if="row.Location" type="button" class="tag-option location-option" :class="{ 'location-group-selectable': row.Type === 'group' }" :data-tip="getLocationTooltip(row.Location.LocationId)" :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }" @mousedown.prevent="setCreateLocationParent(row.Location.LocationId)"><span>{{ row.Label }}</span></button>
                 <div v-else class="location-group-row" :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }">{{ row.Label }}</div>
               </template>
               <div class="tag-option-empty" v-if="!getLocationParentRows(locationCreate.parentSearch).length">没有匹配的父地点</div>
@@ -88,6 +88,7 @@ const {
   getLocationManagerRowContext, getLocationParentOptions, getLocationTreeLabel,
   startLocationEdit, saveLocationEdit, cancelLocationEdit, deleteLocationGlobally,
   closeCreateLocationMenu, getLocationParentRows, getLocationTooltip,
+  getLocationName,
   setCreateLocationParent, clearCreateLocationParent, createLocationAndSelect,
 } = context;
 </script>

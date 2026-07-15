@@ -25,6 +25,11 @@ const {
 const { acquireLibraryLock, releaseLibraryLock } = require("./library-lock");
 const { validateMediaTools } = require("./media-tools");
 const { createOperationReporter } = require("./operation-progress");
+const {
+  assertUuidV4,
+  createUniqueEntityId,
+} = require("../src/shared/identity-schema.js");
+const { validateMediaEntries } = require("../src/shared/library-data-schema.js");
 
 async function run(options = {}) {
   const config = options.config || resolveConfig();
@@ -68,6 +73,7 @@ async function run(options = {}) {
     });
     const mediaFiles = files.filter((file) => extensionType(path.extname(file))).sort((a, b) => a.localeCompare(b));
     const entries = [];
+    const usedEntityIds = new Set();
     for (let index = 0; index < mediaFiles.length; index += 1) {
       if (cancelled) {
         const error = new Error("Initialization cancelled");
@@ -79,7 +85,12 @@ async function run(options = {}) {
       emit({ phase: "metadata", processed: index, total: mediaFiles.length, current: relative });
       try {
         const item = await buildMetadata(file, paths.root, { mediaConfig: config.media });
-        if (item) entries.push(item);
+        if (item) {
+          const id = assertUuidV4(item.MediaId, `MediaId for ${item.FilePath}`);
+          if (usedEntityIds.has(id)) item.MediaId = createUniqueEntityId((candidate) => usedEntityIds.has(candidate));
+          usedEntityIds.add(item.MediaId);
+          entries.push(item);
+        }
       } catch (error) {
         logger.warn(`Skip unreadable media: ${relative} (${error.message})`);
       }
@@ -93,6 +104,8 @@ async function run(options = {}) {
     for (const [hash, filePaths] of byHash) {
       if (filePaths.length > 1) logger.warn(`Duplicate SHA-256 ${hash}: ${filePaths.sort().join(", ")}`);
     }
+
+    validateMediaEntries(entries, {});
 
     emit({ phase: "write", processed: entries.length, total: entries.length, message: "写入图库数据" });
     await writeAll(paths.metadataFile, entries);

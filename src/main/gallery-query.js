@@ -2,8 +2,6 @@ const path = require("node:path");
 
 function createGalleryQueryService({
   getLocationDescendants,
-  normalizeAlbumTitle,
-  normalizeLocationName,
   unassignedAlbumFilter,
 }) {
   function filterAndSort(list, options) {
@@ -14,19 +12,19 @@ function createGalleryQueryService({
       output = output.filter((item) => item?.FileSystem?.FileType === filters.mediaType);
     }
     if (filters.album === unassignedAlbumFilter) {
-      output = output.filter((item) => !normalizeAlbumTitle(item?.Customization?.Album));
+      output = output.filter((item) => !item?.Customization?.AlbumId);
     } else if (filters.album) {
-      output = output.filter((item) => item?.Customization?.Album === filters.album);
+      output = output.filter((item) => item?.Customization?.AlbumId === filters.album);
     }
     if (filters.tag) {
-      output = output.filter((item) => Array.isArray(item?.Customization?.Tags) && item.Customization.Tags.includes(filters.tag));
+      output = output.filter((item) => Array.isArray(item?.Customization?.TagIds) && item.Customization.TagIds.includes(filters.tag));
     }
     if (filters.person) {
-      output = output.filter((item) => Array.isArray(item?.Customization?.People) && item.Customization.People.includes(filters.person));
+      output = output.filter((item) => Array.isArray(item?.Customization?.PersonIds) && item.Customization.PersonIds.includes(filters.person));
     }
     if (filters.location) {
-      const allowed = new Set([normalizeLocationName(filters.location), ...getLocationDescendants(filters.location)]);
-      output = output.filter((item) => allowed.has(normalizeLocationName(item?.Location?.Place ?? item?.Location?.Site)));
+      const allowed = new Set([filters.location, ...getLocationDescendants(filters.location)]);
+      output = output.filter((item) => allowed.has(item?.Location?.LocationId));
     }
     if (search?.value && search?.field) {
       output = output.filter((item) => {

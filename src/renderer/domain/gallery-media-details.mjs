@@ -24,7 +24,7 @@ export function formatVideoFrameRate(value) {
 }
 
 /** Build the fixed, read-only field sequence used by the gallery details popover. */
-export function buildGalleryMediaDetailRows(item) {
+export function buildGalleryMediaDetailRows(item, resolvers = {}) {
   const rows = [
     { key: "filename", label: "文件名", value: getMediaFilename(item) },
     { key: "shooting-date", label: "拍摄日期", value: displayValue(item?.FileSystem?.ShootingTimeString) },
@@ -40,11 +40,11 @@ export function buildGalleryMediaDetailRows(item) {
     );
   }
 
-  const tags = Array.isArray(item?.Customization?.Tags)
-    ? item.Customization.Tags.map((tag) => String(tag).trim()).filter(Boolean).join(", ")
+  const tags = Array.isArray(item?.Customization?.TagIds)
+    ? item.Customization.TagIds.map((id) => resolvers.getTagText?.(id) || "").filter(Boolean).join(", ")
     : "";
   rows.push(
-    { key: "location", label: "地点", value: displayValue(item?.Location?.Place) },
+    { key: "location", label: "地点", value: displayValue(resolvers.getLocationName?.(item?.Location?.LocationId)) },
     { key: "tags", label: "标签", value: displayValue(tags) },
   );
   return rows;

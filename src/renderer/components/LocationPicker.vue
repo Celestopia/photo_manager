@@ -5,14 +5,14 @@
         <button
           type="button"
           class="input album-input registry-trigger"
-          :class="{ 'is-placeholder': !selectedLocation }"
-          :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
+          :class="{ 'is-placeholder': !selectedLocationId }"
+          :data-tip="selectedLocationId ? getLocationTooltip(selectedLocationId) : ''"
           @click="openLocationDropdown(target)"
-        ><span>{{ selectedLocation || placeholder }}</span></button>
+        ><span>{{ selectedLocationName || placeholder }}</span></button>
         <button
           type="button"
           class="album-clear-btn"
-          v-if="selectedLocation"
+          v-if="selectedLocationId"
           data-tip="将当前媒体设为无地点"
           aria-label="将当前媒体设为无地点"
           @click.stop="clearLocationForTarget(target)"
@@ -38,12 +38,12 @@
                 v-else-if="row.Location"
                 type="button"
                 class="tag-option location-option"
-                :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocation === row.Location.Name }"
-                :data-tip="getLocationTooltip(row.Location.Name)"
+                :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocationId === row.Location.LocationId }"
+                :data-tip="getLocationTooltip(row.Location.LocationId)"
                 :data-location-context="getLocationManagerRowContext(row)"
                 :data-location-recent="row.Key.startsWith('recent-location:') ? '1' : null"
                 :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
-                @mousedown.prevent="setLocationForTarget(target, row.Location.Name)"
+                @mousedown.prevent="setLocationForTarget(target, row.Location.LocationId)"
               >
                 <span>{{ row.Label }}</span>
               </button>
@@ -79,11 +79,11 @@
           type="button"
           class="input registry-trigger location-parent-trigger"
           @click="locationCreate.parentDropdown = !locationCreate.parentDropdown"
-        ><span>{{ locationCreate.parent || '选择父地点，可留空' }}</span></button>
+        ><span>{{ getLocationName(locationCreate.parentId) || '选择父地点，可留空' }}</span></button>
         <button
           type="button"
           class="album-clear-btn"
-          v-if="locationCreate.parent"
+          v-if="locationCreate.parentId"
           data-tip="清空父节点"
           @click.stop="clearCreateLocationParent"
         >×</button>
@@ -102,9 +102,9 @@
               type="button"
               class="tag-option location-option"
               :class="{ 'location-group-selectable': row.Type === 'group' }"
-              :data-tip="getLocationTooltip(row.Location.Name)"
+              :data-tip="getLocationTooltip(row.Location.LocationId)"
               :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
-              @mousedown.prevent="setCreateLocationParent(row.Location.Name)"
+              @mousedown.prevent="setCreateLocationParent(row.Location.LocationId)"
             >
               <span>{{ row.Label }}</span>
             </button>
@@ -153,6 +153,7 @@ const {
   getLocationMenuRows,
   getLocationParentRows,
   getLocationTooltip,
+  getLocationName,
   getLocationManagerRowContext,
   openLocationDropdown,
   setLocationForTarget,
@@ -167,9 +168,10 @@ const {
 } = app;
 
 const target = props.target;
-const selectedLocation = computed(() => (props.target === "batch" ? batchEdit.locationPlace : editDraft.LocationPlace));
+const selectedLocationId = computed(() => (props.target === "batch" ? batchEdit.locationId : editDraft.LocationId));
+const selectedLocationName = computed(() => getLocationName(selectedLocationId.value));
 const locationMenuRows = computed(() => getLocationMenuRows(props.target));
-const createParentRows = computed(() => getLocationParentRows(locationCreate.parentSearch, locationCreate.name));
+const createParentRows = computed(() => getLocationParentRows(locationCreate.parentSearch));
 const locationDropdownRef = ref(null);
 const locationDropdownContext = ref("");
 

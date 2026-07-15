@@ -1,87 +1,60 @@
 import { computed, reactive, ref, triggerRef } from "vue";
 
-function normalizePersonName(value) {
-  return String(value ?? "").trim();
-}
+function normalizeText(value) { return String(value ?? "").trim(); }
 
-/** Owns the controlled people registry, picker state, and person-management workflow. */
+/** Owns the ID-backed people registry, picker state, and management workflow. */
 export function usePersonRegistry({
-  api,
-  filterOptions,
-  query,
-  editDraft,
-  batchEdit,
-  selectedItem,
-  orderedItems,
-  galleryGroups,
-  gallerySettingsOpen,
-  recentPeople,
-  rememberRecentPerson,
-  pruneRecentPeople,
-  showToastMessage,
-  closeOtherRegistryDropdowns,
-  requestEdit,
-  removeViewerPersonAt,
-  removeBatchPersonAt,
-  rebuildGalleryItemIndex,
-  galleryItemIndex,
-  queryGallery,
+  api, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  galleryGroups, gallerySettingsOpen, recentPeople, rememberRecentPerson, pruneRecentPeople,
+  showToastMessage, closeOtherRegistryDropdowns, requestEdit, removeViewerPersonAt,
+  removeBatchPersonAt, rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
 }) {
   const personRegistry = ref([]);
   const personSearch = reactive({ viewer: "", batch: "" });
   const personDropdown = reactive({ viewer: false, batch: false });
   const personCreate = reactive({ visible: false, target: "viewer", name: "", description: "", error: "" });
-  const personManager = reactive({ visible: false, search: "", editingName: "", editDescription: "", error: "" });
+  const personManager = reactive({ visible: false, search: "", editingId: "", editDescription: "", error: "" });
 
   const managerFilteredPeople = computed(() => {
     const keyword = personManager.search.trim();
     const source = [...personRegistry.value].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
-    if (!keyword) return source;
-    return source.filter((person) => person.Name.includes(keyword) || (person.Description || "").includes(keyword));
+    return keyword ? source.filter((person) => person.Name.includes(keyword) || person.Description.includes(keyword)) : source;
   });
 
   function applyPersonRegistry(people) {
-    personRegistry.value = (Array.isArray(people) ? people : [])
-      .map((person) => ({
-        Name: normalizePersonName(person?.Name),
-        Description: normalizePersonName(person?.Description),
-        CreatedAt: person?.CreatedAt || "",
-        UpdatedAt: person?.UpdatedAt || "",
-        UsageCount: Number(person?.UsageCount || 0),
-      }))
-      .filter((person) => person.Name);
-    filterOptions.people = personRegistry.value.map((person) => person.Name);
-    pruneRecentPeople(filterOptions.people);
-    if (query.filters.person && !filterOptions.people.includes(query.filters.person)) query.filters.person = "";
+    personRegistry.value = (Array.isArray(people) ? people : []).map((person) => ({
+      PersonId: normalizeText(person?.PersonId),
+      Name: normalizeText(person?.Name),
+      Description: normalizeText(person?.Description),
+      CreatedAt: person?.CreatedAt || "",
+      UpdatedAt: person?.UpdatedAt || "",
+      UsageCount: Number(person?.UsageCount || 0),
+    })).filter((person) => person.PersonId && person.Name);
+    filterOptions.people = personRegistry.value;
+    const ids = personRegistry.value.map((person) => person.PersonId);
+    pruneRecentPeople(ids);
+    if (query.filters.person && !ids.includes(query.filters.person)) query.filters.person = "";
   }
 
   async function loadPeople() {
-    if (typeof api.listPeople !== "function") return;
-    const result = await api.listPeople();
+    const result = await api.listPeople?.();
     if (result?.ok) applyPersonRegistry(result.people);
   }
-
-  function selectedPeopleForTarget(target) {
-    return target === "batch" ? batchEdit.people : editDraft.People;
-  }
-
+  function selectedPersonIdsForTarget(target) { return target === "batch" ? batchEdit.personIds : editDraft.PersonIds; }
+  function getPersonDefinition(personId) { return personRegistry.value.find((person) => person.PersonId === personId) || null; }
+  function getPersonDescription(personId) { return getPersonDefinition(personId)?.Description || ""; }
+  function getPersonName(personId) { return getPersonDefinition(personId)?.Name || ""; }
   function getPersonCandidates(target) {
-    const keyword = normalizePersonName(personSearch[target]);
-    const selected = new Set(selectedPeopleForTarget(target));
+    const keyword = normalizeText(personSearch[target]);
+    const selected = new Set(selectedPersonIdsForTarget(target));
     return personRegistry.value
-      .filter((person) => !keyword || person.Name.includes(keyword) || (person.Description || "").includes(keyword))
-      .sort((a, b) => Number(selected.has(b.Name)) - Number(selected.has(a.Name)) || a.Name.localeCompare(b.Name, "zh-CN"));
+      .filter((person) => !keyword || person.Name.includes(keyword) || person.Description.includes(keyword))
+      .sort((a, b) => Number(selected.has(b.PersonId)) - Number(selected.has(a.PersonId)) || a.Name.localeCompare(b.Name, "zh-CN"));
   }
-
   function getPersonOptions(target) { return getPersonCandidates(target).slice(0, 50); }
-
   function getRecentPersonOptions(target) {
-    const byName = new Map(getPersonCandidates(target).map((person) => [person.Name, person]));
-    return recentPeople.value.map((name) => byName.get(name)).filter(Boolean).slice(0, 3);
-  }
-
-  function getPersonDescription(personName) {
-    return personRegistry.value.find((person) => person.Name === personName)?.Description || "";
+    const byId = new Map(getPersonCandidates(target).map((person) => [person.PersonId, person]));
+    return recentPeople.value.map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
   }
 
   function openPersonDropdown(target) {
@@ -89,81 +62,54 @@ export function usePersonRegistry({
     closeOtherRegistryDropdowns?.();
     personDropdown[target] = shouldOpen;
   }
-
   function closePersonDropdown(target) { personDropdown[target] = false; }
+  function closeAllPersonDropdowns() { personDropdown.viewer = false; personDropdown.batch = false; }
 
-  function closeAllPersonDropdowns() {
-    personDropdown.viewer = false;
-    personDropdown.batch = false;
-  }
-
-  function addPersonToTarget(target, rawName) {
-    const name = normalizePersonName(rawName);
-    if (!name) return;
-    const people = selectedPeopleForTarget(target);
-    if (people.includes(name)) {
-      showToastMessage(`人物“${name}”已存在，添加失败`);
-      personSearch[target] = "";
-      closePersonDropdown(target);
-      return;
+  function addPersonToTarget(target, personId) {
+    const definition = getPersonDefinition(personId);
+    if (!definition) return;
+    const ids = selectedPersonIdsForTarget(target);
+    if (ids.includes(personId)) showToastMessage(`人物“${definition.Name}”已存在，添加失败`);
+    else {
+      ids.push(personId);
+      rememberRecentPerson(personId);
+      if (target === "viewer") requestEdit("People");
     }
-    people.push(name);
-    rememberRecentPerson(name);
     personSearch[target] = "";
     closePersonDropdown(target);
-    if (target === "viewer") requestEdit("People");
   }
-
   function onPersonSearchKeydown(event, target) {
     if (event.key === "Enter") {
       event.preventDefault();
       const first = getRecentPersonOptions(target)[0] || getPersonOptions(target)[0];
-      if (first) addPersonToTarget(target, first.Name);
-      return;
-    }
-    if (event.key === "Escape") {
-      closePersonDropdown(target);
-      return;
-    }
-    if (event.key === "Backspace" && !personSearch[target]) {
+      if (first) addPersonToTarget(target, first.PersonId);
+    } else if (event.key === "Escape") closePersonDropdown(target);
+    else if (event.key === "Backspace" && !personSearch[target]) {
       event.preventDefault();
-      if (target === "batch") removeBatchPersonAt(batchEdit.people.length - 1);
-      else removeViewerPersonAt(editDraft.People.length - 1);
+      if (target === "batch") removeBatchPersonAt(batchEdit.personIds.length - 1);
+      else removeViewerPersonAt(editDraft.PersonIds.length - 1);
     }
   }
 
   function openCreatePersonMenu(target) {
     closeOtherRegistryDropdowns?.();
     Object.assign(personCreate, {
-      visible: true,
-      target,
-      name: target === "manager" ? "" : normalizePersonName(personSearch[target]),
-      description: "",
-      error: "",
+      visible: true, target,
+      name: target === "manager" ? "" : normalizeText(personSearch[target]),
+      description: "", error: "",
     });
     if (target !== "manager") closePersonDropdown(target);
   }
-
-  function closeCreatePersonMenu() {
-    Object.assign(personCreate, { visible: false, name: "", description: "", error: "" });
-  }
-
+  function closeCreatePersonMenu() { Object.assign(personCreate, { visible: false, name: "", description: "", error: "" }); }
   async function createPersonAndSelect() {
-    const name = normalizePersonName(personCreate.name);
-    const description = normalizePersonName(personCreate.description);
-    if (!name) {
-      personCreate.error = "人物姓名不能为空";
-      return;
-    }
-    const result = await api.createPerson({ name, description });
-    if (!result?.ok) {
-      personCreate.error = result?.error || "创建人物失败";
-      return;
-    }
+    const name = normalizeText(personCreate.name);
+    if (!name) { personCreate.error = "人物姓名不能为空"; return; }
+    const result = await api.createPerson({ name, description: normalizeText(personCreate.description) });
+    if (!result?.ok) { personCreate.error = result?.error || "创建人物失败"; return; }
     applyPersonRegistry(result.people);
     const target = personCreate.target;
     if (target === "manager") showToastMessage(`已创建人物“${result.person.Name}”`);
-    else addPersonToTarget(target, result.person.Name);
+    else addPersonToTarget(target, result.person.PersonId);
     closeCreatePersonMenu();
   }
 
@@ -174,105 +120,64 @@ export function usePersonRegistry({
     personManager.visible = true;
     personManager.error = "";
   }
-
   function closePersonManager() {
     if (personCreate.target === "manager") closeCreatePersonMenu();
-    Object.assign(personManager, { visible: false, search: "", editingName: "", editDescription: "", error: "" });
+    Object.assign(personManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
   }
-
   function startPersonDescriptionEdit(person) {
-    Object.assign(personManager, { editingName: person.Name, editDescription: person.Description || "", error: "" });
+    Object.assign(personManager, { editingId: person.PersonId, editDescription: person.Description || "", error: "" });
   }
-
-  function cancelPersonDescriptionEdit() {
-    Object.assign(personManager, { editingName: "", editDescription: "", error: "" });
-  }
-
+  function cancelPersonDescriptionEdit() { Object.assign(personManager, { editingId: "", editDescription: "", error: "" }); }
   async function savePersonDescription() {
-    const name = personManager.editingName;
-    const description = normalizePersonName(personManager.editDescription);
-    if (!name) {
-      personManager.error = "人物姓名不能为空";
-      return;
-    }
-    const result = await api.updatePersonDescription({ name, description });
-    if (!result?.ok) {
-      personManager.error = result?.error || "保存说明失败";
-      return;
-    }
+    const personId = personManager.editingId;
+    if (!personId) { personManager.error = "人物不存在"; return; }
+    const result = await api.updatePersonDescription({ personId, description: normalizeText(personManager.editDescription) });
+    if (!result?.ok) { personManager.error = result?.error || "保存说明失败"; return; }
     applyPersonRegistry(result.people);
     cancelPersonDescriptionEdit();
     showToastMessage("人物说明已更新");
   }
 
-  function stripPersonFromItem(item, personName) {
-    const people = Array.isArray(item?.Customization?.People) ? item.Customization.People : [];
-    if (!people.includes(personName)) return item;
-    return { ...item, Customization: { ...(item.Customization || {}), People: people.filter((person) => person !== personName) } };
+  function stripPersonFromItem(item, personId) {
+    const ids = Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [];
+    return ids.includes(personId)
+      ? { ...item, Customization: { ...(item.Customization || {}), PersonIds: ids.filter((id) => id !== personId) } }
+      : item;
   }
-
-  function syncDeletedPersonLocally(personName) {
-    if (selectedItem.value) selectedItem.value = stripPersonFromItem(selectedItem.value, personName);
-    editDraft.People = editDraft.People.filter((person) => person !== personName);
-    batchEdit.people = batchEdit.people.filter((person) => person !== personName);
-    orderedItems.value = orderedItems.value.map((item) => stripPersonFromItem(item, personName));
+  function syncDeletedPersonLocally(personId) {
+    if (selectedItem.value) selectedItem.value = stripPersonFromItem(selectedItem.value, personId);
+    editDraft.PersonIds = editDraft.PersonIds.filter((id) => id !== personId);
+    batchEdit.personIds = batchEdit.personIds.filter((id) => id !== personId);
+    orderedItems.value = orderedItems.value.map((item) => stripPersonFromItem(item, personId));
     rebuildGalleryItemIndex();
-    for (const group of galleryGroups.value) {
-      group.items = group.items.map((item) => galleryItemIndex.get(item.FilePath) || item);
-    }
+    for (const group of galleryGroups.value) group.items = group.items.map((item) => galleryItemIndex.get(item.MediaId) || item);
     triggerRef(galleryGroups);
   }
-
   async function deletePersonGlobally(person) {
     const usage = Number(person?.UsageCount || 0);
     if (!window.confirm(`确定全局删除人物“${person.Name}”？这会从 ${usage} 个媒体中移除。`)) return;
-    const result = await api.deletePersonGlobally({ name: person.Name });
-    if (!result?.ok) {
-      showToastMessage(`删除人物失败：${result?.error || "未知错误"}`);
-      return;
-    }
+    const result = await api.deletePersonGlobally({ personId: person.PersonId });
+    if (!result?.ok) { showToastMessage(`删除人物失败：${result?.error || "未知错误"}`); return; }
     applyPersonRegistry(result.people);
-    syncDeletedPersonLocally(person.Name);
-    if (query.filters.person === person.Name) {
-      query.filters.person = "";
-      await queryGallery();
-    }
+    syncDeletedPersonLocally(person.PersonId);
+    if (query.filters.person === person.PersonId) { query.filters.person = ""; await queryGallery(); }
     showToastMessage(`已全局删除人物“${person.Name}”`);
   }
 
   function resetPersonState() {
     personRegistry.value = [];
     Object.assign(personSearch, { viewer: "", batch: "" });
-    closeAllPersonDropdowns();
-    closeCreatePersonMenu();
-    Object.assign(personManager, { visible: false, search: "", editingName: "", editDescription: "", error: "" });
+    closeAllPersonDropdowns(); closeCreatePersonMenu();
+    Object.assign(personManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
   }
 
   return {
-    personRegistry,
-    personSearch,
-    personDropdown,
-    personCreate,
-    personManager,
-    managerFilteredPeople,
-    loadPeople,
-    getPersonOptions,
-    getRecentPersonOptions,
-    getPersonDescription,
-    openPersonDropdown,
-    closePersonDropdown,
-    closeAllPersonDropdowns,
-    addPersonToTarget,
-    onPersonSearchKeydown,
-    openCreatePersonMenu,
-    closeCreatePersonMenu,
-    createPersonAndSelect,
-    openPersonManager,
-    closePersonManager,
-    startPersonDescriptionEdit,
-    cancelPersonDescriptionEdit,
-    savePersonDescription,
-    deletePersonGlobally,
-    resetPersonState,
+    personRegistry, personSearch, personDropdown, personCreate, personManager,
+    managerFilteredPeople, loadPeople, getPersonOptions, getRecentPersonOptions,
+    getPersonDescription, getPersonName, openPersonDropdown, closePersonDropdown,
+    closeAllPersonDropdowns, addPersonToTarget, onPersonSearchKeydown,
+    openCreatePersonMenu, closeCreatePersonMenu, createPersonAndSelect,
+    openPersonManager, closePersonManager, startPersonDescriptionEdit,
+    cancelPersonDescriptionEdit, savePersonDescription, deletePersonGlobally, resetPersonState,
   };
 }

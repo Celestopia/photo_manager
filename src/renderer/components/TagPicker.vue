@@ -4,15 +4,15 @@
       <div class="tag-editor controlled-tag-editor">
       <span
         class="tag-chip"
-        v-for="(tag, index) in selectedTags"
-        :key="target + '_' + tag + '_' + index"
-        :data-tip="getTagDescription(tag)"
+        v-for="(tagId, index) in selectedTagIds"
+        :key="target + '_' + tagId"
+        :data-tip="getTagDescription(tagId)"
       >
-        <span>{{ tag }}</span>
+        <span>{{ getTagText(tagId) }}</span>
         <button type="button" class="tag-remove" @click.stop="removeSelectedTag(index)">×</button>
       </span>
       <button type="button" class="tag-editor-trigger" @click="openTagDropdown(target)">
-        <span v-if="!selectedTags.length">{{ placeholder }}</span>
+        <span v-if="!selectedTagIds.length">{{ placeholder }}</span>
         <span v-else>选择标签</span>
       </button>
         <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown selection-dropdown" v-if="tagDropdown[target]">
@@ -29,12 +29,12 @@
               <div class="registry-section-label"><span>最近使用</span></div>
               <button
                 v-for="tag in recentTagOptions"
-                :key="target + '_recent_option_' + tag.Text"
+                :key="target + '_recent_option_' + tag.TagId"
                 type="button"
                 class="tag-option"
-                :class="{ 'is-selected': selectedTags.includes(tag.Text) }"
+                :class="{ 'is-selected': selectedTagIds.includes(tag.TagId) }"
                 :data-tip="tag.Description"
-                @mousedown.prevent="addTagToTarget(target, tag.Text)"
+                @mousedown.prevent="addTagToTarget(target, tag.TagId)"
               >
                 <span>{{ tag.Text }}</span>
               </button>
@@ -42,12 +42,12 @@
             </template>
             <button
               v-for="tag in tagOptions"
-              :key="target + '_option_' + tag.Text"
+              :key="target + '_option_' + tag.TagId"
               type="button"
               class="tag-option"
-              :class="{ 'is-selected': selectedTags.includes(tag.Text) }"
+              :class="{ 'is-selected': selectedTagIds.includes(tag.TagId) }"
               :data-tip="tag.Description"
-              @mousedown.prevent="addTagToTarget(target, tag.Text)"
+              @mousedown.prevent="addTagToTarget(target, tag.TagId)"
             >
               <span>{{ tag.Text }}</span>
             </button>
@@ -100,6 +100,7 @@ const {
   getTagOptions,
   getRecentTagOptions,
   getTagDescription,
+  getTagText,
   openTagDropdown,
   addTagToTarget,
   onTagSearchKeydown,
@@ -112,7 +113,7 @@ const {
 } = app;
 
 const target = props.target;
-const selectedTags = computed(() => (props.target === "batch" ? batchEdit.tags : editDraft.Tags));
+const selectedTagIds = computed(() => (props.target === "batch" ? batchEdit.tagIds : editDraft.TagIds));
 const tagOptions = computed(() => getTagOptions(props.target));
 const recentTagOptions = computed(() => getRecentTagOptions(props.target));
 

@@ -1,7 +1,10 @@
+const { createEntityId, assertUuidV4 } = require("../shared/identity-schema.js");
+
 function createSimpleRegistryService(options) {
   const {
     kind,
     keyLabel,
+    idKey,
     definitionKey,
     responseItemKey,
     responseListKey,
@@ -9,6 +12,7 @@ function createSimpleRegistryService(options) {
     descriptionRequired,
     normalize,
     readKey,
+    readId,
     readDescription,
     getRegistry,
     setRegistry,
@@ -21,8 +25,10 @@ function createSimpleRegistryService(options) {
     listDefinitions,
     getUsageCounts,
     sortEntries,
+    findByLabel,
     mutateMetadataOnDelete,
     appendLog,
+    createId = createEntityId,
   } = options;
 
   function successPayload(item) {
@@ -45,17 +51,18 @@ function createSimpleRegistryService(options) {
     if (!key || (descriptionRequired && !description)) {
       return { ok: false, error: descriptionRequired ? `${keyLabel} and description are required` : `${keyLabel} is required` };
     }
-    const registry = getRegistry();
-    if (registry.has(key)) return { ok: false, error: `${kind} already exists` };
+    if (findByLabel(key)) return { ok: false, error: `${kind} already exists` };
 
+    const id = createId();
     const now = new Date().toISOString();
-    const definition = { [definitionKey]: key, Description: description, CreatedAt: now, UpdatedAt: now };
-    registry.set(key, definition);
+    const definition = { [idKey]: id, [definitionKey]: key, Description: description, CreatedAt: now, UpdatedAt: now };
+    const registry = getRegistry();
+    registry.set(id, definition);
     try {
       await saveRegistry();
       return successPayload({ ...definition, UsageCount: 0 });
     } catch (error) {
-      registry.delete(key);
+      registry.delete(id);
       appendLog(`Failed to create ${kind.toLowerCase()}: ${error.message}`);
       return { ok: false, error: `Failed to write ${kind.toLowerCase()} registry` };
     }
@@ -63,23 +70,26 @@ function createSimpleRegistryService(options) {
 
   async function updateDescription(payload) {
     requireOpenLibrary({ writable: true });
-    const key = normalize(readKey(payload));
+    let id;
+    try {
+      id = assertUuidV4(readId(payload), idKey);
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
     const description = normalize(readDescription(payload));
     const registry = getRegistry();
-    const current = registry.get(key);
-    if (!key || (descriptionRequired && !description)) {
-      return { ok: false, error: descriptionRequired ? `${keyLabel} and description are required` : `${keyLabel} is required` };
-    }
+    const current = registry.get(id);
+    if (descriptionRequired && !description) return { ok: false, error: "Description is required" };
     if (!current) return { ok: false, error: `${kind} not found` };
 
     const previous = { ...current };
     const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
-    registry.set(key, next);
+    registry.set(id, next);
     try {
       await saveRegistry();
-      return successPayload({ ...next, UsageCount: getUsageCounts().get(key) || 0 });
+      return successPayload({ ...next, UsageCount: getUsageCounts().get(id) || 0 });
     } catch (error) {
-      registry.set(key, previous);
+      registry.set(id, previous);
       appendLog(`Failed to update ${kind.toLowerCase()} description: ${error.message}`);
       return { ok: false, error: `Failed to write ${kind.toLowerCase()} registry` };
     }
@@ -87,9 +97,14 @@ function createSimpleRegistryService(options) {
 
   async function deleteGlobal(payload) {
     requireOpenLibrary({ writable: true });
-    const key = normalize(readKey(payload));
+    let id;
+    try {
+      id = assertUuidV4(readId(payload), idKey);
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
     const registry = getRegistry();
-    if (!key || !registry.has(key)) return { ok: false, error: `${kind} not found` };
+    if (!registry.has(id)) return { ok: false, error: `${kind} not found` };
     try {
       await prepareLibraryWrite(`${kind.toLowerCase()}-global-delete`, { immediate: true });
     } catch (error) {
@@ -98,18 +113,18 @@ function createSimpleRegistryService(options) {
 
     const metadata = getMetadata();
     const previousRegistry = new Map(registry);
-    const previousMetadata = new Map([...metadata.entries()].map(([filePath, item]) => [filePath, structuredClone(item)]));
-    registry.delete(key);
+    const previousMetadata = new Map([...metadata.entries()].map(([mediaId, item]) => [mediaId, structuredClone(item)]));
+    registry.delete(id);
     let updatedCount = 0;
-    for (const [filePath, item] of metadata.entries()) {
-      if (!mutateMetadataOnDelete(item, key)) continue;
-      metadata.set(filePath, item);
+    for (const [mediaId, item] of metadata.entries()) {
+      if (!mutateMetadataOnDelete(item, id)) continue;
+      metadata.set(mediaId, item);
       updatedCount += 1;
     }
 
     try {
       await saveTransaction(dataFileName, sortEntries(registry.values()), `${kind.toLowerCase()}-global-delete`, updatedCount > 0);
-      return { ok: true, deleted: key, updatedCount, [responseListKey]: listDefinitions() };
+      return { ok: true, deletedId: id, updatedCount, [responseListKey]: listDefinitions() };
     } catch (error) {
       setRegistry(previousRegistry);
       setMetadata(previousMetadata);

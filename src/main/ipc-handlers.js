@@ -201,9 +201,9 @@ function registerIpcHandlers(options) {
   ipcMain.handle("photo:update-customization", async (_, payload) => toSerializable(await metadataEditService.updateCustomization(payload)));
   ipcMain.handle("photo:batch-update", async (_, payload) => toSerializable(await metadataEditService.batchUpdate(payload)));
 
-  ipcMain.handle("photo:copy-path", async (_, filePath) => {
+  ipcMain.handle("photo:copy-path", async (_, mediaId) => {
     try {
-      const { absolutePath } = resolveIndexedMediaPath(filePath);
+      const { absolutePath } = resolveIndexedMediaPath(mediaId);
       clipboard.writeText(absolutePath);
       return { ok: true };
     } catch (error) {
@@ -214,18 +214,18 @@ function registerIpcHandlers(options) {
     clipboard.writeText(String(value ?? ""));
     return { ok: true };
   });
-  ipcMain.handle("photo:copy-json", async (_, filePath) => {
+  ipcMain.handle("photo:copy-json", async (_, mediaId) => {
     try {
-      const { item } = resolveIndexedMediaPath(filePath);
+      const { item } = resolveIndexedMediaPath(mediaId);
       clipboard.writeText(JSON.stringify(item, null, 2));
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle("photo:copy-image", async (_, filePath) => {
+  ipcMain.handle("photo:copy-image", async (_, mediaId) => {
     try {
-      const resolved = resolveIndexedMediaPath(filePath);
+      const resolved = resolveIndexedMediaPath(mediaId);
       if (resolved.item?.FileSystem?.FileType !== "image") return { ok: false, error: "Only images can be copied" };
       const image = nativeImage.createFromPath(resolved.absolutePath);
       if (image.isEmpty()) return { ok: false, error: "Image load failed" };
@@ -235,18 +235,18 @@ function registerIpcHandlers(options) {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle("photo:open-default", async (_, filePath) => {
+  ipcMain.handle("photo:open-default", async (_, mediaId) => {
     try {
-      const { absolutePath } = resolveIndexedMediaPath(filePath);
+      const { absolutePath } = resolveIndexedMediaPath(mediaId);
       const errorMessage = await shell.openPath(absolutePath);
       return errorMessage ? { ok: false, error: errorMessage } : { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle("photo:show-in-folder", async (_, filePath) => {
+  ipcMain.handle("photo:show-in-folder", async (_, mediaId) => {
     try {
-      const { absolutePath } = resolveIndexedMediaPath(filePath);
+      const { absolutePath } = resolveIndexedMediaPath(mediaId);
       shell.showItemInFolder(absolutePath);
       return { ok: true };
     } catch (error) {
@@ -254,11 +254,12 @@ function registerIpcHandlers(options) {
     }
   });
   ipcMain.handle("photo:report-playback", async (_, payload) => {
-    const filePath = String(payload?.filePath || "").replace(/\\/g, "/");
-    if (!runtime.metadataIndex.has(filePath)) return { ok: false };
+    const mediaId = String(payload?.mediaId || "").trim();
+    const item = runtime.metadataIndex.get(mediaId);
+    if (!item) return { ok: false };
     const mode = String(payload?.mode || "unknown").slice(0, 40);
     const message = String(payload?.message || "").replace(/\s+/g, " ").slice(0, 240);
-    appendLog(`playback-fallback file=${filePath} mode=${mode} message=${message}`);
+    appendLog(`playback-fallback media=${mediaId} file=${item.FilePath} mode=${mode} message=${message}`);
     return { ok: true };
   });
   ipcMain.handle("thumbnail:start-warmup", async () => {

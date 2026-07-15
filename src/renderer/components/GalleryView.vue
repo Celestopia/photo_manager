@@ -35,13 +35,13 @@
         <div class="photo-grid">
           <article
             class="photo-card"
-            :class="{ selected: isSelectionMode && isGallerySelected(item.FilePath) }"
+            :class="{ selected: isSelectionMode && isGallerySelected(item.MediaId) }"
             v-for="item in group.items"
-            :key="item.FilePath"
+            :key="item.MediaId"
             @click="onGalleryCardClick(item)"
             @contextmenu.prevent.stop="toggleGalleryDetailsMenu(item, $event)"
           >
-            <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.FilePath) }" @click.stop="toggleGallerySelection(item.FilePath)">✓</button>
+            <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.MediaId) }" @click.stop="toggleGallerySelection(item.MediaId)">✓</button>
             <div class="card-media">
               <img
                 :src="resolveGalleryImageSrc(item)"
@@ -178,7 +178,7 @@ function closeGalleryDetailsMenu() {
 }
 
 function toggleGalleryDetailsMenu(item, event) {
-  const isSameItem = galleryDetailsMenu.visible && galleryDetailsMenu.item?.FilePath === item?.FilePath;
+  const isSameItem = galleryDetailsMenu.visible && galleryDetailsMenu.item?.MediaId === item?.MediaId;
   window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: GALLERY_DETAILS_SURFACE }));
   if (isSameItem) {
     closeGalleryDetailsMenu();

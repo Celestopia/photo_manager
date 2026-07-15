@@ -12,20 +12,26 @@ const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPath
 const { createOperationReporter } = require("./operation-progress");
 const { readTransactionJournal } = require("./library-transaction");
 const { assertCustomization } = require("../src/shared/customization-schema");
+const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
 // Ordered flattened columns. Left side is intentionally user-facing.
 const COLUMNS = [
+  { header: "MediaId", get: (item) => item?.MediaId || "" },
   { header: "FilePath", get: (item) => item?.FilePath || "" },
   { header: "Title", get: (item) => item?.Customization?.Title || "" },
   { header: "Rating", get: (item) => item?.Customization?.Rating ?? "" },
   { header: "Privacy", get: (item) => item?.Customization?.Privacy ?? "" },
-  { header: "Album", get: (item) => item?.Customization?.Album || "" },
-  { header: "Tags", get: (item) => (item?.Customization?.Tags || []).join(" | ") },
-  { header: "People", get: (item) => (item?.Customization?.People || []).join(" | ") },
+  { header: "AlbumId", get: (item) => item?.Customization?.AlbumId || "" },
+  { header: "Album", get: (item, context) => context.albums.get(item?.Customization?.AlbumId)?.Title || "" },
+  { header: "TagIds", get: (item) => (item?.Customization?.TagIds || []).join(" | ") },
+  { header: "Tags", get: (item, context) => (item?.Customization?.TagIds || []).map((id) => context.tags.get(id)?.Text).join(" | ") },
+  { header: "PersonIds", get: (item) => (item?.Customization?.PersonIds || []).join(" | ") },
+  { header: "People", get: (item, context) => (item?.Customization?.PersonIds || []).map((id) => context.people.get(id)?.Name).join(" | ") },
   { header: "Description", get: (item) => item?.Customization?.Description || "" },
   { header: "HiddenDescription", get: (item) => item?.Customization?.HiddenDescription || "" },
   { header: "MetadataUpdateDate", get: (item) => item?.Customization?.MetadataUpdateDate || "" },
-  { header: "Location.Place", get: (item) => item?.Location?.Place || item?.Location?.Site || "" },
+  { header: "LocationId", get: (item) => item?.Location?.LocationId || "" },
+  { header: "Location.Name", get: (item, context) => context.locations.get(item?.Location?.LocationId)?.Name || "" },
   { header: "Location.Detail", get: (item) => item?.Location?.Detail || "" },
   { header: "FileSystem.FileType", get: (item) => item?.FileSystem?.FileType || "" },
   { header: "FileSystem.ShootingTimeString", get: (item) => item?.FileSystem?.ShootingTimeString || "" },
@@ -131,14 +137,22 @@ async function run(options = {}) {
   try {
   if (await readTransactionJournal(paths)) throw new Error("A pending library transaction must be recovered by opening the library before export");
   const map = await loadExisting(paths.metadataFile);
+  const registryIndexes = await loadRegistryIndexes(paths);
+  validateMetadataMap(map, registryIndexes);
   validateMetadataPaths(paths, map.values());
   const items = [...map.values()];
   for (const item of items) assertCustomization(item.Customization, item.FilePath);
+  const columnContext = {
+    tags: registryIndexes.tags.byId,
+    albums: registryIndexes.albums.byId,
+    people: registryIndexes.people.byId,
+    locations: registryIndexes.locations.byId,
+  };
 
   const lines = [];
   lines.push(COLUMNS.map((column) => toCell(column.header)).join(","));
   for (const item of items) {
-    lines.push(COLUMNS.map((column) => toCell(column.get(item))).join(","));
+    lines.push(COLUMNS.map((column) => toCell(column.get(item, columnContext))).join(","));
   }
 
   // Prefix BOM for better UTF-8 compatibility in spreadsheet apps on Windows.

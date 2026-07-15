@@ -24,13 +24,13 @@
         ><span>未设置相册</span></button>
         <button
           v-for="option in filteredOptions"
-          :key="`${kind}_${option}`"
+          :key="`${kind}_${optionId(option)}`"
           type="button"
           class="tag-option"
-          :class="{ 'is-selected': selectedValue === option }"
-          :data-tip="getDescription(option)"
-          @mousedown.prevent="selectValue(option)"
-        ><span>{{ option }}</span></button>
+          :class="{ 'is-selected': selectedValue === optionId(option) }"
+          :data-tip="getDescription(optionId(option))"
+          @mousedown.prevent="selectValue(optionId(option))"
+        ><span>{{ optionLabel(option) }}</span></button>
         <div class="tag-option-empty" v-if="!filteredOptions.length && !hasUnassignedMatch">没有匹配的{{ label }}</div>
       </div>
     </div>
@@ -68,17 +68,29 @@ const selectedValue = computed(() => query.filters[props.kind] || "");
 const selectedLabel = computed(() => {
   if (!selectedValue.value) return "全部";
   if (selectedValue.value === UNASSIGNED_ALBUM_FILTER) return "未设置相册";
-  return selectedValue.value;
+  return optionLabel(options.value.find((option) => optionId(option) === selectedValue.value)) || "全部";
 });
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
 const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("zh-CN"));
-const filteredOptions = computed(() => options.value.filter((option) => matches(option)));
+const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
 const hasUnassignedMatch = computed(
   () => props.kind === "album" && filterOptions.unassignedAlbumCount > 0 && matches("未设置相册")
 );
 
 function matches(value) {
   return !normalizedSearch.value || String(value).toLocaleLowerCase("zh-CN").includes(normalizedSearch.value);
+}
+
+function optionId(option) {
+  if (props.kind === "album") return option?.AlbumId || "";
+  if (props.kind === "tag") return option?.TagId || "";
+  return option?.PersonId || "";
+}
+
+function optionLabel(option) {
+  if (props.kind === "album") return option?.Title || "";
+  if (props.kind === "tag") return option?.Text || "";
+  return option?.Name || "";
 }
 
 function getDescription(value) {
@@ -117,7 +129,7 @@ async function selectValue(value) {
 
 async function selectFirstOption() {
   if (hasUnassignedMatch.value) return selectValue(UNASSIGNED_ALBUM_FILTER);
-  if (filteredOptions.value.length) return selectValue(filteredOptions.value[0]);
+  if (filteredOptions.value.length) return selectValue(optionId(filteredOptions.value[0]));
 }
 
 watch(dropdownOpen, (open) => {

@@ -10,14 +10,14 @@
       </header>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="personManager.search" placeholder="搜索姓名或说明" /></div>
       <div class="tag-manager-list">
-        <article class="tag-manager-item" v-for="person in managerFilteredPeople" :key="'person_manager_' + person.Name">
+        <article class="tag-manager-item" v-for="person in managerFilteredPeople" :key="'person_manager_' + person.PersonId">
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ person.Name }}</strong><span>{{ person.UsageCount || 0 }} 个媒体</span></div>
-            <textarea v-if="personManager.editingName === person.Name" class="input tag-manager-description-input" v-model="personManager.editDescription" placeholder="可留空"></textarea>
+            <textarea v-if="personManager.editingId === person.PersonId" class="input tag-manager-description-input" v-model="personManager.editDescription" placeholder="可留空"></textarea>
             <p v-else>{{ person.Description || '无说明' }}</p>
-            <div class="tag-manager-error" v-if="personManager.error && personManager.editingName === person.Name">{{ personManager.error }}</div>
+            <div class="tag-manager-error" v-if="personManager.error && personManager.editingId === person.PersonId">{{ personManager.error }}</div>
           </div>
-          <div class="tag-manager-actions" v-if="personManager.editingName === person.Name"><button class="btn btn-primary" @click="savePersonDescription">保存</button><button class="btn" @click="cancelPersonDescriptionEdit">取消</button></div>
+          <div class="tag-manager-actions" v-if="personManager.editingId === person.PersonId"><button class="btn btn-primary" @click="savePersonDescription">保存</button><button class="btn" @click="cancelPersonDescriptionEdit">取消</button></div>
           <div class="tag-manager-actions" v-else><button class="btn" @click="startPersonDescriptionEdit(person)">编辑说明</button><button class="btn danger-text" @click="deletePersonGlobally(person)">全局删除</button></div>
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredPeople.length">没有匹配的人物</div>

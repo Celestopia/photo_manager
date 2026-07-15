@@ -14,43 +14,52 @@ function createMetadataEditService(options) {
     appendLog,
   } = options;
 
+  function validateCustomizationReferences(customization) {
+    if (Object.prototype.hasOwnProperty.call(customization, "Privacy")) assertPrivacy(customization.Privacy);
+    if (Object.prototype.hasOwnProperty.call(customization, "TagIds")) {
+      const validation = normalizeRegisteredTags(customization.TagIds);
+      if (validation.unknown.length) throw new Error(`Unknown TagId: ${validation.unknown.join(", ")}`);
+      customization.TagIds = validation.tagIds;
+    }
+    if (Object.prototype.hasOwnProperty.call(customization, "AlbumId")) {
+      const validation = normalizeRegisteredAlbum(customization.AlbumId);
+      if (validation.unknown.length) throw new Error(`Unknown AlbumId: ${validation.unknown.join(", ")}`);
+      customization.AlbumId = validation.albumId;
+    }
+    if (Object.prototype.hasOwnProperty.call(customization, "PersonIds")) {
+      const validation = normalizeRegisteredPeople(customization.PersonIds);
+      if (validation.unknown.length) throw new Error(`Unknown PersonId: ${validation.unknown.join(", ")}`);
+      customization.PersonIds = validation.personIds;
+    }
+  }
+
   async function updateCustomization(payload) {
     requireOpenLibrary({ writable: true });
-    const { filePath, customization, location } = payload;
+    const mediaId = String(payload?.mediaId || "").trim();
+    const customization = payload?.customization && typeof payload.customization === "object"
+      ? { ...payload.customization }
+      : {};
+    const location = payload?.location;
     const metadata = getMetadata();
-    const current = metadata.get(filePath);
+    const current = metadata.get(mediaId);
     if (!current) return { ok: false, error: "Metadata item not found" };
     const previous = structuredClone(current);
 
-    if (Object.prototype.hasOwnProperty.call(customization || {}, "Privacy")) {
-      try {
-        assertPrivacy(customization.Privacy);
-      } catch (error) {
-        return { ok: false, error: error.message };
-      }
-    }
-
-    if (Object.prototype.hasOwnProperty.call(customization || {}, "Tags")) {
-      const validation = normalizeRegisteredTags(customization.Tags);
-      if (validation.unknown.length) return { ok: false, error: `Unknown tag: ${validation.unknown.join(", ")}` };
-      customization.Tags = validation.tags;
-    }
-    if (Object.prototype.hasOwnProperty.call(customization || {}, "Album")) {
-      const validation = normalizeRegisteredAlbum(customization.Album);
-      if (validation.unknown.length) return { ok: false, error: `Unknown album: ${validation.unknown.join(", ")}` };
-      customization.Album = validation.album;
-    }
-    if (Object.prototype.hasOwnProperty.call(customization || {}, "People")) {
-      const validation = normalizeRegisteredPeople(customization.People);
-      if (validation.unknown.length) return { ok: false, error: `Unknown person: ${validation.unknown.join(", ")}` };
-      customization.People = validation.people;
+    try {
+      validateCustomizationReferences(customization);
+    } catch (error) {
+      return { ok: false, error: error.message };
     }
 
     let normalizedLocation = null;
     if (location && typeof location === "object") {
-      const validation = normalizeRegisteredLocation(location);
-      if (validation.unknown.length) return { ok: false, error: `Unknown location: ${validation.unknown.join(", ")}` };
-      normalizedLocation = validation.location;
+      try {
+        const validation = normalizeRegisteredLocation(location);
+        if (validation.unknown.length) return { ok: false, error: `Unknown LocationId: ${validation.unknown.join(", ")}` };
+        normalizedLocation = validation.location;
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
     }
 
     current.Customization = {
@@ -60,13 +69,13 @@ function createMetadataEditService(options) {
     };
     delete current.Customization.Category;
     if (normalizedLocation) current.Location = normalizedLocation;
-    metadata.set(filePath, current);
+    metadata.set(mediaId, current);
 
     try {
       await saveMetadata();
       return { ok: true, item: enrichItem(current) };
     } catch (error) {
-      metadata.set(filePath, previous);
+      metadata.set(mediaId, previous);
       appendLog(`Failed to write metadata: ${error.message}`);
       return { ok: false, error: "Failed to write metadata" };
     }
@@ -74,65 +83,63 @@ function createMetadataEditService(options) {
 
   async function batchUpdate(payload) {
     requireOpenLibrary({ writable: true });
-    const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths : [];
-    const addTags = Array.isArray(payload?.addTags) ? payload.addTags : [];
-    const addPeople = Array.isArray(payload?.addPeople) ? payload.addPeople : [];
-    const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? payload.locationPatch : {};
-    const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? payload.customizationPatch : {};
-    if (!filePaths.length) return { ok: false, error: "No target file paths" };
+    const mediaIds = Array.isArray(payload?.mediaIds) ? payload.mediaIds : [];
+    const addTagIds = Array.isArray(payload?.addTagIds) ? payload.addTagIds : [];
+    const addPersonIds = Array.isArray(payload?.addPersonIds) ? payload.addPersonIds : [];
+    const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? { ...payload.locationPatch } : {};
+    const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? { ...payload.customizationPatch } : {};
+    if (!mediaIds.length) return { ok: false, error: "No target MediaIds" };
 
-    if (Object.prototype.hasOwnProperty.call(customizationPatch, "Privacy")) {
+    let tagValidation;
+    let peopleValidation;
+    try {
+      validateCustomizationReferences(customizationPatch);
+      tagValidation = normalizeRegisteredTags(addTagIds);
+      peopleValidation = normalizeRegisteredPeople(addPersonIds);
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+    if (tagValidation.unknown.length) return { ok: false, error: `Unknown TagId: ${tagValidation.unknown.join(", ")}` };
+    if (peopleValidation.unknown.length) return { ok: false, error: `Unknown PersonId: ${peopleValidation.unknown.join(", ")}` };
+
+    let normalizedLocationPatch = null;
+    if (Object.prototype.hasOwnProperty.call(locationPatch, "LocationId")) {
       try {
-        assertPrivacy(customizationPatch.Privacy);
+        const validation = normalizeRegisteredLocation({ LocationId: locationPatch.LocationId, Detail: "" });
+        if (validation.unknown.length) return { ok: false, error: `Unknown LocationId: ${validation.unknown.join(", ")}` };
+        normalizedLocationPatch = validation.location;
       } catch (error) {
         return { ok: false, error: error.message };
       }
-    }
-
-    const tagValidation = normalizeRegisteredTags([...new Set(addTags.map((value) => String(value || "").trim()).filter(Boolean))]);
-    if (tagValidation.unknown.length) return { ok: false, error: `Unknown tag: ${tagValidation.unknown.join(", ")}` };
-    const peopleValidation = normalizeRegisteredPeople([...new Set(addPeople.map((value) => String(value || "").trim()).filter(Boolean))]);
-    if (peopleValidation.unknown.length) return { ok: false, error: `Unknown person: ${peopleValidation.unknown.join(", ")}` };
-
-    if (Object.prototype.hasOwnProperty.call(customizationPatch, "Album")) {
-      const albumValidation = normalizeRegisteredAlbum(customizationPatch.Album);
-      if (albumValidation.unknown.length) return { ok: false, error: `Unknown album: ${albumValidation.unknown.join(", ")}` };
-      customizationPatch.Album = albumValidation.album;
-    }
-    let normalizedLocationPatch = null;
-    if (Object.prototype.hasOwnProperty.call(locationPatch, "Place")) {
-      const locationValidation = normalizeRegisteredLocation({ Place: locationPatch.Place, Detail: "" });
-      if (locationValidation.unknown.length) return { ok: false, error: `Unknown location: ${locationValidation.unknown.join(", ")}` };
-      normalizedLocationPatch = locationValidation.location;
     }
 
     const metadata = getMetadata();
     const updatedItems = [];
     const previousItems = new Map();
     let missingCount = 0;
-    for (const filePath of filePaths) {
-      const current = metadata.get(filePath);
+    for (const mediaId of mediaIds) {
+      const current = metadata.get(mediaId);
       if (!current) {
         missingCount += 1;
         continue;
       }
-      previousItems.set(filePath, structuredClone(current));
-      const mergedTags = [...(Array.isArray(current?.Customization?.Tags) ? current.Customization.Tags : [])];
-      for (const tag of tagValidation.tags) if (!mergedTags.includes(tag)) mergedTags.push(tag);
-      const mergedPeople = [...(Array.isArray(current?.Customization?.People) ? current.Customization.People : [])];
-      for (const person of peopleValidation.people) if (!mergedPeople.includes(person)) mergedPeople.push(person);
+      previousItems.set(mediaId, structuredClone(current));
+      const mergedTagIds = [...(Array.isArray(current?.Customization?.TagIds) ? current.Customization.TagIds : [])];
+      for (const tagId of tagValidation.tagIds) if (!mergedTagIds.includes(tagId)) mergedTagIds.push(tagId);
+      const mergedPersonIds = [...(Array.isArray(current?.Customization?.PersonIds) ? current.Customization.PersonIds : [])];
+      for (const personId of peopleValidation.personIds) if (!mergedPersonIds.includes(personId)) mergedPersonIds.push(personId);
 
       current.Customization = {
         ...current.Customization,
         ...customizationPatch,
-        Tags: mergedTags,
-        People: mergedPeople,
+        TagIds: mergedTagIds,
+        PersonIds: mergedPersonIds,
         MetadataUpdateDate: new Date().toISOString(),
       };
       delete current.Customization.Category;
       current.Location = normalizeLocationObject(current.Location);
-      if (normalizedLocationPatch) current.Location.Place = normalizedLocationPatch.Place;
-      metadata.set(filePath, current);
+      if (normalizedLocationPatch) current.Location.LocationId = normalizedLocationPatch.LocationId;
+      metadata.set(mediaId, current);
       updatedItems.push(enrichItem(current));
     }
 
@@ -140,13 +147,13 @@ function createMetadataEditService(options) {
       if (updatedItems.length) await saveMetadata();
       return {
         ok: true,
-        requestedCount: filePaths.length,
+        requestedCount: mediaIds.length,
         updatedCount: updatedItems.length,
         missingCount,
         items: updatedItems,
       };
     } catch (error) {
-      for (const [filePath, previous] of previousItems) metadata.set(filePath, previous);
+      for (const [mediaId, previous] of previousItems) metadata.set(mediaId, previous);
       appendLog(`Failed to batch-write metadata: ${error.message}`);
       return { ok: false, error: "Failed to write metadata" };
     }

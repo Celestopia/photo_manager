@@ -4,9 +4,9 @@
       <button
         type="button"
         class="input location-filter-input registry-trigger"
-        :data-tip="selectedLocation ? getLocationTooltip(selectedLocation) : ''"
+        :data-tip="selectedLocationId ? getLocationTooltip(selectedLocationId) : ''"
         @click="openDropdown"
-      ><span>{{ selectedLocation || '全部' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
+      ><span>{{ selectedLocationName || '全部' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
       <div class="tag-dropdown location-dropdown location-filter-dropdown" v-if="dropdownOpen">
         <input
           ref="searchInputRef"
@@ -17,7 +17,7 @@
         />
         <div class="location-dropdown-current-context" v-if="filterDropdownContext">{{ filterDropdownContext }}</div>
         <div class="location-dropdown-scroll" ref="filterDropdownRef" @scroll="updateFilterDropdownContext">
-          <button type="button" class="tag-option location-option" :class="{ 'is-selected': selectedLocation === '' }" @mousedown.prevent="selectLocation('')">
+          <button type="button" class="tag-option location-option" :class="{ 'is-selected': selectedLocationId === '' }" @mousedown.prevent="selectLocation('')">
             <span>全部</span>
           </button>
           <template v-for="row in filterRows" :key="'filter_' + row.Key">
@@ -30,12 +30,12 @@
               v-else-if="row.Location"
               type="button"
               class="tag-option location-option"
-              :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocation === row.Location.Name }"
-              :data-tip="getLocationTooltip(row.Location.Name)"
+              :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocationId === row.Location.LocationId }"
+              :data-tip="getLocationTooltip(row.Location.LocationId)"
               :data-location-context="getLocationManagerRowContext(row)"
               :data-location-recent="row.Key.startsWith('filter-recent-location:') ? '1' : null"
               :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
-              @mousedown.prevent="selectLocation(row.Location.Name)"
+              @mousedown.prevent="selectLocation(row.Location.LocationId)"
             >
               <span>{{ row.Label }}</span>
             </button>
@@ -66,6 +66,7 @@ const {
   query,
   getLocationFilterRows,
   getLocationTooltip,
+  getLocationName,
   getLocationManagerRowContext,
   setLocationFilter,
 } = app;
@@ -76,7 +77,8 @@ const searchText = ref("");
 const filterDropdownRef = ref(null);
 const searchInputRef = ref(null);
 const filterDropdownContext = ref("");
-const selectedLocation = computed(() => query.filters.location || "");
+const selectedLocationId = computed(() => query.filters.location || "");
+const selectedLocationName = computed(() => getLocationName(selectedLocationId.value));
 const filterRows = computed(() => getLocationFilterRows(searchText.value));
 
 function openDropdown() {
@@ -167,7 +169,7 @@ async function onKeydown(event) {
   if (event.key === "Enter") {
     event.preventDefault();
     const first = firstSelectableRow();
-    if (first) await selectLocation(first.Location.Name);
+    if (first) await selectLocation(first.Location.LocationId);
     return;
   }
   if (event.key === "Escape") {

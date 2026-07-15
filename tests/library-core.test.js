@@ -39,7 +39,7 @@ test("library manifest round-trips with a validated UUID and name", async (t) =>
   const paths = resolveLibraryPaths(root);
   await ensureLibraryDirectories(paths);
   const manifest = createLibraryManifest(root, "Test Library");
-  assert.equal(manifest.schemaVersion, 2);
+  assert.equal(manifest.schemaVersion, 3);
   await writeLibraryManifest(paths, manifest);
   assert.deepEqual(await readLibraryManifest(paths), manifest);
 

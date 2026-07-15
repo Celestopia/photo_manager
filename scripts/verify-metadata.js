@@ -14,6 +14,7 @@ const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPath
 const { createOperationReporter } = require("./operation-progress");
 const { readTransactionJournal } = require("./library-transaction");
 const { assertCustomization } = require("../src/shared/customization-schema");
+const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
 function approximatelyEqual(a, b, tolerance = 0.1) {
   if (a === null || a === undefined || b === null || b === undefined) return a == null && b == null;
@@ -31,6 +32,8 @@ async function run(options = {}) {
   try {
     if (await readTransactionJournal(paths)) throw new Error("A pending library transaction must be recovered by opening the library before verification");
     const existing = await loadExisting(paths.metadataFile);
+    const registries = await loadRegistryIndexes(paths);
+    validateMetadataMap(existing, registries);
     validateMetadataPaths(paths, existing.values());
     const files = (await walkFiles(paths.root, { onProgress: (progress) => emit(progress) }))
       .filter((file) => extensionType(path.extname(file)));

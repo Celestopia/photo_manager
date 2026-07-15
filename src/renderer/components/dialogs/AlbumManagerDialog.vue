@@ -10,14 +10,14 @@
       </header>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="albumManager.search" placeholder="搜索相册或说明" /></div>
       <div class="tag-manager-list">
-        <article class="tag-manager-item" v-for="album in managerFilteredAlbums" :key="'album_manager_' + album.Title">
+        <article class="tag-manager-item" v-for="album in managerFilteredAlbums" :key="'album_manager_' + album.AlbumId">
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ album.Title }}</strong><span>{{ album.UsageCount || 0 }} 个媒体</span></div>
-            <textarea v-if="albumManager.editingTitle === album.Title" class="input tag-manager-description-input" v-model="albumManager.editDescription"></textarea>
+            <textarea v-if="albumManager.editingId === album.AlbumId" class="input tag-manager-description-input" v-model="albumManager.editDescription"></textarea>
             <p v-else>{{ album.Description }}</p>
-            <div class="tag-manager-error" v-if="albumManager.error && albumManager.editingTitle === album.Title">{{ albumManager.error }}</div>
+            <div class="tag-manager-error" v-if="albumManager.error && albumManager.editingId === album.AlbumId">{{ albumManager.error }}</div>
           </div>
-          <div class="tag-manager-actions" v-if="albumManager.editingTitle === album.Title"><button class="btn btn-primary" @click="saveAlbumDescription">保存</button><button class="btn" @click="cancelAlbumDescriptionEdit">取消</button></div>
+          <div class="tag-manager-actions" v-if="albumManager.editingId === album.AlbumId"><button class="btn btn-primary" @click="saveAlbumDescription">保存</button><button class="btn" @click="cancelAlbumDescriptionEdit">取消</button></div>
           <div class="tag-manager-actions" v-else><button class="btn" @click="startAlbumDescriptionEdit(album)">编辑说明</button><button class="btn danger-text" @click="deleteAlbumGlobally(album)">全局删除</button></div>
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredAlbums.length">没有匹配的相册</div>

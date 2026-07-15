@@ -25,6 +25,10 @@ const {
   probeVideoFile,
   failedVideoMetadata,
 } = require("./media-tools");
+const {
+  assertUuidV4,
+  createEntityId,
+} = require("../src/shared/identity-schema.js");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 const DEFAULT_CONFIG = {
@@ -157,9 +161,9 @@ function defaultCustomization(ext, type = extensionType(ext)) {
   const isJpg = ext.toLowerCase() === ".jpg" || ext.toLowerCase() === ".jpeg";
   return {
     Title: "",
-    Album: "",
-    Tags: [],
-    People: [],
+    AlbumId: null,
+    TagIds: [],
+    PersonIds: [],
     Description: "",
     HiddenDescription: "",
     Rating: type === "video" || isJpg ? 2 : 1,
@@ -168,14 +172,13 @@ function defaultCustomization(ext, type = extensionType(ext)) {
   };
 }
 
-// Default location metadata values (manually maintained by user).
 /**
  * Build default Location block for user-maintained location fields.
- * All fields start as empty strings and are filled by manual edits.
+ * The registry reference is empty until the user assigns a location.
  */
 function defaultLocation() {
   return {
-    Place: "",
+    LocationId: null,
     Detail: "",
   };
 }
@@ -286,6 +289,7 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
     : (exif?.DateTimeOriginal ? timeInfoFromDate(exif.DateTimeOriginal) : creation);
   const videoLocation = videoProbe?.location || null;
   const output = {
+    MediaId: createEntityId(),
     FilePath: relativePath,
     SHA256Hash: hash,
     FileSystem: {
@@ -340,20 +344,24 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
   return output;
 }
 
-// Load existing JSONL file into FilePath-keyed Map.
 /**
  * Read existing JSONL metadata file into a FilePath-keyed map.
- * Invalid or duplicate JSONL records reject the operation.
+ * JSONL identity is validated by MediaId before paths are indexed for scanning.
  */
 async function loadExisting(metadataFile) {
   if (!fs.existsSync(metadataFile)) return new Map();
   const lines = await readJsonlStrict(metadataFile, {
     required: false,
     label: path.basename(metadataFile),
-    keyOf: (item) => item?.FilePath,
+    keyOf: (item) => item?.MediaId,
   });
   const map = new Map();
-  for (const item of lines) map.set(item.FilePath, item);
+  for (const item of lines) {
+    assertUuidV4(item.MediaId, `MediaId for ${item?.FilePath || "metadata record"}`);
+    if (typeof item.FilePath !== "string" || !item.FilePath.trim()) throw new Error("Metadata record is missing FilePath");
+    if (map.has(item.FilePath)) throw new Error(`Metadata contains duplicate FilePath: ${item.FilePath}`);
+    map.set(item.FilePath, item);
+  }
   return map;
 }
 

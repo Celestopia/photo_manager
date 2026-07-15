@@ -2,6 +2,7 @@ function createApplicationRuntime() {
   return {
     mainWindow: null,
     metadataIndex: new Map(),
+    mediaPathIndex: new Map(),
     tagRegistryIndex: new Map(),
     albumRegistryIndex: new Map(),
     personRegistryIndex: new Map(),

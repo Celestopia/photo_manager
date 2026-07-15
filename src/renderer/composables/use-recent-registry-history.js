@@ -46,9 +46,9 @@ export function useRecentRegistryHistory({ libraryState }) {
   }
 
   function loadLibraryRecentValues() {
-    recentTags.value = load("Tags");
-    recentPeople.value = load("People");
-    recentLocations.value = load("Locations");
+    recentTags.value = load("TagIds");
+    recentPeople.value = load("PersonIds");
+    recentLocations.value = load("LocationIds");
   }
 
   function resetRecentValues() {
@@ -63,11 +63,11 @@ export function useRecentRegistryHistory({ libraryState }) {
     recentLocations,
     loadLibraryRecentValues,
     resetRecentValues,
-    rememberRecentTag: (value) => remember(recentTags, "Tags", value),
-    rememberRecentPerson: (value) => remember(recentPeople, "People", value),
-    rememberRecentLocation: (value) => remember(recentLocations, "Locations", value),
-    pruneRecentTags: (values) => prune(recentTags, "Tags", values),
-    pruneRecentPeople: (values) => prune(recentPeople, "People", values),
-    pruneRecentLocations: (values) => prune(recentLocations, "Locations", values),
+    rememberRecentTag: (value) => remember(recentTags, "TagIds", value),
+    rememberRecentPerson: (value) => remember(recentPeople, "PersonIds", value),
+    rememberRecentLocation: (value) => remember(recentLocations, "LocationIds", value),
+    pruneRecentTags: (values) => prune(recentTags, "TagIds", values),
+    pruneRecentPeople: (values) => prune(recentPeople, "PersonIds", values),
+    pruneRecentLocations: (values) => prune(recentLocations, "LocationIds", values),
   };
 }

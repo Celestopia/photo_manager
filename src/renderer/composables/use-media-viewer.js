@@ -54,7 +54,7 @@ export function useMediaViewer({
   function openViewer(item) {
     releaseCurrentMedia();
     selectedItem.value = item;
-    selectedGlobalIndex.value = orderedItems.value.findIndex((candidate) => candidate.FilePath === item.FilePath);
+    selectedGlobalIndex.value = orderedItems.value.findIndex((candidate) => candidate.MediaId === item.MediaId);
     setDraftFromItem(item);
     resetPanZoom();
     resetVideoPlaybackState(item);
@@ -103,7 +103,7 @@ export function useMediaViewer({
 
   async function contextCopyImage() {
     if (!selectedItem.value) return;
-    const result = await api.copyImage(selectedItem.value.FilePath);
+    const result = await api.copyImage(selectedItem.value.MediaId);
     if (result?.ok) showToastMessage("已成功复制到剪贴板");
     else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
     closeTransientPanels();
@@ -111,7 +111,7 @@ export function useMediaViewer({
 
   async function contextCopyPath() {
     if (!selectedItem.value) return;
-    const result = await api.copyPath(selectedItem.value.FilePath);
+    const result = await api.copyPath(selectedItem.value.MediaId);
     if (result?.ok) showToastMessage("已成功复制文件路径");
     else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
     closeTransientPanels();
@@ -120,7 +120,7 @@ export function useMediaViewer({
   async function contextCopyJson() {
     if (!selectedItem.value) return;
     try {
-      const result = await api.copyJson(selectedItem.value.FilePath);
+      const result = await api.copyJson(selectedItem.value.MediaId);
       if (result?.ok) showToastMessage("已成功复制媒体元信息");
       else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
     } catch (error) {

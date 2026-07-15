@@ -74,12 +74,12 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   deletePersonGlobally: (payload) => ipcRenderer.invoke("person:delete-global", toSerializable(payload)),
 
   // Clipboard helpers
-  copyPath: (filePath) => ipcRenderer.invoke("photo:copy-path", filePath),
+  copyPath: (mediaId) => ipcRenderer.invoke("photo:copy-path", mediaId),
   copyText: (value) => ipcRenderer.invoke("clipboard:write-text", String(value ?? "")),
-  copyJson: (filePath) => ipcRenderer.invoke("photo:copy-json", filePath),
-  copyImage: (filePath) => ipcRenderer.invoke("photo:copy-image", filePath),
-  openWithSystem: (filePath) => ipcRenderer.invoke("photo:open-default", filePath),
-  showInFolder: (filePath) => ipcRenderer.invoke("photo:show-in-folder", filePath),
+  copyJson: (mediaId) => ipcRenderer.invoke("photo:copy-json", mediaId),
+  copyImage: (mediaId) => ipcRenderer.invoke("photo:copy-image", mediaId),
+  openWithSystem: (mediaId) => ipcRenderer.invoke("photo:open-default", mediaId),
+  showInFolder: (mediaId) => ipcRenderer.invoke("photo:show-in-folder", mediaId),
   reportPlaybackIssue: (payload) => ipcRenderer.invoke("photo:report-playback", toSerializable(payload)),
   startThumbnailWarmup: () => ipcRenderer.invoke("thumbnail:start-warmup"),
   onThumbnailReady: (listener) => {
