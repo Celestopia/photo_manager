@@ -74,7 +74,7 @@ The gallery mixes images and videos on one shooting-time timeline. It supports m
 
 The viewer shares title, rating, privacy level, album, location, people, tags, description, and hidden-description fields across both media types. Privacy is an integer from 1 (lowest privacy requirement) to 5 (highest) and defaults to 1. Its controls are collapsed below rating by default and remain expanded or collapsed while browsing between media. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu.
 
-Selection mode can batch-set title, privacy level, album, and primary location, and batch-add people and tags. Privacy is descriptive metadata only: every level remains visible in the local gallery and CSV export, and it does not restrict clipboard or system-open actions.
+Selection mode can batch-set title, rating, privacy level, album, and primary location, and batch-add people and tags. Rating and privacy controls both use an unset draft state so opening the panel never changes existing metadata until a level is selected. Privacy is descriptive metadata only: every level remains visible in the local gallery and CSV export, and it does not restrict clipboard or system-open actions.
 
 The gallery's bottom-right settings menu provides:
 

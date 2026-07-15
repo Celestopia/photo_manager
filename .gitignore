@@ -33,3 +33,6 @@ release/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# User files
+start-photo-manager.ps1
