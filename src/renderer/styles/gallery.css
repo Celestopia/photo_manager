@@ -135,6 +135,7 @@
 .card-caption .title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-caption .meta { margin-top: 8px; font-size: 12px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--text-soft); }
 .batch-panel { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.batch-panel > label { font-weight: 700; }
 .batch-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .batch-panel-header h3 { margin: 0; }
 .batch-panel-summary { color: var(--text-soft); font-size: 13px; margin-bottom: 4px; }

@@ -20,7 +20,7 @@
   margin-top: 0;
   font-weight: 700;
 }
-.right-panel .input:not(.field-textarea) { width: 100%; }
+.right-panel .input:not(.field-textarea):not(.dropdown-search-input) { width: 100%; }
 .field-textarea {
   width: 75%;
   min-height: 28px;
@@ -38,7 +38,7 @@
   font-size: 15px;
 }
 .right-panel .album-input.registry-trigger {
-  min-height: 34px;
+  min-height: 30px;
   height: auto;
   font-size: 13px;
   line-height: 1.45;

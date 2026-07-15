@@ -1,14 +1,14 @@
 /* Controlled registry pickers, dropdowns, chips, and create popovers. */
 
 .tag-editor {
-  min-height: 44px;
+  min-height: 30px;
   min-width: 0;
   max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  padding: 6px 8px;
+  padding: 2px 6px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
@@ -19,7 +19,7 @@
   gap: 6px;
   flex: 0 1 auto;
   max-width: min(100%, 220px);
-  padding: 4px 8px;
+  padding: 2px 6px;
   border-radius: 999px;
   border: 1px solid #9dc0e7;
   background: #edf5ff;
@@ -76,12 +76,22 @@
 }
 .album-input {
   width: 100%;
-  min-height: 34px;
+  min-height: 30px;
+  height: auto;
+  padding-top: 3px;
+  padding-bottom: 3px;
   padding-right: 30px;
 }
 .album-input.registry-trigger {
   justify-content: flex-start;
   font: inherit;
+}
+.album-input.registry-trigger > span:first-child {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .album-input.registry-trigger.is-placeholder {
   color: var(--text-soft);
