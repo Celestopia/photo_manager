@@ -46,13 +46,19 @@ test("application runtime creates isolated mutable library sessions", () => {
 
 test("location domain resolves ID-backed paths and rejects descendant parents", () => {
   const registry = new Map([
-    [IDS.campus, { LocationId: IDS.campus, Name: "清华大学", ParentId: null }],
-    [IDS.dining, { LocationId: IDS.dining, Name: "清芬园食堂", ParentId: IDS.campus }],
-    [IDS.floor, { LocationId: IDS.floor, Name: "二层", ParentId: IDS.dining }],
+    [IDS.campus, { LocationId: IDS.campus, Name: "清华大学", Country: "中国", Province: "", City: "北京", ParentId: null }],
+    [IDS.dining, { LocationId: IDS.dining, Name: "清芬园食堂", Country: "中国", Province: "", City: "北京", ParentId: IDS.campus }],
+    [IDS.floor, { LocationId: IDS.floor, Name: "二层", Country: "中国", Province: "江苏", City: "南京", ParentId: IDS.dining }],
   ]);
   const domain = createLocationDomain(() => registry);
   assert.deepEqual(domain.buildLocationPath(IDS.floor), ["清华大学", "清芬园食堂", "二层"]);
   assert.deepEqual(new Set(domain.getLocationDescendants(IDS.campus)), new Set([IDS.dining, IDS.floor]));
+  assert.deepEqual(new Set(domain.getLocationIdsForRegion({ level: "city", country: "中国", province: "", city: "北京" })), new Set([IDS.campus, IDS.dining]));
+  assert.deepEqual(domain.getLocationIdsForRegion({ level: "province", country: "中国", province: "江苏", city: "" }), [IDS.floor]);
+  assert.throws(
+    () => domain.getLocationIdsForRegion({ level: "city", country: "中国", province: "", city: "不存在" }),
+    /does not match/,
+  );
   assert.deepEqual(domain.validateLocationParent(IDS.campus, IDS.floor), {
     ok: false,
     error: "Parent cannot be a descendant location",
@@ -73,6 +79,34 @@ test("gallery query composes descendant location ID filters with sorting", () =>
     search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
   });
   assert.deepEqual(result.map((item) => item.FilePath), ["b.jpg"]);
+});
+
+test("gallery query composes administrative region and registry filters", () => {
+  const service = createGalleryQueryService({
+    getLocationDescendants: () => [],
+    getLocationIdsForRegion: (region) => region.city === "北京" ? [IDS.campus, IDS.dining] : [],
+    unassignedAlbumFilter: "__UNASSIGNED__",
+  });
+  const items = [
+    { FilePath: "campus.jpg", Location: { LocationId: IDS.campus }, Customization: { AlbumId: IDS.tag, TagIds: [] } },
+    { FilePath: "dining.jpg", Location: { LocationId: IDS.dining }, Customization: { AlbumId: IDS.other, TagIds: [] } },
+    { FilePath: "nanjing.jpg", Location: { LocationId: IDS.floor }, Customization: { AlbumId: IDS.tag, TagIds: [] } },
+  ];
+  const result = service.filterAndSort(items, {
+    filters: {
+      mediaType: "", album: IDS.tag, tag: "", person: "", location: "",
+      locationRegion: { level: "city", country: "中国", province: "", city: "北京" },
+    },
+    search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
+  });
+  assert.deepEqual(result.map((item) => item.FilePath), ["campus.jpg"]);
+  assert.throws(() => service.filterAndSort(items, {
+    filters: {
+      mediaType: "", album: "", tag: "", person: "", location: IDS.campus,
+      locationRegion: { level: "country", country: "中国", province: "", city: "" },
+    },
+    search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
+  }), /mutually exclusive/);
 });
 
 test("gallery query groups the complete result without a page-size cutoff", () => {

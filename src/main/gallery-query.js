@@ -2,6 +2,7 @@ const path = require("node:path");
 
 function createGalleryQueryService({
   getLocationDescendants,
+  getLocationIdsForRegion,
   unassignedAlbumFilter,
 }) {
   function filterAndSort(list, options) {
@@ -22,7 +23,13 @@ function createGalleryQueryService({
     if (filters.person) {
       output = output.filter((item) => Array.isArray(item?.Customization?.PersonIds) && item.Customization.PersonIds.includes(filters.person));
     }
-    if (filters.location) {
+    if (filters.location && filters.locationRegion) {
+      throw new Error("Location and administrative region filters are mutually exclusive");
+    }
+    if (filters.locationRegion) {
+      const allowed = new Set(getLocationIdsForRegion(filters.locationRegion));
+      output = output.filter((item) => allowed.has(item?.Location?.LocationId));
+    } else if (filters.location) {
       const allowed = new Set([filters.location, ...getLocationDescendants(filters.location)]);
       output = output.filter((item) => allowed.has(item?.Location?.LocationId));
     }

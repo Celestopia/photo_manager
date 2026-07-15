@@ -16,6 +16,32 @@ function normalizeLocationObject(rawLocation) {
   };
 }
 
+function normalizeLocationRegionFilter(rawRegion) {
+  if (rawRegion === null || rawRegion === undefined || rawRegion === "") return null;
+  if (!rawRegion || typeof rawRegion !== "object" || Array.isArray(rawRegion)) {
+    throw new Error("Location region filter must be an object");
+  }
+  const region = {
+    level: normalizeLocationField(rawRegion.level),
+    country: normalizeLocationField(rawRegion.country),
+    province: normalizeLocationField(rawRegion.province),
+    city: normalizeLocationField(rawRegion.city),
+  };
+  if (!new Set(["country", "province", "city"]).has(region.level)) {
+    throw new Error("Unknown location region filter level");
+  }
+  if (region.level === "country" && (!region.country || region.province || region.city)) {
+    throw new Error("Country filter requires only a country value");
+  }
+  if (region.level === "province" && (!region.province || region.city)) {
+    throw new Error("Province filter requires a province value and no city value");
+  }
+  if (region.level === "city" && !region.city) {
+    throw new Error("City filter requires a city value");
+  }
+  return region;
+}
+
 function createLocationDomain(getRegistryIndex) {
   function getLocationChildrenMap() {
     const registry = getRegistryIndex();
@@ -43,6 +69,22 @@ function createLocationDomain(getRegistryIndex) {
       output.push(current);
       stack.push(...(children.get(current) || []));
     }
+    return output;
+  }
+
+  function getLocationIdsForRegion(rawRegion) {
+    const region = normalizeLocationRegionFilter(rawRegion);
+    if (!region) return [];
+    const output = [];
+    for (const location of getRegistryIndex().values()) {
+      const countryMatches = normalizeLocationField(location.Country) === region.country;
+      const provinceMatches = normalizeLocationField(location.Province) === region.province;
+      const cityMatches = normalizeLocationField(location.City) === region.city;
+      if (region.level === "country" && countryMatches) output.push(location.LocationId);
+      if (region.level === "province" && countryMatches && provinceMatches) output.push(location.LocationId);
+      if (region.level === "city" && countryMatches && provinceMatches && cityMatches) output.push(location.LocationId);
+    }
+    if (!output.length) throw new Error("Location region filter does not match the current registry");
     return output;
   }
 
@@ -81,6 +123,7 @@ function createLocationDomain(getRegistryIndex) {
     getLocationChildrenMap,
     getLocationDepth,
     getLocationDescendants,
+    getLocationIdsForRegion,
     validateLocationParent,
   };
 }
@@ -90,4 +133,5 @@ module.exports = {
   normalizeLocationField,
   normalizeLocationName,
   normalizeLocationObject,
+  normalizeLocationRegionFilter,
 };

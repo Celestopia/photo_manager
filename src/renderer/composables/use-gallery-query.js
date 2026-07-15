@@ -12,7 +12,7 @@ export function useGalleryQuery({
   const query = reactive({
     sortBy: "shootingTime",
     sortOrder: "desc",
-    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
+    filters: { mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null },
     search: { field: "title", value: "" },
   });
   const galleryGroups = shallowRef([]);
@@ -45,6 +45,7 @@ export function useGalleryQuery({
           tag: query.filters.tag,
           person: query.filters.person,
           location: query.filters.location,
+          locationRegion: query.filters.locationRegion ? { ...query.filters.locationRegion } : null,
         },
         search: { field: query.search.field, value: query.search.value },
       };
@@ -84,7 +85,7 @@ export function useGalleryQuery({
   }
 
   async function resetAll() {
-    Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "" });
+    Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null });
     Object.assign(query.search, { field: "title", value: "" });
     query.sortBy = "shootingTime";
     query.sortOrder = "desc";
@@ -95,7 +96,7 @@ export function useGalleryQuery({
   function resetGalleryState() {
     latestQueryId += 1;
     loading.value = false;
-    Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "" });
+    Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null });
     Object.assign(query.search, { field: "title", value: "" });
     galleryGroups.value = [];
     orderedItems.value = [];

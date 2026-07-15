@@ -9,7 +9,9 @@ import {
 } from "../src/renderer/domain/media-formatters.mjs";
 import {
   buildLocationHierarchyRows,
+  getLocationRegionFilterLabel,
   getLocationManagerRowContext,
+  sameLocationRegionFilter,
 } from "../src/renderer/domain/location-hierarchy.mjs";
 import {
   buildGalleryMediaDetailRows,
@@ -156,6 +158,10 @@ test("location hierarchy emits administrative rows and stable manager context", 
     rows.filter((row) => row.Type === "group").map((row) => [row.Label, row.Depth]),
     [["中国", 0], ["湖南", 1], ["长沙", 2], ["江苏", 1], ["南京", 2]],
   );
+  const cityGroup = rows.find((row) => row.Type === "group" && row.Label === "长沙");
+  assert.deepEqual(cityGroup.Region, { level: "city", country: "中国", province: "湖南", city: "长沙" });
+  assert.equal(getLocationRegionFilterLabel(cityGroup.Region), "中国 / 湖南 / 长沙");
+  assert.equal(sameLocationRegionFilter(cityGroup.Region, { ...cityGroup.Region }), true);
   const locationRow = rows.find((row) => row.Label === "五一广场");
   assert.equal(getLocationManagerRowContext(locationRow), "中国 | 湖南 | 长沙");
 });

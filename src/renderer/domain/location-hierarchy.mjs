@@ -14,6 +14,33 @@ export function getLocationRegionLabel(location) {
   return getLocationRegionParts(location).join(" / ");
 }
 
+export function getLocationRegionFilterLabel(region) {
+  return [region?.country, region?.province, region?.city].map(normalizeLocationField).filter(Boolean).join(" / ");
+}
+
+export function locationMatchesRegionFilter(location, region) {
+  const level = normalizeLocationField(region?.level);
+  const country = normalizeLocationField(region?.country);
+  const province = normalizeLocationField(region?.province);
+  const city = normalizeLocationField(region?.city);
+  if (level === "country") return normalizeLocationField(location?.Country) === country;
+  if (level === "province") {
+    return normalizeLocationField(location?.Country) === country
+      && normalizeLocationField(location?.Province) === province;
+  }
+  if (level === "city") {
+    return normalizeLocationField(location?.Country) === country
+      && normalizeLocationField(location?.Province) === province
+      && normalizeLocationField(location?.City) === city;
+  }
+  return false;
+}
+
+export function sameLocationRegionFilter(first, second) {
+  return ["level", "country", "province", "city"]
+    .every((field) => normalizeLocationField(first?.[field]) === normalizeLocationField(second?.[field]));
+}
+
 export function getLocationPathLabel(location) {
   const path = Array.isArray(location?.Path) && location.Path.length ? location.Path : [location?.Name].filter(Boolean);
   return path.join(" / ");
@@ -99,7 +126,18 @@ function buildLocationTreeRows(locationRows, baseDepth, representedLocationId = 
   return output;
 }
 
-function createLocationGroupNode(key, label, level, depth, order) {
+function createRegionFilter(groupSpecs) {
+  const region = { level: "", country: "", province: "", city: "" };
+  for (const spec of groupSpecs) {
+    region.level = spec.level;
+    if (spec.level === "country") region.country = spec.label;
+    if (spec.level === "province") region.province = spec.label;
+    if (spec.level === "city") region.city = spec.label;
+  }
+  return region;
+}
+
+function createLocationGroupNode(key, label, level, depth, order, region) {
   return {
     Type: "group",
     Key: key,
@@ -107,6 +145,7 @@ function createLocationGroupNode(key, label, level, depth, order) {
     Level: level,
     Depth: depth,
     Order: order,
+    Region: region,
     Location: null,
     Groups: new Map(),
     Locations: [],
@@ -123,7 +162,14 @@ export function buildLocationHierarchyRows(locations) {
     for (const spec of specs) {
       const key = `${parent.Key}>${spec.level}:${spec.label}`;
       if (!parent.Groups.has(key)) {
-        parent.Groups.set(key, createLocationGroupNode(key, spec.label, spec.level, parent.Depth + 1, spec.order));
+        parent.Groups.set(key, createLocationGroupNode(
+          key,
+          spec.label,
+          spec.level,
+          parent.Depth + 1,
+          spec.order,
+          createRegionFilter([...groupPath, spec]),
+        ));
       }
       parent = parent.Groups.get(key);
       groupPath.push(spec);
@@ -160,6 +206,7 @@ export function buildLocationHierarchyRows(locations) {
         Location: group.Location,
         HasChildren: group.Locations.length > 0 || group.Groups.size > 0,
         ContextParts: groupContextParts,
+        Region: group.Region,
       });
       flatten(group, groupContextParts);
     }

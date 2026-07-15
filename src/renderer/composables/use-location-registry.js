@@ -5,6 +5,7 @@ import {
   getLocationManagerRowContext,
   getLocationPathLabel,
   getLocationRegionLabel,
+  locationMatchesRegionFilter,
   locationMatchesKeyword,
   normalizeLocationField,
   normalizeLocationName,
@@ -57,6 +58,9 @@ export function useLocationRegistry({
     const ids = locationRegistry.value.map((location) => location.LocationId);
     pruneRecentLocations(ids);
     if (query.filters.location && !ids.includes(query.filters.location)) query.filters.location = "";
+    if (query.filters.locationRegion && !locationRegistry.value.some((location) => locationMatchesRegionFilter(location, query.filters.locationRegion))) {
+      query.filters.locationRegion = null;
+    }
   }
 
   async function loadLocations() {
@@ -134,7 +138,19 @@ export function useLocationRegistry({
   }
   async function setLocationFilter(locationId) {
     query.filters.location = locationId || "";
+    query.filters.locationRegion = null;
     if (locationId) rememberRecentLocation(locationId);
+    await applyFilterSort();
+  }
+
+  async function setLocationRegionFilter(region) {
+    query.filters.location = "";
+    query.filters.locationRegion = region ? {
+      level: normalizeLocationField(region.level),
+      country: normalizeLocationField(region.country),
+      province: normalizeLocationField(region.province),
+      city: normalizeLocationField(region.city),
+    } : null;
     await applyFilterSort();
   }
 
@@ -269,7 +285,11 @@ export function useLocationRegistry({
       description: locationManager.editDescription,
     });
     if (!result?.ok) { locationManager.error = result?.error || "保存地点失败"; return; }
-    applyLocationRegistry(result.locations); cancelLocationEdit(); showToastMessage("地点已更新");
+    const regionFilterWasActive = Boolean(query.filters.locationRegion);
+    applyLocationRegistry(result.locations);
+    cancelLocationEdit();
+    if (regionFilterWasActive) await queryGallery();
+    showToastMessage("地点已更新");
   }
 
   function clearLocationFromItem(item, locationId) {
@@ -290,9 +310,12 @@ export function useLocationRegistry({
     if (!window.confirm(`确定全局删除地点“${location.Name}”？这会清空 ${usage} 个媒体的地点信息，并让 ${childCount} 个直接子地点变为无父节点。`)) return;
     const result = await api.deleteLocationGlobally({ locationId: location.LocationId });
     if (!result?.ok) { showToastMessage(`删除地点失败：${result?.error || "未知错误"}`); return; }
+    const regionFilterWasActive = Boolean(query.filters.locationRegion);
+    const exactFilterWasActive = query.filters.location === location.LocationId;
     applyLocationRegistry(result.locations);
     syncDeletedLocationLocally(location.LocationId);
-    if (query.filters.location === location.LocationId) { query.filters.location = ""; await queryGallery(); }
+    if (exactFilterWasActive) query.filters.location = "";
+    if (regionFilterWasActive || exactFilterWasActive) await queryGallery();
     showToastMessage(`已全局删除地点“${location.Name}”`);
   }
 
@@ -314,7 +337,7 @@ export function useLocationRegistry({
     applyLocationRegistry, loadLocations, getLocationName, getLocationTreeLabel, getLocationTooltip,
     getLocationManagerRowContext, updateLocationManagerContext, scheduleLocationManagerContextUpdate,
     getLocationOptions, getRecentLocationOptions, getLocationMenuRows, getLocationFilterRows,
-    setLocationFilter, getLocationParentOptions, getLocationParentRows, openLocationDropdown,
+    setLocationFilter, setLocationRegionFilter, getLocationParentOptions, getLocationParentRows, openLocationDropdown,
     closeLocationDropdown, closeAllLocationDropdowns, setLocationForTarget, clearLocationForTarget,
     onLocationSearchKeydown, openCreateLocationMenu, closeCreateLocationMenu,
     setCreateLocationParent, clearCreateLocationParent, createLocationAndSelect,

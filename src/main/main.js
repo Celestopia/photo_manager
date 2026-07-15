@@ -342,6 +342,7 @@ const {
   getLocationChildrenMap,
   getLocationDepth,
   getLocationDescendants,
+  getLocationIdsForRegion,
   validateLocationParent,
 } = createLocationDomain(() => state.locationRegistryIndex);
 const locationCatalog = createLocationCatalog({
@@ -395,6 +396,7 @@ function normalizeRegisteredAlbum(rawAlbum) {
 
 const { filterAndSort, groupByDate } = createGalleryQueryService({
   getLocationDescendants,
+  getLocationIdsForRegion,
   unassignedAlbumFilter: UNASSIGNED_ALBUM_FILTER,
 });
 

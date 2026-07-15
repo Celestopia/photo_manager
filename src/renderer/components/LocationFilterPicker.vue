@@ -4,9 +4,9 @@
       <button
         type="button"
         class="input location-filter-input registry-trigger"
-        :data-tip="selectedLocationId ? getLocationTooltip(selectedLocationId) : ''"
+        :data-tip="selectedLocationId ? getLocationTooltip(selectedLocationId) : selectedRegionLabel"
         @click="openDropdown"
-      ><span>{{ selectedLocationName || '全部' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
+      ><span>{{ selectedFilterLabel || '全部' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
       <div class="tag-dropdown location-dropdown location-filter-dropdown" v-if="dropdownOpen">
         <input
           ref="searchInputRef"
@@ -17,7 +17,7 @@
         />
         <div class="location-dropdown-current-context" v-if="filterDropdownContext">{{ filterDropdownContext }}</div>
         <div class="location-dropdown-scroll" ref="filterDropdownRef" @scroll="updateFilterDropdownContext">
-          <button type="button" class="tag-option location-option" :class="{ 'is-selected': selectedLocationId === '' }" @mousedown.prevent="selectLocation('')">
+          <button type="button" class="tag-option location-option" :class="{ 'is-selected': selectedLocationId === '' && !selectedLocationRegion }" @mousedown.prevent="selectLocation('')">
             <span>全部</span>
           </button>
           <template v-for="row in filterRows" :key="'filter_' + row.Key">
@@ -27,10 +27,22 @@
               :class="{ 'registry-section-divider': row.Key.includes('section:all') }"
             ><span>{{ row.Label }}</span></div>
             <button
+              v-else-if="row.Type === 'group'"
+              type="button"
+              class="tag-option location-option location-group-selectable"
+              :class="{ 'is-selected': isSelectedRegion(row.Region) }"
+              :data-tip="`筛选 ${regionLabel(row.Region)} 下的全部地点`"
+              :data-location-context="getLocationManagerRowContext(row)"
+              :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
+              @mousedown.prevent="selectRegion(row.Region)"
+            >
+              <span>{{ row.Label }}</span>
+            </button>
+            <button
               v-else-if="row.Location"
               type="button"
               class="tag-option location-option"
-              :class="{ 'location-group-selectable': row.Type === 'group', 'is-selected': selectedLocationId === row.Location.LocationId }"
+              :class="{ 'is-selected': selectedLocationId === row.Location.LocationId }"
               :data-tip="getLocationTooltip(row.Location.LocationId)"
               :data-location-context="getLocationManagerRowContext(row)"
               :data-location-recent="row.Key.startsWith('filter-recent-location:') ? '1' : null"
@@ -39,11 +51,6 @@
             >
               <span>{{ row.Label }}</span>
             </button>
-            <div
-              v-else
-              class="location-group-row"
-              :style="{ paddingLeft: 8 + row.Depth * 16 + 'px' }"
-            >{{ row.Label }}</div>
           </template>
           <div class="tag-option-empty" v-if="!filterRows.length">没有匹配的地点</div>
         </div>
@@ -55,6 +62,7 @@
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { LOCATION_CONTEXT } from "../context/renderer-contexts.js";
+import { getLocationRegionFilterLabel, sameLocationRegionFilter } from "../domain/location-hierarchy.mjs";
 
 const app = inject(LOCATION_CONTEXT);
 if (!app) {
@@ -69,6 +77,7 @@ const {
   getLocationName,
   getLocationManagerRowContext,
   setLocationFilter,
+  setLocationRegionFilter,
 } = app;
 
 const dropdownOpen = ref(false);
@@ -78,7 +87,10 @@ const filterDropdownRef = ref(null);
 const searchInputRef = ref(null);
 const filterDropdownContext = ref("");
 const selectedLocationId = computed(() => query.filters.location || "");
+const selectedLocationRegion = computed(() => query.filters.locationRegion || null);
 const selectedLocationName = computed(() => getLocationName(selectedLocationId.value));
+const selectedRegionLabel = computed(() => getLocationRegionFilterLabel(selectedLocationRegion.value));
+const selectedFilterLabel = computed(() => selectedLocationName.value || selectedRegionLabel.value);
 const filterRows = computed(() => getLocationFilterRows(searchText.value));
 
 function openDropdown() {
@@ -110,6 +122,19 @@ function closeDropdown() {
 async function selectLocation(name) {
   await setLocationFilter(name);
   closeDropdown();
+}
+
+async function selectRegion(region) {
+  await setLocationRegionFilter(region);
+  closeDropdown();
+}
+
+function regionLabel(region) {
+  return getLocationRegionFilterLabel(region);
+}
+
+function isSelectedRegion(region) {
+  return Boolean(selectedLocationRegion.value && sameLocationRegionFilter(selectedLocationRegion.value, region));
 }
 
 async function clearFilter() {
@@ -162,14 +187,15 @@ onBeforeUnmount(() => {
 });
 
 function firstSelectableRow() {
-  return filterRows.value.find((row) => row.Location);
+  return filterRows.value.find((row) => row.Type === "group" || row.Location);
 }
 
 async function onKeydown(event) {
   if (event.key === "Enter") {
     event.preventDefault();
     const first = firstSelectableRow();
-    if (first) await selectLocation(first.Location.LocationId);
+    if (first?.Type === "group") await selectRegion(first.Region);
+    else if (first?.Location) await selectLocation(first.Location.LocationId);
     return;
   }
   if (event.key === "Escape") {
