@@ -33,6 +33,23 @@
   overflow-y: hidden;
   resize: none;
 }
+.viewer-title-input {
+  font-family: inherit;
+  font-size: 15px;
+}
+.right-panel .album-input.registry-trigger {
+  min-height: 34px;
+  height: auto;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.right-panel .album-input.registry-trigger > span:first-child {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .viewer-detail-toggle {
   position: relative;
   width: 24px;

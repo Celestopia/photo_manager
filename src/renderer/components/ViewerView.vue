@@ -105,7 +105,7 @@
   </section>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel }">
     <h3>个性化信息</h3>
-    <label>标题</label><textarea class="input field-textarea" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" rows="1"></textarea>
+    <label>标题</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" rows="1"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Title'">{{ saveNotice.message }}</div>
     <label>评级</label>
