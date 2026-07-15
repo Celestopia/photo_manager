@@ -164,6 +164,44 @@
   background: #fff0f2;
   color: #7a1f2b;
 }
+.gallery-media-details-menu {
+  position: fixed;
+  z-index: 120;
+  visibility: hidden;
+  width: min(300px, calc(100vw - 20px));
+  max-height: min(360px, calc(100vh - 20px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(31, 74, 117, 0.2);
+  overscroll-behavior: contain;
+}
+.gallery-media-details-menu.is-positioned { visibility: visible; }
+.gallery-media-details-list { margin: 0; padding: 5px 0; }
+.gallery-media-details-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.gallery-media-details-row dt {
+  color: var(--text-soft);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.gallery-media-details-row dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
+}
 .gallery-footer {
   flex: 0 0 58px;
   min-height: 58px;

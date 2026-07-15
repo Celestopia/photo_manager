@@ -82,6 +82,7 @@ export function useRendererApplication() {
       cancelLibraryOperation,
       recheckMediaTools,
       toggleGallerySettings,
+      closeGallerySettings,
       openLibraryInfo,
       closeLibraryInfo,
       saveLibraryInfo,
@@ -658,7 +659,7 @@ export function useRendererApplication() {
       deleteLocationGlobally,
     };
     const settingsContext = {
-      ICONS, isSelectionMode, gallerySettingsOpen, toggleGallerySettings, openLibraryInfo,
+      ICONS, isSelectionMode, gallerySettingsOpen, toggleGallerySettings, closeGallerySettings, openLibraryInfo,
       openMaintenanceDialog, openAlbumManager, openLocationManager, openPersonManager,
       openTagManager, returnToLibraryEntry,
     };

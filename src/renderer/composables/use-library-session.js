@@ -229,6 +229,10 @@ export function useLibrarySession({
     gallerySettingsOpen.value = !gallerySettingsOpen.value;
   }
 
+  function closeGallerySettings() {
+    gallerySettingsOpen.value = false;
+  }
+
   function openLibraryInfo() {
     gallerySettingsOpen.value = false;
     libraryInfo.name = libraryState.value.active?.name || "";
@@ -389,6 +393,7 @@ export function useLibrarySession({
     cancelLibraryOperation,
     recheckMediaTools,
     toggleGallerySettings,
+    closeGallerySettings,
     openLibraryInfo,
     closeLibraryInfo,
     saveLibraryInfo,

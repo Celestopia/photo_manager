@@ -1,6 +1,6 @@
 <template>
   <div v-if="!isSelectionMode" class="gallery-settings-anchor" @click.stop>
-    <button class="btn icon-btn gallery-settings-trigger" data-tip="图库设置" :aria-expanded="gallerySettingsOpen" @click="toggleGallerySettings">
+    <button class="btn icon-btn gallery-settings-trigger" data-tip="图库设置" :aria-expanded="gallerySettingsOpen" @click="onToggleGallerySettings">
       <img class="icon" :src="ICONS.settings" alt="图库设置" />
     </button>
     <div v-if="gallerySettingsOpen" class="gallery-settings-menu">
@@ -21,8 +21,10 @@
 </template>
 
 <script setup>
-import { inject } from "vue";
+import { inject, onBeforeUnmount, onMounted } from "vue";
 import { SETTINGS_CONTEXT } from "../context/renderer-contexts.js";
+
+const GALLERY_SETTINGS_SURFACE = Symbol("gallery-settings");
 const app = inject(SETTINGS_CONTEXT);
 if (!app) throw new Error("GallerySettingsMenu must be used under App.vue provider");
 const {
@@ -30,6 +32,7 @@ const {
   isSelectionMode,
   gallerySettingsOpen,
   toggleGallerySettings,
+  closeGallerySettings,
   openLibraryInfo,
   openMaintenanceDialog,
   openAlbumManager,
@@ -38,4 +41,18 @@ const {
   openTagManager,
   returnToLibraryEntry,
 } = app;
+
+function onToggleGallerySettings() {
+  if (!gallerySettingsOpen.value) {
+    window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: GALLERY_SETTINGS_SURFACE }));
+  }
+  toggleGallerySettings();
+}
+
+function closeFromOtherSurface(event) {
+  if (event.detail !== GALLERY_SETTINGS_SURFACE) closeGallerySettings();
+}
+
+onMounted(() => window.addEventListener("gallery-transient-open", closeFromOtherSurface));
+onBeforeUnmount(() => window.removeEventListener("gallery-transient-open", closeFromOtherSurface));
 </script>

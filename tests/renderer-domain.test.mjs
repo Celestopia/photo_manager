@@ -11,6 +11,11 @@ import {
   buildLocationHierarchyRows,
   getLocationManagerRowContext,
 } from "../src/renderer/domain/location-hierarchy.mjs";
+import {
+  buildGalleryMediaDetailRows,
+  formatMediaResolution,
+  formatVideoFrameRate,
+} from "../src/renderer/domain/gallery-media-details.mjs";
 
 test("renderer media formatters preserve display semantics", () => {
   assert.equal(formatFileSize(1024 * 1024), "1.00 MB");
@@ -23,6 +28,58 @@ test("local media paths are encoded as file URLs", () => {
     buildImageUrl("C:\\图库\\a b.jpg"),
     "file:///C:/%E5%9B%BE%E5%BA%93/a%20b.jpg",
   );
+});
+
+test("gallery image details use the fixed compact field sequence", () => {
+  const rows = buildGalleryMediaDetailRows({
+    FilePath: "旅行/IMG_0001.jpg",
+    FileSystem: {
+      FileType: "image",
+      FileSize: 3 * 1024 * 1024,
+      ShootingTimeString: "2026-07-14 10:20:30",
+      ModificationTimeString: "2026-07-14 10:21:00",
+    },
+    Picture: { Width: 4096, Height: 3072 },
+    Location: { Place: "清华大学", Detail: "不在菜单中显示" },
+    Customization: { Tags: ["校园", "建筑"] },
+  });
+
+  assert.deepEqual(
+    rows.map((row) => row.label),
+    ["文件名", "拍摄日期", "修改日期", "文件大小", "分辨率", "地点", "标签"],
+  );
+  assert.deepEqual(
+    Object.fromEntries(rows.map((row) => [row.key, row.value])),
+    {
+      filename: "IMG_0001.jpg",
+      "shooting-date": "2026-07-14 10:20:30",
+      "modification-date": "2026-07-14 10:21:00",
+      "file-size": "3.00 MB",
+      resolution: "4096x3072",
+      location: "清华大学",
+      tags: "校园, 建筑",
+    },
+  );
+});
+
+test("gallery video details add frame rate and duration before location", () => {
+  const rows = buildGalleryMediaDetailRows({
+    FilePath: "VID_0001.mp4",
+    FileSystem: { FileType: "video", FileSize: 1024 },
+    Video: { DisplayWidth: 1920, DisplayHeight: 1080, FrameRate: 29.97003, DurationSeconds: 65.8 },
+    Location: { Place: "" },
+    Customization: { Tags: [] },
+  });
+
+  assert.deepEqual(
+    rows.map((row) => row.label),
+    ["文件名", "拍摄日期", "修改日期", "文件大小", "分辨率", "帧率", "时长", "地点", "标签"],
+  );
+  assert.equal(formatMediaResolution({ FileSystem: { FileType: "video" }, Video: { DisplayWidth: 1920, DisplayHeight: 1080 } }), "1920x1080");
+  assert.equal(formatVideoFrameRate(29.97003), "29.97 fps");
+  assert.equal(rows.find((row) => row.key === "duration").value, "1:05");
+  assert.equal(rows.find((row) => row.key === "location").value, "-");
+  assert.equal(rows.find((row) => row.key === "tags").value, "-");
 });
 
 test("location hierarchy keeps child locations immediately after their parent", () => {

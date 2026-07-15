@@ -94,11 +94,18 @@ function closeDropdown() {
 
 function toggleDropdown() {
   const nextOpen = !dropdownOpen.value;
-  if (nextOpen) window.dispatchEvent(new CustomEvent("gallery-filter-picker-open", { detail: pickerId }));
+  if (nextOpen) {
+    window.dispatchEvent(new CustomEvent("gallery-filter-picker-open", { detail: pickerId }));
+    window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: pickerId }));
+  }
   dropdownOpen.value = nextOpen;
 }
 
 function closeFromOtherPicker(event) {
+  if (event.detail !== pickerId) closeDropdown();
+}
+
+function closeFromOtherSurface(event) {
   if (event.detail !== pickerId) closeDropdown();
 }
 
@@ -121,10 +128,12 @@ watch(dropdownOpen, (open) => {
 onMounted(() => {
   window.addEventListener("click", closeDropdown);
   window.addEventListener("gallery-filter-picker-open", closeFromOtherPicker);
+  window.addEventListener("gallery-transient-open", closeFromOtherSurface);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("click", closeDropdown);
   window.removeEventListener("gallery-filter-picker-open", closeFromOtherPicker);
+  window.removeEventListener("gallery-transient-open", closeFromOtherSurface);
 });
 </script>

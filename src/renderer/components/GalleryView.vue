@@ -33,7 +33,14 @@
       <template v-for="group in galleryGroups" :key="group.date">
         <h2 class="date-title">{{ group.date }}</h2>
         <div class="photo-grid">
-          <article class="photo-card" :class="{ selected: isSelectionMode && isGallerySelected(item.FilePath) }" v-for="item in group.items" :key="item.FilePath" @click="onGalleryCardClick(item)">
+          <article
+            class="photo-card"
+            :class="{ selected: isSelectionMode && isGallerySelected(item.FilePath) }"
+            v-for="item in group.items"
+            :key="item.FilePath"
+            @click="onGalleryCardClick(item)"
+            @contextmenu.prevent.stop="toggleGalleryDetailsMenu(item, $event)"
+          >
             <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.FilePath) }" @click.stop="toggleGallerySelection(item.FilePath)">✓</button>
             <div class="card-media">
               <img
@@ -78,10 +85,16 @@
 <footer class="gallery-footer">
   <GallerySettingsMenu />
 </footer>
+<GalleryMediaDetailsMenu
+  v-if="galleryDetailsMenu.visible && galleryDetailsMenu.item"
+  :item="galleryDetailsMenu.item"
+  :x="galleryDetailsMenu.x"
+  :y="galleryDetailsMenu.y"
+/>
 </template>
 
 <script setup>
-import { inject, ref } from "vue";
+import { inject, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
@@ -90,6 +103,9 @@ import LocationFilterPicker from "./LocationFilterPicker.vue";
 import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import GallerySettingsMenu from "./GallerySettingsMenu.vue";
+import GalleryMediaDetailsMenu from "./GalleryMediaDetailsMenu.vue";
+
+const GALLERY_DETAILS_SURFACE = Symbol("gallery-media-details");
 
 const app = inject(GALLERY_CONTEXT);
 if (!app) {
@@ -136,6 +152,61 @@ const {
 
 // Track thumbnail load failures by hash to avoid repeated failing requests.
 const brokenThumbnailHashes = ref(new Set());
+const galleryDetailsMenu = reactive({ visible: false, item: null, x: 0, y: 0 });
+
+function closeGalleryDetailsMenu() {
+  galleryDetailsMenu.visible = false;
+  galleryDetailsMenu.item = null;
+}
+
+function toggleGalleryDetailsMenu(item, event) {
+  const isSameItem = galleryDetailsMenu.visible && galleryDetailsMenu.item?.FilePath === item?.FilePath;
+  window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: GALLERY_DETAILS_SURFACE }));
+  if (isSameItem) {
+    closeGalleryDetailsMenu();
+    return;
+  }
+  galleryDetailsMenu.item = item;
+  galleryDetailsMenu.x = event.clientX;
+  galleryDetailsMenu.y = event.clientY;
+  galleryDetailsMenu.visible = true;
+}
+
+function closeDetailsFromOtherSurface(event) {
+  if (event.detail !== GALLERY_DETAILS_SURFACE) closeGalleryDetailsMenu();
+}
+
+function closeDetailsOnExternalPointer(event) {
+  if (event.button !== 0 || event.target?.closest?.(".gallery-media-details-menu")) return;
+  closeGalleryDetailsMenu();
+}
+
+function closeDetailsOnScroll(event) {
+  if (event.target?.closest?.(".gallery-media-details-menu")) return;
+  closeGalleryDetailsMenu();
+}
+
+function closeDetailsOnKeydown(event) {
+  if (event.key === "Escape") closeGalleryDetailsMenu();
+}
+
+onMounted(() => {
+  document.addEventListener("pointerdown", closeDetailsOnExternalPointer, true);
+  document.addEventListener("contextmenu", closeGalleryDetailsMenu);
+  document.addEventListener("scroll", closeDetailsOnScroll, true);
+  window.addEventListener("resize", closeGalleryDetailsMenu);
+  window.addEventListener("keydown", closeDetailsOnKeydown);
+  window.addEventListener("gallery-transient-open", closeDetailsFromOtherSurface);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("pointerdown", closeDetailsOnExternalPointer, true);
+  document.removeEventListener("contextmenu", closeGalleryDetailsMenu);
+  document.removeEventListener("scroll", closeDetailsOnScroll, true);
+  window.removeEventListener("resize", closeGalleryDetailsMenu);
+  window.removeEventListener("keydown", closeDetailsOnKeydown);
+  window.removeEventListener("gallery-transient-open", closeDetailsFromOtherSurface);
+});
 
 /**
  * Resolve gallery card image source.
