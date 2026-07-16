@@ -18,11 +18,42 @@ import {
   formatMediaResolution,
   formatVideoFrameRate,
 } from "../src/renderer/domain/gallery-media-details.mjs";
+import {
+  calculateFittedMediaSize,
+  calculateRotationFitScale,
+  exceedsDragThreshold,
+  normalizeQuarterTurn,
+} from "../src/renderer/domain/media-transform.mjs";
 
 test("renderer media formatters preserve display semantics", () => {
   assert.equal(formatFileSize(1024 * 1024), "1.00 MB");
   assert.equal(formatDuration(3661.9), "1:01:01");
   assert.equal(formatBitRate(8000000), "8.00 Mbps");
+});
+
+test("media transforms preserve aspect ratio and fit quarter-turn rotations", () => {
+  const fitted = calculateFittedMediaSize({
+    stageWidth: 1000,
+    stageHeight: 700,
+    mediaWidth: 1920,
+    mediaHeight: 1080,
+    maxFraction: 1,
+  });
+  assert.ok(Math.abs(fitted.width - 1000) < 1e-9);
+  assert.ok(Math.abs(fitted.height - 562.5) < 1e-9);
+  assert.equal(calculateRotationFitScale({
+    stageWidth: 1000,
+    stageHeight: 700,
+    fittedWidth: 1000,
+    fittedHeight: 562.5,
+    rotationDegrees: 90,
+  }), 0.7);
+  assert.equal(normalizeQuarterTurn(-90), 3);
+});
+
+test("media dragging starts only after the pointer crosses its movement threshold", () => {
+  assert.equal(exceedsDragThreshold(2, 2), false);
+  assert.equal(exceedsDragThreshold(4, 0), true);
 });
 
 test("local media paths are encoded as file URLs", () => {

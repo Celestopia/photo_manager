@@ -92,9 +92,11 @@ Maintenance operations lock editing and library switching until completion. Repo
 
 ## Video Behavior
 
-Videos use Electron's native media controls. Unsupported video decoding falls back to audio-only playback when possible, then to the Windows default player. No proxy transcoding is performed.
+Videos use a fixed in-app control bar over Electron's native video element, with play/pause, timeline, time, mute, and volume controls. Unsupported video decoding falls back to native audio-only playback when possible, then to the Windows default player. No proxy transcoding is performed.
 
 - A new video does not autoplay.
+- Click the video to play or pause; double-click the media area for fullscreen.
+- Decodable videos share the image viewer's temporary pan, 10–1000% zoom, quarter-turn rotation, horizontal mirror, and restore controls. These visual transforms reset when media changes and never alter files or metadata.
 - Before playback starts, `Left/Right` browses media.
 - After playback, scrubbing, or frame stepping starts the playback session, `Left/Right` seeks 5 seconds even while paused; `Shift+Left/Right` browses media.
 - `Space` toggles play/pause.

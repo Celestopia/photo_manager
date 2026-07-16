@@ -9,12 +9,60 @@
   cursor: grab; user-select: none;
 }
 .image-container:active { cursor: grabbing; }
-.viewer-image { max-width: 88%; max-height: 88%; transform-origin: center center; will-change: transform; }
+.viewer-image,
+.viewer-video { flex: 0 0 auto; transform-origin: center center; will-change: transform; }
+.viewer-image { max-width: 88%; max-height: 88%; }
 .video-container {
-  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  position: relative; width: 100%; height: 100%;
   background: #0d1822; overflow: hidden;
 }
-.viewer-video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.video-transform-viewport {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; cursor: grab; user-select: none;
+}
+.video-transform-viewport:active { cursor: grabbing; }
+.viewer-video { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; background: #000; }
+.video-playback-controls {
+  position: absolute; left: 50%; bottom: 14px; z-index: 6; transform: translateX(-50%);
+  width: min(880px, calc(100% - 112px)); min-height: 44px; padding: 6px 10px;
+  display: grid; grid-template-columns: 30px auto minmax(100px, 1fr) auto 30px 92px;
+  align-items: center; gap: 8px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 7px;
+  background: rgba(8, 20, 31, 0.84); box-shadow: 0 5px 18px rgba(0, 0, 0, 0.28);
+  color: #fff; backdrop-filter: blur(8px);
+}
+.video-control-button {
+  position: relative; width: 30px; height: 30px; padding: 3px; border: 0; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #fff; cursor: pointer;
+}
+.video-control-button:hover { background: rgba(255, 255, 255, 0.14); }
+.video-control-button:disabled { cursor: default; opacity: 0.48; }
+.video-control-button > img { width: 22px; height: 22px; display: block; }
+.video-control-spinner {
+  width: 17px; height: 17px; border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff; border-radius: 50%; animation: video-control-spin 700ms linear infinite;
+}
+@keyframes video-control-spin { to { transform: rotate(360deg); } }
+.video-time { min-width: 38px; font-size: 12px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.video-time-current { text-align: right; }
+.video-progress-slider,
+.video-volume-slider {
+  min-width: 0; margin: 0; cursor: pointer; accent-color: #79b9f2;
+}
+.video-progress-slider {
+  width: 100%; height: 4px; appearance: none; border-radius: 2px;
+  background: linear-gradient(to right,
+    #72b7f2 0 var(--video-played-percent),
+    rgba(255, 255, 255, 0.46) var(--video-played-percent) var(--video-buffered-percent),
+    rgba(255, 255, 255, 0.2) var(--video-buffered-percent) 100%);
+}
+.video-volume-slider { width: 92px; }
+.video-progress-slider::-webkit-slider-thumb {
+  appearance: none; width: 13px; height: 13px; border: 0; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+.video-progress-slider:focus-visible,
+.video-volume-slider:focus-visible,
+.video-control-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .video-fallback-panel {
   width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 14px; padding: 24px; color: #fff; text-align: center;
@@ -51,8 +99,7 @@
 .camera-table td { border: 1px solid #c9ddf5; padding: 6px 8px; text-align: left; vertical-align: top; }
 .camera-table th { width: 88px; color: var(--text-soft); font-weight: 600; background: #edf5ff; }
 .viewer-tools, .zoom-controls, .right-tools { display: flex; gap: 8px; align-items: center; }
-.viewer-tools { justify-content: center; }
-.video-tools { flex-wrap: wrap; }
+.viewer-tools { min-width: 0; justify-content: center; flex-wrap: wrap; }
 .zoom-controls { justify-content: center; }
 .right-tools { justify-content: flex-end; }
 .zoom-input { width: 84px; }
@@ -71,4 +118,11 @@
   box-shadow: var(--shadow);
   z-index: 120;
   pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .video-playback-controls {
+    width: calc(100% - 72px); grid-template-columns: 30px auto minmax(70px, 1fr) auto 30px;
+  }
+  .video-volume-slider { display: none; }
 }

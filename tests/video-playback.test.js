@@ -19,3 +19,13 @@ test("resolves horizontal arrow behavior from playback-session state", async () 
   assert.equal(resolveHorizontalArrowAction({ isVideo: true, hasPlaybackStarted: true, shiftKey: true }), "navigate");
   assert.equal(resolveHorizontalArrowAction({ isVideo: true, hasPlaybackStarted: false, shiftKey: true }), "navigate");
 });
+
+test("clamps custom playback timeline and buffered progress values", async () => {
+  const { calculateBufferedPercent, clampVideoTime } = await import("../src/renderer/video-playback.mjs");
+  assert.equal(clampVideoTime(-2, 10), 0);
+  assert.equal(clampVideoTime(12, 10), 10);
+  assert.equal(clampVideoTime(4.5, 10), 4.5);
+  assert.equal(calculateBufferedPercent(4, 10), 40);
+  assert.equal(calculateBufferedPercent(12, 10), 100);
+  assert.equal(calculateBufferedPercent(2, 0), 0);
+});

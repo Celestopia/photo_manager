@@ -521,9 +521,11 @@ min(max(DurationSeconds * 0.1, 1), 10, DurationSeconds / 2)
 
 ## 13. 视频播放
 
-### 13.1 原生播放与降级
+### 13.1 固定播放控件与降级
 
-- 优先使用 `<video controls preload="metadata">`，封面作为 poster，不自动播放，不循环。
+- 主视频使用 `<video preload="metadata">` 解码，但不启用原生 controls；`VideoPlaybackControls.vue` 在画面底部持续显示固定的播放/暂停、当前时间、进度、总时长、静音和音量控件。封面作为 poster，不自动播放，不循环。
+- 单击视频画面切换播放/暂停，双击进入媒体区域全屏。单击延迟 220 ms 执行，以便双击不会意外切换播放状态；超过拖动阈值的指针操作不会再触发单击播放。
+- 进度拖动开始时记录原播放状态并暂停，拖动期间直接预览目标画面；结束时仅在原先处于播放状态时恢复播放。
 - 原生画面解码失败但元数据表明有音轨时，尝试 `<audio controls>` 播放同一文件，并提示仅播放音频。
 - 音频也失败、无音轨或探测失败时，显示不可播放状态、封面/占位图、错误原因和“用系统播放器打开”。
 - MKV、AVI、HEVC 等 Chromium 不支持的编码可以通过 Windows 默认播放器作为正式回退路径。
@@ -539,7 +541,7 @@ photoManager.videoMuted
 photoManager.videoPlaybackRate
 ```
 
-虽然界面不提供独立倍速控件，原生控件或运行时变更仍按上述键持久化。播放位置不记忆；切换媒体后从 0 开始，但继承音量、静音和倍速。
+虽然界面不提供独立倍速控件，运行时变更仍按上述键持久化。播放位置不记忆；切换媒体后从 0 开始，但继承音量、静音和倍速。
 
 切换、关闭或销毁播放器前必须暂停、移除 `src` 并调用 `load()`，避免后台残留声音和文件句柄。
 
@@ -556,6 +558,14 @@ photoManager.videoPlaybackRate
 - 双击媒体区域进入全屏。
 
 输入框、文本域、选择器、弹窗或其它可编辑控件获得焦点时，不触发媒体快捷键。
+
+### 13.4 视频画面变换
+
+图片和可解码视频共享临时视图变换：10%–1000% 中心缩放、任意缩放级别下拖动、90° 步进旋转、水平镜像和复原。变换仅通过 CSS 作用于当前画面，不修改视频文件、媒体元数据、播放时间轴或缩略图，并在切换媒体、关闭查看器或打开另一媒体时复原。
+
+`use-media-transform.js` 保留图片由浏览器按 EXIF 朝向解释的固有尺寸和既有 88% 适配规则，避免用原始像素宽高拉伸带方向信息的图片；视频根据中间媒体区域和规范化显示尺寸计算初始适配大小。视频在 100% 时使用完整可用区域；旋转到 90°/270° 时额外计算适配系数，保证旋转后的画面仍完整位于视口内，再在此基础上应用用户缩放。拖动需越过 4 px 阈值才成立，用于区分点击播放与拖动画面。
+
+固定播放控件始终覆盖在视频画面底部，全屏时继续可用；查看器底栏中的缩放、旋转、镜像、逐帧等编辑视图控件不进入媒体区域全屏。音频降级和不可播放状态不提供画面变换。
 
 ## 14. 画廊查询和筛选
 
@@ -594,7 +604,7 @@ photoManager.videoPlaybackRate
 - 中栏：图片操作区或视频/音频播放器。
 - 右栏：图片和视频共用的个性化信息。
 
-图片支持缩放、拖动、旋转、镜像、复原、全屏和复制图像。视频隐藏图片工具，不提供复制视频二进制、定位文件或倍速按钮；保留逐帧、全屏和系统播放器图标。
+图片和可解码视频均支持缩放、拖动、旋转、水平镜像、复原和全屏；视频另外保留逐帧和系统播放器图标。视频不提供复制视频二进制、定位文件或倍速按钮，音频降级与不可播放状态不显示画面变换工具。
 
 右栏字段：标题、评级、隐私等级、相册、地点、位置细节、人物、标签、描述、隐藏描述。小标题使用粗体。隐私等级默认折叠，由“评级”标题右侧的控制按钮展开；展开后显示独立小标题和五级 `PrivacyLevelPicker`，等级 N 累计点亮前 N 个圆圈。位置细节和隐藏描述采用同类折叠交互，控制分别放在所属主字段标题右侧；位置细节文本框展开后缩进，隐私等级和隐藏描述不缩进。三者的折叠状态在当前查看器实例内跨媒体共享，退出查看器后恢复默认状态。
 
@@ -781,7 +791,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 - `components/`：页面和可复用交互控件。组件负责模板、DOM 事件转发和局部展示判断，不直接建立第二份业务状态。
 - `components/dialogs/`：跨一级页面存在的图库、维护任务、注册表管理和全局反馈弹窗。弹窗关闭或提交时调用所属 context 的动作，不自行写注册表。
 - `constants/ui-constants.mjs`：图标、评级、特殊筛选值和窗口动作等静态常量。
-- `video-playback.mjs`：逐帧目标和方向键状态规则的纯函数；播放器 DOM 生命周期仍由 `use-video-playback.js` 管理。
+- `video-playback.mjs`：逐帧目标、时间轴边界、缓冲比例和方向键状态规则的纯函数；播放器 DOM 生命周期仍由 `use-video-playback.js` 管理。
 - `styles.css` 与 `styles/`：全局样式入口及按职责拆分的样式模块。入口只声明稳定的导入顺序，具体规则由对应模块持有。
 
 依赖方向固定为：
@@ -807,8 +817,8 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 | `use-gallery-selection.js` | 选择模式、完整结果上的选中集合、含可选评级和 Privacy 补丁的批量编辑草稿及批量结果 | 无文档级监听器 |
 | `use-media-viewer.js` | 当前媒体索引、查看器左右面板、私密描述、右键菜单、媒体导航和上下文操作 | 文档点击、键盘快捷键和窗口失焦处理 |
 | `use-media-editor.js` | 单媒体个性化草稿、dirty 状态、活动编辑字段、保存确认和文本域自适应 | 无常驻全局监听器 |
-| `use-image-transform.js` | 图片缩放、平移、旋转、镜像和拖动 | 文档 `mousemove`/`mouseup` |
-| `use-video-playback.js` | video/audio 元素、播放/音频降级状态、逐帧、时长、音量、静音和倍速偏好 | 媒体元素事件；偏好写入 `localStorage` |
+| `use-media-transform.js` | 图片/视频共用的适配尺寸、缩放、平移、旋转、镜像、拖动阈值和临时复原状态 | 文档 `mousemove`/`mouseup`；媒体区域 `ResizeObserver` |
+| `use-video-playback.js` | video/audio 元素、固定控件状态、进度拖动、缓冲、播放/音频降级、逐帧、音量、静音和倍速偏好 | 媒体元素事件；偏好写入 `localStorage` |
 | `use-tag-registry.js` | 标签列表、选择器、创建面板和管理面板 | 标签 IPC，不拥有其它注册表状态 |
 | `use-album-registry.js` | 单值相册列表、选择器、创建面板和管理面板 | 相册 IPC |
 | `use-person-registry.js` | 人物列表、选择器、创建面板和管理面板 | 人物 IPC |
@@ -826,7 +836,7 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 - `LIBRARY_CONTEXT`：入口页和图库生命周期弹窗。
 - `GALLERY_CONTEXT`：画廊结果、选择模式和批量编辑。
 - `GALLERY_FILTER_CONTEXT`：顶部筛选控件需要的查询值和候选项。
-- `VIEWER_CONTEXT`：媒体查看器、技术信息、编辑草稿、图片变换和视频播放。
+- `VIEWER_CONTEXT`：媒体查看器、技术信息、编辑草稿、共享媒体变换和视频播放。
 - `SETTINGS_CONTEXT`：画廊右下角设置菜单及其入口动作。
 - `TAG_CONTEXT`、`ALBUM_CONTEXT`、`PERSON_CONTEXT`、`LOCATION_CONTEXT`：各注册表的选择、创建和管理能力。
 - `UI_FEEDBACK_CONTEXT`：toast、保存提示和 tooltip 的只读展示状态。
@@ -838,6 +848,7 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 - `LibraryEntryView.vue`：选择图库、媒体工具错误、初始化/加载进度和重试。
 - `GalleryView.vue`：不分页的混合媒体画廊、单实例右键详情浮层和覆盖完整查询结果的批量编辑；卡片缩略图使用浏览器原生懒加载。
 - `ViewerView.vue`：图片/视频媒体区域、左右信息面板、查看器工具栏和技术信息；个性化保存由 editor composable 完成。
+- `VideoPlaybackControls.vue`：固定视频播放控件，只展示 playback composable 提供的状态并转发播放、进度和音量意图，不直接操作媒体元素。
 - `GallerySettingsMenu.vue`：图库设置入口，只发起管理面板和维护任务动作。
 - `GalleryMediaDetailsMenu.vue`：只读媒体详情行、菜单内部滚动和视口边界定位。
 - `PrivacyLevelPicker.vue`：查看器和批量编辑共用的五级 Privacy 单选控件，只发出数值变更，不拥有保存状态。
@@ -899,7 +910,8 @@ renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或
 - 内置 FFmpeg 集成、损坏视频、缩略图生成与临时文件清理。
 - FFprobe 字段规范化、日期/GPS/设备映射、超时和错误清理。
 - 增量更新的复用、变更、移动、副本和失败保留。
-- 视频逐帧和键盘状态规则。
+- 视频逐帧、时间轴边界、缓冲比例和键盘状态规则。
+- 图片/视频初始适配、90°/270° 旋转适配和拖动阈值。
 - 主进程配置合并、运行时隔离、地点层级、画廊组合筛选和通用注册表统计。
 - UUID 格式、固定 ID 字段、跨注册表与媒体的全局唯一性、未知引用拒绝和地点同名上下文约束。
 - Privacy 当前契约、默认值、严格写入、批量补丁、画廊全等级可见性和 CSV 列顺序。

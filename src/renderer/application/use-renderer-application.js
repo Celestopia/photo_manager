@@ -3,7 +3,7 @@ import { ICONS, STAR_LEVELS, UNASSIGNED_ALBUM_FILTER, WINDOW_ACTIONS } from "../
 import { buildImageUrl, formatBitRate, formatDuration, formatFileSize } from "../domain/media-formatters.mjs";
 import { useUiFeedback } from "../composables/use-ui-feedback.js";
 import { useWindowControls } from "../composables/use-window-controls.js";
-import { useImageTransform } from "../composables/use-image-transform.js";
+import { useMediaTransform } from "../composables/use-media-transform.js";
 import { useVideoPlayback } from "../composables/use-video-playback.js";
 import { useLibrarySession } from "../composables/use-library-session.js";
 import { useGalleryQuery } from "../composables/use-gallery-query.js";
@@ -219,30 +219,38 @@ export function useRendererApplication() {
     });
     const {
       zoomPercent,
-      imageStageRef,
+      mediaStageRef,
       minZoom,
       maxZoom,
       zoomStep,
-      viewerImageStyle,
-      resetPanZoom,
-      onImageWheel,
+      viewerMediaStyle,
+      resetMediaTransform,
+      onMediaWheel,
       startDrag,
-      onDrag,
       endDrag,
-      restoreImageState,
+      consumeCompletedDrag,
+      restoreMediaState,
       zoomIn,
       zoomOut,
       rotateClockwise,
       rotateCounterclockwise,
       toggleMirror,
-      initialize: initializeImageTransform,
-      dispose: disposeImageTransform,
-    } = useImageTransform({ config });
+      initialize: initializeMediaTransform,
+      dispose: disposeMediaTransform,
+    } = useMediaTransform({ config, selectedItem });
     const {
       videoElementRef,
       audioElementRef,
       videoPlaybackMode,
       videoPlaybackMessage,
+      videoDisplayedTime,
+      videoDuration,
+      videoPlaying,
+      videoWaiting,
+      videoReady,
+      videoBufferedPercent,
+      videoVolume,
+      videoMuted,
       hasVideoPlaybackStarted,
       isSelectedVideo,
       canStepVideoBackward,
@@ -250,15 +258,27 @@ export function useRendererApplication() {
       releaseCurrentMedia,
       resetVideoPlaybackState,
       onVideoLoadedMetadata,
+      onVideoCanPlay,
+      onVideoWaiting,
+      onVideoProgress,
+      onVideoDurationChange,
       onVideoPlaybackError,
       onAudioLoadedMetadata,
       onAudioPlaybackError,
       onVideoVolumeChange,
       onVideoRateChange,
-      onMediaPlaybackStarted,
+      onMediaPlaying,
+      onMediaPaused,
+      onMediaEnded,
       onMediaTimeUpdate,
+      onVideoSeeked,
       toggleVideoPlayback,
       seekVideo,
+      beginVideoSeek,
+      previewVideoSeek,
+      commitVideoSeek,
+      toggleVideoMuted,
+      setVideoVolume,
       stepVideoFrame,
       openCurrentWithSystem,
       showCurrentInFolder,
@@ -529,6 +549,8 @@ export function useRendererApplication() {
       contextCopyPath,
       contextCopyJson,
       toggleFullscreen,
+      onVideoSurfaceClick,
+      onVideoSurfaceDoubleClick,
       resetViewerState,
       initialize: initializeMediaViewer,
       dispose: disposeMediaViewer,
@@ -544,10 +566,11 @@ export function useRendererApplication() {
       setDraftFromItem,
       confirmEdit,
       closeRegistryDropdowns: () => closeAllRegistryDropdowns(),
-      resetPanZoom,
+      resetMediaTransform,
       releaseCurrentMedia,
       resetVideoPlaybackState,
-      imageStageRef,
+      mediaStageRef,
+      consumeCompletedDrag,
       isSelectedVideo,
       hasVideoPlaybackStarted,
       seekVideo,
@@ -593,7 +616,7 @@ export function useRendererApplication() {
       await nextTick();
       autoGrowAllFieldTextareas();
       initializeMediaViewer();
-      initializeImageTransform();
+      initializeMediaTransform();
       installUiFeedback();
     });
 
@@ -601,7 +624,7 @@ export function useRendererApplication() {
       // Cleanup global listeners when app unmounts.
       releaseCurrentMedia();
       disposeMediaViewer();
-      disposeImageTransform();
+      disposeMediaTransform();
       disposeUiFeedback();
       disposeWindowControls();
       disposeLibrarySession();
@@ -681,18 +704,24 @@ export function useRendererApplication() {
     };
     const viewerContext = {
       ICONS, WINDOW_ACTIONS, selectedItem, viewerHeaderTime, windowToggleTip, windowToggleIcon,
-      ratioStyle, showLeftPanel, showRightPanel, imageStageRef, videoElementRef, audioElementRef,
-      videoPlaybackMode, videoPlaybackMessage, canStepVideoBackward, canStepVideoForward,
+      ratioStyle, showLeftPanel, showRightPanel, mediaStageRef, videoElementRef, audioElementRef,
+      videoPlaybackMode, videoPlaybackMessage, videoDisplayedTime, videoDuration,
+      videoPlaying, videoWaiting, videoReady, videoBufferedPercent, videoVolume, videoMuted,
+      canStepVideoBackward, canStepVideoForward,
       isSelectedVideo, showContextMenu, contextPosition, editDraft, editingDirty, activeEditField,
-      saveNotice, STAR_LEVELS, viewerImageStyle, minZoom, maxZoom, zoomPercent, zoomStep,
+      saveNotice, STAR_LEVELS, viewerMediaStyle, minZoom, maxZoom, zoomPercent, zoomStep,
       closeViewer, doWindowAction, toggleWindowMaximizeRestore, formatFileSize, formatDuration,
-      formatBitRate, onImageWheel, onDrag, endDrag, openContextMenu, switchPhoto, startDrag,
+      formatBitRate, onMediaWheel, endDrag, openContextMenu, switchPhoto, startDrag,
       toggleFullscreen, buildImageUrl, contextCopyImage, contextCopyPath, contextCopyJson,
       openCurrentWithSystem, showCurrentInFolder, onVideoLoadedMetadata, onVideoPlaybackError,
+      onVideoCanPlay, onVideoWaiting, onVideoProgress, onVideoDurationChange,
       onAudioLoadedMetadata, onAudioPlaybackError, onVideoVolumeChange, onVideoRateChange,
-      onMediaPlaybackStarted, onMediaTimeUpdate, stepVideoFrame, onFieldTextareaInput,
+      onMediaPlaying, onMediaPaused, onMediaEnded, onMediaTimeUpdate, onVideoSeeked,
+      toggleVideoPlayback, beginVideoSeek, previewVideoSeek, commitVideoSeek,
+      toggleVideoMuted, setVideoVolume, onVideoSurfaceClick, onVideoSurfaceDoubleClick,
+      stepVideoFrame, onFieldTextareaInput,
       confirmEdit, cancelEdit, setRating, setPrivacy, requestEdit, toggleLeftPanel, zoomIn, zoomOut,
-      rotateClockwise, rotateCounterclockwise, toggleMirror, restoreImageState, toggleRightPanel,
+      rotateClockwise, rotateCounterclockwise, toggleMirror, restoreMediaState, toggleRightPanel,
     };
     const uiFeedbackContext = { toast, dynamicTooltip, dynamicTooltipRef };
 

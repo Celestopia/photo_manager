@@ -14,10 +14,11 @@ export function useMediaViewer({
   setDraftFromItem,
   confirmEdit,
   closeRegistryDropdowns,
-  resetPanZoom,
+  resetMediaTransform,
   releaseCurrentMedia,
   resetVideoPlaybackState,
-  imageStageRef,
+  mediaStageRef,
+  consumeCompletedDrag,
   isSelectedVideo,
   hasVideoPlaybackStarted,
   seekVideo,
@@ -30,6 +31,7 @@ export function useMediaViewer({
   const showPrivateNote = ref(false);
   const showLeftPanel = ref(true);
   const showRightPanel = ref(true);
+  let videoClickTimer = null;
 
   const ratioStyle = computed(() => {
     const ratio = config.value?.ui?.viewer?.panelRatio || { left: 1, center: 2, right: 1 };
@@ -52,16 +54,18 @@ export function useMediaViewer({
   });
 
   function openViewer(item) {
+    clearVideoClickTimer();
     releaseCurrentMedia();
     selectedItem.value = item;
     selectedGlobalIndex.value = orderedItems.value.findIndex((candidate) => candidate.MediaId === item.MediaId);
     setDraftFromItem(item);
-    resetPanZoom();
+    resetMediaTransform();
     resetVideoPlaybackState(item);
     view.value = "viewer";
   }
 
   function closeViewer() {
+    clearVideoClickTimer();
     releaseCurrentMedia();
     view.value = "gallery";
     showContextMenu.value = false;
@@ -77,11 +81,12 @@ export function useMediaViewer({
       showToastMessage("已经是最后一个媒体");
       return;
     }
+    clearVideoClickTimer();
     releaseCurrentMedia();
     selectedGlobalIndex.value = next;
     selectedItem.value = orderedItems.value[next];
     setDraftFromItem(selectedItem.value);
-    resetPanZoom();
+    resetMediaTransform();
     resetVideoPlaybackState(selectedItem.value);
   }
 
@@ -131,10 +136,30 @@ export function useMediaViewer({
   }
 
   async function toggleFullscreen() {
-    const root = imageStageRef.value;
+    const root = mediaStageRef.value;
     if (!root) return;
     if (document.fullscreenElement) await document.exitFullscreen();
     else await root.requestFullscreen();
+  }
+
+  function clearVideoClickTimer() {
+    if (videoClickTimer === null) return;
+    window.clearTimeout(videoClickTimer);
+    videoClickTimer = null;
+  }
+
+  function onVideoSurfaceClick(event) {
+    if (event?.button !== 0 || consumeCompletedDrag?.()) return;
+    clearVideoClickTimer();
+    videoClickTimer = window.setTimeout(() => {
+      videoClickTimer = null;
+      toggleVideoPlayback();
+    }, 220);
+  }
+
+  function onVideoSurfaceDoubleClick() {
+    clearVideoClickTimer();
+    toggleFullscreen();
   }
 
   function onGlobalKeydown(event) {
@@ -200,11 +225,13 @@ export function useMediaViewer({
   }
 
   function dispose() {
+    clearVideoClickTimer();
     window.removeEventListener("keydown", onGlobalKeydown);
     document.removeEventListener("click", closeTransientPanels);
   }
 
   function resetViewerState() {
+    clearVideoClickTimer();
     releaseCurrentMedia();
     selectedItem.value = null;
     selectedGlobalIndex.value = -1;
@@ -231,6 +258,8 @@ export function useMediaViewer({
     contextCopyPath,
     contextCopyJson,
     toggleFullscreen,
+    onVideoSurfaceClick,
+    onVideoSurfaceDoubleClick,
     resetViewerState,
     initialize,
     dispose,

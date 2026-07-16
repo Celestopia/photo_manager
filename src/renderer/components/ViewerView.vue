@@ -50,29 +50,60 @@
       </table>
     </div>
   </aside>
-  <section class="image-stage" ref="imageStageRef" @wheel="!isSelectedVideo && onImageWheel($event)" @mousemove="!isSelectedVideo && onDrag($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
+  <section class="image-stage" ref="mediaStageRef" @wheel="(!isSelectedVideo || videoPlaybackMode === 'video') && onMediaWheel($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
     <button class="nav-btn left" @click="switchPhoto(-1)">◀</button>
-    <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerImageStyle" /></div>
-    <div v-else class="video-container" @dblclick.stop.prevent="toggleFullscreen">
-      <video
-        v-if="videoPlaybackMode === 'video'"
-        :key="selectedItem?.MediaId"
-        ref="videoElementRef"
-        class="viewer-video"
-        controls
-        preload="metadata"
-        playsinline
-        :data-media-id="selectedItem?.MediaId"
-        :poster="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder"
-        :src="buildImageUrl(selectedItem?.__absolutePath)"
-        @loadedmetadata="onVideoLoadedMetadata"
-        @error="onVideoPlaybackError"
-        @volumechange="onVideoVolumeChange"
-        @ratechange="onVideoRateChange"
-        @play="onMediaPlaybackStarted"
-        @timeupdate="onMediaTimeUpdate"
-        @seeked="onMediaTimeUpdate"
-      ></video>
+    <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerMediaStyle" /></div>
+    <div v-else class="video-container">
+      <template v-if="videoPlaybackMode === 'video'">
+        <div
+          class="video-transform-viewport"
+          @mousedown="startDrag"
+          @click="onVideoSurfaceClick"
+          @dblclick.stop.prevent="onVideoSurfaceDoubleClick"
+        >
+          <video
+            :key="selectedItem?.MediaId"
+            ref="videoElementRef"
+            class="viewer-video"
+            preload="metadata"
+            playsinline
+            :style="viewerMediaStyle"
+            :data-media-id="selectedItem?.MediaId"
+            :poster="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder"
+            :src="buildImageUrl(selectedItem?.__absolutePath)"
+            @loadedmetadata="onVideoLoadedMetadata"
+            @canplay="onVideoCanPlay"
+            @waiting="onVideoWaiting"
+            @progress="onVideoProgress"
+            @durationchange="onVideoDurationChange"
+            @error="onVideoPlaybackError"
+            @volumechange="onVideoVolumeChange"
+            @ratechange="onVideoRateChange"
+            @playing="onMediaPlaying"
+            @pause="onMediaPaused"
+            @ended="onMediaEnded"
+            @timeupdate="onMediaTimeUpdate"
+            @seeked="onVideoSeeked"
+          ></video>
+        </div>
+        <VideoPlaybackControls
+          :icons="ICONS"
+          :playing="videoPlaying"
+          :ready="videoReady"
+          :waiting="videoWaiting"
+          :current-time="videoDisplayedTime"
+          :duration="videoDuration"
+          :buffered-percent="videoBufferedPercent"
+          :volume="videoVolume"
+          :muted="videoMuted"
+          @toggle-play="toggleVideoPlayback"
+          @seek-start="beginVideoSeek"
+          @seek-input="previewVideoSeek"
+          @seek-commit="commitVideoSeek"
+          @toggle-muted="toggleVideoMuted"
+          @volume-input="setVideoVolume"
+        />
+      </template>
       <div v-else-if="videoPlaybackMode === 'audio'" class="video-fallback-panel">
         <img :src="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder" alt="视频封面" />
         <p>{{ videoPlaybackMessage || '当前仅播放音频' }}</p>
@@ -87,7 +118,9 @@
           @error="onAudioPlaybackError"
           @volumechange="onVideoVolumeChange"
           @ratechange="onVideoRateChange"
-          @play="onMediaPlaybackStarted"
+          @playing="onMediaPlaying"
+          @pause="onMediaPaused"
+          @ended="onMediaEnded"
           @timeupdate="onMediaTimeUpdate"
           @seeked="onMediaTimeUpdate"
         ></audio>
@@ -207,20 +240,22 @@
 </main>
 <footer class="viewer-footer">
   <div class="meta-popup-wrapper"><button class="btn icon-btn" data-tip="显示/隐藏媒体信息" @click="toggleLeftPanel"><img class="icon" :src="ICONS.metadataInfo" alt="显示/隐藏媒体信息" /></button></div>
-  <div class="viewer-tools" v-if="!isSelectedVideo">
-    <button class="btn icon-btn" data-tip="放大" @click="zoomIn"><img class="icon" :src="ICONS.zoomIn" alt="放大" /></button>
-    <button class="btn icon-btn" data-tip="缩小" @click="zoomOut"><img class="icon" :src="ICONS.zoomOut" alt="缩小" /></button>
-    <button class="btn icon-btn" data-tip="顺时针旋转" @click="rotateClockwise"><img class="icon" :src="ICONS.rotateClockwise" alt="顺时针旋转" /></button>
-    <button class="btn icon-btn" data-tip="逆时针旋转" @click="rotateCounterclockwise"><img class="icon" :src="ICONS.rotateCounterclockwise" alt="逆时针旋转" /></button>
-    <button class="btn icon-btn" data-tip="镜像" @click="toggleMirror"><img class="icon" :src="ICONS.mirror" alt="镜像" /></button>
-    <button class="btn icon-btn" data-tip="复原视图" @click="restoreImageState"><img class="icon" :src="ICONS.restoreView" alt="复原视图" /></button>
-    <div class="zoom-controls"><input class="input zoom-input" type="number" :min="minZoom" :max="maxZoom" v-model.number="zoomPercent" /><input class="slider" type="range" :min="minZoom" :max="maxZoom" :step="zoomStep" v-model.number="zoomPercent" /><button class="btn icon-btn" data-tip="图像全屏" @click="toggleFullscreen"><img class="icon" :src="ICONS.fullscreen" alt="图像全屏" /></button></div>
-  </div>
-  <div class="viewer-tools video-tools" v-else>
-    <button class="btn icon-btn" data-tip="上一帧" aria-label="上一帧" :disabled="!canStepVideoBackward" @click="stepVideoFrame(-1)"><img class="icon" :src="ICONS.previousFrame" alt="" /></button>
-    <button class="btn icon-btn" data-tip="下一帧" aria-label="下一帧" :disabled="!canStepVideoForward" @click="stepVideoFrame(1)"><img class="icon" :src="ICONS.nextFrame" alt="" /></button>
-    <button class="btn icon-btn" data-tip="媒体全屏" @click="toggleFullscreen"><img class="icon" :src="ICONS.fullscreen" alt="媒体全屏" /></button>
-    <button class="btn icon-btn" data-tip="用系统播放器打开" aria-label="用系统播放器打开" @click="openCurrentWithSystem"><img class="icon" :src="ICONS.openSystem" alt="" /></button>
+  <div class="viewer-tools" :class="{ 'video-tools': isSelectedVideo }">
+    <template v-if="canTransformSelectedMedia">
+      <button class="btn icon-btn" data-tip="放大" @click="zoomIn"><img class="icon" :src="ICONS.zoomIn" alt="放大" /></button>
+      <button class="btn icon-btn" data-tip="缩小" @click="zoomOut"><img class="icon" :src="ICONS.zoomOut" alt="缩小" /></button>
+      <button class="btn icon-btn" data-tip="顺时针旋转" @click="rotateClockwise"><img class="icon" :src="ICONS.rotateClockwise" alt="顺时针旋转" /></button>
+      <button class="btn icon-btn" data-tip="逆时针旋转" @click="rotateCounterclockwise"><img class="icon" :src="ICONS.rotateCounterclockwise" alt="逆时针旋转" /></button>
+      <button class="btn icon-btn" data-tip="镜像" @click="toggleMirror"><img class="icon" :src="ICONS.mirror" alt="镜像" /></button>
+      <button class="btn icon-btn" data-tip="复原视图" @click="restoreMediaState"><img class="icon" :src="ICONS.restoreView" alt="复原视图" /></button>
+      <div class="zoom-controls"><input class="input zoom-input" type="number" :min="minZoom" :max="maxZoom" v-model.number="zoomPercent" /><input class="slider" type="range" :min="minZoom" :max="maxZoom" :step="zoomStep" v-model.number="zoomPercent" /></div>
+    </template>
+    <template v-if="isSelectedVideo">
+      <button class="btn icon-btn" data-tip="上一帧" aria-label="上一帧" :disabled="!canStepVideoBackward" @click="stepVideoFrame(-1)"><img class="icon" :src="ICONS.previousFrame" alt="" /></button>
+      <button class="btn icon-btn" data-tip="下一帧" aria-label="下一帧" :disabled="!canStepVideoForward" @click="stepVideoFrame(1)"><img class="icon" :src="ICONS.nextFrame" alt="" /></button>
+    </template>
+    <button class="btn icon-btn" :data-tip="isSelectedVideo ? '媒体全屏' : '图像全屏'" @click="toggleFullscreen"><img class="icon" :src="ICONS.fullscreen" :alt="isSelectedVideo ? '媒体全屏' : '图像全屏'" /></button>
+    <button v-if="isSelectedVideo" class="btn icon-btn" data-tip="用系统播放器打开" aria-label="用系统播放器打开" @click="openCurrentWithSystem"><img class="icon" :src="ICONS.openSystem" alt="" /></button>
   </div>
   <div class="right-tools">
     <button class="btn icon-btn" data-tip="显示/隐藏个性化信息" @click="toggleRightPanel"><img class="icon" :src="ICONS.customization" alt="显示/隐藏个性化信息" /></button>
@@ -229,13 +264,14 @@
 </template>
 
 <script setup>
-import { inject, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
+import VideoPlaybackControls from "./VideoPlaybackControls.vue";
 
 const app = inject(VIEWER_CONTEXT);
 if (!app) {
@@ -269,11 +305,19 @@ const {
   ratioStyle,
   showLeftPanel,
   showRightPanel,
-  imageStageRef,
+  mediaStageRef,
   videoElementRef,
   audioElementRef,
   videoPlaybackMode,
   videoPlaybackMessage,
+  videoDisplayedTime,
+  videoDuration,
+  videoPlaying,
+  videoWaiting,
+  videoReady,
+  videoBufferedPercent,
+  videoVolume,
+  videoMuted,
   canStepVideoBackward,
   canStepVideoForward,
   isSelectedVideo,
@@ -284,7 +328,7 @@ const {
   activeEditField,
   saveNotice,
   STAR_LEVELS,
-  viewerImageStyle,
+  viewerMediaStyle,
   minZoom,
   maxZoom,
   zoomPercent,
@@ -295,8 +339,7 @@ const {
   formatFileSize,
   formatDuration,
   formatBitRate,
-  onImageWheel,
-  onDrag,
+  onMediaWheel,
   endDrag,
   openContextMenu,
   switchPhoto,
@@ -309,13 +352,28 @@ const {
   openCurrentWithSystem,
   showCurrentInFolder,
   onVideoLoadedMetadata,
+  onVideoCanPlay,
+  onVideoWaiting,
+  onVideoProgress,
+  onVideoDurationChange,
   onVideoPlaybackError,
   onAudioLoadedMetadata,
   onAudioPlaybackError,
   onVideoVolumeChange,
   onVideoRateChange,
-  onMediaPlaybackStarted,
+  onMediaPlaying,
+  onMediaPaused,
+  onMediaEnded,
   onMediaTimeUpdate,
+  onVideoSeeked,
+  toggleVideoPlayback,
+  beginVideoSeek,
+  previewVideoSeek,
+  commitVideoSeek,
+  toggleVideoMuted,
+  setVideoVolume,
+  onVideoSurfaceClick,
+  onVideoSurfaceDoubleClick,
   stepVideoFrame,
   onFieldTextareaInput,
   confirmEdit,
@@ -329,7 +387,11 @@ const {
   rotateClockwise,
   rotateCounterclockwise,
   toggleMirror,
-  restoreImageState,
+  restoreMediaState,
   toggleRightPanel,
 } = app;
+
+const canTransformSelectedMedia = computed(() => (
+  !isSelectedVideo.value || videoPlaybackMode.value === "video"
+));
 </script>
