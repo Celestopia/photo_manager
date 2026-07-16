@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   // Tag registry
   listTags: () => ipcRenderer.invoke("tag:list"),
   createTag: (payload) => ipcRenderer.invoke("tag:create", toSerializable(payload)),
-  updateTagDescription: (payload) => ipcRenderer.invoke("tag:update-description", toSerializable(payload)),
+  updateTag: (payload) => ipcRenderer.invoke("tag:update", toSerializable(payload)),
   deleteTagGlobally: (payload) => ipcRenderer.invoke("tag:delete-global", toSerializable(payload)),
 
   // Location registry
@@ -64,13 +64,13 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   // Album registry
   listAlbums: () => ipcRenderer.invoke("album:list"),
   createAlbum: (payload) => ipcRenderer.invoke("album:create", toSerializable(payload)),
-  updateAlbumDescription: (payload) => ipcRenderer.invoke("album:update-description", toSerializable(payload)),
+  updateAlbum: (payload) => ipcRenderer.invoke("album:update", toSerializable(payload)),
   deleteAlbumGlobally: (payload) => ipcRenderer.invoke("album:delete-global", toSerializable(payload)),
 
   // Person registry
   listPeople: () => ipcRenderer.invoke("person:list"),
   createPerson: (payload) => ipcRenderer.invoke("person:create", toSerializable(payload)),
-  updatePersonDescription: (payload) => ipcRenderer.invoke("person:update-description", toSerializable(payload)),
+  updatePerson: (payload) => ipcRenderer.invoke("person:update", toSerializable(payload)),
   deletePersonGlobally: (payload) => ipcRenderer.invoke("person:delete-global", toSerializable(payload)),
 
   // Clipboard helpers

@@ -82,6 +82,8 @@ function createLocationRegistryService(options) {
     const registry = getRegistry();
     const current = registry.get(locationId);
     if (!current) return { ok: false, error: "Location not found" };
+    const name = normalizeName(payload?.name ?? payload?.Name);
+    if (!name) return { ok: false, error: "Location name is required" };
     let parentValidation;
     try {
       parentValidation = validateParent(locationId, payload?.parentId ?? payload?.ParentId);
@@ -93,6 +95,7 @@ function createLocationRegistryService(options) {
     const previous = { ...current };
     const next = {
       ...current,
+      Name: name,
       Country: normalizeField(payload?.country ?? payload?.Country),
       Province: normalizeField(payload?.province ?? payload?.Province),
       City: normalizeField(payload?.city ?? payload?.City),

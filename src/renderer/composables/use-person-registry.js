@@ -13,7 +13,9 @@ export function usePersonRegistry({
   const personSearch = reactive({ viewer: "", batch: "" });
   const personDropdown = reactive({ viewer: false, batch: false });
   const personCreate = reactive({ visible: false, target: "viewer", name: "", description: "", error: "" });
-  const personManager = reactive({ visible: false, search: "", editingId: "", editDescription: "", error: "" });
+  const personManager = reactive({
+    visible: false, search: "", editingId: "", editName: "", editDescription: "", saving: false, error: "",
+  });
 
   const managerFilteredPeople = computed(() => {
     const keyword = personManager.search.trim();
@@ -121,21 +123,42 @@ export function usePersonRegistry({
     personManager.error = "";
   }
   function closePersonManager() {
+    if (personManager.saving) return;
     if (personCreate.target === "manager") closeCreatePersonMenu();
-    Object.assign(personManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
+    Object.assign(personManager, {
+      visible: false, search: "", editingId: "", editName: "", editDescription: "", saving: false, error: "",
+    });
   }
-  function startPersonDescriptionEdit(person) {
-    Object.assign(personManager, { editingId: person.PersonId, editDescription: person.Description || "", error: "" });
+  function startPersonEdit(person) {
+    if (personManager.saving) return;
+    Object.assign(personManager, {
+      editingId: person.PersonId, editName: person.Name || "", editDescription: person.Description || "", saving: false, error: "",
+    });
   }
-  function cancelPersonDescriptionEdit() { Object.assign(personManager, { editingId: "", editDescription: "", error: "" }); }
-  async function savePersonDescription() {
+  function cancelPersonEdit() {
+    if (personManager.saving) return;
+    Object.assign(personManager, { editingId: "", editName: "", editDescription: "", saving: false, error: "" });
+  }
+  async function savePersonEdit() {
     const personId = personManager.editingId;
+    const name = normalizeText(personManager.editName);
     if (!personId) { personManager.error = "人物不存在"; return; }
-    const result = await api.updatePersonDescription({ personId, description: normalizeText(personManager.editDescription) });
-    if (!result?.ok) { personManager.error = result?.error || "保存说明失败"; return; }
+    if (!name) { personManager.error = "人物姓名不能为空"; return; }
+    const previousName = getPersonName(personId);
+    personManager.saving = true;
+    let result;
+    try {
+      result = await api.updatePerson({ personId, name, description: normalizeText(personManager.editDescription) });
+    } catch {
+      personManager.saving = false;
+      personManager.error = "保存人物失败";
+      return;
+    }
+    personManager.saving = false;
+    if (!result?.ok) { personManager.error = result?.error || "保存人物失败"; return; }
     applyPersonRegistry(result.people);
-    cancelPersonDescriptionEdit();
-    showToastMessage("人物说明已更新");
+    cancelPersonEdit();
+    showToastMessage(previousName === name ? "人物已更新" : `已将人物“${previousName}”重命名为“${name}”`);
   }
 
   function stripPersonFromItem(item, personId) {
@@ -168,7 +191,9 @@ export function usePersonRegistry({
     personRegistry.value = [];
     Object.assign(personSearch, { viewer: "", batch: "" });
     closeAllPersonDropdowns(); closeCreatePersonMenu();
-    Object.assign(personManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
+    Object.assign(personManager, {
+      visible: false, search: "", editingId: "", editName: "", editDescription: "", saving: false, error: "",
+    });
   }
 
   return {
@@ -177,7 +202,7 @@ export function usePersonRegistry({
     getPersonDescription, getPersonName, openPersonDropdown, closePersonDropdown,
     closeAllPersonDropdowns, addPersonToTarget, onPersonSearchKeydown,
     openCreatePersonMenu, closeCreatePersonMenu, createPersonAndSelect,
-    openPersonManager, closePersonManager, startPersonDescriptionEdit,
-    cancelPersonDescriptionEdit, savePersonDescription, deletePersonGlobally, resetPersonState,
+    openPersonManager, closePersonManager, startPersonEdit,
+    cancelPersonEdit, savePersonEdit, deletePersonGlobally, resetPersonState,
   };
 }

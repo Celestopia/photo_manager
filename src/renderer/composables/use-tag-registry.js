@@ -15,7 +15,9 @@ export function useTagRegistry({
   const tagSearch = reactive({ viewer: "", batch: "" });
   const tagDropdown = reactive({ viewer: false, batch: false });
   const tagCreate = reactive({ visible: false, target: "viewer", text: "", description: "", error: "" });
-  const tagManager = reactive({ visible: false, search: "", editingId: "", editDescription: "", error: "" });
+  const tagManager = reactive({
+    visible: false, search: "", editingId: "", editText: "", editDescription: "", saving: false, error: "",
+  });
 
   const managerFilteredTags = computed(() => {
     const keyword = tagManager.search.trim();
@@ -140,21 +142,42 @@ export function useTagRegistry({
     tagManager.error = "";
   }
   function closeTagManager() {
+    if (tagManager.saving) return;
     if (tagCreate.target === "manager") closeCreateTagMenu();
-    Object.assign(tagManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
+    Object.assign(tagManager, {
+      visible: false, search: "", editingId: "", editText: "", editDescription: "", saving: false, error: "",
+    });
   }
-  function startTagDescriptionEdit(tag) {
-    Object.assign(tagManager, { editingId: tag.TagId, editDescription: tag.Description || "", error: "" });
+  function startTagEdit(tag) {
+    if (tagManager.saving) return;
+    Object.assign(tagManager, {
+      editingId: tag.TagId, editText: tag.Text || "", editDescription: tag.Description || "", saving: false, error: "",
+    });
   }
-  function cancelTagDescriptionEdit() { Object.assign(tagManager, { editingId: "", editDescription: "", error: "" }); }
-  async function saveTagDescription() {
+  function cancelTagEdit() {
+    if (tagManager.saving) return;
+    Object.assign(tagManager, { editingId: "", editText: "", editDescription: "", saving: false, error: "" });
+  }
+  async function saveTagEdit() {
     const tagId = tagManager.editingId;
+    const text = normalizeText(tagManager.editText);
     if (!tagId) { tagManager.error = "标签不存在"; return; }
-    const result = await api.updateTagDescription({ tagId, description: normalizeText(tagManager.editDescription) });
-    if (!result?.ok) { tagManager.error = result?.error || "保存说明失败"; return; }
+    if (!text) { tagManager.error = "标签名称不能为空"; return; }
+    const previousText = getTagText(tagId);
+    tagManager.saving = true;
+    let result;
+    try {
+      result = await api.updateTag({ tagId, text, description: normalizeText(tagManager.editDescription) });
+    } catch {
+      tagManager.saving = false;
+      tagManager.error = "保存标签失败";
+      return;
+    }
+    tagManager.saving = false;
+    if (!result?.ok) { tagManager.error = result?.error || "保存标签失败"; return; }
     applyTagRegistry(result.tags);
-    cancelTagDescriptionEdit();
-    showToastMessage("标签说明已更新");
+    cancelTagEdit();
+    showToastMessage(previousText === text ? "标签已更新" : `已将标签“${previousText}”重命名为“${text}”`);
   }
 
   function stripTagFromItem(item, tagId) {
@@ -188,7 +211,9 @@ export function useTagRegistry({
     Object.assign(tagSearch, { viewer: "", batch: "" });
     closeAllTagDropdowns();
     closeCreateTagMenu();
-    Object.assign(tagManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
+    Object.assign(tagManager, {
+      visible: false, search: "", editingId: "", editText: "", editDescription: "", saving: false, error: "",
+    });
   }
 
   return {
@@ -196,7 +221,7 @@ export function useTagRegistry({
     loadTags, getTagOptions, getRecentTagOptions, getTagDescription, getTagText,
     openTagDropdown, closeTagDropdown, closeAllTagDropdowns, addTagToTarget, addTag,
     onTagSearchKeydown, openCreateTagMenu, closeCreateTagMenu, createTagAndSelect,
-    openTagManager, closeTagManager, startTagDescriptionEdit, cancelTagDescriptionEdit,
-    saveTagDescription, deleteTagGlobally, resetTagState,
+    openTagManager, closeTagManager, startTagEdit, cancelTagEdit,
+    saveTagEdit, deleteTagGlobally, resetTagState,
   };
 }

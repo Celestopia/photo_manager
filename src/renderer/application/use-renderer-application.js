@@ -328,9 +328,9 @@ export function useRendererApplication() {
       createTagAndSelect,
       openTagManager,
       closeTagManager,
-      startTagDescriptionEdit,
-      cancelTagDescriptionEdit,
-      saveTagDescription,
+      startTagEdit,
+      cancelTagEdit,
+      saveTagEdit,
       deleteTagGlobally,
       resetTagState,
     } = useTagRegistry({
@@ -376,9 +376,9 @@ export function useRendererApplication() {
       createPersonAndSelect,
       openPersonManager,
       closePersonManager,
-      startPersonDescriptionEdit,
-      cancelPersonDescriptionEdit,
-      savePersonDescription,
+      startPersonEdit,
+      cancelPersonEdit,
+      savePersonEdit,
       deletePersonGlobally,
       resetPersonState,
     } = usePersonRegistry({
@@ -424,9 +424,9 @@ export function useRendererApplication() {
       createAlbumAndSelect,
       openAlbumManager,
       closeAlbumManager,
-      startAlbumDescriptionEdit,
-      cancelAlbumDescriptionEdit,
-      saveAlbumDescription,
+      startAlbumEdit,
+      cancelAlbumEdit,
+      saveAlbumEdit,
       deleteAlbumGlobally,
       resetAlbumState,
     } = useAlbumRegistry({
@@ -633,8 +633,8 @@ export function useRendererApplication() {
       getTagText,
       openTagDropdown, closeTagDropdown, addTagToTarget, onTagSearchKeydown,
       openCreateTagMenu, closeCreateTagMenu, createTagAndSelect, openTagManager,
-      closeTagManager, removeTagAt, removeBatchTagAt, startTagDescriptionEdit,
-      cancelTagDescriptionEdit, saveTagDescription, deleteTagGlobally,
+      closeTagManager, removeTagAt, removeBatchTagAt, startTagEdit,
+      cancelTagEdit, saveTagEdit, deleteTagGlobally,
     };
     const albumContext = {
       ICONS, editDraft, batchEdit, albumSearch, albumDropdown, albumCreate, albumManager,
@@ -642,8 +642,8 @@ export function useRendererApplication() {
       getAlbumTitle,
       closeAlbumDropdown, setAlbumForTarget, clearAlbumForTarget, onAlbumSearchKeydown,
       openCreateAlbumMenu, closeCreateAlbumMenu, createAlbumAndSelect, openAlbumManager,
-      closeAlbumManager, startAlbumDescriptionEdit, cancelAlbumDescriptionEdit,
-      saveAlbumDescription, deleteAlbumGlobally,
+      closeAlbumManager, startAlbumEdit, cancelAlbumEdit,
+      saveAlbumEdit, deleteAlbumGlobally,
     };
     const personContext = {
       ICONS, editDraft, batchEdit, personSearch, personDropdown, personCreate, personManager,
@@ -651,8 +651,8 @@ export function useRendererApplication() {
       getPersonName,
       openPersonDropdown, closePersonDropdown, addPersonToTarget, onPersonSearchKeydown,
       openCreatePersonMenu, closeCreatePersonMenu, createPersonAndSelect, openPersonManager,
-      closePersonManager, removePersonAt, removeBatchPersonAt, startPersonDescriptionEdit,
-      cancelPersonDescriptionEdit, savePersonDescription, deletePersonGlobally,
+      closePersonManager, removePersonAt, removeBatchPersonAt, startPersonEdit,
+      cancelPersonEdit, savePersonEdit, deletePersonGlobally,
     };
     const locationContext = {
       ICONS, query, editDraft, batchEdit, locationSearch, locationDropdown, locationCreate,

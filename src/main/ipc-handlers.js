@@ -184,11 +184,11 @@ function registerIpcHandlers(options) {
 
   ipcMain.handle("tag:list", async () => toSerializable(await tagService.list()));
   ipcMain.handle("tag:create", async (_, payload) => toSerializable(await tagService.create(payload)));
-  ipcMain.handle("tag:update-description", async (_, payload) => toSerializable(await tagService.updateDescription(payload)));
+  ipcMain.handle("tag:update", async (_, payload) => toSerializable(await tagService.update(payload)));
   ipcMain.handle("tag:delete-global", async (_, payload) => toSerializable(await tagService.deleteGlobal(payload)));
   ipcMain.handle("person:list", async () => toSerializable(await personService.list()));
   ipcMain.handle("person:create", async (_, payload) => toSerializable(await personService.create(payload)));
-  ipcMain.handle("person:update-description", async (_, payload) => toSerializable(await personService.updateDescription(payload)));
+  ipcMain.handle("person:update", async (_, payload) => toSerializable(await personService.update(payload)));
   ipcMain.handle("person:delete-global", async (_, payload) => toSerializable(await personService.deleteGlobal(payload)));
   ipcMain.handle("location:list", async () => toSerializable(await locationService.list()));
   ipcMain.handle("location:create", async (_, payload) => toSerializable(await locationService.create(payload)));
@@ -196,7 +196,7 @@ function registerIpcHandlers(options) {
   ipcMain.handle("location:delete-global", async (_, payload) => toSerializable(await locationService.deleteGlobal(payload)));
   ipcMain.handle("album:list", async () => toSerializable(await albumService.list()));
   ipcMain.handle("album:create", async (_, payload) => toSerializable(await albumService.create(payload)));
-  ipcMain.handle("album:update-description", async (_, payload) => toSerializable(await albumService.updateDescription(payload)));
+  ipcMain.handle("album:update", async (_, payload) => toSerializable(await albumService.update(payload)));
   ipcMain.handle("album:delete-global", async (_, payload) => toSerializable(await albumService.deleteGlobal(payload)));
   ipcMain.handle("photo:update-customization", async (_, payload) => toSerializable(await metadataEditService.updateCustomization(payload)));
   ipcMain.handle("photo:batch-update", async (_, payload) => toSerializable(await metadataEditService.batchUpdate(payload)));

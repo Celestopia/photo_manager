@@ -26,8 +26,8 @@ export function useLocationRegistry({
     parentId: null, parentSearch: "", parentDropdown: false, description: "", error: "",
   });
   const locationManager = reactive({
-    visible: false, search: "", editingId: "", editCountry: "", editProvince: "",
-    editCity: "", editParentId: null, editDescription: "", error: "",
+    visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
+    editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
   });
   const locationManagerListRef = ref(null);
   const locationManagerContext = ref("");
@@ -260,36 +260,63 @@ export function useLocationRegistry({
     scheduleLocationManagerContextUpdate();
   }
   function cancelLocationEdit() {
+    if (locationManager.saving) return;
     Object.assign(locationManager, {
-      editingId: "", editCountry: "", editProvince: "", editCity: "",
-      editParentId: null, editDescription: "", error: "",
+      editingId: "", editName: "", editCountry: "", editProvince: "", editCity: "",
+      editParentId: null, editDescription: "", saving: false, error: "",
     });
   }
   function closeLocationManager() {
+    if (locationManager.saving) return;
     if (locationCreate.target === "manager") closeCreateLocationMenu();
     locationManager.visible = false; locationManager.search = ""; locationManagerContext.value = ""; cancelLocationEdit();
   }
   function startLocationEdit(location) {
+    if (locationManager.saving) return;
     Object.assign(locationManager, {
-      editingId: location.LocationId, editCountry: location.Country || "", editProvince: location.Province || "",
+      editingId: location.LocationId, editName: location.Name || "",
+      editCountry: location.Country || "", editProvince: location.Province || "",
       editCity: location.City || "", editParentId: location.ParentId || null,
-      editDescription: location.Description || "", error: "",
+      editDescription: location.Description || "", saving: false, error: "",
     });
   }
   async function saveLocationEdit() {
     const locationId = locationManager.editingId;
     if (!locationId) { locationManager.error = "地点不存在"; return; }
-    const result = await api.updateLocation({
-      locationId, country: locationManager.editCountry, province: locationManager.editProvince,
-      city: locationManager.editCity, parentId: locationManager.editParentId,
-      description: locationManager.editDescription,
-    });
+    const name = normalizeLocationName(locationManager.editName);
+    if (!name) { locationManager.error = "地点名称不能为空"; return; }
+    const previous = getLocation(locationId);
+    const country = normalizeLocationField(locationManager.editCountry);
+    const province = normalizeLocationField(locationManager.editProvince);
+    const city = normalizeLocationField(locationManager.editCity);
+    const parentId = locationManager.editParentId || null;
+    locationManager.saving = true;
+    let result;
+    try {
+      result = await api.updateLocation({
+        locationId, name, country, province, city, parentId,
+        description: locationManager.editDescription,
+      });
+    } catch {
+      locationManager.saving = false;
+      locationManager.error = "保存地点失败";
+      return;
+    }
+    locationManager.saving = false;
     if (!result?.ok) { locationManager.error = result?.error || "保存地点失败"; return; }
-    const regionFilterWasActive = Boolean(query.filters.locationRegion);
+    const administrativeRegionChanged = Boolean(previous) && (
+      previous.Country !== country || previous.Province !== province || previous.City !== city
+    );
+    const parentChanged = Boolean(previous) && previous.ParentId !== parentId;
+    const shouldRefreshGallery = (
+      (administrativeRegionChanged && Boolean(query.filters.locationRegion))
+      || (parentChanged && Boolean(query.filters.location))
+    );
     applyLocationRegistry(result.locations);
     cancelLocationEdit();
-    if (regionFilterWasActive) await queryGallery();
-    showToastMessage("地点已更新");
+    scheduleLocationManagerContextUpdate();
+    if (shouldRefreshGallery) await queryGallery();
+    showToastMessage(previous?.Name === name ? "地点已更新" : `已将地点“${previous?.Name || ""}”重命名为“${name}”`);
   }
 
   function clearLocationFromItem(item, locationId) {
@@ -324,8 +351,8 @@ export function useLocationRegistry({
     Object.assign(locationSearch, { viewer: "", batch: "" });
     closeAllLocationDropdowns(); resetLocationCreateState();
     Object.assign(locationManager, {
-      visible: false, search: "", editingId: "", editCountry: "", editProvince: "",
-      editCity: "", editParentId: null, editDescription: "", error: "",
+      visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
+      editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
     });
     locationManagerContext.value = "";
   }

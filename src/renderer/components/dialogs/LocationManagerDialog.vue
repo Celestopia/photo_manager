@@ -4,8 +4,8 @@
       <header class="tag-manager-header">
         <h3>地点管理</h3>
         <div class="tag-manager-header-actions">
-          <button class="btn icon-btn modal-symbol-btn" data-tip="新建地点" @click="openCreateLocationMenu('manager')">+</button>
-          <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closeLocationManager">×</button>
+          <button class="btn icon-btn modal-symbol-btn" data-tip="新建地点" :disabled="locationManager.saving" @click="openCreateLocationMenu('manager')">+</button>
+          <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" :disabled="locationManager.saving" @click="closeLocationManager">×</button>
         </div>
       </header>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="locationManager.search" placeholder="搜索地点、说明或行政区" /></div>
@@ -25,20 +25,21 @@
                 <span>{{ row.Location.UsageCount || 0 }} 个媒体</span>
               </div>
               <div v-if="locationManager.editingId === row.Location.LocationId" class="location-manager-edit">
-                <label>国家</label><input class="input" v-model="locationManager.editCountry" />
-                <label>省</label><input class="input" v-model="locationManager.editProvince" />
-                <label>市</label><input class="input" v-model="locationManager.editCity" />
+                <label>地点名称</label><input autofocus class="input" v-model="locationManager.editName" :disabled="locationManager.saving" @keydown.enter.exact.prevent="saveLocationEdit" @keydown.escape.prevent="cancelLocationEdit" />
+                <label>国家</label><input class="input" v-model="locationManager.editCountry" :disabled="locationManager.saving" />
+                <label>省</label><input class="input" v-model="locationManager.editProvince" :disabled="locationManager.saving" />
+                <label>市</label><input class="input" v-model="locationManager.editCity" :disabled="locationManager.saving" />
                 <label>父节点</label>
-                <select class="input" v-model="locationManager.editParentId">
+                <select class="input" v-model="locationManager.editParentId" :disabled="locationManager.saving">
                   <option :value="null">无父节点</option>
                   <option v-for="option in getLocationParentOptions('', row.Location.LocationId)" :key="'manager_parent_' + row.Location.LocationId + '_' + option.LocationId" :value="option.LocationId">{{ getLocationTreeLabel(option) }}</option>
                 </select>
-                <label>说明</label><textarea class="input tag-manager-description-input" v-model="locationManager.editDescription" placeholder="可留空"></textarea>
+                <label>说明</label><textarea class="input tag-manager-description-input" v-model="locationManager.editDescription" placeholder="可留空" :disabled="locationManager.saving" @keydown.ctrl.enter.prevent="saveLocationEdit"></textarea>
               </div>
               <div class="tag-manager-error" v-if="locationManager.error && locationManager.editingId === row.Location.LocationId">{{ locationManager.error }}</div>
             </div>
-            <div class="tag-manager-actions" v-if="locationManager.editingId === row.Location.LocationId"><button class="btn btn-primary" @click="saveLocationEdit">保存</button><button class="btn" @click="cancelLocationEdit">取消</button></div>
-            <div class="tag-manager-actions" v-else><button class="btn" @click="startLocationEdit(row.Location)">编辑</button><button class="btn danger-text" @click="deleteLocationGlobally(row.Location)">全局删除</button></div>
+            <div class="tag-manager-actions" v-if="locationManager.editingId === row.Location.LocationId"><button class="btn btn-primary" :disabled="locationManager.saving" @click="saveLocationEdit">保存</button><button class="btn" :disabled="locationManager.saving" @click="cancelLocationEdit">取消</button></div>
+            <div class="tag-manager-actions" v-else><button class="btn" :disabled="locationManager.saving" @click="startLocationEdit(row.Location)">编辑</button><button class="btn danger-text" :disabled="locationManager.saving" @click="deleteLocationGlobally(row.Location)">全局删除</button></div>
           </article>
         </template>
         <div class="tag-manager-empty" v-if="!managerLocationRows.length">没有匹配的地点</div>

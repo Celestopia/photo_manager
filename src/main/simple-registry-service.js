@@ -68,7 +68,7 @@ function createSimpleRegistryService(options) {
     }
   }
 
-  async function updateDescription(payload) {
+  async function update(payload) {
     requireOpenLibrary({ writable: true });
     let id;
     try {
@@ -76,21 +76,31 @@ function createSimpleRegistryService(options) {
     } catch (error) {
       return { ok: false, error: error.message };
     }
+    const key = normalize(readKey(payload));
     const description = normalize(readDescription(payload));
     const registry = getRegistry();
     const current = registry.get(id);
-    if (descriptionRequired && !description) return { ok: false, error: "Description is required" };
+    if (!key || (descriptionRequired && !description)) {
+      return { ok: false, error: descriptionRequired ? `${keyLabel} and description are required` : `${keyLabel} is required` };
+    }
     if (!current) return { ok: false, error: `${kind} not found` };
+    const duplicate = findByLabel(key);
+    if (duplicate && duplicate[idKey] !== id) return { ok: false, error: `${kind} already exists` };
 
     const previous = { ...current };
-    const next = { ...current, Description: description, UpdatedAt: new Date().toISOString() };
+    const next = {
+      ...current,
+      [definitionKey]: key,
+      Description: description,
+      UpdatedAt: new Date().toISOString(),
+    };
     registry.set(id, next);
     try {
       await saveRegistry();
       return successPayload({ ...next, UsageCount: getUsageCounts().get(id) || 0 });
     } catch (error) {
       registry.set(id, previous);
-      appendLog(`Failed to update ${kind.toLowerCase()} description: ${error.message}`);
+      appendLog(`Failed to update ${kind.toLowerCase()}: ${error.message}`);
       return { ok: false, error: `Failed to write ${kind.toLowerCase()} registry` };
     }
   }
@@ -133,7 +143,7 @@ function createSimpleRegistryService(options) {
     }
   }
 
-  return { create, deleteGlobal, list, updateDescription };
+  return { create, deleteGlobal, list, update };
 }
 
 module.exports = { createSimpleRegistryService };

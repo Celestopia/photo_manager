@@ -152,6 +152,21 @@
   min-height: 72px;
   resize: vertical;
 }
+.registry-manager-edit {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.registry-manager-edit label {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.registry-manager-edit textarea,
+.registry-manager-edit .tag-manager-description-input {
+  grid-column: 2;
+}
 .location-manager-list {
   gap: 6px;
 }

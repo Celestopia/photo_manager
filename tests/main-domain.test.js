@@ -4,8 +4,15 @@ const assert = require("node:assert/strict");
 const { applyConfigPatch } = require("../src/main/application-config.js");
 const { createApplicationRuntime } = require("../src/main/application-runtime.js");
 const { createGalleryQueryService } = require("../src/main/gallery-query.js");
-const { createLocationDomain } = require("../src/main/location-domain.js");
+const {
+  createLocationDomain,
+  normalizeLocationField,
+  normalizeLocationName,
+} = require("../src/main/location-domain.js");
+const { createLocationRegistryService } = require("../src/main/location-registry-service.js");
 const { createSimpleRegistryCatalog } = require("../src/main/simple-registry-catalog.js");
+const { createSimpleRegistryService } = require("../src/main/simple-registry-service.js");
+const { locationContextKey } = require("../src/shared/library-data-schema.js");
 
 const IDS = {
   campus: "00000000-0000-4000-8000-000000000001",
@@ -157,4 +164,125 @@ test("simple registry catalog deduplicates IDs and reports usage", () => {
     values: [IDS.tag, IDS.unknownTag], unknown: [IDS.unknownTag],
   });
   assert.equal(catalog.listDefinitions()[0].UsageCount, 2);
+});
+
+test("simple registry updates names atomically without rewriting media references", async () => {
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  const registry = new Map([
+    [IDS.tag, { TagId: IDS.tag, Text: "美食", Description: "旧说明", CreatedAt: createdAt, UpdatedAt: createdAt }],
+    [IDS.unknownTag, { TagId: IDS.unknownTag, Text: "校园", Description: "", CreatedAt: createdAt, UpdatedAt: createdAt }],
+  ]);
+  const metadata = new Map([[IDS.other, { Customization: { TagIds: [IDS.tag] } }]]);
+  const metadataBefore = structuredClone([...metadata.entries()]);
+  let failWrite = false;
+  let saveCount = 0;
+  const listDefinitions = () => [...registry.values()].map((definition) => ({
+    ...definition,
+    UsageCount: definition.TagId === IDS.tag ? 1 : 0,
+  }));
+  const service = createSimpleRegistryService({
+    kind: "Tag", keyLabel: "Tag text", idKey: "TagId", definitionKey: "Text",
+    responseItemKey: "tag", responseListKey: "tags", dataFileName: "tag_registry.jsonl",
+    descriptionRequired: false, normalize: (value) => String(value ?? "").trim(),
+    readKey: (payload) => payload?.text, readId: (payload) => payload?.tagId,
+    readDescription: (payload) => payload?.description, getRegistry: () => registry,
+    setRegistry: () => {}, getMetadata: () => metadata, setMetadata: () => {},
+    requireOpenLibrary: () => {}, prepareLibraryWrite: async () => {},
+    saveRegistry: async () => { saveCount += 1; if (failWrite) throw new Error("disk full"); },
+    saveTransaction: async () => {}, listDefinitions,
+    getUsageCounts: () => new Map([[IDS.tag, 1]]),
+    sortEntries: (values) => [...values],
+    findByLabel: (label) => [...registry.values()].find((definition) => definition.Text === label) || null,
+    mutateMetadataOnDelete: () => false, appendLog: () => {},
+  });
+
+  const renamed = await service.update({ tagId: IDS.tag, text: "餐饮", description: "新说明" });
+  assert.equal(renamed.ok, true);
+  assert.equal(renamed.tag.TagId, IDS.tag);
+  assert.equal(renamed.tag.Text, "餐饮");
+  assert.equal(renamed.tag.Description, "新说明");
+  assert.equal(renamed.tag.CreatedAt, createdAt);
+  assert.notEqual(renamed.tag.UpdatedAt, createdAt);
+  assert.deepEqual([...metadata.entries()], metadataBefore);
+
+  const duplicate = await service.update({ tagId: IDS.tag, text: "校园", description: "" });
+  assert.equal(duplicate.ok, false);
+  assert.equal(registry.get(IDS.tag).Text, "餐饮");
+
+  failWrite = true;
+  const failed = await service.update({ tagId: IDS.tag, text: "晚餐", description: "" });
+  assert.equal(failed.ok, false);
+  assert.equal(registry.get(IDS.tag).Text, "餐饮");
+  assert.equal(registry.get(IDS.tag).Description, "新说明");
+  assert.equal(saveCount, 2);
+});
+
+test("location updates names while preserving IDs and rebuilding descendant paths", async () => {
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  const registry = new Map([
+    [IDS.campus, {
+      LocationId: IDS.campus, Name: "清华大学", Country: "中国", Province: "", City: "北京",
+      ParentId: null, Description: "", CreatedAt: createdAt, UpdatedAt: createdAt,
+    }],
+    [IDS.dining, {
+      LocationId: IDS.dining, Name: "清芬园食堂", Country: "中国", Province: "", City: "北京",
+      ParentId: IDS.campus, Description: "", CreatedAt: createdAt, UpdatedAt: createdAt,
+    }],
+    [IDS.other, {
+      LocationId: IDS.other, Name: "东门", Country: "中国", Province: "", City: "北京",
+      ParentId: null, Description: "", CreatedAt: createdAt, UpdatedAt: createdAt,
+    }],
+  ]);
+  const metadata = new Map([[IDS.tag, { Location: { LocationId: IDS.campus, Detail: "" } }]]);
+  const metadataBefore = structuredClone([...metadata.entries()]);
+  const domain = createLocationDomain(() => registry);
+  let failWrite = false;
+  const listDefinitions = () => [...registry.values()].map((location) => ({
+    ...location,
+    UsageCount: location.LocationId === IDS.campus ? 1 : 0,
+    ChildrenIds: domain.getLocationChildrenMap().get(location.LocationId) || [],
+    Depth: domain.getLocationDepth(location.LocationId),
+    Path: domain.buildLocationPath(location.LocationId),
+  }));
+  const service = createLocationRegistryService({
+    dataFileName: "location_registry.jsonl", getRegistry: () => registry, setRegistry: () => {},
+    getMetadata: () => metadata, setMetadata: () => {}, normalizeName: normalizeLocationName,
+    normalizeField: normalizeLocationField, validateParent: domain.validateLocationParent,
+    getDepth: domain.getLocationDepth, buildPath: domain.buildLocationPath, listDefinitions,
+    findDuplicate: (candidate, excludeId) => [...registry.values()].find((location) => (
+      location.LocationId !== excludeId && locationContextKey(location) === locationContextKey(candidate)
+    )) || null,
+    sortEntries: (values) => [...values], requireOpenLibrary: () => {},
+    prepareLibraryWrite: async () => {},
+    saveRegistry: async () => { if (failWrite) throw new Error("disk full"); },
+    saveTransaction: async () => {},
+    appendLog: () => {},
+  });
+
+  const result = await service.update({
+    locationId: IDS.campus, name: "清华园", country: "中国", province: "", city: "北京",
+    parentId: null, description: "校园",
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.location.LocationId, IDS.campus);
+  assert.equal(result.location.Name, "清华园");
+  assert.equal(result.location.CreatedAt, createdAt);
+  assert.deepEqual(result.locations.find((location) => location.LocationId === IDS.dining).Path, ["清华园", "清芬园食堂"]);
+  assert.deepEqual([...metadata.entries()], metadataBefore);
+
+  const duplicate = await service.update({
+    locationId: IDS.campus, name: "东门", country: "中国", province: "", city: "北京",
+    parentId: null, description: "",
+  });
+  assert.equal(duplicate.ok, false);
+  assert.equal(registry.get(IDS.campus).Name, "清华园");
+
+  failWrite = true;
+  const failed = await service.update({
+    locationId: IDS.campus, name: "主校区", country: "中国", province: "", city: "北京",
+    parentId: null, description: "",
+  });
+  assert.equal(failed.ok, false);
+  assert.equal(registry.get(IDS.campus).Name, "清华园");
+  assert.equal(registry.get(IDS.campus).Description, "校园");
 });

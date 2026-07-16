@@ -12,7 +12,9 @@ export function useAlbumRegistry({
   const albumSearch = reactive({ viewer: "", batch: "" });
   const albumDropdown = reactive({ viewer: false, batch: false });
   const albumCreate = reactive({ visible: false, target: "viewer", title: "", description: "", error: "" });
-  const albumManager = reactive({ visible: false, search: "", editingId: "", editDescription: "", error: "" });
+  const albumManager = reactive({
+    visible: false, search: "", editingId: "", editTitle: "", editDescription: "", saving: false, error: "",
+  });
 
   const managerFilteredAlbums = computed(() => {
     const keyword = albumManager.search.trim();
@@ -116,22 +118,43 @@ export function useAlbumRegistry({
     albumManager.error = "";
   }
   function closeAlbumManager() {
+    if (albumManager.saving) return;
     if (albumCreate.target === "manager") closeCreateAlbumMenu();
-    Object.assign(albumManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
+    Object.assign(albumManager, {
+      visible: false, search: "", editingId: "", editTitle: "", editDescription: "", saving: false, error: "",
+    });
   }
-  function startAlbumDescriptionEdit(album) {
-    Object.assign(albumManager, { editingId: album.AlbumId, editDescription: album.Description || "", error: "" });
+  function startAlbumEdit(album) {
+    if (albumManager.saving) return;
+    Object.assign(albumManager, {
+      editingId: album.AlbumId, editTitle: album.Title || "", editDescription: album.Description || "", saving: false, error: "",
+    });
   }
-  function cancelAlbumDescriptionEdit() { Object.assign(albumManager, { editingId: "", editDescription: "", error: "" }); }
-  async function saveAlbumDescription() {
+  function cancelAlbumEdit() {
+    if (albumManager.saving) return;
+    Object.assign(albumManager, { editingId: "", editTitle: "", editDescription: "", saving: false, error: "" });
+  }
+  async function saveAlbumEdit() {
     const albumId = albumManager.editingId;
+    const title = normalizeText(albumManager.editTitle);
     const description = normalizeText(albumManager.editDescription);
-    if (!albumId || !description) { albumManager.error = "说明不能为空"; return; }
-    const result = await api.updateAlbumDescription({ albumId, description });
-    if (!result?.ok) { albumManager.error = result?.error || "保存说明失败"; return; }
+    if (!albumId) { albumManager.error = "相册不存在"; return; }
+    if (!title || !description) { albumManager.error = "相册名称和说明不能为空"; return; }
+    const previousTitle = getAlbumTitle(albumId);
+    albumManager.saving = true;
+    let result;
+    try {
+      result = await api.updateAlbum({ albumId, title, description });
+    } catch {
+      albumManager.saving = false;
+      albumManager.error = "保存相册失败";
+      return;
+    }
+    albumManager.saving = false;
+    if (!result?.ok) { albumManager.error = result?.error || "保存相册失败"; return; }
     applyAlbumRegistry(result.albums);
-    cancelAlbumDescriptionEdit();
-    showToastMessage("相册说明已更新");
+    cancelAlbumEdit();
+    showToastMessage(previousTitle === title ? "相册已更新" : `已将相册“${previousTitle}”重命名为“${title}”`);
   }
 
   function clearAlbumFromItem(item, albumId) {
@@ -163,7 +186,9 @@ export function useAlbumRegistry({
     albumRegistry.value = [];
     Object.assign(albumSearch, { viewer: "", batch: "" });
     closeAllAlbumDropdowns(); closeCreateAlbumMenu();
-    Object.assign(albumManager, { visible: false, search: "", editingId: "", editDescription: "", error: "" });
+    Object.assign(albumManager, {
+      visible: false, search: "", editingId: "", editTitle: "", editDescription: "", saving: false, error: "",
+    });
   }
 
   return {
@@ -171,7 +196,7 @@ export function useAlbumRegistry({
     loadAlbums, getAlbumOptions, getAlbumDescription, getAlbumTitle, openAlbumDropdown,
     closeAlbumDropdown, closeAllAlbumDropdowns, setAlbumForTarget, clearAlbumForTarget,
     onAlbumSearchKeydown, openCreateAlbumMenu, closeCreateAlbumMenu, createAlbumAndSelect,
-    openAlbumManager, closeAlbumManager, startAlbumDescriptionEdit, cancelAlbumDescriptionEdit,
-    saveAlbumDescription, deleteAlbumGlobally, resetAlbumState,
+    openAlbumManager, closeAlbumManager, startAlbumEdit, cancelAlbumEdit,
+    saveAlbumEdit, deleteAlbumGlobally, resetAlbumState,
   };
 }

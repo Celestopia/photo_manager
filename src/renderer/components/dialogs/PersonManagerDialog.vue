@@ -4,8 +4,8 @@
       <header class="tag-manager-header">
         <h3>人物管理</h3>
         <div class="tag-manager-header-actions">
-          <button class="btn icon-btn modal-symbol-btn" data-tip="新建人物" @click="openCreatePersonMenu('manager')">+</button>
-          <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" @click="closePersonManager">×</button>
+          <button class="btn icon-btn modal-symbol-btn" data-tip="新建人物" :disabled="personManager.saving" @click="openCreatePersonMenu('manager')">+</button>
+          <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="关闭" aria-label="关闭" :disabled="personManager.saving" @click="closePersonManager">×</button>
         </div>
       </header>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="personManager.search" placeholder="搜索姓名或说明" /></div>
@@ -13,12 +13,15 @@
         <article class="tag-manager-item" v-for="person in managerFilteredPeople" :key="'person_manager_' + person.PersonId">
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ person.Name }}</strong><span>{{ person.UsageCount || 0 }} 个媒体</span></div>
-            <textarea v-if="personManager.editingId === person.PersonId" class="input tag-manager-description-input" v-model="personManager.editDescription" placeholder="可留空"></textarea>
+            <div v-if="personManager.editingId === person.PersonId" class="registry-manager-edit">
+              <label>人物姓名</label><input autofocus class="input" v-model="personManager.editName" :disabled="personManager.saving" @keydown.enter.exact.prevent="savePersonEdit" @keydown.escape.prevent="cancelPersonEdit" />
+              <label>说明</label><textarea class="input tag-manager-description-input" v-model="personManager.editDescription" placeholder="可留空" :disabled="personManager.saving" @keydown.ctrl.enter.prevent="savePersonEdit"></textarea>
+            </div>
             <p v-else>{{ person.Description || '无说明' }}</p>
             <div class="tag-manager-error" v-if="personManager.error && personManager.editingId === person.PersonId">{{ personManager.error }}</div>
           </div>
-          <div class="tag-manager-actions" v-if="personManager.editingId === person.PersonId"><button class="btn btn-primary" @click="savePersonDescription">保存</button><button class="btn" @click="cancelPersonDescriptionEdit">取消</button></div>
-          <div class="tag-manager-actions" v-else><button class="btn" @click="startPersonDescriptionEdit(person)">编辑说明</button><button class="btn danger-text" @click="deletePersonGlobally(person)">全局删除</button></div>
+          <div class="tag-manager-actions" v-if="personManager.editingId === person.PersonId"><button class="btn btn-primary" :disabled="personManager.saving" @click="savePersonEdit">保存</button><button class="btn" :disabled="personManager.saving" @click="cancelPersonEdit">取消</button></div>
+          <div class="tag-manager-actions" v-else><button class="btn" :disabled="personManager.saving" @click="startPersonEdit(person)">编辑</button><button class="btn danger-text" :disabled="personManager.saving" @click="deletePersonGlobally(person)">全局删除</button></div>
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredPeople.length">没有匹配的人物</div>
       </div>
@@ -44,8 +47,8 @@ const context = inject(PERSON_CONTEXT);
 if (!context) throw new Error("PersonManagerDialog requires PERSON_CONTEXT");
 const {
   personManager, managerFilteredPeople, personCreate, openCreatePersonMenu,
-  closePersonManager, startPersonDescriptionEdit, savePersonDescription,
-  cancelPersonDescriptionEdit, deletePersonGlobally, closeCreatePersonMenu,
+  closePersonManager, startPersonEdit, savePersonEdit,
+  cancelPersonEdit, deletePersonGlobally, closeCreatePersonMenu,
   createPersonAndSelect,
 } = context;
 </script>
