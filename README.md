@@ -95,6 +95,7 @@ Maintenance operations lock editing and library switching until completion. Repo
 Videos use a fixed in-app control bar over Electron's native video element, with play/pause, timeline, time, mute, and volume controls. Unsupported video decoding falls back to native audio-only playback when possible, then to the Windows default player. No proxy transcoding is performed.
 
 - A new video does not autoplay.
+- Before playback and while paused, a central play button mirrors the bottom-left playback control.
 - Click the video to play or pause; double-click the media area for fullscreen.
 - Decodable videos share the image viewer's temporary pan, 10–1000% zoom, quarter-turn rotation, horizontal mirror, and restore controls. These visual transforms reset when media changes and never alter files or metadata.
 - Before playback starts, `Left/Right` browses media.

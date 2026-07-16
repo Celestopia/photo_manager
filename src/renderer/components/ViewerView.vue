@@ -86,6 +86,17 @@
             @seeked="onVideoSeeked"
           ></video>
         </div>
+        <button
+          v-if="showVideoCenterPlay"
+          type="button"
+          class="video-center-play-button"
+          data-tip="播放"
+          aria-label="播放"
+          :disabled="!videoReady"
+          @click="toggleVideoPlayback"
+        >
+          <img :src="ICONS.videoPlay" alt="" />
+        </button>
         <VideoPlaybackControls
           :icons="ICONS"
           :playing="videoPlaying"
@@ -310,11 +321,13 @@ const {
   audioElementRef,
   videoPlaybackMode,
   videoPlaybackMessage,
+  videoFrameStepping,
   videoDisplayedTime,
   videoDuration,
   videoPlaying,
   videoWaiting,
   videoReady,
+  videoSeeking,
   videoBufferedPercent,
   videoVolume,
   videoMuted,
@@ -393,5 +406,13 @@ const {
 
 const canTransformSelectedMedia = computed(() => (
   !isSelectedVideo.value || videoPlaybackMode.value === "video"
+));
+
+const showVideoCenterPlay = computed(() => (
+  videoPlaybackMode.value === "video"
+  && !videoPlaying.value
+  && !videoWaiting.value
+  && !videoSeeking.value
+  && !videoFrameStepping.value
 ));
 </script>
