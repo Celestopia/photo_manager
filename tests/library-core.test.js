@@ -15,7 +15,13 @@ const {
   assertPathInsideLibrary,
   parseLibraryArgument,
 } = require("../scripts/library-core");
-const { walkFiles, buildMetadata } = require("../scripts/common");
+const {
+  walkFiles,
+  buildMetadata,
+  normalizeFlashUsed,
+  normalizePictureBitDepth,
+  normalizePositiveNumber,
+} = require("../scripts/common");
 
 async function temporaryDirectory(t) {
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), "photo-manager-library-test-"));
@@ -39,7 +45,7 @@ test("library manifest round-trips with a validated UUID and name", async (t) =>
   const paths = resolveLibraryPaths(root);
   await ensureLibraryDirectories(paths);
   const manifest = createLibraryManifest(root, "Test Library");
-  assert.equal(manifest.schemaVersion, 3);
+  assert.equal(manifest.schemaVersion, 4);
   await writeLibraryManifest(paths, manifest);
   assert.deepEqual(await readLibraryManifest(paths), manifest);
 
@@ -84,5 +90,33 @@ test("damaged images retain metadata with a failed picture probe", async (t) => 
   assert.equal(item.FileSystem.FileType, "image");
   assert.equal(item.Picture.ProbeStatus, "failed");
   assert.equal(item.Picture.Width, null);
+  assert.equal(item.Picture.Dpi, null);
+  assert.equal(item.Picture.BitDepth, null);
+  assert.equal(Object.hasOwn(item.Picture, "dpi"), false);
+  assert.equal(item.Camera.FlashUsed, null);
   assert.match(item.Picture.ProbeError, /image|unsupported|format/i);
+});
+
+test("camera and picture scalar metadata have stable nullable types", () => {
+  assert.equal(normalizeFlashUsed(null), null);
+  assert.equal(normalizeFlashUsed(0), false);
+  assert.equal(normalizeFlashUsed(1), true);
+  assert.equal(normalizeFlashUsed(16), false);
+  assert.equal(normalizeFlashUsed(25), true);
+  assert.equal(normalizeFlashUsed("Flash did not fire, auto mode"), false);
+  assert.equal(normalizeFlashUsed("Flash fired"), true);
+  assert.equal(normalizeFlashUsed("unknown"), null);
+  assert.equal(normalizeFlashUsed(Uint8Array.from([1])), true);
+
+  assert.equal(normalizePictureBitDepth(8), 8);
+  assert.equal(normalizePictureBitDepth([8, 8, 8]), 8);
+  assert.equal(normalizePictureBitDepth(Uint8Array.from([10, 10, 10])), 10);
+  assert.equal(normalizePictureBitDepth([8, 10]), null);
+  assert.equal(normalizePictureBitDepth([]), null);
+  assert.equal(normalizePictureBitDepth(0), null);
+
+  assert.equal(normalizePositiveNumber(72), 72);
+  assert.equal(normalizePositiveNumber("300"), 300);
+  assert.equal(normalizePositiveNumber(0), null);
+  assert.equal(normalizePositiveNumber("invalid"), null);
 });

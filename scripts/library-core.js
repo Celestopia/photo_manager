@@ -10,7 +10,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const yaml = require("js-yaml");
 
-const LIBRARY_SCHEMA_VERSION = 3;
+const LIBRARY_SCHEMA_VERSION = 4;
 const MANAGER_DIR_NAME = ".photo_manager";
 const DATA_FILE_NAMES = Object.freeze({
   metadata: "photo_metadata.jsonl",

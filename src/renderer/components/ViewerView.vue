@@ -46,7 +46,7 @@
         <tr><th>光圈</th><td>{{ formatCameraValue(selectedItem?.Camera?.Aperture) }}</td></tr>
         <tr><th>ISO</th><td>{{ formatCameraValue(selectedItem?.Camera?.ISO) }}</td></tr>
         <tr><th>快门</th><td>{{ formatCameraValue(selectedItem?.Camera?.ExposureTime) }}</td></tr>
-        <tr><th>闪光灯</th><td>{{ selectedItem?.Camera?.FlashUsed ? '是' : '否' }}</td></tr>
+        <tr><th>闪光灯</th><td>{{ formatFlashUsed(selectedItem?.Camera?.FlashUsed) }}</td></tr>
       </table>
     </div>
   </aside>
@@ -251,6 +251,12 @@ function formatCameraValue(value) {
   if (typeof value !== "number") return value;
   if (!Number.isFinite(value)) return "-";
   return Number(value.toFixed(6)).toString();
+}
+
+function formatFlashUsed(value) {
+  if (value === true) return "是";
+  if (value === false) return "否";
+  return "-";
 }
 
 const {

@@ -203,6 +203,37 @@ function decimalToDms(value) {
   return [degrees, minutes, seconds];
 }
 
+/** Normalize EXIF Flash to whether the flash actually fired. */
+function normalizeFlashUsed(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (ArrayBuffer.isView(value)) return value.length === 1 ? normalizeFlashUsed(value[0]) : null;
+  if (Array.isArray(value)) return value.length === 1 ? normalizeFlashUsed(value[0]) : null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value >= 0 ? Boolean(Math.trunc(value) & 1) : null;
+  }
+  const text = String(value).trim().toLowerCase();
+  if (!text) return null;
+  if (/^\d+$/.test(text)) return Boolean(Number(text) & 1);
+  if (text.includes("did not fire") || text.includes("not fired")) return false;
+  if (text.includes("flash fired") || text === "fired") return true;
+  return null;
+}
+
+/** Store a channel bit depth only when it can be represented by one integer. */
+function normalizePictureBitDepth(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const values = ArrayBuffer.isView(value) || Array.isArray(value) ? [...value] : [value];
+  if (!values.length) return null;
+  const normalized = values.map((item) => Number(item));
+  if (normalized.some((item) => !Number.isInteger(item) || item <= 0)) return null;
+  return normalized.every((item) => item === normalized[0]) ? normalized[0] : null;
+}
+
+function normalizePositiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 function parseMediaDate(value) {
   if (!value) return null;
   const raw = String(value).trim().replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
@@ -325,7 +356,7 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
       Aperture: exif?.FNumber || null,
       ISO: exif?.ISO || null,
       ExposureTime: exif?.ExposureTime || null,
-      FlashUsed: Boolean(exif?.Flash),
+      FlashUsed: normalizeFlashUsed(exif?.Flash),
     },
     Customization: defaultCustomization(ext, type),
   };
@@ -335,8 +366,8 @@ async function buildMetadata(filePath, workspaceRoot, options = {}) {
       ProbeError: pictureProbeError,
       Width: pictureProbeStatus === "ok" ? width || null : null,
       Height: pictureProbeStatus === "ok" ? height || null : null,
-      dpi: pictureProbeStatus === "ok" ? dpi : null,
-      BitDepth: pictureProbeStatus === "ok" ? bitDepth : null,
+      Dpi: pictureProbeStatus === "ok" ? normalizePositiveNumber(dpi) : null,
+      BitDepth: pictureProbeStatus === "ok" ? normalizePictureBitDepth(bitDepth) : null,
     };
   } else {
     output.Video = videoProbe.video;
@@ -389,4 +420,7 @@ module.exports = {
   timeInfoFromDate,
   parseMediaDate,
   defaultCustomization,
+  normalizeFlashUsed,
+  normalizePictureBitDepth,
+  normalizePositiveNumber,
 };

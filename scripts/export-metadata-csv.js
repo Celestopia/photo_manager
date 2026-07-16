@@ -40,6 +40,8 @@ const COLUMNS = [
   { header: "Picture.ProbeError", get: (item) => item?.Picture?.ProbeError || "" },
   { header: "Picture.Width", get: (item) => item?.Picture?.Width ?? "" },
   { header: "Picture.Height", get: (item) => item?.Picture?.Height ?? "" },
+  { header: "Picture.Dpi", get: (item) => item?.Picture?.Dpi ?? "" },
+  { header: "Picture.BitDepth", get: (item) => item?.Picture?.BitDepth ?? "" },
   { header: "Video.ProbeStatus", get: (item) => item?.Video?.ProbeStatus || "" },
   { header: "Video.ProbeError", get: (item) => item?.Video?.ProbeError || "" },
   { header: "Video.DurationSeconds", get: (item) => item?.Video?.DurationSeconds ?? "" },
@@ -83,7 +85,7 @@ const COLUMNS = [
   { header: "Camera.Aperture", get: (item) => item?.Camera?.Aperture ?? "" },
   { header: "Camera.ISO", get: (item) => item?.Camera?.ISO ?? "" },
   { header: "Camera.ExposureTime", get: (item) => item?.Camera?.ExposureTime ?? "" },
-  { header: "Camera.FlashUsed", get: (item) => item?.Camera?.FlashUsed ?? false },
+  { header: "Camera.FlashUsed", get: (item) => item?.Camera?.FlashUsed ?? "" },
 ];
 
 /**

@@ -17,6 +17,15 @@ test("CSV schema exports all normalized video fields", () => {
   }
 });
 
+test("CSV exports normalized picture fields and preserves nullable flash semantics", () => {
+  const columns = Object.fromEntries(COLUMNS.map((column) => [column.header, column]));
+  const image = { Picture: { Dpi: 72, BitDepth: 8 }, Camera: { FlashUsed: false } };
+  assert.equal(columns["Picture.Dpi"].get(image), 72);
+  assert.equal(columns["Picture.BitDepth"].get(image), 8);
+  assert.equal(columns["Camera.FlashUsed"].get(image), false);
+  assert.equal(columns["Camera.FlashUsed"].get({ Camera: { FlashUsed: null } }), "");
+});
+
 test("CSV places Privacy immediately after Rating", () => {
   const headers = COLUMNS.map((column) => column.header);
   assert.equal(headers[headers.indexOf("Rating") + 1], "Privacy");
