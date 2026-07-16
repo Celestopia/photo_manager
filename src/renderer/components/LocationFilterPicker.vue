@@ -120,13 +120,13 @@ function closeDropdown() {
 }
 
 async function selectLocation(name) {
-  await setLocationFilter(name);
   closeDropdown();
+  await setLocationFilter(name);
 }
 
 async function selectRegion(region) {
-  await setLocationRegionFilter(region);
   closeDropdown();
+  await setLocationRegionFilter(region);
 }
 
 function regionLabel(region) {
