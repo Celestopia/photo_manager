@@ -27,7 +27,8 @@ export function useLocationRegistry({
   });
   const locationManager = reactive({
     visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
-    editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
+    editCity: "", editParentId: null, editParentSearch: "", editParentDropdown: false,
+    editDescription: "", saving: false, error: "",
   });
   const locationManagerListRef = ref(null);
   const locationManagerContext = ref("");
@@ -184,7 +185,10 @@ export function useLocationRegistry({
   }
   function closeLocationDropdown(target) { locationDropdown[target] = false; }
   function closeAllLocationDropdowns() {
-    locationDropdown.viewer = false; locationDropdown.batch = false; locationCreate.parentDropdown = false;
+    locationDropdown.viewer = false;
+    locationDropdown.batch = false;
+    locationCreate.parentDropdown = false;
+    locationManager.editParentDropdown = false;
   }
   function setLocationForTarget(target, locationId) {
     if (!getLocation(locationId)) return;
@@ -263,7 +267,8 @@ export function useLocationRegistry({
     if (locationManager.saving) return;
     Object.assign(locationManager, {
       editingId: "", editName: "", editCountry: "", editProvince: "", editCity: "",
-      editParentId: null, editDescription: "", saving: false, error: "",
+      editParentId: null, editParentSearch: "", editParentDropdown: false,
+      editDescription: "", saving: false, error: "",
     });
   }
   function closeLocationManager() {
@@ -277,9 +282,26 @@ export function useLocationRegistry({
       editingId: location.LocationId, editName: location.Name || "",
       editCountry: location.Country || "", editProvince: location.Province || "",
       editCity: location.City || "", editParentId: location.ParentId || null,
+      editParentSearch: "", editParentDropdown: false,
       editDescription: location.Description || "", saving: false, error: "",
     });
   }
+  function toggleEditLocationParentDropdown() {
+    if (locationManager.saving) return;
+    const shouldOpen = !locationManager.editParentDropdown;
+    closeOtherRegistryDropdowns?.();
+    locationManager.editParentSearch = "";
+    locationManager.editParentDropdown = shouldOpen;
+  }
+  function closeEditLocationParentDropdown() {
+    locationManager.editParentDropdown = false;
+    locationManager.editParentSearch = "";
+  }
+  function setEditLocationParent(parentId) {
+    locationManager.editParentId = parentId || null;
+    closeEditLocationParentDropdown();
+  }
+  function clearEditLocationParent() { setEditLocationParent(null); }
   async function saveLocationEdit() {
     const locationId = locationManager.editingId;
     if (!locationId) { locationManager.error = "地点不存在"; return; }
@@ -352,7 +374,8 @@ export function useLocationRegistry({
     closeAllLocationDropdowns(); resetLocationCreateState();
     Object.assign(locationManager, {
       visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
-      editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
+      editCity: "", editParentId: null, editParentSearch: "", editParentDropdown: false,
+      editDescription: "", saving: false, error: "",
     });
     locationManagerContext.value = "";
   }
@@ -369,6 +392,8 @@ export function useLocationRegistry({
     onLocationSearchKeydown, openCreateLocationMenu, closeCreateLocationMenu,
     setCreateLocationParent, clearCreateLocationParent, createLocationAndSelect,
     openLocationManager, closeLocationManager, startLocationEdit, cancelLocationEdit,
+    toggleEditLocationParentDropdown, closeEditLocationParentDropdown,
+    setEditLocationParent, clearEditLocationParent,
     saveLocationEdit, deleteLocationGlobally, resetLocationState,
   };
 }

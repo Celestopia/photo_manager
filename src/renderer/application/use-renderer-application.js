@@ -483,6 +483,10 @@ export function useRendererApplication() {
       closeLocationManager,
       startLocationEdit,
       cancelLocationEdit,
+      toggleEditLocationParentDropdown,
+      closeEditLocationParentDropdown,
+      setEditLocationParent,
+      clearEditLocationParent,
       saveLocationEdit,
       deleteLocationGlobally,
       resetLocationState,
@@ -665,7 +669,9 @@ export function useRendererApplication() {
       setLocationForTarget, clearLocationForTarget, onLocationSearchKeydown,
       openCreateLocationMenu, closeCreateLocationMenu, createLocationAndSelect,
       setCreateLocationParent, clearCreateLocationParent, openLocationManager,
-      closeLocationManager, startLocationEdit, cancelLocationEdit, saveLocationEdit,
+      closeLocationManager, startLocationEdit, cancelLocationEdit,
+      toggleEditLocationParentDropdown, closeEditLocationParentDropdown,
+      setEditLocationParent, clearEditLocationParent, saveLocationEdit,
       deleteLocationGlobally,
     };
     const settingsContext = {

@@ -237,6 +237,13 @@
 .location-manager-edit .tag-manager-description-input {
   grid-column: 2;
 }
+.location-manager-parent-control {
+  grid-column: 2;
+  width: 100%;
+}
+.location-manager-parent-control .location-dropdown {
+  z-index: 90;
+}
 .location-option span {
   min-width: 0;
   overflow-wrap: anywhere;
