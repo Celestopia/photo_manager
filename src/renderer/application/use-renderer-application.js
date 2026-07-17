@@ -75,7 +75,7 @@ export function useRendererApplication() {
       maintenanceDialogDescription,
       applyLibraryState,
       openLibraryPath,
-      retryLastLibrary,
+      enterLibraryFromEntry,
       chooseLibrary,
       closeInitializationConfirm,
       confirmInitializeLibrary,
@@ -610,7 +610,7 @@ export function useRendererApplication() {
     }
 
     onMounted(async () => {
-      // Initial render flow: application config -> library state -> optional last-library open.
+      // Initial render flow: application config -> library state -> entry-page prefill.
       await loadConfig();
       await initializeWindowControls();
       initializeGalleryQuery();
@@ -636,7 +636,7 @@ export function useRendererApplication() {
     const libraryContext = {
       ICONS, WINDOW_ACTIONS, libraryState, entry, initializationConfirm, libraryInfo,
       maintenanceDialog, maintenanceDialogTitle, maintenanceDialogDescription,
-      chooseLibrary, retryLastLibrary, recheckMediaTools, cancelLibraryOperation,
+      chooseLibrary, enterLibraryFromEntry, recheckMediaTools, cancelLibraryOperation,
       closeInitializationConfirm, confirmInitializeLibrary, closeLibraryInfo, saveLibraryInfo,
       openLibraryRoot, openLibraryManagerDir, openLibraryLogDir, closeMaintenanceDialog,
       startMaintenanceOperation, copyMaintenanceReport, showMaintenanceOutput,

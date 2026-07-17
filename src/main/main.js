@@ -119,6 +119,7 @@ const DEFAULT_CONFIG = {
 const state = createApplicationRuntime();
 let config = null;
 let appState = { lastLibraryPath: "" };
+let lastLibraryName = "";
 let applicationStartedAt = new Date().toISOString();
 const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
 
@@ -196,6 +197,14 @@ async function loadAppState() {
     appState = { lastLibraryPath: typeof parsed?.lastLibraryPath === "string" ? parsed.lastLibraryPath : "" };
   } catch {
     appState = { lastLibraryPath: "" };
+  }
+  lastLibraryName = "";
+  if (!appState.lastLibraryPath) return;
+  try {
+    const paths = resolveLibraryPaths(appState.lastLibraryPath);
+    lastLibraryName = (await readLibraryManifest(paths)).name;
+  } catch (error) {
+    appendLog(`last-library manifest read failed: ${error.message}`);
   }
 }
 
@@ -497,6 +506,7 @@ function getLibraryState(extra = {}) {
       videoCount: [...state.metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "video").length,
     } : null,
     lastLibraryPath: appState.lastLibraryPath,
+    lastLibraryName: state.activeLibrary?.manifest?.name || lastLibraryName,
     mediaTools: state.mediaToolsState,
     maintenance: state.maintenanceState,
     ...extra,
@@ -579,6 +589,7 @@ async function openLibrary(rawRoot, options = {}) {
     state.activeLibrary.state = "open";
     state.thumbnailWarmupStarted = false;
     appState.lastLibraryPath = paths.root;
+    lastLibraryName = state.activeLibrary.manifest.name;
     await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
     emitLibraryState();
     return getLibraryState();
@@ -601,6 +612,7 @@ async function closeLibrary(options = {}) {
   state.activeLibrary.state = "closing";
   emitLibraryState();
   const closing = state.activeLibrary;
+  lastLibraryName = closing.manifest.name;
   if (state.thumbnailWarmupToken?.sessionId === closing.sessionId) state.thumbnailWarmupToken.cancelled = true;
   state.thumbnailWarmupToken = null;
   state.activeLibrary = null;
@@ -970,7 +982,7 @@ function registerIpcHandlers() {
  * 1) load app-level config and last-library state
  * 2) validate media tools without opening a library
  * 3) create BrowserWindow and bind diagnostics
- * 4) load the renderer entry; renderer may then request last-library open
+ * 4) load the renderer entry; the user may then request the prefilled last library to open
  */
 async function bootstrap() {
   const configResult = loadConfig(CONFIG_PATH, DEFAULT_CONFIG, normalizeMediaConfig);

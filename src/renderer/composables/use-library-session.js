@@ -17,6 +17,7 @@ export function useLibrarySession({
     state: "closed",
     active: null,
     lastLibraryPath: "",
+    lastLibraryName: "",
     mediaTools: { available: false, error: "" },
     maintenance: { running: false },
   });
@@ -28,7 +29,7 @@ export function useLibrarySession({
     error: "",
     libraryName: "",
     libraryPath: "",
-    canRetry: false,
+    canOpenLibrary: false,
   });
   const initializationConfirm = reactive({ visible: false, path: "", name: "", mediaCount: 0, acknowledged: false });
   const gallerySettingsOpen = ref(false);
@@ -85,7 +86,7 @@ export function useLibrarySession({
     entry.busy = false;
     entry.cancellable = false;
     entry.error = "";
-    entry.canRetry = false;
+    entry.canOpenLibrary = false;
     api.startThumbnailWarmup().catch((error) => console.error("Thumbnail warmup failed", error));
   }
 
@@ -102,7 +103,7 @@ export function useLibrarySession({
       if (confirmed) return openLibraryPath(libraryPath, { force: true });
     }
     if (!result?.ok) {
-      entry.canRetry = true;
+      entry.canOpenLibrary = true;
       setEntryError(result?.error || "无法打开图库");
       return false;
     }
@@ -110,7 +111,7 @@ export function useLibrarySession({
     return true;
   }
 
-  async function retryLastLibrary() {
+  async function enterLibraryFromEntry() {
     const libraryPath = entry.libraryPath || libraryState.value.lastLibraryPath;
     if (libraryPath) await openLibraryPath(libraryPath);
   }
@@ -203,7 +204,7 @@ export function useLibrarySession({
         entry.error = "";
         return;
       }
-      entry.canRetry = false;
+      entry.canOpenLibrary = false;
       setEntryError(result?.error || "图库初始化失败");
       return;
     }
@@ -326,7 +327,7 @@ export function useLibrarySession({
     view.value = "library-entry";
     entry.busy = false;
     entry.error = "";
-    entry.canRetry = false;
+    entry.canOpenLibrary = Boolean(entry.libraryPath || result.library?.lastLibraryPath);
   }
 
   async function initialize() {
@@ -355,11 +356,12 @@ export function useLibrarySession({
     applyLibraryState(initialState);
     if (initialState?.active) {
       await enterOpenedLibrary(initialState);
-    } else if (initialState?.lastLibraryPath && initialState?.mediaTools?.available) {
+    } else if (initialState?.lastLibraryPath) {
       entry.libraryPath = initialState.lastLibraryPath;
-      entry.libraryName = initialState.lastLibraryPath.split(/[\\/]/).filter(Boolean).pop() || initialState.lastLibraryPath;
-      entry.canRetry = true;
-      await openLibraryPath(initialState.lastLibraryPath);
+      entry.libraryName = initialState.lastLibraryName
+        || initialState.lastLibraryPath.split(/[\\/]/).filter(Boolean).pop()
+        || initialState.lastLibraryPath;
+      entry.canOpenLibrary = true;
     }
   }
 
@@ -386,7 +388,7 @@ export function useLibrarySession({
     maintenanceDialogDescription,
     applyLibraryState,
     openLibraryPath,
-    retryLastLibrary,
+    enterLibraryFromEntry,
     chooseLibrary,
     closeInitializationConfirm,
     confirmInitializeLibrary,

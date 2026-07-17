@@ -38,7 +38,7 @@
       </div>
 
       <div class="library-entry-actions">
-        <button v-if="entry.canRetry" class="btn" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="retryLastLibrary">重试</button>
+        <button v-if="entry.canOpenLibrary" class="btn" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="enterLibraryFromEntry">进入图库</button>
         <button class="btn btn-primary" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="chooseLibrary">选择图库</button>
       </div>
     </section>
@@ -58,7 +58,7 @@ const {
   libraryState,
   entry,
   chooseLibrary,
-  retryLastLibrary,
+  enterLibraryFromEntry,
   recheckMediaTools,
   cancelLibraryOperation,
   doWindowAction,
