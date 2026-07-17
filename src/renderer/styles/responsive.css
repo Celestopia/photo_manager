@@ -7,3 +7,15 @@
   .viewer-main { grid-template-columns: 1fr; height: calc(100% - 180px); }
   .viewer-footer { grid-template-columns: 1fr; height: auto; }
 }
+
+@media (max-width: 900px) {
+  .gallery-controls-primary,
+  .gallery-controls-secondary { align-items: flex-start; }
+  .gallery-controls-primary .location-filter-group { width: 100%; }
+  .gallery-controls-primary .location-filter-picker { width: min(100%, 360px); }
+  .sort-tools { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-controls-panel { animation: none; }
+}

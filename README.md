@@ -70,13 +70,13 @@ The library root can be moved as a unit. `library.yml` contains a UUID that iden
 
 ## Using the App
 
-The gallery mixes images and videos on one shooting-time timeline. It supports media-type, album, tag, person, and hierarchical-location filters, plus text search and batch editing. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
+The gallery mixes images and videos on one shooting-time timeline. Its collapsible filter panel supports media type, multi-select rating and privacy levels, album, tag, person, and hierarchical location, plus shooting-time direction and text search. Rating defaults to all levels and privacy defaults to level 1. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
 
 The viewer shares title, rating, privacy level, album, location, people, tags, description, and hidden-description fields across both media types. Privacy is an integer from 1 (lowest privacy requirement) to 5 (highest) and defaults to 1. Its controls are collapsed below rating by default and remain expanded or collapsed while browsing between media. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu.
 
 Each media record has a stable lowercase UUID v4 `MediaId`. Album, tag, person, and location references also use registry UUIDs rather than display text. Moving or renaming a file inside one library preserves its `MediaId`; a coexisting duplicate or a file imported into another library receives a new one. `FilePath` remains the current relative location and SHA-256 remains the content fingerprint, so neither is treated as the record identity.
 
-Selection mode can batch-set title, rating, privacy level, album, and primary location, and batch-add people and tags. Rating and privacy controls both use an unset draft state so opening the panel never changes existing metadata until a level is selected. Privacy is descriptive metadata only: every level remains visible in the local gallery and CSV export, and it does not restrict clipboard or system-open actions.
+Selection mode can batch-set title, rating, privacy level, album, and primary location, and batch-add people and tags. Rating and privacy controls both use an unset draft state so opening the panel never changes existing metadata until a level is selected. Privacy is descriptive metadata rather than access control: gallery filters may select its levels, while CSV export, clipboard, and system-open actions remain unrestricted.
 
 The gallery's bottom-right settings menu provides:
 

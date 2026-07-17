@@ -14,19 +14,55 @@
 </header>
 <main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode && selectedGalleryCount > 0 }">
   <section class="gallery-content">
-    <section class="toolbar-row">
-      <div class="toolbar-group media-type-filter" role="group" aria-label="媒体类型">
-        <button type="button" class="btn" :class="{ active: !query.filters.mediaType }" @click="setMediaTypeFilter('')">全部</button>
-        <button type="button" class="btn" :class="{ active: query.filters.mediaType === 'image' }" @click="setMediaTypeFilter('image')">图片</button>
-        <button type="button" class="btn" :class="{ active: query.filters.mediaType === 'video' }" @click="setMediaTypeFilter('video')">视频</button>
+    <section class="gallery-controls-host">
+      <div class="gallery-controls-drawer" :class="{ expanded: galleryControlsExpanded }">
+        <button
+          type="button"
+          class="gallery-controls-toggle"
+          :data-tip="galleryControlsExpanded ? '收起筛选与排序' : '展开筛选与排序'"
+          :aria-label="galleryControlsExpanded ? '收起筛选与排序' : '展开筛选与排序'"
+          :aria-expanded="galleryControlsExpanded"
+          @click="toggleGalleryControls"
+        >
+          <span v-if="galleryControlsModified" class="gallery-controls-status-dot" aria-hidden="true"></span>
+          <img class="gallery-controls-chevron" :class="galleryControlsExpanded ? 'point-right' : 'point-left'" :src="ICONS.chevronDown" alt="" />
+        </button>
+        <section v-if="galleryControlsExpanded" class="gallery-controls-panel">
+          <div class="gallery-controls-primary">
+            <div class="toolbar-group"><label>相册</label><RegistryFilterPicker kind="album" label="相册" /></div>
+            <div class="toolbar-group"><label>标签</label><RegistryFilterPicker kind="tag" label="标签" /></div>
+            <div class="toolbar-group"><label>人物</label><RegistryFilterPicker kind="person" label="人物" /></div>
+            <div class="toolbar-group location-filter-group"><label>地点</label><LocationFilterPicker /></div>
+            <div class="toolbar-group selection-tools" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
+            <div class="toolbar-group selection-tools" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
+            <div class="toolbar-group sort-tools"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
+          </div>
+          <div class="gallery-controls-secondary">
+            <div class="gallery-media-type-filter">
+              <span class="gallery-filter-label">媒体类型</span>
+              <div class="segmented-filter" role="group" aria-label="媒体类型">
+                <button type="button" :class="{ active: !query.filters.mediaType }" :aria-pressed="!query.filters.mediaType" @click="setMediaTypeFilter('')">全部</button>
+                <button type="button" :class="{ active: query.filters.mediaType === 'image' }" :aria-pressed="query.filters.mediaType === 'image'" @click="setMediaTypeFilter('image')">图片</button>
+                <button type="button" :class="{ active: query.filters.mediaType === 'video' }" :aria-pressed="query.filters.mediaType === 'video'" @click="setMediaTypeFilter('video')">视频</button>
+              </div>
+            </div>
+            <GalleryLevelFilter
+              label="评级"
+              :levels="STAR_LEVELS"
+              :selected-levels="query.filters.ratingLevels"
+              @select-all="setAllGalleryLevels('ratingLevels')"
+              @toggle-level="toggleGalleryLevelFilter('ratingLevels', $event)"
+            />
+            <GalleryLevelFilter
+              label="隐私等级"
+              :levels="STAR_LEVELS"
+              :selected-levels="query.filters.privacyLevels"
+              @select-all="setAllGalleryLevels('privacyLevels')"
+              @toggle-level="toggleGalleryLevelFilter('privacyLevels', $event)"
+            />
+          </div>
+        </section>
       </div>
-      <div class="toolbar-group"><label>相册</label><RegistryFilterPicker kind="album" label="相册" /></div>
-      <div class="toolbar-group"><label>标签</label><RegistryFilterPicker kind="tag" label="标签" /></div>
-      <div class="toolbar-group"><label>人物</label><RegistryFilterPicker kind="person" label="人物" /></div>
-      <div class="toolbar-group location-filter-group"><label>地点</label><LocationFilterPicker /></div>
-      <div class="toolbar-group" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
-      <div class="toolbar-group" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
-      <div class="toolbar-group right"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option><option value="filename">文件名</option><option value="rating">评级</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
     </section>
     <section class="gallery-list">
       <div class="summary">{{ loading ? '正在加载媒体...' : `共 ${total} 个媒体` }}</div>
@@ -121,6 +157,7 @@ import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import GallerySettingsMenu from "./GallerySettingsMenu.vue";
 import GalleryMediaDetailsMenu from "./GalleryMediaDetailsMenu.vue";
+import GalleryLevelFilter from "./GalleryLevelFilter.vue";
 import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 import { STAR_LEVELS } from "../constants/ui-constants.mjs";
 
@@ -135,7 +172,8 @@ const {
   ICONS,
   WINDOW_ACTIONS,
   query,
-  filterOptions,
+  galleryControlsExpanded,
+  galleryControlsModified,
   isSelectionMode,
   selectedGalleryCount,
   batchEdit,
@@ -147,14 +185,13 @@ const {
   canApplyBatchEdit,
   windowToggleTip,
   windowToggleIcon,
-  UNASSIGNED_ALBUM_FILTER,
-  getAlbumDescription,
-  getTagDescription,
-  getPersonDescription,
   resetAll,
   applySearch,
   applyFilterSort,
   setMediaTypeFilter,
+  setAllGalleryLevels,
+  toggleGalleryLevelFilter,
+  toggleGalleryControls,
   enterSelectionMode,
   exitSelectionMode,
   onGalleryCardClick,

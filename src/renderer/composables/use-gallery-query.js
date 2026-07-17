@@ -1,4 +1,10 @@
-import { reactive, ref, shallowRef, triggerRef } from "vue";
+import { computed, reactive, ref, shallowRef, triggerRef } from "vue";
+import {
+  createDefaultGalleryFilters,
+  hasNonDefaultGalleryControls,
+  normalizeGalleryLevels,
+  toggleGalleryLevel,
+} from "../domain/gallery-filter-state.mjs";
 
 /** Owns the complete gallery query result, indexes, filters, and thumbnail refresh events. */
 export function useGalleryQuery({
@@ -12,9 +18,11 @@ export function useGalleryQuery({
   const query = reactive({
     sortBy: "shootingTime",
     sortOrder: "desc",
-    filters: { mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null },
+    filters: createDefaultGalleryFilters(),
     search: { field: "title", value: "" },
   });
+  const galleryControlsExpanded = ref(true);
+  const galleryControlsModified = computed(() => hasNonDefaultGalleryControls(query));
   const galleryGroups = shallowRef([]);
   const orderedItems = shallowRef([]);
   const total = ref(0);
@@ -46,6 +54,8 @@ export function useGalleryQuery({
           person: query.filters.person,
           location: query.filters.location,
           locationRegion: query.filters.locationRegion ? { ...query.filters.locationRegion } : null,
+          ratingLevels: normalizeGalleryLevels(query.filters.ratingLevels),
+          privacyLevels: normalizeGalleryLevels(query.filters.privacyLevels),
         },
         search: { field: query.search.field, value: query.search.value },
       };
@@ -84,8 +94,24 @@ export function useGalleryQuery({
     await queryGallery();
   }
 
+  async function setAllGalleryLevels(filterKey) {
+    if (filterKey !== "ratingLevels" && filterKey !== "privacyLevels") return;
+    query.filters[filterKey] = [];
+    await queryGallery();
+  }
+
+  async function toggleGalleryLevelFilter(filterKey, level) {
+    if (filterKey !== "ratingLevels" && filterKey !== "privacyLevels") return;
+    query.filters[filterKey] = toggleGalleryLevel(query.filters[filterKey], level);
+    await queryGallery();
+  }
+
+  function toggleGalleryControls() {
+    galleryControlsExpanded.value = !galleryControlsExpanded.value;
+  }
+
   async function resetAll() {
-    Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null });
+    Object.assign(query.filters, createDefaultGalleryFilters());
     Object.assign(query.search, { field: "title", value: "" });
     query.sortBy = "shootingTime";
     query.sortOrder = "desc";
@@ -96,8 +122,11 @@ export function useGalleryQuery({
   function resetGalleryState() {
     latestQueryId += 1;
     loading.value = false;
-    Object.assign(query.filters, { mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null });
+    Object.assign(query.filters, createDefaultGalleryFilters());
     Object.assign(query.search, { field: "title", value: "" });
+    query.sortBy = "shootingTime";
+    query.sortOrder = "desc";
+    galleryControlsExpanded.value = true;
     galleryGroups.value = [];
     orderedItems.value = [];
     galleryItemIndex.clear();
@@ -134,6 +163,8 @@ export function useGalleryQuery({
 
   return {
     query,
+    galleryControlsExpanded,
+    galleryControlsModified,
     galleryGroups,
     orderedItems,
     total,
@@ -145,6 +176,9 @@ export function useGalleryQuery({
     applySearch,
     applyFilterSort,
     setMediaTypeFilter,
+    setAllGalleryLevels,
+    toggleGalleryLevelFilter,
+    toggleGalleryControls,
     resetAll,
     resetGalleryState,
     rebuildGalleryItemIndex,

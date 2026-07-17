@@ -24,6 +24,28 @@ import {
   exceedsDragThreshold,
   normalizeQuarterTurn,
 } from "../src/renderer/domain/media-transform.mjs";
+import {
+  createDefaultGalleryFilters,
+  hasNonDefaultGalleryControls,
+  normalizeGalleryLevels,
+  toggleGalleryLevel,
+} from "../src/renderer/domain/gallery-filter-state.mjs";
+
+test("gallery level filters normalize multi-select values and return to all", () => {
+  assert.deepEqual(normalizeGalleryLevels([4, 2, 4, 9, "1"]), [1, 2, 4]);
+  assert.deepEqual(toggleGalleryLevel([], 2), [2]);
+  assert.deepEqual(toggleGalleryLevel([2, 4], 2), [4]);
+  assert.deepEqual(toggleGalleryLevel([4], 4), []);
+});
+
+test("gallery control defaults use all ratings and privacy level one", () => {
+  const filters = createDefaultGalleryFilters();
+  assert.deepEqual(filters.ratingLevels, []);
+  assert.deepEqual(filters.privacyLevels, [1]);
+  assert.equal(hasNonDefaultGalleryControls({ filters, sortBy: "shootingTime", sortOrder: "desc" }), false);
+  assert.equal(hasNonDefaultGalleryControls({ filters: { ...filters, privacyLevels: [] }, sortBy: "shootingTime", sortOrder: "desc" }), true);
+  assert.equal(hasNonDefaultGalleryControls({ filters, sortBy: "shootingTime", sortOrder: "asc" }), true);
+});
 
 test("renderer media formatters preserve display semantics", () => {
   assert.equal(formatFileSize(1024 * 1024), "1.00 MB");

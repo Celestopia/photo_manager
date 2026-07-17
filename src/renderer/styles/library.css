@@ -24,13 +24,16 @@
 .maintenance-modal code { font-family: Consolas, monospace; color: #245b91; }
 .library-entry-current {
   display: grid;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--bg-card-soft);
   overflow-wrap: anywhere;
 }
+.library-entry-current-info { min-width: 0; display: grid; gap: 5px; }
 .library-entry-current strong { font-size: 18px; }
 .library-entry-current span { color: var(--text-soft); }
 .library-entry-alert { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }

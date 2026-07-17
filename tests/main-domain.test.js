@@ -72,7 +72,7 @@ test("location domain resolves ID-backed paths and rejects descendant parents", 
   });
 });
 
-test("gallery query composes descendant location ID filters with sorting", () => {
+test("gallery query composes descendant location ID filters with shooting-time sorting", () => {
   const service = createGalleryQueryService({
     getLocationDescendants: (id) => id === IDS.campus ? [IDS.dining] : [],
     unassignedAlbumFilter: "__UNASSIGNED__",
@@ -83,7 +83,7 @@ test("gallery query composes descendant location ID filters with sorting", () =>
   ];
   const result = service.filterAndSort(items, {
     filters: { mediaType: "", album: "", tag: "", person: "", location: IDS.campus },
-    search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
+    search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   });
   assert.deepEqual(result.map((item) => item.FilePath), ["b.jpg"]);
 });
@@ -104,7 +104,7 @@ test("gallery query composes administrative region and registry filters", () => 
       mediaType: "", album: IDS.tag, tag: "", person: "", location: "",
       locationRegion: { level: "city", country: "中国", province: "", city: "北京" },
     },
-    search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
+    search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   });
   assert.deepEqual(result.map((item) => item.FilePath), ["campus.jpg"]);
   assert.throws(() => service.filterAndSort(items, {
@@ -112,7 +112,7 @@ test("gallery query composes administrative region and registry filters", () => 
       mediaType: "", album: "", tag: "", person: "", location: IDS.campus,
       locationRegion: { level: "country", country: "中国", province: "", city: "" },
     },
-    search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
+    search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   }), /mutually exclusive/);
 });
 
@@ -133,16 +133,44 @@ test("gallery query groups the complete result without a page-size cutoff", () =
   assert.deepEqual(groups.map((group) => [group.date, group.items.length]), [["2026-01-02", 125], ["2026-01-01", 25]]);
 });
 
-test("gallery query includes every privacy level", () => {
+test("gallery query treats empty rating and privacy level selections as all", () => {
   const service = createGalleryQueryService({ getLocationDescendants: () => [], unassignedAlbumFilter: "__UNASSIGNED__" });
   const items = [1, 2, 3, 4, 5].map((privacy) => ({
     FilePath: `privacy-${privacy}.jpg`, FileSystem: { ShootingTimeString: "2026-01-01" }, Customization: { Rating: 2, Privacy: privacy },
   }));
   const result = service.filterAndSort(items, {
-    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
-    search: { field: "", value: "" }, sortBy: "filename", sortOrder: "asc",
+    filters: { mediaType: "", album: "", tag: "", person: "", location: "", ratingLevels: [], privacyLevels: [] },
+    search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   });
   assert.equal(result.length, 5);
+});
+
+test("gallery query combines rating and privacy multi-select filters", () => {
+  const service = createGalleryQueryService({ getLocationDescendants: () => [], unassignedAlbumFilter: "__UNASSIGNED__" });
+  const items = [
+    { FilePath: "a.jpg", FileSystem: { ShootingTimeString: "2026-01-01" }, Customization: { Rating: 2, Privacy: 1 } },
+    { FilePath: "b.jpg", FileSystem: { ShootingTimeString: "2026-01-02" }, Customization: { Rating: 4, Privacy: 2 } },
+    { FilePath: "c.jpg", FileSystem: { ShootingTimeString: "2026-01-03" }, Customization: { Rating: 4, Privacy: 3 } },
+    { FilePath: "d.jpg", FileSystem: { ShootingTimeString: "2026-01-04" }, Customization: { Rating: 5, Privacy: 1 } },
+  ];
+  const result = service.filterAndSort(items, {
+    filters: {
+      mediaType: "", album: "", tag: "", person: "", location: "",
+      ratingLevels: [2, 4], privacyLevels: [1, 2],
+    },
+    search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "desc",
+  });
+  assert.deepEqual(result.map((item) => item.FilePath), ["b.jpg", "a.jpg"]);
+});
+
+test("gallery query rejects removed sorting modes", () => {
+  const service = createGalleryQueryService({ getLocationDescendants: () => [], unassignedAlbumFilter: "__UNASSIGNED__" });
+  const options = {
+    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
+    search: { field: "", value: "" }, sortOrder: "asc",
+  };
+  assert.throws(() => service.filterAndSort([], { ...options, sortBy: "filename" }), /Unsupported gallery sort/);
+  assert.throws(() => service.filterAndSort([], { ...options, sortBy: "rating" }), /Unsupported gallery sort/);
 });
 
 test("simple registry catalog deduplicates IDs and reports usage", () => {

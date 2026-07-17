@@ -1,5 +1,17 @@
 const path = require("node:path");
 
+function selectedLevels(value, label) {
+  if (value == null) return new Set();
+  if (!Array.isArray(value)) throw new Error(`${label} filters must be an array`);
+  const levels = new Set();
+  for (const rawLevel of value) {
+    const level = Number(rawLevel);
+    if (!Number.isInteger(level) || level < 1 || level > 5) throw new Error(`${label} filters must contain integers from 1 through 5`);
+    levels.add(level);
+  }
+  return levels;
+}
+
 function createGalleryQueryService({
   getLocationDescendants,
   getLocationIdsForRegion,
@@ -7,6 +19,7 @@ function createGalleryQueryService({
 }) {
   function filterAndSort(list, options) {
     const { filters, search, sortBy, sortOrder } = options;
+    if (sortBy !== "shootingTime") throw new Error(`Unsupported gallery sort: ${sortBy}`);
     let output = [...list];
 
     if (filters.mediaType === "image" || filters.mediaType === "video") {
@@ -33,6 +46,14 @@ function createGalleryQueryService({
       const allowed = new Set([filters.location, ...getLocationDescendants(filters.location)]);
       output = output.filter((item) => allowed.has(item?.Location?.LocationId));
     }
+    const ratingLevels = selectedLevels(filters.ratingLevels, "Rating");
+    if (ratingLevels.size) {
+      output = output.filter((item) => ratingLevels.has(item?.Customization?.Rating));
+    }
+    const privacyLevels = selectedLevels(filters.privacyLevels, "Privacy");
+    if (privacyLevels.size) {
+      output = output.filter((item) => privacyLevels.has(item?.Customization?.Privacy));
+    }
     if (search?.value && search?.field) {
       output = output.filter((item) => {
         let fieldValue = "";
@@ -44,18 +65,8 @@ function createGalleryQueryService({
     }
 
     output.sort((a, b) => {
-      let first;
-      let second;
-      if (sortBy === "filename") {
-        first = path.basename(a.FilePath || "");
-        second = path.basename(b.FilePath || "");
-      } else if (sortBy === "rating") {
-        first = a?.Customization?.Rating || 0;
-        second = b?.Customization?.Rating || 0;
-      } else {
-        first = a?.FileSystem?.ShootingTimeString || "";
-        second = b?.FileSystem?.ShootingTimeString || "";
-      }
+      const first = a?.FileSystem?.ShootingTimeString || "";
+      const second = b?.FileSystem?.ShootingTimeString || "";
       if (first < second) return sortOrder === "asc" ? -1 : 1;
       if (first > second) return sortOrder === "asc" ? 1 : -1;
       return 0;

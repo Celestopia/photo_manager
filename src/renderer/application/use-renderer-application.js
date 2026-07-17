@@ -139,6 +139,8 @@ export function useRendererApplication() {
     const selectedItem = ref(null);
     const {
       query,
+      galleryControlsExpanded,
+      galleryControlsModified,
       galleryGroups,
       orderedItems,
       total,
@@ -150,6 +152,9 @@ export function useRendererApplication() {
       applySearch,
       applyFilterSort,
       setMediaTypeFilter,
+      setAllGalleryLevels,
+      toggleGalleryLevelFilter,
+      toggleGalleryControls,
       resetAll,
       resetGalleryState,
       rebuildGalleryItemIndex,
@@ -643,11 +648,13 @@ export function useRendererApplication() {
       doWindowAction, toggleWindowMaximizeRestore, windowToggleTip, windowToggleIcon,
     };
     const galleryContext = {
-      ICONS, WINDOW_ACTIONS, query, filterOptions, isSelectionMode, selectedGalleryCount,
+      ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
+      filterOptions, isSelectionMode, selectedGalleryCount,
       batchEdit, batchStatus, total, galleryGroups, loading, batchHasChanges, canApplyBatchEdit,
       windowToggleTip, windowToggleIcon, UNASSIGNED_ALBUM_FILTER,
       getAlbumDescription, getTagDescription, getPersonDescription,
-      resetAll, applySearch, applyFilterSort, setMediaTypeFilter, enterSelectionMode,
+      resetAll, applySearch, applyFilterSort, setMediaTypeFilter, setAllGalleryLevels,
+      toggleGalleryLevelFilter, toggleGalleryControls, enterSelectionMode,
       exitSelectionMode, onGalleryCardClick, isGallerySelected, toggleGallerySelection,
       clearGallerySelection, selectAllGalleryPhotos, clearBatchEditInputs, applyBatchEdit,
       buildImageUrl, doWindowAction, toggleWindowMaximizeRestore,

@@ -21,8 +21,11 @@
       </div>
 
       <div v-if="entry.libraryName || entry.libraryPath" class="library-entry-current">
-        <strong>{{ entry.libraryName || '未命名图库' }}</strong>
-        <span>{{ entry.libraryPath }}</span>
+        <div class="library-entry-current-info">
+          <strong>{{ entry.libraryName || '未命名图库' }}</strong>
+          <span>{{ entry.libraryPath }}</span>
+        </div>
+        <button v-if="entry.canOpenLibrary" class="btn" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="enterLibraryFromEntry">进入图库</button>
       </div>
 
       <div v-if="entry.busy" class="library-progress-panel">
@@ -38,7 +41,6 @@
       </div>
 
       <div class="library-entry-actions">
-        <button v-if="entry.canOpenLibrary" class="btn" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="enterLibraryFromEntry">进入图库</button>
         <button class="btn btn-primary" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="chooseLibrary">选择图库</button>
       </div>
     </section>
