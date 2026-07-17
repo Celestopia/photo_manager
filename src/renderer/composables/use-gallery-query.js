@@ -1,4 +1,4 @@
-import { computed, reactive, ref, shallowRef, triggerRef } from "vue";
+import { computed, reactive, ref, shallowRef } from "vue";
 import {
   createDefaultGalleryFilters,
   hasNonDefaultGalleryControls,
@@ -6,10 +6,9 @@ import {
   toggleGalleryLevel,
 } from "../domain/gallery-filter-state.mjs";
 
-/** Owns the complete gallery query result, indexes, filters, and thumbnail refresh events. */
+/** Owns the complete gallery query result, indexes, and filters. */
 export function useGalleryQuery({
   api,
-  selectedItem,
   showToastMessage,
   onLocationsLoaded,
   onSelectionResultChanged,
@@ -31,7 +30,6 @@ export function useGalleryQuery({
   const filterOptions = reactive({ albums: [], tags: [], people: [], locations: [], unassignedAlbumCount: 0 });
   const galleryItemIndex = new Map();
   let latestQueryId = 0;
-  let removeThumbnailReadyListener = null;
 
   function rebuildGalleryItemIndex() {
     galleryItemIndex.clear();
@@ -135,32 +133,6 @@ export function useGalleryQuery({
     Object.assign(filterOptions, { albums: [], tags: [], people: [], locations: [], unassignedAlbumCount: 0 });
   }
 
-  function markThumbnailReady(payload) {
-    const mediaId = String(payload?.mediaId || "");
-    if (!mediaId) return;
-    const readyAt = Date.now();
-    const update = (item) => {
-      if (!item || item.MediaId !== mediaId) return;
-      item.__thumbnailPath = payload.thumbnailPath || item.__thumbnailPath;
-      item.__thumbnailAvailable = true;
-      item.__thumbnailReadyAt = readyAt;
-    };
-    update(selectedItem.value);
-    update(galleryItemIndex.get(mediaId));
-    triggerRef(orderedItems);
-    triggerRef(galleryGroups);
-  }
-
-  function initialize() {
-    if (typeof api.onThumbnailReady === "function") {
-      removeThumbnailReadyListener = api.onThumbnailReady(markThumbnailReady);
-    }
-  }
-
-  function dispose() {
-    if (typeof removeThumbnailReadyListener === "function") removeThumbnailReadyListener();
-  }
-
   return {
     query,
     galleryControlsExpanded,
@@ -182,7 +154,5 @@ export function useGalleryQuery({
     resetAll,
     resetGalleryState,
     rebuildGalleryItemIndex,
-    initialize,
-    dispose,
   };
 }

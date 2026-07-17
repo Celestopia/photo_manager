@@ -158,11 +158,8 @@ export function useRendererApplication() {
       resetAll,
       resetGalleryState,
       rebuildGalleryItemIndex,
-      initialize: initializeGalleryQuery,
-      dispose: disposeGalleryQuery,
     } = useGalleryQuery({
       api: API,
-      selectedItem,
       showToastMessage,
       onLocationsLoaded: (locations) => applyLocationRegistry(locations),
       onSelectionResultChanged: () => syncGallerySelectionWithLoadedItems(),
@@ -618,7 +615,6 @@ export function useRendererApplication() {
       // Initial render flow: application config -> library state -> entry-page prefill.
       await loadConfig();
       await initializeWindowControls();
-      initializeGalleryQuery();
       await initializeLibrarySession();
       await nextTick();
       autoGrowAllFieldTextareas();
@@ -635,7 +631,6 @@ export function useRendererApplication() {
       disposeUiFeedback();
       disposeWindowControls();
       disposeLibrarySession();
-      disposeGalleryQuery();
     });
 
     const libraryContext = {

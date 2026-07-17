@@ -152,7 +152,7 @@
 </template>
 
 <script setup>
-import { inject, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { inject, onBeforeUnmount, onMounted, reactive } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
@@ -211,8 +211,6 @@ const {
   toggleWindowMaximizeRestore,
 } = app;
 
-// Track thumbnail load failures by hash to avoid repeated failing requests.
-const brokenThumbnailHashes = ref(new Set());
 const galleryDetailsMenu = reactive({ visible: false, item: null, x: 0, y: 0 });
 
 function closeGalleryDetailsMenu() {
@@ -284,40 +282,25 @@ onBeforeUnmount(() => {
 /**
  * Resolve gallery card image source.
  * Priority:
- * 1) cached thumbnail file
- * 2) original image file fallback
+ * Missing thumbnails intentionally use placeholders until the user runs the
+ * explicit thumbnail-generation maintenance task.
  */
 function resolveGalleryImageSrc(item) {
-  const hash = item?.SHA256Hash || "";
   const thumbnailPath = item?.__thumbnailPath || "";
-  if (!isVideo(item) && item?.Picture?.ProbeStatus === "failed") return ICONS.imagePlaceholder;
-  if (isVideo(item) && (!thumbnailPath || (!item.__thumbnailAvailable && !item.__thumbnailReadyAt) || (hash && brokenThumbnailHashes.value.has(hash) && !item.__thumbnailReadyAt))) {
-    return ICONS.videoPlaceholder;
-  }
-  if (hash && brokenThumbnailHashes.value.has(hash) && !item.__thumbnailReadyAt) {
-    return buildImageUrl(item.__absolutePath);
-  }
-  if (thumbnailPath && (item.__thumbnailAvailable || item.__thumbnailReadyAt)) {
+  if (thumbnailPath && item.__thumbnailAvailable) {
     const source = buildImageUrl(thumbnailPath);
-    return item.__thumbnailReadyAt ? `${source}?v=${item.__thumbnailReadyAt}` : source;
+    const modifiedTime = Number(item.__thumbnailModifiedTimeMs || 0);
+    return modifiedTime > 0 ? `${source}?v=${modifiedTime}` : source;
   }
-  return buildImageUrl(item.__absolutePath);
+  return isVideo(item) ? ICONS.videoPlaceholder : ICONS.imagePlaceholder;
 }
 
 /**
- * Fallback to original image when thumbnail is missing or broken.
+ * A broken cache entry is treated the same as a missing thumbnail.
  */
 function onGalleryImageError(item, event) {
-  const hash = item?.SHA256Hash || "";
-  if (hash) {
-    const next = new Set(brokenThumbnailHashes.value);
-    next.add(hash);
-    brokenThumbnailHashes.value = next;
-  }
-  const originalSrc = isVideo(item) ? ICONS.videoPlaceholder : (item?.Picture?.ProbeStatus === "failed" ? ICONS.imagePlaceholder : buildImageUrl(item.__absolutePath));
-  if (event?.target?.src !== originalSrc) {
-    event.target.src = originalSrc;
-  }
+  const placeholder = isVideo(item) ? ICONS.videoPlaceholder : ICONS.imagePlaceholder;
+  if (event?.target?.src !== placeholder) event.target.src = placeholder;
 }
 
 function isVideo(item) {

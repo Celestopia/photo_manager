@@ -28,7 +28,6 @@ function registerIpcHandlers(options) {
     runMaintenanceOperation,
     queryGallery,
     resolveIndexedMediaPath,
-    warmupThumbnailCache,
     services,
   } = options;
   const { albumService, locationService, metadataEditService, personService, tagService } = services;
@@ -260,10 +259,6 @@ function registerIpcHandlers(options) {
     const mode = String(payload?.mode || "unknown").slice(0, 40);
     const message = String(payload?.message || "").replace(/\s+/g, " ").slice(0, 240);
     appendLog(`playback-fallback media=${mediaId} file=${item.FilePath} mode=${mode} message=${message}`);
-    return { ok: true };
-  });
-  ipcMain.handle("thumbnail:start-warmup", async () => {
-    warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
     return { ok: true };
   });
   ipcMain.handle("window:action", async (_, action) => {

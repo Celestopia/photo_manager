@@ -87,7 +87,6 @@ export function useLibrarySession({
     entry.cancellable = false;
     entry.error = "";
     entry.canOpenLibrary = false;
-    api.startThumbnailWarmup().catch((error) => console.error("Thumbnail warmup failed", error));
   }
 
   async function openLibraryPath(libraryPath, options = {}) {

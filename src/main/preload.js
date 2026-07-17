@@ -81,14 +81,6 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   openWithSystem: (mediaId) => ipcRenderer.invoke("photo:open-default", mediaId),
   showInFolder: (mediaId) => ipcRenderer.invoke("photo:show-in-folder", mediaId),
   reportPlaybackIssue: (payload) => ipcRenderer.invoke("photo:report-playback", toSerializable(payload)),
-  startThumbnailWarmup: () => ipcRenderer.invoke("thumbnail:start-warmup"),
-  onThumbnailReady: (listener) => {
-    if (typeof listener !== "function") return () => {};
-    const wrapped = (_, payload) => listener(toSerializable(payload || {}));
-    ipcRenderer.on("thumbnail:ready", wrapped);
-    return () => ipcRenderer.removeListener("thumbnail:ready", wrapped);
-  },
-
   // Custom title-bar controls
   windowAction: (action) => ipcRenderer.invoke("window:action", action),
   getWindowState: () => ipcRenderer.invoke("window:get-state"),

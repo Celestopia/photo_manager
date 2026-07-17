@@ -32,14 +32,11 @@ const { createMetadataEditService } = require("./metadata-edit-service.js");
 const { registerIpcHandlers: registerMainIpcHandlers } = require("./ipc-handlers.js");
 const { createMainWindow } = require("./window-manager.js");
 const { createApplicationRuntime } = require("./application-runtime.js");
-const { createThumbnailWarmupService } = require("./thumbnail-warmup-service.js");
 const { assertCustomization } = require("../shared/customization-schema.js");
 const { createUniqueEntityId } = require("../shared/identity-schema.js");
 const { validateMediaEntries } = require("../shared/library-data-schema.js");
 const {
-  normalizeThumbnailConfig,
   thumbnailAbsolutePath,
-  ensureThumbnailsForItems,
 } = require(path.join(__dirname, "..", "..", "scripts", "thumbnail-cache.js"));
 const {
   DEFAULT_MEDIA_CONFIG,
@@ -55,7 +52,6 @@ const {
   normalizeLibraryName,
   readJsonlStrict,
   writeJsonlAtomic,
-  writeTextAtomic,
   assertPathInsideLibrary,
   findNestedManagerDirectory,
   findParentManagerDirectory,
@@ -71,10 +67,6 @@ const {
   recoverPendingTransaction,
   commitJsonlTransaction,
 } = require(path.join(__dirname, "..", "..", "scripts", "library-transaction.js"));
-const {
-  buildThumbnailManifest,
-  thumbnailManifestMatches,
-} = require(path.join(__dirname, "..", "..", "scripts", "build-thumbnails.js"));
 const {
   walkFiles,
   extensionType,
@@ -418,11 +410,20 @@ function enrichItem(item) {
   const library = requireOpenLibrary();
   const absPath = assertPathInsideLibrary(library.paths, path.join(library.paths.root, item.FilePath));
   const thumbPath = item?.SHA256Hash ? thumbnailAbsolutePath(library.paths.thumbnailDir, item.SHA256Hash) : "";
+  let thumbnailModifiedTimeMs = 0;
+  if (thumbPath) {
+    try {
+      thumbnailModifiedTimeMs = fs.statSync(thumbPath).mtimeMs;
+    } catch {
+      thumbnailModifiedTimeMs = 0;
+    }
+  }
   return {
     ...item,
     __absolutePath: absPath,
     __thumbnailPath: thumbPath,
-    __thumbnailAvailable: Boolean(thumbPath && fs.existsSync(thumbPath)),
+    __thumbnailAvailable: thumbnailModifiedTimeMs > 0,
+    __thumbnailModifiedTimeMs: thumbnailModifiedTimeMs,
     __groupDate: (item?.FileSystem?.ShootingTimeString || "").slice(0, 10) || "Unknown",
   };
 }
@@ -436,18 +437,6 @@ function resolveIndexedMediaPath(rawMediaId) {
   if (!fs.existsSync(absolutePath)) throw new Error("Media file not found");
   return { item, absolutePath };
 }
-
-const thumbnailWarmupService = createThumbnailWarmupService({
-  state,
-  getConfig: () => config,
-  normalizeThumbnailConfig,
-  ensureThumbnailsForItems,
-  buildThumbnailManifest,
-  thumbnailManifestMatches,
-  writeTextAtomic,
-  appendLog,
-});
-const warmupThumbnailCache = thumbnailWarmupService.warmup;
 
 /**
  * Persist full metadata Map back to JSONL using atomic replace:
@@ -587,7 +576,6 @@ async function openLibrary(rawRoot, options = {}) {
     await loadAllLibraryIndexes();
     if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
     state.activeLibrary.state = "open";
-    state.thumbnailWarmupStarted = false;
     appState.lastLibraryPath = paths.root;
     lastLibraryName = state.activeLibrary.manifest.name;
     await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
@@ -613,10 +601,7 @@ async function closeLibrary(options = {}) {
   emitLibraryState();
   const closing = state.activeLibrary;
   lastLibraryName = closing.manifest.name;
-  if (state.thumbnailWarmupToken?.sessionId === closing.sessionId) state.thumbnailWarmupToken.cancelled = true;
-  state.thumbnailWarmupToken = null;
   state.activeLibrary = null;
-  state.thumbnailWarmupStarted = false;
   clearLibraryIndexes();
   await releaseLibraryLock(closing.paths, closing.sessionId).catch((error) => appendLog(`lock-release failed: ${error.message}`));
   if (!options.preserveLastPath) {
@@ -738,11 +723,7 @@ function runOperationWorker(operation, root, options = {}) {
 
 async function runMaintenanceOperation(operation, options = {}) {
   const library = requireOpenLibrary({ writable: true });
-  if (state.thumbnailWarmupToken?.sessionId === library.sessionId) state.thumbnailWarmupToken.cancelled = true;
-  state.thumbnailWarmupToken = null;
   state.maintenanceState = { running: true, operation, progress: null, report: null };
-  state.thumbnailWarmupStarted = false;
-  let updateCompleted = false;
   emitLibraryState();
   try {
     const result = await runOperationWorker(operation, library.paths.root, options);
@@ -752,7 +733,6 @@ async function runMaintenanceOperation(operation, options = {}) {
       // flag before reloading because legacy registry backfill may persist data.
       state.maintenanceState.running = false;
       await loadAllLibraryIndexes();
-      updateCompleted = true;
     }
     state.mainWindow?.webContents.send("maintenance:completed", { ok: true, operation, result });
     return { ok: true, result };
@@ -764,7 +744,6 @@ async function runMaintenanceOperation(operation, options = {}) {
     state.maintenanceState.running = false;
     state.maintenanceState.operation = "";
     emitLibraryState();
-    if (updateCompleted) warmupThumbnailCache().catch((error) => appendLog(`thumbnail-warmup failed: ${error.message}`));
   }
 }
 
@@ -972,7 +951,6 @@ function registerIpcHandlers() {
     runMaintenanceOperation,
     queryGallery,
     resolveIndexedMediaPath,
-    warmupThumbnailCache,
     services: createDomainServices(),
   });
 }
