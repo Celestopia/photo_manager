@@ -124,13 +124,16 @@
   width: 30px; height: 30px; border-radius: 50%; background: rgba(14, 65, 111, 0.82); color: #fff;
   font-size: 13px; line-height: 1; padding-left: 2px;
 }
+.video-frame-rate-badge,
 .video-duration-badge,
 .video-error-badge {
   position: absolute; right: 8px; padding: 3px 6px; border-radius: 5px;
   background: rgba(14, 48, 79, 0.82); color: #fff; font-size: 11px; line-height: 1.2;
 }
+.video-frame-rate-badge { top: 8px; font-variant-numeric: tabular-nums; }
 .video-duration-badge { bottom: 8px; font-variant-numeric: tabular-nums; }
 .video-error-badge { top: 8px; background: rgba(154, 40, 51, 0.9); }
+.video-error-badge.below-frame-rate { top: 31px; }
 .card-caption { padding: 10px; }
 .card-caption .title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-caption .meta { margin-top: 8px; font-size: 12px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--text-soft); }

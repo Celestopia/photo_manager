@@ -50,8 +50,9 @@
                 @error="onGalleryImageError(item, $event)"
               />
               <span v-if="isVideo(item)" class="video-play-badge" aria-label="视频">▶</span>
+              <span v-if="videoFrameRateBadge(item)" class="video-frame-rate-badge">{{ videoFrameRateBadge(item) }}</span>
               <span v-if="isVideo(item) && item.Video?.DurationSeconds != null" class="video-duration-badge">{{ formatDuration(item.Video.DurationSeconds) }}</span>
-              <span v-if="isVideo(item) && item.Video?.ProbeStatus === 'failed'" class="video-error-badge">解析失败</span>
+              <span v-if="isVideo(item) && item.Video?.ProbeStatus === 'failed'" class="video-error-badge" :class="{ 'below-frame-rate': videoFrameRateBadge(item) }">解析失败</span>
               <span v-if="!isVideo(item) && item.Picture?.ProbeStatus === 'failed'" class="video-error-badge">解析失败</span>
             </div>
             <div class="card-caption">
@@ -279,6 +280,12 @@ function onGalleryImageError(item, event) {
 
 function isVideo(item) {
   return item?.FileSystem?.FileType === "video";
+}
+
+function videoFrameRateBadge(item) {
+  if (!isVideo(item)) return "";
+  const frameRate = Number(item?.Video?.FrameRate);
+  return Number.isFinite(frameRate) && frameRate > 0 ? `${Math.round(frameRate)}FPS` : "";
 }
 
 function formatDuration(value) {
