@@ -24,6 +24,7 @@ export function useMediaViewer({
   seekVideo,
   toggleVideoPlayback,
   stepVideoFrame,
+  onReturnToGallery,
 }) {
   const selectedGlobalIndex = ref(-1);
   const showContextMenu = ref(false);
@@ -67,6 +68,7 @@ export function useMediaViewer({
   function closeViewer() {
     clearVideoClickTimer();
     releaseCurrentMedia();
+    onReturnToGallery?.(selectedItem.value?.MediaId);
     view.value = "gallery";
     showContextMenu.value = false;
   }

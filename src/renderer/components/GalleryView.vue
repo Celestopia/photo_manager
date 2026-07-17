@@ -64,7 +64,7 @@
         </section>
       </div>
     </section>
-    <section class="gallery-list">
+    <section ref="galleryListRef" class="gallery-list">
       <div class="summary">{{ loading ? '正在加载媒体...' : `共 ${total} 个媒体` }}</div>
       <template v-for="group in galleryGroups" :key="group.date">
         <h2 class="date-title">{{ group.date }}</h2>
@@ -74,6 +74,7 @@
             :class="{ selected: isSelectionMode && isGallerySelected(item.MediaId) }"
             v-for="item in group.items"
             :key="item.MediaId"
+            :data-media-id="item.MediaId"
             @click="onGalleryCardClick(item)"
             @contextmenu.prevent.stop="toggleGalleryDetailsMenu(item, $event)"
           >
@@ -152,7 +153,7 @@
 </template>
 
 <script setup>
-import { inject, onBeforeUnmount, onMounted, reactive } from "vue";
+import { inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
@@ -197,6 +198,7 @@ const {
   setAllGalleryLevels,
   toggleGalleryLevelFilter,
   toggleGalleryControls,
+  consumeGalleryReturnMediaId,
   enterSelectionMode,
   exitSelectionMode,
   onGalleryCardClick,
@@ -212,6 +214,15 @@ const {
 } = app;
 
 const galleryDetailsMenu = reactive({ visible: false, item: null, x: 0, y: 0 });
+const galleryListRef = ref(null);
+let galleryRestoreFrame = null;
+
+function restoreViewedMediaPosition() {
+  const mediaId = consumeGalleryReturnMediaId?.();
+  if (!mediaId || !galleryListRef.value) return;
+  const card = galleryListRef.value.querySelector(`[data-media-id="${CSS.escape(mediaId)}"]`);
+  card?.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+}
 
 function closeGalleryDetailsMenu() {
   galleryDetailsMenu.visible = false;
@@ -268,9 +279,16 @@ onMounted(() => {
   window.addEventListener("resize", closeGalleryDetailsMenu);
   window.addEventListener("keydown", handleGalleryKeydown);
   window.addEventListener("gallery-transient-open", closeDetailsFromOtherSurface);
+  nextTick(() => {
+    galleryRestoreFrame = window.requestAnimationFrame(() => {
+      galleryRestoreFrame = null;
+      restoreViewedMediaPosition();
+    });
+  });
 });
 
 onBeforeUnmount(() => {
+  if (galleryRestoreFrame !== null) window.cancelAnimationFrame(galleryRestoreFrame);
   document.removeEventListener("pointerdown", closeDetailsOnExternalPointer, true);
   document.removeEventListener("contextmenu", closeGalleryDetailsMenu);
   document.removeEventListener("scroll", closeDetailsOnScroll, true);

@@ -155,6 +155,8 @@ export function useRendererApplication() {
       setAllGalleryLevels,
       toggleGalleryLevelFilter,
       toggleGalleryControls,
+      requestGalleryReturn,
+      consumeGalleryReturnMediaId,
       resetAll,
       resetGalleryState,
       rebuildGalleryItemIndex,
@@ -580,6 +582,7 @@ export function useRendererApplication() {
       seekVideo,
       toggleVideoPlayback,
       stepVideoFrame,
+      onReturnToGallery: requestGalleryReturn,
     });
 
     // Application-level viewer defaults are loaded before a library can enter the gallery.
@@ -650,6 +653,7 @@ export function useRendererApplication() {
       getAlbumDescription, getTagDescription, getPersonDescription,
       resetAll, applySearch, applyFilterSort, setMediaTypeFilter, setAllGalleryLevels,
       toggleGalleryLevelFilter, toggleGalleryControls, enterSelectionMode,
+      consumeGalleryReturnMediaId,
       exitSelectionMode, onGalleryCardClick, isGallerySelected, toggleGallerySelection,
       clearGallerySelection, selectAllGalleryPhotos, clearBatchEditInputs, applyBatchEdit,
       buildImageUrl, doWindowAction, toggleWindowMaximizeRestore,

@@ -22,6 +22,7 @@ export function useGalleryQuery({
   });
   const galleryControlsExpanded = ref(true);
   const galleryControlsModified = computed(() => hasNonDefaultGalleryControls(query));
+  const galleryReturnMediaId = ref("");
   const galleryGroups = shallowRef([]);
   const orderedItems = shallowRef([]);
   const total = ref(0);
@@ -108,6 +109,16 @@ export function useGalleryQuery({
     galleryControlsExpanded.value = !galleryControlsExpanded.value;
   }
 
+  function requestGalleryReturn(mediaId) {
+    galleryReturnMediaId.value = String(mediaId || "").trim();
+  }
+
+  function consumeGalleryReturnMediaId() {
+    const mediaId = galleryReturnMediaId.value;
+    galleryReturnMediaId.value = "";
+    return mediaId;
+  }
+
   async function resetAll() {
     Object.assign(query.filters, createDefaultGalleryFilters());
     Object.assign(query.search, { field: "title", value: "" });
@@ -125,6 +136,7 @@ export function useGalleryQuery({
     query.sortBy = "shootingTime";
     query.sortOrder = "desc";
     galleryControlsExpanded.value = true;
+    galleryReturnMediaId.value = "";
     galleryGroups.value = [];
     orderedItems.value = [];
     galleryItemIndex.clear();
@@ -151,6 +163,8 @@ export function useGalleryQuery({
     setAllGalleryLevels,
     toggleGalleryLevelFilter,
     toggleGalleryControls,
+    requestGalleryReturn,
+    consumeGalleryReturnMediaId,
     resetAll,
     resetGalleryState,
     rebuildGalleryItemIndex,
