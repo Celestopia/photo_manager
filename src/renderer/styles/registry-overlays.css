@@ -244,12 +244,6 @@
 .location-manager-parent-control .location-dropdown {
   z-index: 90;
 }
-.location-option span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  white-space: normal;
-}
 .album-picker .location-dropdown {
   width: 100%;
 }
@@ -260,6 +254,10 @@
   overflow: hidden;
   padding: 6px;
 }
+.location-tree-menu {
+  display: flex;
+  flex-direction: column;
+}
 .location-dropdown-search {
   width: 100%;
   margin: 0 0 6px;
@@ -269,19 +267,11 @@
   overflow: auto;
   padding: 0;
 }
-.location-dropdown-current-context {
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  padding: 6px 8px 5px;
-  color: var(--text-soft);
-  background: #fff;
-  border-bottom: 1px solid rgba(144, 185, 232, 0.55);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+.location-filter-dropdown .location-dropdown-scroll {
+  max-height: min(540px, calc(100vh - 190px));
+}
+.location-tree-menu-viewer .location-dropdown-scroll {
+  max-height: min(405px, calc(100vh - 220px));
 }
 .location-section-label,
 .registry-section-label {
@@ -305,13 +295,6 @@
   padding-top: 8px;
   border-top: 1px solid rgba(144, 185, 232, 0.65);
 }
-.location-option {
-  min-height: 34px;
-  align-items: center;
-}
-.location-option.location-group-selectable {
-  font-weight: 700;
-}
 .registry-filter-dropdown,
 .location-filter-dropdown,
 .selection-dropdown {
@@ -328,18 +311,85 @@
 .selection-dropdown .tag-option {
   border-radius: 0;
 }
-.location-group-row {
-  min-height: 30px;
+.location-tree-row {
+  width: 100%;
+  min-height: 34px;
   display: flex;
   align-items: center;
-  color: var(--text-soft);
+  padding-right: 4px;
+  color: var(--text);
   font-size: 14px;
-  font-weight: 700;
   line-height: 1.25;
-  border-radius: 8px;
+  border-radius: 0;
+}
+.location-tree-row.is-interactive:hover {
+  background: rgba(31, 114, 204, 0.1);
+}
+.location-tree-row.is-selected {
+  background: rgba(31, 114, 204, 0.18);
+  color: #174f84;
+}
+.location-tree-toggle,
+.location-tree-toggle-spacer {
+  flex: 0 0 26px;
+  width: 26px;
+  min-height: 34px;
+}
+.location-tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.location-tree-toggle:hover,
+.location-tree-toggle:focus-visible {
+  background: rgba(31, 114, 204, 0.12);
+}
+.location-tree-toggle img {
+  width: 12px;
+  height: 12px;
+  transform: rotate(-90deg);
+  transition: transform 120ms ease;
+}
+.location-tree-toggle.is-expanded img {
+  transform: rotate(0deg);
+}
+.location-tree-label {
+  min-width: 0;
+  min-height: 34px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  border: 0;
+  padding: 6px 8px 6px 2px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.25;
+  text-align: left;
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
+}
+.location-tree-group-label {
+  color: var(--text-soft);
+  font-weight: 700;
+}
+button.location-tree-label {
+  cursor: pointer;
+}
+.location-tree-location-label {
+  font-weight: 500;
+}
+.location-tree-all-option {
+  border-radius: 0;
+}
+.location-parent-picker {
+  width: 100%;
 }
 .tag-manager-actions {
   flex: 0 0 auto;

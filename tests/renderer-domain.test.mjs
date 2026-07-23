@@ -9,8 +9,11 @@ import {
 } from "../src/renderer/domain/media-formatters.mjs";
 import {
   buildLocationHierarchyRows,
+  filterLocationsWithAncestors,
+  getDefaultLocationExpansionKeys,
   getLocationRegionFilterLabel,
   getLocationManagerRowContext,
+  getVisibleLocationHierarchyRows,
   sameLocationRegionFilter,
 } from "../src/renderer/domain/location-hierarchy.mjs";
 import {
@@ -182,7 +185,7 @@ test("location hierarchy keeps child locations immediately after their parent", 
     locationRows.map((row) => row.Label),
     ["清华大学", "清华大学观畴园食堂", "清华大学东南门外餐厅"],
   );
-  assert.deepEqual(locationRows.map((row) => row.Depth), [2, 3, 2]);
+  assert.deepEqual(locationRows.map((row) => row.Depth), [3, 4, 3]);
 });
 
 test("location hierarchy emits administrative rows and stable manager context", () => {
@@ -217,4 +220,89 @@ test("location hierarchy emits administrative rows and stable manager context", 
   assert.equal(sameLocationRegionFilter(cityGroup.Region, { ...cityGroup.Region }), true);
   const locationRow = rows.find((row) => row.Label === "五一广场");
   assert.equal(getLocationManagerRowContext(locationRow), "中国 | 湖南 | 长沙");
+});
+
+test("folded location hierarchy reveals only one concrete level at a time", () => {
+  const campusId = "00000000-0000-4000-8000-000000000001";
+  const diningId = "00000000-0000-4000-8000-000000000002";
+  const rows = buildLocationHierarchyRows([
+    {
+      LocationId: campusId,
+      Name: "清华大学",
+      Country: "中国",
+      Province: "",
+      City: "北京",
+      ParentId: null,
+      Path: ["清华大学"],
+    },
+    {
+      LocationId: diningId,
+      Name: "清华大学观畴园食堂",
+      Country: "中国",
+      Province: "",
+      City: "北京",
+      ParentId: campusId,
+      Path: ["清华大学", "清华大学观畴园食堂"],
+    },
+  ]);
+
+  const cityRow = rows.find((row) => row.Type === "group" && row.Label === "北京");
+  const countryRow = rows.find((row) => row.Type === "group" && row.Label === "中国");
+  const campusRow = rows.find((row) => row.Location?.LocationId === campusId && row.Type === "location");
+  assert.equal(cityRow.Depth, 2);
+  assert.equal(cityRow.Level, "city");
+  assert.equal(countryRow.Level, "country");
+  assert.ok(cityRow?.HasExpandableChildren);
+  assert.ok(campusRow?.HasExpandableChildren);
+  assert.deepEqual(
+    getVisibleLocationHierarchyRows(rows, new Set(), false).filter((row) => row.Type === "location"),
+    [],
+  );
+  assert.deepEqual(
+    getVisibleLocationHierarchyRows(rows, new Set([countryRow.Key]), false)
+      .filter((row) => row.Type === "group").map((row) => row.Label),
+    ["中国", "北京"],
+  );
+  assert.deepEqual(
+    getVisibleLocationHierarchyRows(rows, new Set(getDefaultLocationExpansionKeys(rows)), false)
+      .filter((row) => row.Type === "group").map((row) => row.Label),
+    ["中国", "北京"],
+  );
+  const cityExpansionKeys = [countryRow.Key, cityRow.Key, `group-locations:${cityRow.Key}`];
+  assert.deepEqual(
+    getVisibleLocationHierarchyRows(rows, new Set(cityExpansionKeys), false)
+      .filter((row) => row.Type === "location").map((row) => row.Label),
+    ["清华大学"],
+  );
+  assert.deepEqual(
+    getVisibleLocationHierarchyRows(rows, new Set([...cityExpansionKeys, campusRow.Key]), false)
+      .filter((row) => row.Type === "location").map((row) => row.Label),
+    ["清华大学", "清华大学观畴园食堂"],
+  );
+  assert.deepEqual(
+    getVisibleLocationHierarchyRows(rows, new Set([campusRow.Key]), false)
+      .filter((row) => row.Type === "location").map((row) => row.Label),
+    [],
+  );
+});
+
+test("location search keeps ancestors and never truncates the complete candidate set", () => {
+  const locations = Array.from({ length: 75 }, (_, index) => ({
+    LocationId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    Name: `地点 ${index}`,
+    Country: "中国",
+    Province: "",
+    City: "北京",
+    ParentId: index === 74 ? "00000000-0000-4000-8000-000000000000" : null,
+    Path: index === 74 ? ["地点 0", "地点 74"] : [`地点 ${index}`],
+  }));
+
+  assert.equal(filterLocationsWithAncestors(locations, "").length, 75);
+  const matches = filterLocationsWithAncestors(locations, "地点 74");
+  assert.deepEqual(matches.map((location) => location.Name), ["地点 0", "地点 74"]);
+  const visibleSearchRows = getVisibleLocationHierarchyRows(buildLocationHierarchyRows(matches), new Set(), true);
+  assert.deepEqual(
+    visibleSearchRows.filter((row) => row.Type === "location").map((row) => row.Label),
+    ["地点 0", "地点 74"],
+  );
 });

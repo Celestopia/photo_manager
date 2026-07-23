@@ -2,6 +2,7 @@ import { computed, nextTick, reactive, ref, triggerRef, watch } from "vue";
 import {
   buildLocationHierarchyRows,
   compareLocationsByRegionAndTree,
+  filterLocationsWithAncestors,
   getLocationManagerRowContext,
   getLocationPathLabel,
   getLocationRegionLabel,
@@ -23,12 +24,11 @@ export function useLocationRegistry({
   const locationDropdown = reactive({ viewer: false, batch: false });
   const locationCreate = reactive({
     visible: false, target: "viewer", name: "", country: "", province: "", city: "",
-    parentId: null, parentSearch: "", parentDropdown: false, description: "", error: "",
+    parentId: null, description: "", error: "",
   });
   const locationManager = reactive({
     visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
-    editCity: "", editParentId: null, editParentSearch: "", editParentDropdown: false,
-    editDescription: "", saving: false, error: "",
+    editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
   });
   const locationManagerListRef = ref(null);
   const locationManagerContext = ref("");
@@ -98,44 +98,60 @@ export function useLocationRegistry({
 
   function getLocationCandidates(target) {
     const keyword = normalizeLocationName(locationSearch[target]);
-    return locationRegistry.value.filter((location) => locationMatchesKeyword(location, keyword)).sort(compareLocationsByRegionAndTree);
+    return filterLocationsWithAncestors(locationRegistry.value, keyword).sort(compareLocationsByRegionAndTree);
   }
   function getRecentLocationOptions(target) {
-    const byId = new Map(getLocationCandidates(target).map((location) => [location.LocationId, location]));
+    const keyword = normalizeLocationName(locationSearch[target]);
+    const byId = new Map(locationRegistry.value
+      .filter((location) => locationMatchesKeyword(location, keyword))
+      .map((location) => [location.LocationId, location]));
     return recentLocations.value.map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
   }
   function getLocationOptions(target) {
-    const candidates = getLocationCandidates(target);
-    const limited = candidates.slice(0, 50);
-    const selectedId = selectedLocationIdForTarget(target);
-    const selected = candidates.find((location) => location.LocationId === selectedId);
-    if (selected && !limited.some((location) => location.LocationId === selectedId)) limited.push(selected);
-    return limited;
+    return getLocationCandidates(target);
+  }
+  function createPinnedLocationRow(location, keyPrefix) {
+    return {
+      Type: "location",
+      Key: `${keyPrefix}:${location.LocationId}`,
+      Label: location.Name,
+      Depth: 0,
+      Location: location,
+      Pinned: true,
+    };
+  }
+  function composeLocationMenuRows(rows, recentOptions, keyPrefix = "") {
+    const recentRows = recentOptions.map((location) => createPinnedLocationRow(
+      location,
+      `${keyPrefix}recent-location`,
+    ));
+    return [
+      ...(recentRows.length ? [
+        { Type: "section", Key: `${keyPrefix}section:recent`, Label: "最近使用", Depth: 0 },
+        ...recentRows,
+      ] : []),
+      ...(rows.length ? [
+        { Type: "section", Key: `${keyPrefix}section:all`, Label: "全部地点", Depth: 0 },
+        ...rows,
+      ] : []),
+    ];
   }
   function getLocationMenuRows(target) {
-    const recentRows = getRecentLocationOptions(target).map((location) => ({
-      Type: "location", Key: `recent-location:${location.LocationId}`, Label: location.Name, Depth: 0, Location: location,
-    }));
     const rows = buildLocationHierarchyRows(getLocationOptions(target));
-    if (!recentRows.length) return rows;
-    return [
-      { Type: "section", Key: "section:recent", Label: "最近使用", Depth: 0 }, ...recentRows,
-      ...(rows.length ? [{ Type: "section", Key: "section:all", Label: "全部地点", Depth: 0 }, ...rows] : []),
-    ];
+    return composeLocationMenuRows(rows, getRecentLocationOptions(target));
   }
   function getLocationFilterRows(keywordValue = "") {
     const keyword = normalizeLocationName(keywordValue);
-    const candidates = locationRegistry.value.filter((location) => locationMatchesKeyword(location, keyword)).sort(compareLocationsByRegionAndTree);
-    const byId = new Map(candidates.map((location) => [location.LocationId, location]));
-    const recentRows = recentLocations.value.map((id) => byId.get(id)).filter(Boolean).slice(0, 3).map((location) => ({
-      Type: "location", Key: `filter-recent-location:${location.LocationId}`, Label: location.Name, Depth: 0, Location: location,
-    }));
+    const candidates = filterLocationsWithAncestors(locationRegistry.value, keyword).sort(compareLocationsByRegionAndTree);
+    const matchingById = new Map(locationRegistry.value
+      .filter((location) => locationMatchesKeyword(location, keyword))
+      .map((location) => [location.LocationId, location]));
+    const recentOptions = recentLocations.value
+      .map((id) => matchingById.get(id))
+      .filter(Boolean)
+      .slice(0, 3);
     const rows = buildLocationHierarchyRows(candidates);
-    if (!recentRows.length) return rows;
-    return [
-      { Type: "section", Key: "filter-section:recent", Label: "最近使用", Depth: 0 }, ...recentRows,
-      ...(rows.length ? [{ Type: "section", Key: "filter-section:all", Label: "全部地点", Depth: 0 }, ...rows] : []),
-    ];
+    return composeLocationMenuRows(rows, recentOptions, "filter-");
   }
   async function setLocationFilter(locationId) {
     query.filters.location = locationId || "";
@@ -169,13 +185,20 @@ export function useLocationRegistry({
       excluded.add(current);
       stack.push(...(children.get(current) || []));
     }
-    return locationRegistry.value
+    const eligible = locationRegistry.value
       .filter((location) => !excluded.has(location.LocationId))
-      .filter((location) => locationMatchesKeyword(location, keyword))
-      .sort(compareLocationsByRegionAndTree).slice(0, 50);
+      .sort(compareLocationsByRegionAndTree);
+    return filterLocationsWithAncestors(eligible, keyword).sort(compareLocationsByRegionAndTree);
   }
   function getLocationParentRows(keywordValue = "", excludeId = "") {
-    return buildLocationHierarchyRows(getLocationParentOptions(keywordValue, excludeId));
+    const keyword = normalizeLocationName(keywordValue);
+    const options = getLocationParentOptions(keywordValue, excludeId);
+    const optionById = new Map(options.map((location) => [location.LocationId, location]));
+    const recentOptions = recentLocations.value
+      .map((id) => optionById.get(id))
+      .filter((location) => location && locationMatchesKeyword(location, keyword))
+      .slice(0, 3);
+    return composeLocationMenuRows(buildLocationHierarchyRows(options), recentOptions, "parent-");
   }
 
   function openLocationDropdown(target) {
@@ -187,8 +210,6 @@ export function useLocationRegistry({
   function closeAllLocationDropdowns() {
     locationDropdown.viewer = false;
     locationDropdown.batch = false;
-    locationCreate.parentDropdown = false;
-    locationManager.editParentDropdown = false;
   }
   function setLocationForTarget(target, locationId) {
     if (!getLocation(locationId)) return;
@@ -204,21 +225,10 @@ export function useLocationRegistry({
     locationSearch[target] = "";
     closeLocationDropdown(target);
   }
-  function onLocationSearchKeydown(event, target) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const first = getRecentLocationOptions(target)[0] || getLocationOptions(target)[0];
-      if (first) setLocationForTarget(target, first.LocationId);
-    } else if (event.key === "Escape") closeLocationDropdown(target);
-    else if (event.key === "Backspace" && !locationSearch[target] && selectedLocationIdForTarget(target)) {
-      event.preventDefault(); clearLocationForTarget(target);
-    }
-  }
-
   function resetLocationCreateState() {
     Object.assign(locationCreate, {
       visible: false, name: "", country: "", province: "", city: "", parentId: null,
-      parentSearch: "", parentDropdown: false, description: "", error: "",
+      description: "", error: "",
     });
   }
   function openCreateLocationMenu(target) {
@@ -229,17 +239,14 @@ export function useLocationRegistry({
       visible: true, target,
       name: target === "manager" ? "" : normalizeLocationName(locationSearch[target]),
       country: current?.Country || "", province: current?.Province || "", city: current?.City || "",
-      parentId: currentId || null, parentSearch: "", parentDropdown: false, description: "", error: "",
+      parentId: currentId || null, description: "", error: "",
     });
     if (target !== "manager") closeLocationDropdown(target);
   }
   function closeCreateLocationMenu() { resetLocationCreateState(); }
   function setCreateLocationParent(parentId) {
     locationCreate.parentId = parentId || null;
-    locationCreate.parentSearch = "";
-    locationCreate.parentDropdown = false;
   }
-  function clearCreateLocationParent() { setCreateLocationParent(null); }
   async function createLocationAndSelect() {
     const name = normalizeLocationName(locationCreate.name);
     if (!name) { locationCreate.error = "地点名称不能为空"; return; }
@@ -267,8 +274,7 @@ export function useLocationRegistry({
     if (locationManager.saving) return;
     Object.assign(locationManager, {
       editingId: "", editName: "", editCountry: "", editProvince: "", editCity: "",
-      editParentId: null, editParentSearch: "", editParentDropdown: false,
-      editDescription: "", saving: false, error: "",
+      editParentId: null, editDescription: "", saving: false, error: "",
     });
   }
   function closeLocationManager() {
@@ -282,26 +288,12 @@ export function useLocationRegistry({
       editingId: location.LocationId, editName: location.Name || "",
       editCountry: location.Country || "", editProvince: location.Province || "",
       editCity: location.City || "", editParentId: location.ParentId || null,
-      editParentSearch: "", editParentDropdown: false,
       editDescription: location.Description || "", saving: false, error: "",
     });
   }
-  function toggleEditLocationParentDropdown() {
-    if (locationManager.saving) return;
-    const shouldOpen = !locationManager.editParentDropdown;
-    closeOtherRegistryDropdowns?.();
-    locationManager.editParentSearch = "";
-    locationManager.editParentDropdown = shouldOpen;
-  }
-  function closeEditLocationParentDropdown() {
-    locationManager.editParentDropdown = false;
-    locationManager.editParentSearch = "";
-  }
   function setEditLocationParent(parentId) {
     locationManager.editParentId = parentId || null;
-    closeEditLocationParentDropdown();
   }
-  function clearEditLocationParent() { setEditLocationParent(null); }
   async function saveLocationEdit() {
     const locationId = locationManager.editingId;
     if (!locationId) { locationManager.error = "地点不存在"; return; }
@@ -374,8 +366,7 @@ export function useLocationRegistry({
     closeAllLocationDropdowns(); resetLocationCreateState();
     Object.assign(locationManager, {
       visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
-      editCity: "", editParentId: null, editParentSearch: "", editParentDropdown: false,
-      editDescription: "", saving: false, error: "",
+      editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
     });
     locationManagerContext.value = "";
   }
@@ -387,13 +378,12 @@ export function useLocationRegistry({
     applyLocationRegistry, loadLocations, getLocationName, getLocationTreeLabel, getLocationTooltip,
     getLocationManagerRowContext, updateLocationManagerContext, scheduleLocationManagerContextUpdate,
     getLocationOptions, getRecentLocationOptions, getLocationMenuRows, getLocationFilterRows,
-    setLocationFilter, setLocationRegionFilter, getLocationParentOptions, getLocationParentRows, openLocationDropdown,
+    setLocationFilter, setLocationRegionFilter, getLocationParentRows, openLocationDropdown,
     closeLocationDropdown, closeAllLocationDropdowns, setLocationForTarget, clearLocationForTarget,
-    onLocationSearchKeydown, openCreateLocationMenu, closeCreateLocationMenu,
-    setCreateLocationParent, clearCreateLocationParent, createLocationAndSelect,
+    openCreateLocationMenu, closeCreateLocationMenu,
+    setCreateLocationParent, createLocationAndSelect,
     openLocationManager, closeLocationManager, startLocationEdit, cancelLocationEdit,
-    toggleEditLocationParentDropdown, closeEditLocationParentDropdown,
-    setEditLocationParent, clearEditLocationParent,
+    setEditLocationParent,
     saveLocationEdit, deleteLocationGlobally, resetLocationState,
   };
 }
