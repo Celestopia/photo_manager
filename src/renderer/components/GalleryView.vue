@@ -12,7 +12,7 @@
     <button class="btn ghost danger icon-btn" data-tip="关闭" @click="doWindowAction(WINDOW_ACTIONS.close)"><img class="icon" :src="ICONS.windowClose" alt="关闭" /></button>
   </div>
 </header>
-<main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode && selectedGalleryCount > 0 }">
+<main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode }">
   <section class="gallery-content">
     <section class="gallery-controls-host">
       <div class="gallery-controls-drawer" :class="{ expanded: galleryControlsExpanded }">
@@ -106,7 +106,7 @@
       </template>
     </section>
   </section>
-  <aside class="side-panel batch-panel" v-if="isSelectionMode && selectedGalleryCount > 0">
+  <aside class="side-panel batch-panel" v-if="isSelectionMode">
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
     <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 个媒体</div>
     <label>批量设置标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
@@ -266,7 +266,7 @@ function handleGalleryKeydown(event) {
   const target = event.target;
   const isEditableTarget = ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName) || target?.isContentEditable;
   const hasModalOverlay = Boolean(document.querySelector(".tag-modal-backdrop"));
-  if (isEditableTarget || hasModalOverlay || !isSelectionMode.value || selectedGalleryCount.value <= 0) return;
+  if (isEditableTarget || hasModalOverlay || !isSelectionMode.value) return;
 
   event.preventDefault();
   exitSelectionMode();
