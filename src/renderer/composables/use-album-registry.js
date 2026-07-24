@@ -1,10 +1,11 @@
 import { computed, reactive, ref, triggerRef } from "vue";
+import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
 
 function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed single-valued album registry and management workflow. */
 export function useAlbumRegistry({
-  api, unassignedAlbumFilter, filterOptions, query, editDraft, batchEdit, selectedItem,
+  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem,
   orderedItems, galleryGroups, gallerySettingsOpen, showToastMessage,
   closeOtherRegistryDropdowns, requestEdit, rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
 }) {
@@ -33,7 +34,7 @@ export function useAlbumRegistry({
     })).filter((album) => album.AlbumId && album.Title);
     filterOptions.albums = albumRegistry.value;
     const ids = albumRegistry.value.map((album) => album.AlbumId);
-    if (query.filters.album && query.filters.album !== unassignedAlbumFilter && !ids.includes(query.filters.album)) query.filters.album = "";
+    if (!isRegistryFilterValueValid(query.filters.album, ids, unassignedFilter)) query.filters.album = "";
   }
 
   async function loadAlbums() {
@@ -75,18 +76,6 @@ export function useAlbumRegistry({
     albumSearch[target] = "";
     closeAlbumDropdown(target);
   }
-  function onAlbumSearchKeydown(event, target) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const first = getAlbumOptions(target)[0];
-      if (first) setAlbumForTarget(target, first.AlbumId);
-    } else if (event.key === "Escape") closeAlbumDropdown(target);
-    else if (event.key === "Backspace" && !albumSearch[target] && selectedAlbumIdForTarget(target)) {
-      event.preventDefault();
-      clearAlbumForTarget(target);
-    }
-  }
-
   function openCreateAlbumMenu(target) {
     closeOtherRegistryDropdowns?.();
     Object.assign(albumCreate, {
@@ -195,7 +184,7 @@ export function useAlbumRegistry({
     albumRegistry, albumSearch, albumDropdown, albumCreate, albumManager, managerFilteredAlbums,
     loadAlbums, getAlbumOptions, getAlbumDescription, getAlbumTitle, openAlbumDropdown,
     closeAlbumDropdown, closeAllAlbumDropdowns, setAlbumForTarget, clearAlbumForTarget,
-    onAlbumSearchKeydown, openCreateAlbumMenu, closeCreateAlbumMenu, createAlbumAndSelect,
+    openCreateAlbumMenu, closeCreateAlbumMenu, createAlbumAndSelect,
     openAlbumManager, closeAlbumManager, startAlbumEdit, cancelAlbumEdit,
     saveAlbumEdit, deleteAlbumGlobally, resetAlbumState,
   };

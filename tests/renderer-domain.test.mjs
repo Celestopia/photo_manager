@@ -28,8 +28,10 @@ import {
   normalizeQuarterTurn,
 } from "../src/renderer/domain/media-transform.mjs";
 import {
+  applyLocationSelectionFilter,
   createDefaultGalleryFilters,
   hasNonDefaultGalleryControls,
+  isRegistryFilterValueValid,
   normalizeGalleryLevels,
   toggleGalleryLevel,
 } from "../src/renderer/domain/gallery-filter-state.mjs";
@@ -48,6 +50,21 @@ test("gallery control defaults use all ratings and privacy level one", () => {
   assert.equal(hasNonDefaultGalleryControls({ filters, sortBy: "shootingTime", sortOrder: "desc" }), false);
   assert.equal(hasNonDefaultGalleryControls({ filters: { ...filters, privacyLevels: [] }, sortBy: "shootingTime", sortOrder: "desc" }), true);
   assert.equal(hasNonDefaultGalleryControls({ filters, sortBy: "shootingTime", sortOrder: "asc" }), true);
+});
+
+test("unassigned registry filters survive refresh and location selection clears regions", () => {
+  const unassigned = "__UNASSIGNED__";
+  assert.equal(isRegistryFilterValueValid("", [], unassigned), true);
+  assert.equal(isRegistryFilterValueValid(unassigned, [], unassigned), true);
+  assert.equal(isRegistryFilterValueValid("known-id", ["known-id"], unassigned), true);
+  assert.equal(isRegistryFilterValueValid("removed-id", ["known-id"], unassigned), false);
+
+  const filters = {
+    location: "",
+    locationRegion: { level: "city", country: "中国", province: "", city: "北京" },
+  };
+  applyLocationSelectionFilter(filters, unassigned);
+  assert.deepEqual(filters, { location: unassigned, locationRegion: null });
 });
 
 test("renderer media formatters preserve display semantics", () => {

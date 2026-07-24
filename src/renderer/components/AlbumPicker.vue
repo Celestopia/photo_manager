@@ -17,30 +17,21 @@
           aria-label="将当前媒体移出相册"
           @click.stop="clearAlbumForTarget(target)"
         >×</button>
-        <div class="tag-dropdown searchable-dropdown selection-dropdown" v-if="albumDropdown[target]">
-          <input
-            autofocus
-            class="input dropdown-search-input"
-            v-model="albumSearch[target]"
-            @keydown="onAlbumSearchKeydown($event, target)"
-            :placeholder="placeholder"
-            autocomplete="off"
-          />
-          <div class="registry-dropdown-options">
-            <button
-              v-for="album in albumOptions"
-              :key="target + '_album_option_' + album.AlbumId"
-              type="button"
-              class="tag-option"
-              :class="{ 'is-selected': selectedAlbumId === album.AlbumId }"
-              :data-tip="album.Description"
-              @mousedown.prevent="setAlbumForTarget(target, album.AlbumId)"
-            >
-              <span>{{ album.Title }}</span>
-            </button>
-            <div class="tag-option-empty" v-if="!albumOptions.length">没有匹配的相册</div>
-          </div>
-        </div>
+        <RegistryOptionsMenu
+          v-if="albumDropdown[target]"
+          :search-text="albumSearch[target]"
+          :search-placeholder="placeholder"
+          :options="albumOptions"
+          :selected-values="selectedAlbumId ? [selectedAlbumId] : []"
+          id-key="AlbumId"
+          label-key="Title"
+          all-section-label="全部相册"
+          empty-text="没有匹配的相册"
+          @update:search-text="albumSearch[target] = $event"
+          @select="setAlbumForTarget(target, $event)"
+          @close="closeAlbumDropdown(target)"
+          @backspace-empty="selectedAlbumId && clearAlbumForTarget(target)"
+        />
       </div>
       <div class="tag-actions">
         <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建相册" @click.stop="openCreateAlbumMenu(target)">+</button>
@@ -66,6 +57,7 @@
 <script setup>
 import { computed, inject } from "vue";
 import { ALBUM_CONTEXT } from "../context/renderer-contexts.js";
+import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   target: { type: String, required: true },
@@ -88,9 +80,9 @@ const {
   getAlbumDescription,
   getAlbumTitle,
   openAlbumDropdown,
+  closeAlbumDropdown,
   setAlbumForTarget,
   clearAlbumForTarget,
-  onAlbumSearchKeydown,
   openCreateAlbumMenu,
   closeCreateAlbumMenu,
   createAlbumAndSelect,

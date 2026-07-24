@@ -113,7 +113,7 @@ let config = null;
 let appState = { lastLibraryPath: "" };
 let lastLibraryName = "";
 let applicationStartedAt = new Date().toISOString();
-const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
+const UNASSIGNED_FILTER = "__UNASSIGNED__";
 
 function createRuntimeEntityId() {
   return createUniqueEntityId((id) => (
@@ -398,7 +398,7 @@ function normalizeRegisteredAlbum(rawAlbum) {
 const { filterAndSort, groupByDate } = createGalleryQueryService({
   getLocationDescendants,
   getLocationIdsForRegion,
-  unassignedAlbumFilter: UNASSIGNED_ALBUM_FILTER,
+  unassignedFilter: UNASSIGNED_FILTER,
 });
 
 /**
@@ -755,7 +755,6 @@ function queryGallery(query) {
     ...query,
     filters: { ...(query.filters || {}), mediaType: "" },
   });
-  const unassignedAlbumCount = all.filter((item) => !item?.Customization?.AlbumId).length;
   return {
     total: filtered.length,
     mediaCounts: {
@@ -766,7 +765,6 @@ function queryGallery(query) {
     groups: groupByDate(filtered),
     filterOptions: {
       albums: listAlbumDefinitions(),
-      unassignedAlbumCount,
       tags: listTagDefinitions(),
       people: listPersonDefinitions(),
       locations: listLocationDefinitions(),

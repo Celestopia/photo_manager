@@ -4,42 +4,30 @@
       <span>{{ selectedLabel }}</span>
       <img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" />
     </button>
-    <div class="tag-dropdown registry-filter-dropdown" v-if="dropdownOpen">
-      <input
-        ref="searchInputRef"
-        class="input dropdown-search-input"
-        v-model="searchText"
-        :placeholder="`搜索${label}`"
-        @keydown.enter.prevent="selectFirstOption"
-        @keydown.escape="closeDropdown"
-      />
-      <div class="registry-dropdown-options">
-        <button type="button" class="tag-option" :class="{ 'is-selected': selectedValue === '' }" @mousedown.prevent="selectValue('')"><span>全部</span></button>
-        <button
-          v-if="kind === 'album' && filterOptions.unassignedAlbumCount > 0 && matches('未设置相册')"
-          type="button"
-          class="tag-option"
-          :class="{ 'is-selected': selectedValue === UNASSIGNED_ALBUM_FILTER }"
-          @mousedown.prevent="selectValue(UNASSIGNED_ALBUM_FILTER)"
-        ><span>未设置相册</span></button>
-        <button
-          v-for="option in filteredOptions"
-          :key="`${kind}_${optionId(option)}`"
-          type="button"
-          class="tag-option"
-          :class="{ 'is-selected': selectedValue === optionId(option) }"
-          :data-tip="getDescription(optionId(option))"
-          @mousedown.prevent="selectValue(optionId(option))"
-        ><span>{{ optionLabel(option) }}</span></button>
-        <div class="tag-option-empty" v-if="!filteredOptions.length && !hasUnassignedMatch">没有匹配的{{ label }}</div>
-      </div>
-    </div>
+    <RegistryOptionsMenu
+      v-if="dropdownOpen"
+      class="registry-filter-dropdown"
+      :search-text="searchText"
+      :search-placeholder="`搜索${label}`"
+      :options="filteredOptions"
+      :recent-options="recentOptions"
+      :fixed-options="fixedOptions"
+      :selected-values="[selectedValue]"
+      :id-key="optionIdKey"
+      :label-key="optionLabelKey"
+      :all-section-label="`全部${label}`"
+      :empty-text="`没有匹配的${label}`"
+      @update:search-text="searchText = $event"
+      @select="selectValue"
+      @close="closeDropdown"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { GALLERY_FILTER_CONTEXT } from "../context/renderer-contexts.js";
+import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -53,29 +41,48 @@ const {
   ICONS,
   query,
   filterOptions,
-  UNASSIGNED_ALBUM_FILTER,
-  getAlbumDescription,
-  getTagDescription,
-  getPersonDescription,
+  UNASSIGNED_FILTER,
+  recentTags,
+  recentPeople,
+  rememberRecentTag,
+  rememberRecentPerson,
   applyFilterSort,
 } = app;
 
 const dropdownOpen = ref(false);
 const pickerId = Symbol(props.kind);
 const searchText = ref("");
-const searchInputRef = ref(null);
 const selectedValue = computed(() => query.filters[props.kind] || "");
+const unassignedLabel = computed(() => `未设置${props.label}`);
+const fixedOptions = computed(() => [
+  { value: "", label: "全部" },
+  { value: UNASSIGNED_FILTER, label: unassignedLabel.value },
+]);
+const optionIdKey = computed(() => {
+  if (props.kind === "album") return "AlbumId";
+  if (props.kind === "tag") return "TagId";
+  return "PersonId";
+});
+const optionLabelKey = computed(() => {
+  if (props.kind === "album") return "Title";
+  if (props.kind === "tag") return "Text";
+  return "Name";
+});
 const selectedLabel = computed(() => {
   if (!selectedValue.value) return "全部";
-  if (selectedValue.value === UNASSIGNED_ALBUM_FILTER) return "未设置相册";
+  if (selectedValue.value === UNASSIGNED_FILTER) return unassignedLabel.value;
   return optionLabel(options.value.find((option) => optionId(option) === selectedValue.value)) || "全部";
 });
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
 const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("zh-CN"));
 const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
-const hasUnassignedMatch = computed(
-  () => props.kind === "album" && filterOptions.unassignedAlbumCount > 0 && matches("未设置相册")
-);
+const recentOptions = computed(() => {
+  const ids = props.kind === "tag"
+    ? recentTags.value
+    : props.kind === "person" ? recentPeople.value : [];
+  const byId = new Map(filteredOptions.value.map((option) => [optionId(option), option]));
+  return ids.map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
+});
 
 function matches(value) {
   return !normalizedSearch.value || String(value).toLocaleLowerCase("zh-CN").includes(normalizedSearch.value);
@@ -91,12 +98,6 @@ function optionLabel(option) {
   if (props.kind === "album") return option?.Title || "";
   if (props.kind === "tag") return option?.Text || "";
   return option?.Name || "";
-}
-
-function getDescription(value) {
-  if (props.kind === "album") return getAlbumDescription(value);
-  if (props.kind === "tag") return getTagDescription(value);
-  return getPersonDescription(value);
 }
 
 function closeDropdown() {
@@ -123,19 +124,13 @@ function closeFromOtherSurface(event) {
 
 async function selectValue(value) {
   query.filters[props.kind] = value;
+  if (value && value !== UNASSIGNED_FILTER) {
+    if (props.kind === "tag") rememberRecentTag(value);
+    if (props.kind === "person") rememberRecentPerson(value);
+  }
   closeDropdown();
   await applyFilterSort();
 }
-
-async function selectFirstOption() {
-  if (hasUnassignedMatch.value) return selectValue(UNASSIGNED_ALBUM_FILTER);
-  if (filteredOptions.value.length) return selectValue(optionId(filteredOptions.value[0]));
-}
-
-watch(dropdownOpen, (open) => {
-  if (open) nextTick(() => searchInputRef.value?.focus());
-  else searchText.value = "";
-});
 
 onMounted(() => {
   window.addEventListener("click", closeDropdown);

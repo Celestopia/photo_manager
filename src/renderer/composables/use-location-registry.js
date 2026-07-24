@@ -1,5 +1,9 @@
 import { computed, nextTick, reactive, ref, triggerRef, watch } from "vue";
 import {
+  applyLocationSelectionFilter,
+  isRegistryFilterValueValid,
+} from "../domain/gallery-filter-state.mjs";
+import {
   buildLocationHierarchyRows,
   compareLocationsByRegionAndTree,
   filterLocationsWithAncestors,
@@ -14,7 +18,7 @@ import {
 
 /** Owns ID-backed hierarchical location pickers, context bars, and registry mutations. */
 export function useLocationRegistry({
-  api, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
   galleryGroups, gallerySettingsOpen, recentLocations, rememberRecentLocation,
   pruneRecentLocations, showToastMessage, closeOtherRegistryDropdowns, requestEdit,
   rebuildGalleryItemIndex, galleryItemIndex, queryGallery, applyFilterSort,
@@ -58,7 +62,7 @@ export function useLocationRegistry({
     filterOptions.locations = locationRegistry.value;
     const ids = locationRegistry.value.map((location) => location.LocationId);
     pruneRecentLocations(ids);
-    if (query.filters.location && !ids.includes(query.filters.location)) query.filters.location = "";
+    if (!isRegistryFilterValueValid(query.filters.location, ids, unassignedFilter)) query.filters.location = "";
     if (query.filters.locationRegion && !locationRegistry.value.some((location) => locationMatchesRegionFilter(location, query.filters.locationRegion))) {
       query.filters.locationRegion = null;
     }
@@ -154,9 +158,8 @@ export function useLocationRegistry({
     return composeLocationMenuRows(rows, recentOptions, "filter-");
   }
   async function setLocationFilter(locationId) {
-    query.filters.location = locationId || "";
-    query.filters.locationRegion = null;
-    if (locationId) rememberRecentLocation(locationId);
+    applyLocationSelectionFilter(query.filters, locationId);
+    if (locationId && locationId !== unassignedFilter) rememberRecentLocation(locationId);
     await applyFilterSort();
   }
 

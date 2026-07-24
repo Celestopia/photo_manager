@@ -5,7 +5,7 @@ export const WINDOW_ACTIONS = Object.freeze({
   close: "close",
 });
 
-export const UNASSIGNED_ALBUM_FILTER = "__UNASSIGNED__";
+export const UNASSIGNED_FILTER = "__UNASSIGNED__";
 export const STAR_LEVELS = Object.freeze([1, 2, 3, 4, 5]);
 export const PRIVACY_LEVELS = Object.freeze([1, 2, 3, 4, 5]);
 

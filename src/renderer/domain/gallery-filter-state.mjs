@@ -27,6 +27,16 @@ export function createDefaultGalleryFilters() {
   };
 }
 
+export function isRegistryFilterValueValid(value, registeredIds, unassignedFilter) {
+  if (!value || value === unassignedFilter) return true;
+  return Array.isArray(registeredIds) && registeredIds.includes(value);
+}
+
+export function applyLocationSelectionFilter(filters, locationValue) {
+  filters.location = locationValue || "";
+  filters.locationRegion = null;
+}
+
 export function hasNonDefaultGalleryControls(query) {
   const filters = query?.filters || {};
   const privacyLevels = normalizeGalleryLevels(filters.privacyLevels);

@@ -8,9 +8,6 @@ export function useGallerySelection({
   rebuildGalleryItemIndex,
   showToastMessage,
   openViewer,
-  getBatchTagOptions,
-  addBatchTagOption,
-  handleBatchTagKeydown,
   resetBatchPickers,
   refreshRegistries,
 }) {
@@ -76,11 +73,6 @@ export function useGallerySelection({
     if (next.size !== gallerySelection.value.size) gallerySelection.value = next;
   }
 
-  function addBatchTag() {
-    const first = getBatchTagOptions?.()[0];
-    if (first) addBatchTagOption?.(first.TagId);
-  }
-
   function setBatchStatus(tone, message) {
     batchStatus.visible = true;
     batchStatus.tone = tone;
@@ -118,10 +110,6 @@ export function useGallerySelection({
 
   function removeBatchPersonAt(index) {
     if (index >= 0 && index < batchEdit.personIds.length) batchEdit.personIds.splice(index, 1);
-  }
-
-  function onBatchTagInputKeydown(event) {
-    handleBatchTagKeydown?.(event);
   }
 
   async function applyBatchEdit() {
@@ -183,14 +171,12 @@ export function useGallerySelection({
     clearGallerySelection,
     selectAllGalleryPhotos,
     syncGallerySelectionWithLoadedItems,
-    addBatchTag,
     setBatchStatus,
     clearBatchEditInputs,
     resetSelectionState,
     syncUpdatedItemsIntoGallery,
     removeBatchTagAt,
     removeBatchPersonAt,
-    onBatchTagInputKeydown,
     applyBatchEdit,
   };
 }

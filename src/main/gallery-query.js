@@ -15,7 +15,7 @@ function selectedLevels(value, label) {
 function createGalleryQueryService({
   getLocationDescendants,
   getLocationIdsForRegion,
-  unassignedAlbumFilter,
+  unassignedFilter,
 }) {
   function filterAndSort(list, options) {
     const { filters, search, sortBy, sortOrder } = options;
@@ -25,15 +25,19 @@ function createGalleryQueryService({
     if (filters.mediaType === "image" || filters.mediaType === "video") {
       output = output.filter((item) => item?.FileSystem?.FileType === filters.mediaType);
     }
-    if (filters.album === unassignedAlbumFilter) {
-      output = output.filter((item) => !item?.Customization?.AlbumId);
+    if (filters.album === unassignedFilter) {
+      output = output.filter((item) => item?.Customization?.AlbumId === null);
     } else if (filters.album) {
       output = output.filter((item) => item?.Customization?.AlbumId === filters.album);
     }
-    if (filters.tag) {
+    if (filters.tag === unassignedFilter) {
+      output = output.filter((item) => Array.isArray(item?.Customization?.TagIds) && item.Customization.TagIds.length === 0);
+    } else if (filters.tag) {
       output = output.filter((item) => Array.isArray(item?.Customization?.TagIds) && item.Customization.TagIds.includes(filters.tag));
     }
-    if (filters.person) {
+    if (filters.person === unassignedFilter) {
+      output = output.filter((item) => Array.isArray(item?.Customization?.PersonIds) && item.Customization.PersonIds.length === 0);
+    } else if (filters.person) {
       output = output.filter((item) => Array.isArray(item?.Customization?.PersonIds) && item.Customization.PersonIds.includes(filters.person));
     }
     if (filters.location && filters.locationRegion) {
@@ -42,6 +46,8 @@ function createGalleryQueryService({
     if (filters.locationRegion) {
       const allowed = new Set(getLocationIdsForRegion(filters.locationRegion));
       output = output.filter((item) => allowed.has(item?.Location?.LocationId));
+    } else if (filters.location === unassignedFilter) {
+      output = output.filter((item) => item?.Location?.LocationId === null);
     } else if (filters.location) {
       const allowed = new Set([filters.location, ...getLocationDescendants(filters.location)]);
       output = output.filter((item) => allowed.has(item?.Location?.LocationId));

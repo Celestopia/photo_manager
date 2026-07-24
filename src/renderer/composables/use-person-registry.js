@@ -1,13 +1,14 @@
 import { computed, reactive, ref, triggerRef } from "vue";
+import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
 
 function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed people registry, picker state, and management workflow. */
 export function usePersonRegistry({
-  api, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
   galleryGroups, gallerySettingsOpen, recentPeople, rememberRecentPerson, pruneRecentPeople,
-  showToastMessage, closeOtherRegistryDropdowns, requestEdit, removeViewerPersonAt,
-  removeBatchPersonAt, rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
+  showToastMessage, closeOtherRegistryDropdowns, requestEdit,
+  rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
 }) {
   const personRegistry = ref([]);
   const personSearch = reactive({ viewer: "", batch: "" });
@@ -35,7 +36,7 @@ export function usePersonRegistry({
     filterOptions.people = personRegistry.value;
     const ids = personRegistry.value.map((person) => person.PersonId);
     pruneRecentPeople(ids);
-    if (query.filters.person && !ids.includes(query.filters.person)) query.filters.person = "";
+    if (!isRegistryFilterValueValid(query.filters.person, ids, unassignedFilter)) query.filters.person = "";
   }
 
   async function loadPeople() {
@@ -80,19 +81,6 @@ export function usePersonRegistry({
     personSearch[target] = "";
     closePersonDropdown(target);
   }
-  function onPersonSearchKeydown(event, target) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const first = getRecentPersonOptions(target)[0] || getPersonOptions(target)[0];
-      if (first) addPersonToTarget(target, first.PersonId);
-    } else if (event.key === "Escape") closePersonDropdown(target);
-    else if (event.key === "Backspace" && !personSearch[target]) {
-      event.preventDefault();
-      if (target === "batch") removeBatchPersonAt(batchEdit.personIds.length - 1);
-      else removeViewerPersonAt(editDraft.PersonIds.length - 1);
-    }
-  }
-
   function openCreatePersonMenu(target) {
     closeOtherRegistryDropdowns?.();
     Object.assign(personCreate, {
@@ -200,7 +188,7 @@ export function usePersonRegistry({
     personRegistry, personSearch, personDropdown, personCreate, personManager,
     managerFilteredPeople, loadPeople, getPersonOptions, getRecentPersonOptions,
     getPersonDescription, getPersonName, openPersonDropdown, closePersonDropdown,
-    closeAllPersonDropdowns, addPersonToTarget, onPersonSearchKeydown,
+    closeAllPersonDropdowns, addPersonToTarget,
     openCreatePersonMenu, closeCreatePersonMenu, createPersonAndSelect,
     openPersonManager, closePersonManager, startPersonEdit,
     cancelPersonEdit, savePersonEdit, deletePersonGlobally, resetPersonState,

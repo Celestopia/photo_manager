@@ -15,13 +15,16 @@
         :selected-location-id="selectedLocationId"
         :selected-region="selectedLocationRegion"
         :all-selected="selectedLocationId === '' && !selectedLocationRegion"
+        :unassigned-selected="selectedLocationId === UNASSIGNED_FILTER"
         show-all-option
+        show-unassigned-option
         mode="filter"
         search-placeholder="搜索地点"
         @update:search-text="searchText = $event"
         @select-location="selectLocation"
         @select-region="selectRegion"
         @select-all="selectLocation('')"
+        @select-unassigned="selectLocation(UNASSIGNED_FILTER)"
         @close="closeDropdown"
       />
     </div>
@@ -41,6 +44,7 @@ if (!app) {
 
 const {
   ICONS,
+  UNASSIGNED_FILTER,
   query,
   getLocationFilterRows,
   getLocationTooltip,
@@ -56,7 +60,11 @@ const selectedLocationId = computed(() => query.filters.location || "");
 const selectedLocationRegion = computed(() => query.filters.locationRegion || null);
 const selectedLocationName = computed(() => getLocationName(selectedLocationId.value));
 const selectedRegionLabel = computed(() => getLocationRegionFilterLabel(selectedLocationRegion.value));
-const selectedFilterLabel = computed(() => selectedLocationName.value || selectedRegionLabel.value);
+const selectedFilterLabel = computed(() => (
+  selectedLocationId.value === UNASSIGNED_FILTER
+    ? "未设置地点"
+    : selectedLocationName.value || selectedRegionLabel.value
+));
 const filterRows = computed(() => getLocationFilterRows(searchText.value));
 
 function openDropdown() {

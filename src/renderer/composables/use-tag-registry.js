@@ -1,4 +1,5 @@
 import { computed, reactive, ref, triggerRef } from "vue";
+import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
 
 function normalizeText(value) {
   return String(value ?? "").trim();
@@ -6,10 +7,10 @@ function normalizeText(value) {
 
 /** Owns the ID-backed tag registry, picker state, and tag-management workflow. */
 export function useTagRegistry({
-  api, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
   galleryGroups, gallerySettingsOpen, recentTags, rememberRecentTag, pruneRecentTags,
-  showToastMessage, closeOtherRegistryDropdowns, requestEdit, removeViewerTagAt,
-  removeBatchTagAt, rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
+  showToastMessage, closeOtherRegistryDropdowns, requestEdit,
+  rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
 }) {
   const tagRegistry = ref([]);
   const tagSearch = reactive({ viewer: "", batch: "" });
@@ -37,7 +38,7 @@ export function useTagRegistry({
     filterOptions.tags = tagRegistry.value;
     const ids = tagRegistry.value.map((tag) => tag.TagId);
     pruneRecentTags(ids);
-    if (query.filters.tag && !ids.includes(query.filters.tag)) query.filters.tag = "";
+    if (!isRegistryFilterValueValid(query.filters.tag, ids, unassignedFilter)) query.filters.tag = "";
   }
 
   async function loadTags() {
@@ -89,24 +90,6 @@ export function useTagRegistry({
     }
     tagSearch[target] = "";
     closeTagDropdown(target);
-  }
-
-  function addTag() {
-    const first = getTagOptions("viewer")[0];
-    if (first) addTagToTarget("viewer", first.TagId);
-  }
-
-  function onTagSearchKeydown(event, target) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const first = getRecentTagOptions(target)[0] || getTagOptions(target)[0];
-      if (first) addTagToTarget(target, first.TagId);
-    } else if (event.key === "Escape") closeTagDropdown(target);
-    else if (event.key === "Backspace" && !tagSearch[target]) {
-      event.preventDefault();
-      if (target === "batch") removeBatchTagAt(batchEdit.tagIds.length - 1);
-      else removeViewerTagAt(editDraft.TagIds.length - 1);
-    }
   }
 
   function openCreateTagMenu(target) {
@@ -219,8 +202,8 @@ export function useTagRegistry({
   return {
     tagRegistry, tagSearch, tagDropdown, tagCreate, tagManager, managerFilteredTags,
     loadTags, getTagOptions, getRecentTagOptions, getTagDescription, getTagText,
-    openTagDropdown, closeTagDropdown, closeAllTagDropdowns, addTagToTarget, addTag,
-    onTagSearchKeydown, openCreateTagMenu, closeCreateTagMenu, createTagAndSelect,
+    openTagDropdown, closeTagDropdown, closeAllTagDropdowns, addTagToTarget,
+    openCreateTagMenu, closeCreateTagMenu, createTagAndSelect,
     openTagManager, closeTagManager, startTagEdit, cancelTagEdit,
     saveTagEdit, deleteTagGlobally, resetTagState,
   };

@@ -17,12 +17,21 @@
         :class="{ 'is-selected': allSelected }"
         @mousedown.prevent="emit('select-all')"
       ><span>全部</span></button>
-
-      <template v-for="row in visibleRows" :key="row.Key">
+      <button
+        v-if="showUnassignedOption"
+        type="button"
+        class="tag-option location-option location-tree-unassigned-option"
+        :class="{ 'is-selected': unassignedSelected }"
+        @mousedown.prevent="emit('select-unassigned')"
+      ><span>未设置地点</span></button>
+      <template v-for="(row, rowIndex) in visibleRows" :key="row.Key">
         <div
           v-if="row.Type === 'section'"
           class="location-section-label"
-          :class="{ 'registry-section-divider': row.Key.includes('section:all') }"
+          :class="{
+            'registry-section-divider': row.Key.includes('section:all')
+              || (showUnassignedOption && rowIndex === 0),
+          }"
         ><span>{{ row.Label }}</span></div>
 
         <div
@@ -102,6 +111,8 @@ const props = defineProps({
   mode: { type: String, default: "location" },
   showAllOption: { type: Boolean, default: false },
   allSelected: { type: Boolean, default: false },
+  showUnassignedOption: { type: Boolean, default: false },
+  unassignedSelected: { type: Boolean, default: false },
   emptyText: { type: String, default: "没有匹配的地点" },
 });
 
@@ -110,6 +121,7 @@ const emit = defineEmits([
   "select-location",
   "select-region",
   "select-all",
+  "select-unassigned",
   "clear-selection",
   "close",
 ]);

@@ -15,45 +15,23 @@
         <span v-if="!selectedTagIds.length">{{ placeholder }}</span>
         <span v-else>选择标签</span>
       </button>
-        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown selection-dropdown" v-if="tagDropdown[target]">
-          <input
-            autofocus
-            class="input dropdown-search-input"
-            v-model="tagSearch[target]"
-            @keydown="onTagSearchKeydown($event, target)"
-            :placeholder="placeholder"
-            autocomplete="off"
-          />
-          <div class="registry-dropdown-options">
-            <template v-if="recentTagOptions.length">
-              <div class="registry-section-label"><span>最近使用</span></div>
-              <button
-                v-for="tag in recentTagOptions"
-                :key="target + '_recent_option_' + tag.TagId"
-                type="button"
-                class="tag-option"
-                :class="{ 'is-selected': selectedTagIds.includes(tag.TagId) }"
-                :data-tip="tag.Description"
-                @mousedown.prevent="addTagToTarget(target, tag.TagId)"
-              >
-                <span>{{ tag.Text }}</span>
-              </button>
-              <div class="registry-section-label registry-section-divider"><span>全部标签</span></div>
-            </template>
-            <button
-              v-for="tag in tagOptions"
-              :key="target + '_option_' + tag.TagId"
-              type="button"
-              class="tag-option"
-              :class="{ 'is-selected': selectedTagIds.includes(tag.TagId) }"
-              :data-tip="tag.Description"
-              @mousedown.prevent="addTagToTarget(target, tag.TagId)"
-            >
-              <span>{{ tag.Text }}</span>
-            </button>
-            <div class="tag-option-empty" v-if="!tagOptions.length">没有匹配的标签</div>
-          </div>
-        </div>
+        <RegistryOptionsMenu
+          v-if="tagDropdown[target]"
+          class="controlled-tag-dropdown"
+          :search-text="tagSearch[target]"
+          :search-placeholder="placeholder"
+          :options="tagOptions"
+          :recent-options="recentTagOptions"
+          :selected-values="selectedTagIds"
+          id-key="TagId"
+          label-key="Text"
+          all-section-label="全部标签"
+          empty-text="没有匹配的标签"
+          @update:search-text="tagSearch[target] = $event"
+          @select="addTagToTarget(target, $event)"
+          @close="closeTagDropdown(target)"
+          @backspace-empty="removeSelectedTag(selectedTagIds.length - 1)"
+        />
       </div>
       <div class="tag-actions">
         <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建标签" @click.stop="openCreateTagMenu(target)">+</button>
@@ -79,6 +57,7 @@
 <script setup>
 import { computed, inject } from "vue";
 import { TAG_CONTEXT } from "../context/renderer-contexts.js";
+import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   target: { type: String, required: true },
@@ -102,8 +81,8 @@ const {
   getTagDescription,
   getTagText,
   openTagDropdown,
+  closeTagDropdown,
   addTagToTarget,
-  onTagSearchKeydown,
   openCreateTagMenu,
   closeCreateTagMenu,
   createTagAndSelect,
@@ -118,6 +97,7 @@ const tagOptions = computed(() => getTagOptions(props.target));
 const recentTagOptions = computed(() => getRecentTagOptions(props.target));
 
 function removeSelectedTag(index) {
+  if (index < 0) return;
   if (props.target === "batch") removeBatchTagAt(index);
   else removeTagAt(index);
 }

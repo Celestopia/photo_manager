@@ -1,5 +1,5 @@
 import { ref, onMounted, onBeforeUnmount, nextTick, provide } from "vue";
-import { ICONS, STAR_LEVELS, UNASSIGNED_ALBUM_FILTER, WINDOW_ACTIONS } from "../constants/ui-constants.mjs";
+import { ICONS, STAR_LEVELS, UNASSIGNED_FILTER, WINDOW_ACTIONS } from "../constants/ui-constants.mjs";
 import { buildImageUrl, formatBitRate, formatDuration, formatFileSize } from "../domain/media-formatters.mjs";
 import { useUiFeedback } from "../composables/use-ui-feedback.js";
 import { useWindowControls } from "../composables/use-window-controls.js";
@@ -185,14 +185,12 @@ export function useRendererApplication() {
       clearGallerySelection,
       selectAllGalleryPhotos,
       syncGallerySelectionWithLoadedItems,
-      addBatchTag,
       setBatchStatus,
       clearBatchEditInputs,
       resetSelectionState,
       syncUpdatedItemsIntoGallery,
       removeBatchTagAt,
       removeBatchPersonAt,
-      onBatchTagInputKeydown,
       applyBatchEdit,
     } = useGallerySelection({
       api: API,
@@ -201,9 +199,6 @@ export function useRendererApplication() {
       rebuildGalleryItemIndex,
       showToastMessage,
       openViewer: (item) => openViewer(item),
-      getBatchTagOptions: () => getTagOptions("batch"),
-      addBatchTagOption: (tagId) => addTagToTarget("batch", tagId),
-      handleBatchTagKeydown: (event) => onTagSearchKeydown(event, "batch"),
       resetBatchPickers: () => {
         tagSearch.batch = "";
         tagDropdown.batch = false;
@@ -348,7 +343,6 @@ export function useRendererApplication() {
       closeTagDropdown,
       closeAllTagDropdowns,
       addTagToTarget,
-      onTagSearchKeydown,
       openCreateTagMenu,
       closeCreateTagMenu,
       createTagAndSelect,
@@ -361,6 +355,7 @@ export function useRendererApplication() {
       resetTagState,
     } = useTagRegistry({
       api: API,
+      unassignedFilter: UNASSIGNED_FILTER,
       filterOptions,
       query,
       editDraft,
@@ -375,8 +370,6 @@ export function useRendererApplication() {
       showToastMessage,
       closeOtherRegistryDropdowns: () => closeAllRegistryDropdowns(),
       requestEdit: (field) => requestEdit(field),
-      removeViewerTagAt: (index) => removeTagAt(index),
-      removeBatchTagAt,
       rebuildGalleryItemIndex,
       galleryItemIndex,
       queryGallery,
@@ -396,7 +389,6 @@ export function useRendererApplication() {
       closePersonDropdown,
       closeAllPersonDropdowns,
       addPersonToTarget,
-      onPersonSearchKeydown,
       openCreatePersonMenu,
       closeCreatePersonMenu,
       createPersonAndSelect,
@@ -409,6 +401,7 @@ export function useRendererApplication() {
       resetPersonState,
     } = usePersonRegistry({
       api: API,
+      unassignedFilter: UNASSIGNED_FILTER,
       filterOptions,
       query,
       editDraft,
@@ -423,8 +416,6 @@ export function useRendererApplication() {
       showToastMessage,
       closeOtherRegistryDropdowns: () => closeAllRegistryDropdowns(),
       requestEdit: (field) => requestEdit(field),
-      removeViewerPersonAt: (index) => removePersonAt(index),
-      removeBatchPersonAt,
       rebuildGalleryItemIndex,
       galleryItemIndex,
       queryGallery,
@@ -444,7 +435,6 @@ export function useRendererApplication() {
       closeAllAlbumDropdowns,
       setAlbumForTarget,
       clearAlbumForTarget,
-      onAlbumSearchKeydown,
       openCreateAlbumMenu,
       closeCreateAlbumMenu,
       createAlbumAndSelect,
@@ -457,7 +447,7 @@ export function useRendererApplication() {
       resetAlbumState,
     } = useAlbumRegistry({
       api: API,
-      unassignedAlbumFilter: UNASSIGNED_ALBUM_FILTER,
+      unassignedFilter: UNASSIGNED_FILTER,
       filterOptions,
       query,
       editDraft,
@@ -512,6 +502,7 @@ export function useRendererApplication() {
       resetLocationState,
     } = useLocationRegistry({
       api: API,
+      unassignedFilter: UNASSIGNED_FILTER,
       filterOptions,
       query,
       editDraft,
@@ -643,8 +634,7 @@ export function useRendererApplication() {
       ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
       filterOptions, isSelectionMode, selectedGalleryCount,
       batchEdit, batchStatus, total, galleryGroups, loading, batchHasChanges, canApplyBatchEdit,
-      windowToggleTip, windowToggleIcon, UNASSIGNED_ALBUM_FILTER,
-      getAlbumDescription, getTagDescription, getPersonDescription,
+      windowToggleTip, windowToggleIcon,
       resetAll, applySearch, applyFilterSort, setMediaTypeFilter, setAllGalleryLevels,
       toggleGalleryLevelFilter, toggleGalleryControls, enterSelectionMode,
       consumeGalleryReturnMediaId,
@@ -653,14 +643,15 @@ export function useRendererApplication() {
       buildImageUrl, doWindowAction, toggleWindowMaximizeRestore,
     };
     const galleryFilterContext = {
-      ICONS, query, filterOptions, UNASSIGNED_ALBUM_FILTER,
-      getAlbumDescription, getTagDescription, getPersonDescription, applyFilterSort,
+      ICONS, query, filterOptions, UNASSIGNED_FILTER,
+      applyFilterSort,
+      recentTags, recentPeople, rememberRecentTag, rememberRecentPerson,
     };
     const tagContext = {
       ICONS, editDraft, batchEdit, tagSearch, tagDropdown, tagCreate, tagManager,
       managerFilteredTags, getTagOptions, getRecentTagOptions, getTagDescription,
       getTagText,
-      openTagDropdown, closeTagDropdown, addTagToTarget, onTagSearchKeydown,
+      openTagDropdown, closeTagDropdown, addTagToTarget,
       openCreateTagMenu, closeCreateTagMenu, createTagAndSelect, openTagManager,
       closeTagManager, removeTagAt, removeBatchTagAt, startTagEdit,
       cancelTagEdit, saveTagEdit, deleteTagGlobally,
@@ -669,7 +660,7 @@ export function useRendererApplication() {
       ICONS, editDraft, batchEdit, albumSearch, albumDropdown, albumCreate, albumManager,
       managerFilteredAlbums, getAlbumOptions, getAlbumDescription, openAlbumDropdown,
       getAlbumTitle,
-      closeAlbumDropdown, setAlbumForTarget, clearAlbumForTarget, onAlbumSearchKeydown,
+      closeAlbumDropdown, setAlbumForTarget, clearAlbumForTarget,
       openCreateAlbumMenu, closeCreateAlbumMenu, createAlbumAndSelect, openAlbumManager,
       closeAlbumManager, startAlbumEdit, cancelAlbumEdit,
       saveAlbumEdit, deleteAlbumGlobally,
@@ -678,13 +669,13 @@ export function useRendererApplication() {
       ICONS, editDraft, batchEdit, personSearch, personDropdown, personCreate, personManager,
       managerFilteredPeople, getPersonOptions, getRecentPersonOptions, getPersonDescription,
       getPersonName,
-      openPersonDropdown, closePersonDropdown, addPersonToTarget, onPersonSearchKeydown,
+      openPersonDropdown, closePersonDropdown, addPersonToTarget,
       openCreatePersonMenu, closeCreatePersonMenu, createPersonAndSelect, openPersonManager,
       closePersonManager, removePersonAt, removeBatchPersonAt, startPersonEdit,
       cancelPersonEdit, savePersonEdit, deletePersonGlobally,
     };
     const locationContext = {
-      ICONS, query, editDraft, batchEdit, locationSearch, locationDropdown, locationCreate,
+      ICONS, UNASSIGNED_FILTER, query, editDraft, batchEdit, locationSearch, locationDropdown, locationCreate,
       locationManager, locationManagerListRef, locationManagerContext, managerLocationRows,
       getLocationMenuRows, getLocationFilterRows,
       getLocationName,

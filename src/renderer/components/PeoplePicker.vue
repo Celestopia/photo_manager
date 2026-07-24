@@ -15,45 +15,23 @@
         <span v-if="!selectedPersonIds.length">{{ placeholder }}</span>
         <span v-else>选择人物</span>
       </button>
-        <div class="tag-dropdown controlled-tag-dropdown searchable-dropdown selection-dropdown" v-if="personDropdown[target]">
-          <input
-            autofocus
-            class="input dropdown-search-input"
-            v-model="personSearch[target]"
-            @keydown="onPersonSearchKeydown($event, target)"
-            :placeholder="searchPlaceholder"
-            autocomplete="off"
-          />
-          <div class="registry-dropdown-options">
-            <template v-if="recentPersonOptions.length">
-              <div class="registry-section-label"><span>最近使用</span></div>
-              <button
-                v-for="person in recentPersonOptions"
-                :key="target + '_recent_person_option_' + person.PersonId"
-                type="button"
-                class="tag-option"
-                :class="{ 'is-selected': selectedPersonIds.includes(person.PersonId) }"
-                :data-tip="person.Description"
-                @mousedown.prevent="addPersonToTarget(target, person.PersonId)"
-              >
-                <span>{{ person.Name }}</span>
-              </button>
-              <div class="registry-section-label registry-section-divider"><span>全部人物</span></div>
-            </template>
-            <button
-              v-for="person in personOptions"
-              :key="target + '_person_option_' + person.PersonId"
-              type="button"
-              class="tag-option"
-              :class="{ 'is-selected': selectedPersonIds.includes(person.PersonId) }"
-              :data-tip="person.Description"
-              @mousedown.prevent="addPersonToTarget(target, person.PersonId)"
-            >
-              <span>{{ person.Name }}</span>
-            </button>
-            <div class="tag-option-empty" v-if="!personOptions.length">没有匹配的人物</div>
-          </div>
-        </div>
+        <RegistryOptionsMenu
+          v-if="personDropdown[target]"
+          class="controlled-tag-dropdown"
+          :search-text="personSearch[target]"
+          :search-placeholder="searchPlaceholder"
+          :options="personOptions"
+          :recent-options="recentPersonOptions"
+          :selected-values="selectedPersonIds"
+          id-key="PersonId"
+          label-key="Name"
+          all-section-label="全部人物"
+          empty-text="没有匹配的人物"
+          @update:search-text="personSearch[target] = $event"
+          @select="addPersonToTarget(target, $event)"
+          @close="closePersonDropdown(target)"
+          @backspace-empty="removeSelectedPerson(selectedPersonIds.length - 1)"
+        />
       </div>
       <div class="tag-actions">
         <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建人物" @click.stop="openCreatePersonMenu(target)">+</button>
@@ -79,6 +57,7 @@
 <script setup>
 import { computed, inject } from "vue";
 import { PERSON_CONTEXT } from "../context/renderer-contexts.js";
+import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   target: { type: String, required: true },
@@ -103,8 +82,8 @@ const {
   getPersonDescription,
   getPersonName,
   openPersonDropdown,
+  closePersonDropdown,
   addPersonToTarget,
-  onPersonSearchKeydown,
   openCreatePersonMenu,
   closeCreatePersonMenu,
   createPersonAndSelect,
@@ -119,6 +98,7 @@ const personOptions = computed(() => getPersonOptions(props.target));
 const recentPersonOptions = computed(() => getRecentPersonOptions(props.target));
 
 function removeSelectedPerson(index) {
+  if (index < 0) return;
   if (props.target === "batch") removeBatchPersonAt(index);
   else removePersonAt(index);
 }
