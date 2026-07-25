@@ -147,19 +147,10 @@ export function useLocationRegistry({
   function getLocationFilterRows(keywordValue = "") {
     const keyword = normalizeLocationName(keywordValue);
     const candidates = filterLocationsWithAncestors(locationRegistry.value, keyword).sort(compareLocationsByRegionAndTree);
-    const matchingById = new Map(locationRegistry.value
-      .filter((location) => locationMatchesKeyword(location, keyword))
-      .map((location) => [location.LocationId, location]));
-    const recentOptions = recentLocations.value
-      .map((id) => matchingById.get(id))
-      .filter(Boolean)
-      .slice(0, 3);
-    const rows = buildLocationHierarchyRows(candidates);
-    return composeLocationMenuRows(rows, recentOptions, "filter-");
+    return buildLocationHierarchyRows(candidates);
   }
   async function setLocationFilter(locationId) {
     applyLocationSelectionFilter(query.filters, locationId);
-    if (locationId && locationId !== unassignedFilter) rememberRecentLocation(locationId);
     await applyFilterSort();
   }
 

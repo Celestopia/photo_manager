@@ -24,14 +24,16 @@
         :class="{ 'is-selected': unassignedSelected }"
         @mousedown.prevent="emit('select-unassigned')"
       ><span>未设置地点</span></button>
-      <template v-for="(row, rowIndex) in visibleRows" :key="row.Key">
+      <div
+        v-if="showFixedOptionsDivider && hasHierarchyRows"
+        class="registry-section-divider"
+        aria-hidden="true"
+      ></div>
+      <template v-for="row in visibleRows" :key="row.Key">
         <div
           v-if="row.Type === 'section'"
           class="location-section-label"
-          :class="{
-            'registry-section-divider': row.Key.includes('section:all')
-              || (showUnassignedOption && rowIndex === 0),
-          }"
+          :class="{ 'registry-section-divider': row.Key.includes('section:all') }"
         ><span>{{ row.Label }}</span></div>
 
         <div
@@ -113,6 +115,7 @@ const props = defineProps({
   allSelected: { type: Boolean, default: false },
   showUnassignedOption: { type: Boolean, default: false },
   unassignedSelected: { type: Boolean, default: false },
+  showFixedOptionsDivider: { type: Boolean, default: false },
   emptyText: { type: String, default: "没有匹配的地点" },
 });
 

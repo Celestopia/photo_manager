@@ -645,7 +645,6 @@ export function useRendererApplication() {
     const galleryFilterContext = {
       ICONS, query, filterOptions, UNASSIGNED_FILTER,
       applyFilterSort,
-      recentTags, recentPeople, rememberRecentTag, rememberRecentPerson,
     };
     const tagContext = {
       ICONS, editDraft, batchEdit, tagSearch, tagDropdown, tagCreate, tagManager,

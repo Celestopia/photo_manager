@@ -36,9 +36,15 @@
       </template>
 
       <div
+        v-if="showAllSectionLabel"
         class="registry-section-label"
         :class="{ 'registry-section-divider': fixedOptions.length || recentOptions.length }"
       ><span>{{ allSectionLabel }}</span></div>
+      <div
+        v-else-if="fixedOptions.length || recentOptions.length"
+        class="registry-section-divider"
+        aria-hidden="true"
+      ></div>
       <button
         v-for="option in options"
         :key="`all_${optionValue(option)}`"
@@ -67,7 +73,8 @@ const props = defineProps({
   labelKey: { type: String, required: true },
   descriptionKey: { type: String, default: "Description" },
   recentSectionLabel: { type: String, default: "最近使用" },
-  allSectionLabel: { type: String, required: true },
+  allSectionLabel: { type: String, default: "全部" },
+  showAllSectionLabel: { type: Boolean, default: true },
   emptyText: { type: String, required: true },
 });
 

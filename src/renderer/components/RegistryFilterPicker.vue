@@ -10,12 +10,11 @@
       :search-text="searchText"
       :search-placeholder="`搜索${label}`"
       :options="filteredOptions"
-      :recent-options="recentOptions"
       :fixed-options="fixedOptions"
       :selected-values="[selectedValue]"
       :id-key="optionIdKey"
       :label-key="optionLabelKey"
-      :all-section-label="`全部${label}`"
+      :show-all-section-label="false"
       :empty-text="`没有匹配的${label}`"
       @update:search-text="searchText = $event"
       @select="selectValue"
@@ -42,10 +41,6 @@ const {
   query,
   filterOptions,
   UNASSIGNED_FILTER,
-  recentTags,
-  recentPeople,
-  rememberRecentTag,
-  rememberRecentPerson,
   applyFilterSort,
 } = app;
 
@@ -76,13 +71,6 @@ const selectedLabel = computed(() => {
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
 const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("zh-CN"));
 const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
-const recentOptions = computed(() => {
-  const ids = props.kind === "tag"
-    ? recentTags.value
-    : props.kind === "person" ? recentPeople.value : [];
-  const byId = new Map(filteredOptions.value.map((option) => [optionId(option), option]));
-  return ids.map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
-});
 
 function matches(value) {
   return !normalizedSearch.value || String(value).toLocaleLowerCase("zh-CN").includes(normalizedSearch.value);
@@ -124,10 +112,6 @@ function closeFromOtherSurface(event) {
 
 async function selectValue(value) {
   query.filters[props.kind] = value;
-  if (value && value !== UNASSIGNED_FILTER) {
-    if (props.kind === "tag") rememberRecentTag(value);
-    if (props.kind === "person") rememberRecentPerson(value);
-  }
   closeDropdown();
   await applyFilterSort();
 }

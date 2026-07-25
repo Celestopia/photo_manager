@@ -18,6 +18,7 @@
         :unassigned-selected="selectedLocationId === UNASSIGNED_FILTER"
         show-all-option
         show-unassigned-option
+        show-fixed-options-divider
         mode="filter"
         search-placeholder="搜索地点"
         @update:search-text="searchText = $event"
