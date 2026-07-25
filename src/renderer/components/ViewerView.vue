@@ -149,7 +149,7 @@
   </section>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel }">
     <h3>个性化信息</h3>
-    <label>标题</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" rows="1"></textarea>
+    <label>标题</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Title'">{{ saveNotice.message }}</div>
     <div class="viewer-field-heading">
@@ -208,6 +208,8 @@
       class="input field-textarea location-detail-input"
       v-model="editDraft.LocationDetail"
       @input="onFieldTextareaInput($event, 'Location')"
+      @keydown.ctrl.enter.exact="confirmTextEdit"
+      @keydown.escape="blurTextEdit"
       rows="1"
       placeholder="输入具体位置细节"
     ></textarea>
@@ -235,12 +237,14 @@
         <span v-if="editDraft.HiddenDescription && !hiddenDescriptionExpanded" class="viewer-detail-indicator" aria-hidden="true"></span>
       </button>
     </div>
-    <textarea class="input textarea" v-model="editDraft.Description" @input="requestEdit('Description')"></textarea>
+    <textarea class="input textarea" v-model="editDraft.Description" @input="requestEdit('Description')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit"></textarea>
     <textarea
       v-if="hiddenDescriptionExpanded"
       class="input textarea private-textarea hidden-description-input"
       v-model="editDraft.HiddenDescription"
       @input="requestEdit('HiddenDescription')"
+      @keydown.ctrl.enter.exact="confirmTextEdit"
+      @keydown.escape="blurTextEdit"
       placeholder="输入隐藏描述"
     ></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Description'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
@@ -415,4 +419,16 @@ const showVideoCenterPlay = computed(() => (
   && !videoSeeking.value
   && !videoFrameStepping.value
 ));
+
+function confirmTextEdit(event) {
+  if (!editingDirty.value || event.isComposing || event.repeat) return;
+  event.preventDefault();
+  confirmEdit();
+}
+
+function blurTextEdit(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget?.blur();
+}
 </script>
