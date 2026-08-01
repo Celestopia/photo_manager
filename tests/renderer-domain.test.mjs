@@ -8,6 +8,7 @@ import {
   formatFileSize,
 } from "../src/renderer/domain/media-formatters.mjs";
 import {
+  buildLocationCreateParentPatch,
   buildLocationHierarchyRows,
   filterLocationsWithAncestors,
   getDefaultLocationExpansionKeys,
@@ -265,6 +266,21 @@ test("location hierarchy emits administrative rows and stable manager context", 
   assert.equal(sameLocationRegionFilter(cityGroup.Region, { ...cityGroup.Region }), true);
   const locationRow = rows.find((row) => row.Label === "五一广场");
   assert.equal(getLocationManagerRowContext(locationRow), "中国 | 湖南 | 长沙");
+});
+
+test("new location parent selection copies direct administrative fields without binding clear", () => {
+  assert.deepEqual(buildLocationCreateParentPatch({
+    LocationId: "00000000-0000-4000-8000-000000000001",
+    Country: " 中国 ",
+    Province: "",
+    City: " 北京 ",
+  }), {
+    parentId: "00000000-0000-4000-8000-000000000001",
+    country: "中国",
+    province: "",
+    city: "北京",
+  });
+  assert.deepEqual(buildLocationCreateParentPatch(null), { parentId: null });
 });
 
 test("folded location hierarchy reveals only one concrete level at a time", () => {

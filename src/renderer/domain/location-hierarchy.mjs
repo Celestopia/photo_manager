@@ -14,6 +14,16 @@ export function getLocationRegionLabel(location) {
   return getLocationRegionParts(location).join(" / ");
 }
 
+export function buildLocationCreateParentPatch(location) {
+  if (!location) return { parentId: null };
+  return {
+    parentId: normalizeLocationName(location.LocationId) || null,
+    country: normalizeLocationField(location.Country),
+    province: normalizeLocationField(location.Province),
+    city: normalizeLocationField(location.City),
+  };
+}
+
 export function getLocationRegionFilterLabel(region) {
   return [region?.country, region?.province, region?.city].map(normalizeLocationField).filter(Boolean).join(" / ");
 }

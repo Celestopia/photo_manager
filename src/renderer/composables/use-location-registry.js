@@ -4,6 +4,7 @@ import {
   isRegistryFilterValueValid,
 } from "../domain/gallery-filter-state.mjs";
 import {
+  buildLocationCreateParentPatch,
   buildLocationHierarchyRows,
   compareLocationsByRegionAndTree,
   filterLocationsWithAncestors,
@@ -205,11 +206,14 @@ export function useLocationRegistry({
     locationDropdown.viewer = false;
     locationDropdown.batch = false;
   }
+  function rememberSelectedLocation(locationId) {
+    if (locationId && getLocation(locationId)) rememberRecentLocation(locationId);
+  }
   function setLocationForTarget(target, locationId) {
     if (!getLocation(locationId)) return;
     if (target === "batch") batchEdit.locationId = locationId;
     else { editDraft.LocationId = locationId; requestEdit("Location"); }
-    rememberRecentLocation(locationId);
+    rememberSelectedLocation(locationId);
     locationSearch[target] = "";
     closeLocationDropdown(target);
   }
@@ -229,17 +233,20 @@ export function useLocationRegistry({
     closeOtherRegistryDropdowns?.();
     const currentId = target === "manager" ? null : selectedLocationIdForTarget(target);
     const current = getLocation(currentId);
+    const parentPatch = buildLocationCreateParentPatch(current);
     Object.assign(locationCreate, {
       visible: true, target,
       name: target === "manager" ? "" : normalizeLocationName(locationSearch[target]),
-      country: current?.Country || "", province: current?.Province || "", city: current?.City || "",
-      parentId: currentId || null, description: "", error: "",
+      country: parentPatch.country || "", province: parentPatch.province || "", city: parentPatch.city || "",
+      parentId: parentPatch.parentId, description: "", error: "",
     });
     if (target !== "manager") closeLocationDropdown(target);
   }
   function closeCreateLocationMenu() { resetLocationCreateState(); }
   function setCreateLocationParent(parentId) {
-    locationCreate.parentId = parentId || null;
+    const parent = getLocation(parentId);
+    Object.assign(locationCreate, buildLocationCreateParentPatch(parent));
+    rememberSelectedLocation(parent?.LocationId);
   }
   async function createLocationAndSelect() {
     const name = normalizeLocationName(locationCreate.name);
@@ -287,6 +294,7 @@ export function useLocationRegistry({
   }
   function setEditLocationParent(parentId) {
     locationManager.editParentId = parentId || null;
+    rememberSelectedLocation(parentId);
   }
   async function saveLocationEdit() {
     const locationId = locationManager.editingId;
