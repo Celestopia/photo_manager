@@ -750,12 +750,6 @@ function queryGallery(query) {
       videos: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "video").length,
     },
     groups: groupByDate(filtered),
-    filterOptions: {
-      albums: listAlbumDefinitions(),
-      tags: listTagDefinitions(),
-      people: listPersonDefinitions(),
-      locations: listLocationDefinitions(),
-    },
   };
 }
 

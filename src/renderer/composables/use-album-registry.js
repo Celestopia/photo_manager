@@ -5,7 +5,7 @@ function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed single-valued album registry and management workflow. */
 export function useAlbumRegistry({
-  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem,
+  api, unassignedFilter, query, editDraft, batchEdit, selectedItem,
   orderedItems, galleryGroups, gallerySettingsOpen, showToastMessage,
   closeOtherRegistryDropdowns, requestEdit, rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
 }) {
@@ -32,7 +32,6 @@ export function useAlbumRegistry({
       UpdatedAt: album?.UpdatedAt || "",
       UsageCount: Number(album?.UsageCount || 0),
     })).filter((album) => album.AlbumId && album.Title);
-    filterOptions.albums = albumRegistry.value;
     const ids = albumRegistry.value.map((album) => album.AlbumId);
     if (!isRegistryFilterValueValid(query.filters.album, ids, unassignedFilter)) query.filters.album = "";
   }

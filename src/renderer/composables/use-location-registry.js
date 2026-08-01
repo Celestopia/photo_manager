@@ -19,7 +19,7 @@ import {
 
 /** Owns ID-backed hierarchical location pickers, context bars, and registry mutations. */
 export function useLocationRegistry({
-  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   galleryGroups, gallerySettingsOpen, recentLocations, rememberRecentLocation,
   pruneRecentLocations, showToastMessage, closeOtherRegistryDropdowns, requestEdit,
   rebuildGalleryItemIndex, galleryItemIndex, queryGallery, applyFilterSort,
@@ -60,7 +60,6 @@ export function useLocationRegistry({
       Depth: Number(location?.Depth || 0),
       Path: Array.isArray(location?.Path) ? location.Path : [],
     })).filter((location) => location.LocationId && location.Name).sort(compareLocationsByRegionAndTree);
-    filterOptions.locations = locationRegistry.value;
     const ids = locationRegistry.value.map((location) => location.LocationId);
     pruneRecentLocations(ids);
     if (!isRegistryFilterValueValid(query.filters.location, ids, unassignedFilter)) query.filters.location = "";
@@ -377,7 +376,7 @@ export function useLocationRegistry({
   return {
     locationRegistry, locationSearch, locationDropdown, locationCreate, locationManager,
     locationManagerListRef, locationManagerContext, managerFilteredLocations, managerLocationRows,
-    applyLocationRegistry, loadLocations, getLocationName, getLocationTreeLabel, getLocationTooltip,
+    loadLocations, getLocationName, getLocationTreeLabel, getLocationTooltip,
     getLocationManagerRowContext, updateLocationManagerContext, scheduleLocationManagerContextUpdate,
     getLocationOptions, getRecentLocationOptions, getLocationMenuRows, getLocationFilterRows,
     setLocationFilter, setLocationRegionFilter, getLocationParentRows, openLocationDropdown,

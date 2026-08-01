@@ -5,7 +5,7 @@ function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed people registry, picker state, and management workflow. */
 export function usePersonRegistry({
-  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   galleryGroups, gallerySettingsOpen, recentPeople, rememberRecentPerson, pruneRecentPeople,
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
   rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
@@ -33,7 +33,6 @@ export function usePersonRegistry({
       UpdatedAt: person?.UpdatedAt || "",
       UsageCount: Number(person?.UsageCount || 0),
     })).filter((person) => person.PersonId && person.Name);
-    filterOptions.people = personRegistry.value;
     const ids = personRegistry.value.map((person) => person.PersonId);
     pruneRecentPeople(ids);
     if (!isRegistryFilterValueValid(query.filters.person, ids, unassignedFilter)) query.filters.person = "";

@@ -7,7 +7,7 @@ function normalizeText(value) {
 
 /** Owns the ID-backed tag registry, picker state, and tag-management workflow. */
 export function useTagRegistry({
-  api, unassignedFilter, filterOptions, query, editDraft, batchEdit, selectedItem, orderedItems,
+  api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   galleryGroups, gallerySettingsOpen, recentTags, rememberRecentTag, pruneRecentTags,
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
   rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
@@ -35,7 +35,6 @@ export function useTagRegistry({
       UpdatedAt: tag?.UpdatedAt || "",
       UsageCount: Number(tag?.UsageCount || 0),
     })).filter((tag) => tag.TagId && tag.Text);
-    filterOptions.tags = tagRegistry.value;
     const ids = tagRegistry.value.map((tag) => tag.TagId);
     pruneRecentTags(ids);
     if (!isRegistryFilterValueValid(query.filters.tag, ids, unassignedFilter)) query.filters.tag = "";

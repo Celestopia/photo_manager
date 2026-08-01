@@ -104,19 +104,13 @@ export function useRendererApplication() {
       onLibraryOpened: async () => {
         resetLibraryUiState();
         loadLibraryRecentValues();
-        await loadTags();
-        await loadAlbums();
-        await loadPeople();
-        await loadLocations();
+        await loadAllRegistries();
         await queryGallery();
       },
       onLibraryClosed: () => resetLibraryUiState(),
       onMaintenanceRefresh: async (operation) => {
         if (operation === "update") {
-          await loadTags();
-          await loadAlbums();
-          await loadPeople();
-          await loadLocations();
+          await loadAllRegistries();
           await queryGallery();
         }
         if (operation === "thumbnails") await queryGallery();
@@ -146,7 +140,6 @@ export function useRendererApplication() {
       total,
       mediaCounts,
       loading,
-      filterOptions,
       galleryItemIndex,
       queryGallery,
       applySearch,
@@ -163,7 +156,6 @@ export function useRendererApplication() {
     } = useGalleryQuery({
       api: API,
       showToastMessage,
-      onLocationsLoaded: (locations) => applyLocationRegistry(locations),
       onSelectionResultChanged: () => syncGallerySelectionWithLoadedItems(),
       onResetSelection: () => exitSelectionMode(),
     });
@@ -209,12 +201,6 @@ export function useRendererApplication() {
         albumDropdown.batch = false;
         locationSearch.batch = "";
         locationDropdown.batch = false;
-      },
-      refreshRegistries: async () => {
-        await loadTags();
-        await loadAlbums();
-        await loadPeople();
-        await loadLocations();
       },
     });
     const {
@@ -322,14 +308,9 @@ export function useRendererApplication() {
         locationDropdown.viewer = false;
       },
       syncUpdatedItems: (items) => syncUpdatedItemsIntoGallery(items),
-      refreshRegistries: async () => {
-        await loadTags();
-        await loadAlbums();
-        await loadPeople();
-        await loadLocations();
-      },
     });
     const {
+      tagRegistry,
       tagSearch,
       tagDropdown,
       tagCreate,
@@ -357,7 +338,6 @@ export function useRendererApplication() {
     } = useTagRegistry({
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
-      filterOptions,
       query,
       editDraft,
       batchEdit,
@@ -376,6 +356,7 @@ export function useRendererApplication() {
       queryGallery,
     });
     const {
+      personRegistry,
       personSearch,
       personDropdown,
       personCreate,
@@ -403,7 +384,6 @@ export function useRendererApplication() {
     } = usePersonRegistry({
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
-      filterOptions,
       query,
       editDraft,
       batchEdit,
@@ -422,6 +402,7 @@ export function useRendererApplication() {
       queryGallery,
     });
     const {
+      albumRegistry,
       albumSearch,
       albumDropdown,
       albumCreate,
@@ -449,7 +430,6 @@ export function useRendererApplication() {
     } = useAlbumRegistry({
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
-      filterOptions,
       query,
       editDraft,
       batchEdit,
@@ -465,6 +445,7 @@ export function useRendererApplication() {
       queryGallery,
     });
     const {
+      locationRegistry,
       locationSearch,
       locationDropdown,
       locationCreate,
@@ -472,7 +453,6 @@ export function useRendererApplication() {
       locationManagerListRef,
       locationManagerContext,
       managerLocationRows,
-      applyLocationRegistry,
       loadLocations,
       getLocationTreeLabel,
       getLocationName,
@@ -504,7 +484,6 @@ export function useRendererApplication() {
     } = useLocationRegistry({
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
-      filterOptions,
       query,
       editDraft,
       batchEdit,
@@ -523,6 +502,20 @@ export function useRendererApplication() {
       queryGallery,
       applyFilterSort,
     });
+
+    // Registry composables own the mutable definitions. Gallery filters receive
+    // one read-only aggregate view instead of a second synchronized registry state.
+    const filterOptions = Object.freeze({
+      get albums() { return albumRegistry.value; },
+      get tags() { return tagRegistry.value; },
+      get people() { return personRegistry.value; },
+      get locations() { return locationRegistry.value; },
+    });
+
+    async function loadAllRegistries() {
+      await Promise.all([loadAlbums(), loadTags(), loadPeople(), loadLocations()]);
+    }
+
     const {
       showContextMenu,
       contextPosition,
@@ -639,7 +632,7 @@ export function useRendererApplication() {
     };
     const galleryContext = {
       ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
-      filterOptions, isSelectionMode, selectedGalleryCount,
+      isSelectionMode, selectedGalleryCount,
       batchEdit, batchStatus, applyingBatchEdit, total, galleryGroups, loading, batchHasChanges, canApplyBatchEdit,
       windowToggleTip, windowToggleIcon,
       resetAll, applySearch, applyFilterSort, setMediaTypeFilter, setAllGalleryLevels,

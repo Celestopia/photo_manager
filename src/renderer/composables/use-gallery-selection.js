@@ -9,7 +9,6 @@ export function useGallerySelection({
   showToastMessage,
   openViewer,
   resetBatchPickers,
-  refreshRegistries,
 }) {
   const isSelectionMode = ref(false);
   const gallerySelection = ref(new Set());
@@ -147,11 +146,6 @@ export function useGallerySelection({
 
       const updatedItems = Array.isArray(result.items) ? result.items : [];
       syncUpdatedItemsIntoGallery(updatedItems);
-      try {
-        await refreshRegistries?.();
-      } catch (error) {
-        showToastMessage(`批量修改已保存，但注册表刷新失败：${error?.message || "未知错误"}`);
-      }
       const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
       const missingCount = Number(result.missingCount || 0);
       const requestedCount = Number(result.requestedCount || mediaIds.length || 0);

@@ -10,7 +10,6 @@ export function useMediaEditor({
   showToastMessage,
   resetViewerPickers,
   syncUpdatedItems,
-  refreshRegistries,
 }) {
   const editDraft = reactive({
     Title: "",
@@ -125,11 +124,6 @@ export function useMediaEditor({
         setDraftFromItem(result.item, true);
         activeEditField.value = saveField;
         showSaveNotice("已修改", saveField);
-        try {
-          await refreshRegistries?.();
-        } catch (error) {
-          showToastMessage(`修改已保存，但注册表刷新失败：${error?.message || "未知错误"}`);
-        }
         return true;
       }
       showToastMessage(`修改失败：${result?.error || "未知错误"}`);

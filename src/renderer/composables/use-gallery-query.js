@@ -10,7 +10,6 @@ import {
 export function useGalleryQuery({
   api,
   showToastMessage,
-  onLocationsLoaded,
   onSelectionResultChanged,
   onResetSelection,
 }) {
@@ -28,7 +27,6 @@ export function useGalleryQuery({
   const total = ref(0);
   const mediaCounts = reactive({ all: 0, images: 0, videos: 0 });
   const loading = ref(false);
-  const filterOptions = reactive({ albums: [], tags: [], people: [], locations: [] });
   const galleryItemIndex = new Map();
   let latestQueryId = 0;
 
@@ -64,10 +62,6 @@ export function useGalleryQuery({
       mediaCounts.all = Number(response?.mediaCounts?.all || 0);
       mediaCounts.images = Number(response?.mediaCounts?.images || 0);
       mediaCounts.videos = Number(response?.mediaCounts?.videos || 0);
-      filterOptions.albums = Array.isArray(response?.filterOptions?.albums) ? response.filterOptions.albums : [];
-      filterOptions.tags = Array.isArray(response?.filterOptions?.tags) ? response.filterOptions.tags : [];
-      filterOptions.people = Array.isArray(response?.filterOptions?.people) ? response.filterOptions.people : [];
-      onLocationsLoaded?.(Array.isArray(response?.filterOptions?.locations) ? response.filterOptions.locations : []);
 
       galleryGroups.value = Array.isArray(response?.groups) ? response.groups : [];
       orderedItems.value = galleryGroups.value.flatMap((group) => group.items);
@@ -141,7 +135,6 @@ export function useGalleryQuery({
     galleryItemIndex.clear();
     total.value = 0;
     Object.assign(mediaCounts, { all: 0, images: 0, videos: 0 });
-    Object.assign(filterOptions, { albums: [], tags: [], people: [], locations: [] });
   }
 
   return {
@@ -153,7 +146,6 @@ export function useGalleryQuery({
     total,
     mediaCounts,
     loading,
-    filterOptions,
     galleryItemIndex,
     queryGallery,
     applySearch,
