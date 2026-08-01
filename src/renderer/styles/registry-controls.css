@@ -85,6 +85,8 @@
 .album-input.registry-trigger {
   justify-content: flex-start;
   font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
 }
 .album-input.registry-trigger > span:first-child {
   overflow: visible;

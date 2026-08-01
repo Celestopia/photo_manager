@@ -40,8 +40,6 @@
 .right-panel .album-input.registry-trigger {
   min-height: 30px;
   height: auto;
-  font-size: 13px;
-  line-height: 1.45;
 }
 .right-panel .album-input.registry-trigger > span:first-child {
   overflow: visible;
