@@ -1,6 +1,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import {
   calculateFittedMediaSize,
+  calculatePointerAnchoredPan,
   calculateRotationFitScale,
   exceedsDragThreshold,
 } from "../domain/media-transform.mjs";
@@ -107,7 +108,29 @@ export function useMediaTransform({ config, selectedItem }) {
     event.preventDefault();
     const direction = event.deltaY < 0 ? 1 : -1;
     const step = getWheelZoomStep();
-    zoomPercent.value = Math.min(maxZoom.value, Math.max(minZoom.value, zoomPercent.value + direction * step));
+    const previousZoom = zoomPercent.value;
+    const nextZoom = Math.min(maxZoom.value, Math.max(minZoom.value, previousZoom + direction * step));
+    if (nextZoom === previousZoom) return;
+    const stageRect = mediaStageRef.value?.getBoundingClientRect?.();
+    if (
+      stageRect
+      && stageRect.width > 0
+      && stageRect.height > 0
+      && Number.isFinite(event.clientX)
+      && Number.isFinite(event.clientY)
+    ) {
+      const nextPan = calculatePointerAnchoredPan({
+        panX: pan.x,
+        panY: pan.y,
+        pointerX: event.clientX - stageRect.left - stageRect.width / 2,
+        pointerY: event.clientY - stageRect.top - stageRect.height / 2,
+        previousScale: previousZoom / 100,
+        nextScale: nextZoom / 100,
+      });
+      pan.x = nextPan.x;
+      pan.y = nextPan.y;
+    }
+    zoomPercent.value = nextZoom;
   }
 
   function startDrag(event) {

@@ -23,6 +23,7 @@ import {
 } from "../src/renderer/domain/gallery-media-details.mjs";
 import {
   calculateFittedMediaSize,
+  calculatePointerAnchoredPan,
   calculateRotationFitScale,
   exceedsDragThreshold,
   normalizeQuarterTurn,
@@ -91,6 +92,33 @@ test("media transforms preserve aspect ratio and fit quarter-turn rotations", ()
     rotationDegrees: 90,
   }), 0.7);
   assert.equal(normalizeQuarterTurn(-90), 3);
+});
+
+test("pointer-anchored zoom keeps the pointed media position stationary", () => {
+  assert.deepEqual(calculatePointerAnchoredPan({
+    panX: 0,
+    panY: 0,
+    pointerX: 200,
+    pointerY: -100,
+    previousScale: 1,
+    nextScale: 2,
+  }), { x: -200, y: 100 });
+  assert.deepEqual(calculatePointerAnchoredPan({
+    panX: -200,
+    panY: 100,
+    pointerX: 200,
+    pointerY: -100,
+    previousScale: 2,
+    nextScale: 1,
+  }), { x: 0, y: 0 });
+  assert.deepEqual(calculatePointerAnchoredPan({
+    panX: 40,
+    panY: -20,
+    pointerX: 0,
+    pointerY: 0,
+    previousScale: 1,
+    nextScale: 1.5,
+  }), { x: 60, y: -30 });
 });
 
 test("media dragging starts only after the pointer crosses its movement threshold", () => {

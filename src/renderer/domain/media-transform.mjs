@@ -42,6 +42,28 @@ export function calculateRotationFitScale({
   return Math.min(1, availableWidth / rotatedWidth, availableHeight / rotatedHeight);
 }
 
+export function calculatePointerAnchoredPan({
+  panX,
+  panY,
+  pointerX,
+  pointerY,
+  previousScale,
+  nextScale,
+}) {
+  const currentX = Number.isFinite(Number(panX)) ? Number(panX) : 0;
+  const currentY = Number.isFinite(Number(panY)) ? Number(panY) : 0;
+  const anchorX = Number.isFinite(Number(pointerX)) ? Number(pointerX) : 0;
+  const anchorY = Number.isFinite(Number(pointerY)) ? Number(pointerY) : 0;
+  const fromScale = positiveNumber(previousScale);
+  const toScale = positiveNumber(nextScale);
+  if (!fromScale || !toScale) return { x: currentX, y: currentY };
+  const ratio = toScale / fromScale;
+  return {
+    x: anchorX - ratio * (anchorX - currentX),
+    y: anchorY - ratio * (anchorY - currentY),
+  };
+}
+
 export function exceedsDragThreshold(deltaX, deltaY, threshold = 4) {
   const limit = Math.max(0, Number(threshold) || 0);
   return Math.hypot(Number(deltaX) || 0, Number(deltaY) || 0) >= limit;
