@@ -29,7 +29,6 @@ export function useMediaViewer({
   const selectedGlobalIndex = ref(-1);
   const showContextMenu = ref(false);
   const contextPosition = reactive({ x: 0, y: 0 });
-  const showPrivateNote = ref(false);
   const showLeftPanel = ref(true);
   const showRightPanel = ref(true);
   let videoClickTimer = null;
@@ -244,7 +243,6 @@ export function useMediaViewer({
     selectedGlobalIndex,
     showContextMenu,
     contextPosition,
-    showPrivateNote,
     showLeftPanel,
     showRightPanel,
     ratioStyle,

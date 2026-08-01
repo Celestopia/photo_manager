@@ -12,11 +12,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { fork } = require("node:child_process");
-const {
-  applyConfigPatch,
-  loadConfig,
-  saveConfig: persistConfig,
-} = require("./application-config.js");
+const { loadConfig } = require("./application-config.js");
 const {
   createLocationDomain,
   normalizeLocationField,
@@ -85,7 +81,6 @@ const DEFAULT_CONFIG = {
   media: { ...DEFAULT_MEDIA_CONFIG },
   backup: { retentionCount: 10 },
   ui: {
-    language: "zh-CN",
     gallery: {
       minCardWidth: 190,
     },
@@ -927,10 +922,6 @@ function registerIpcHandlers() {
   };
   registerMainIpcHandlers({
     runtime,
-    configPath: CONFIG_PATH,
-    normalizeMediaConfig,
-    applyConfigPatch,
-    persistConfig,
     toSerializable,
     appendLog,
     getLibraryState,

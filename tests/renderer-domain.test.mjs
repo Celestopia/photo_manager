@@ -28,6 +28,7 @@ import {
   calculateRotationFitScale,
   exceedsDragThreshold,
   normalizeQuarterTurn,
+  resolveWheelZoomStep,
 } from "../src/renderer/domain/media-transform.mjs";
 import {
   applyLocationSelectionFilter,
@@ -120,6 +121,13 @@ test("pointer-anchored zoom keeps the pointed media position stationary", () => 
     previousScale: 1,
     nextScale: 1.5,
   }), { x: 60, y: -30 });
+});
+
+test("wheel zoom uses larger steps only after its documented thresholds", () => {
+  assert.equal(resolveWheelZoomStep(199, 10), 10);
+  assert.equal(resolveWheelZoomStep(200, 10), 20);
+  assert.equal(resolveWheelZoomStep(500, 10), 20);
+  assert.equal(resolveWheelZoomStep(501, 10), 50);
 });
 
 test("media dragging starts only after the pointer crosses its movement threshold", () => {

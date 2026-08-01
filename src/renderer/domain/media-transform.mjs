@@ -64,6 +64,13 @@ export function calculatePointerAnchoredPan({
   };
 }
 
+export function resolveWheelZoomStep(zoomPercent, baseStep) {
+  const zoom = Number(zoomPercent) || 0;
+  if (zoom > 500) return 50;
+  if (zoom >= 200) return 20;
+  return positiveNumber(baseStep);
+}
+
 export function exceedsDragThreshold(deltaX, deltaY, threshold = 4) {
   const limit = Math.max(0, Number(threshold) || 0);
   return Math.hypot(Number(deltaX) || 0, Number(deltaY) || 0) >= limit;

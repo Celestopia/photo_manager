@@ -70,7 +70,7 @@ The library root can be moved as a unit. `library.yml` contains a UUID that iden
 
 ## Using the App
 
-The gallery mixes images and videos on one shooting-time timeline. Its collapsible filter panel supports media type, multi-select rating and privacy levels, album, tag, person, and hierarchical location, plus shooting-time direction and text search. Rating defaults to all levels and privacy defaults to level 1. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
+The gallery mixes images and videos on one shooting-time timeline. Its collapsible filter panel supports media type, multi-select rating and privacy levels, album, tag, person, and hierarchical location, plus shooting-time direction and case-sensitive substring search over a selected field: title, filename, or description. Rating defaults to all levels and privacy defaults to level 1. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
 
 Thumbnail generation is explicit. Opening a library and updating metadata do not generate thumbnails automatically; media without a cached thumbnail use image or video placeholders until **Generate Thumbnails** is run from the gallery settings menu or the maintenance script.
 
@@ -132,6 +132,8 @@ Independent scripts acquire the same library lock as the desktop application. Cl
 - FFmpeg path and timeouts
 - Backup retention count per library
 - Gallery and viewer UI defaults
+
+The desktop application and maintenance scripts create `config.yml` with their required defaults if it is missing. Invalid YAML is left untouched and causes that run to fall back to defaults. Configuration is read at startup and has no in-app editor.
 
 Library paths and internal data directories are intentionally not configurable. Fixed filenames and the `.photo_manager` layout are part of the library contract.
 

@@ -45,9 +45,11 @@ PhotoManager 是一个 Windows 本地桌面媒体管理器，用于管理用户�
 - `thumbnail`：缩略图尺寸、WebP 质量、极端长宽比阈值、图片并发数。
 - `media`：FFmpeg 目录、探测超时、抽帧超时、视频缩略图并发数。
 - `backup.retentionCount`：每个图库最多保留的备份快照目录数，最小为 1。
-- `ui`：语言、画廊卡片宽度、查看器面板比例、默认可见性、缩放范围。
+- `ui`：画廊卡片宽度、查看器面板比例、默认可见性、缩放范围。
 
 `config.yml` 不保存图库路径、数据目录、缩略图目录或日志目录。不同图库不能覆盖缩略图参数和 UI 参数。
+
+应用和独立维护脚本启动时都会读取项目根目录的 `config.yml`。文件不存在时，当前入口会写入自身所需的默认配置后继续运行；文件存在但 YAML 无效时，不覆盖原文件，而是仅在本次运行中回退到默认值。配置目前没有运行时编辑界面，渲染进程只能读取规范化后的配置。
 
 ### 3.2 应用私有状态
 
@@ -562,7 +564,7 @@ photoManager.videoPlaybackRate
 
 ### 13.4 视频画面变换
 
-图片和可解码视频共享临时视图变换：10%–1000% 缩放、任意缩放级别下拖动、90° 步进旋转、水平镜像和复原。鼠标滚轮围绕当前光标所指的画面位置缩放，底栏按钮、数值框和滑块仍以画面中心缩放。变换仅通过 CSS 作用于当前画面，不修改视频文件、媒体元数据、播放时间轴或缩略图，并在切换媒体、关闭查看器或打开另一媒体时复原。
+图片和可解码视频共享临时视图变换：10%–1000% 缩放、任意缩放级别下拖动、90° 步进旋转、水平镜像和复原。鼠标滚轮围绕当前光标所指的画面位置缩放：低于 200% 时使用配置的基础步长，200%–500%（含边界）使用 20 个百分点，大于 500% 时使用 50 个百分点；底栏按钮、数值框和滑块仍以画面中心缩放，其中按钮始终使用配置的基础步长。变换仅通过 CSS 作用于当前画面，不修改视频文件、媒体元数据、播放时间轴或缩略图，并在切换媒体、关闭查看器或打开另一媒体时复原。
 
 `use-media-transform.js` 保留图片由浏览器按 EXIF 朝向解释的固有尺寸和既有 88% 适配规则，避免用原始像素宽高拉伸带方向信息的图片；视频根据中间媒体区域和规范化显示尺寸计算初始适配大小。视频在 100% 时使用完整可用区域；旋转到 90°/270° 时额外计算适配系数，保证旋转后的画面仍完整位于视口内，再在此基础上应用用户缩放。拖动需越过 4 px 阈值才成立，用于区分点击播放与拖动画面。
 
@@ -575,7 +577,7 @@ photoManager.videoPlaybackRate
 1. 应用媒体类型筛选：全部、图片、视频。
 2. 应用评级和 Privacy 等级筛选。同一等级维度内的多个选择取并集；评级与 Privacy 以及其它筛选维度取交集。空等级集合表示全部，默认评级为空集合、Privacy 为 `[1]`。
 3. 应用相册、标签、人物、具体地点或行政区筛选，多个维度取交集。相册、标签、人物和地点各自支持常驻的“未设置”特殊条件，分别匹配 `AlbumId = null`、空 `TagIds`、空 `PersonIds` 和 `LocationId = null`；地点自由文本 `Detail` 不改变“未设置地点”的判断。
-4. 应用文本搜索。
+4. 应用区分大小写的文本子串搜索。搜索字段由用户单选标题、文件名或描述；标题和描述分别读取 `Customization.Title`、`Customization.Description`，文件名只匹配 `FilePath` 的末级名称，不匹配目录部分。
 5. 按拍摄时间排序，方向为顺序或逆序。排序依据下拉菜单保留扩展边界，但当前唯一合法值是 `shootingTime`。
 6. 按拍摄日期分组。
 
@@ -732,7 +734,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 
 主要请求通道：
 
-- 配置：`app:get-config`、`app:update-config`。
+- 配置：`app:get-config`。
 - 图库生命周期：`library:get-state`、`library:choose-directory`、`library:inspect`、`library:open`、`library:initialize`、`library:close`、`library:update-info`。
 - 初始化辅助：`library:cancel-scan`、`library:cancel-initialization`、`library:cleanup-failed-initialization`、`library:recheck-media-tools`。
 - 文件夹入口：`library:open-root`、`library:open-manager-dir`、`library:open-log-dir`。
@@ -835,7 +837,7 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 | `use-library-session.js` | 当前一级视图、活动图库摘要、入口页选择/初始化状态、图库信息、设置菜单和维护任务 | 图库初始化与维护进度 IPC 订阅 |
 | `use-gallery-query.js` | 完整查询条件、筛选抽屉会话状态、一次性查看器返回目标、日期分组、顺序媒体集合、统计、筛选项和 `MediaId` 索引 | 请求序号用于丢弃过期响应 |
 | `use-gallery-selection.js` | 选择模式、完整结果上的选中集合、含可选评级和 Privacy 补丁的批量编辑草稿及批量结果 | 无文档级监听器 |
-| `use-media-viewer.js` | 当前媒体索引、查看器左右面板、私密描述、右键菜单、媒体导航和上下文操作 | 文档点击、键盘快捷键和窗口失焦处理 |
+| `use-media-viewer.js` | 当前媒体索引、查看器左右面板、右键菜单、媒体导航和上下文操作 | 文档点击、键盘快捷键和窗口失焦处理 |
 | `use-media-editor.js` | 单媒体个性化草稿、dirty 状态、活动编辑字段、保存确认和文本域自适应 | 无常驻全局监听器 |
 | `use-media-transform.js` | 图片/视频共用的适配尺寸、缩放、平移、旋转、镜像、拖动阈值和临时复原状态 | 文档 `mousemove`/`mouseup`；媒体区域 `ResizeObserver` |
 | `use-video-playback.js` | video/audio 元素、固定控件状态、进度拖动、缓冲、播放/音频降级、逐帧、音量、静音和倍速偏好 | 媒体元素事件；偏好写入 `localStorage` |

@@ -17,7 +17,6 @@ backup:
   retentionCount: 10 # Maximum number of library data snapshots retained per library (minimum 1).
 
 ui:
-  language: zh-CN # UI language code.
   gallery:
     minCardWidth: 190 # Minimum card width (px) for responsive gallery layout.
 

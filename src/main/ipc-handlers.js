@@ -6,10 +6,6 @@ const path = require("node:path");
 function registerIpcHandlers(options) {
   const {
     runtime,
-    configPath,
-    normalizeMediaConfig,
-    applyConfigPatch,
-    persistConfig,
     toSerializable,
     appendLog,
     getLibraryState,
@@ -33,16 +29,6 @@ function registerIpcHandlers(options) {
   const { albumService, locationService, metadataEditService, personService, tagService } = services;
 
   ipcMain.handle("app:get-config", async () => toSerializable(runtime.config));
-  ipcMain.handle("app:update-config", async (_, patch) => {
-    try {
-      runtime.config = applyConfigPatch(runtime.config, patch, normalizeMediaConfig);
-      await persistConfig(configPath, runtime.config);
-      return { ok: true, config: toSerializable(runtime.config) };
-    } catch (error) {
-      appendLog(`Failed to update config: ${error.message}`);
-      return { ok: false, error: "Failed to update config" };
-    }
-  });
 
   ipcMain.handle("library:get-state", async () => toSerializable(getLibraryState()));
   ipcMain.handle("library:recheck-media-tools", async () => toSerializable(await checkMediaTools()));

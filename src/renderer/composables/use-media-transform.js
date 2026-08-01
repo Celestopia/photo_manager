@@ -4,6 +4,7 @@ import {
   calculatePointerAnchoredPan,
   calculateRotationFitScale,
   exceedsDragThreshold,
+  resolveWheelZoomStep,
 } from "../domain/media-transform.mjs";
 
 /** Owns temporary image and video zoom, pan, rotation, mirror, and drag state. */
@@ -97,17 +98,11 @@ export function useMediaTransform({ config, selectedItem }) {
     Object.assign(dragging, { pending: false, active: false, moved: false });
   }
 
-  function getWheelZoomStep() {
-    if (zoomPercent.value > 500) return 50;
-    if (zoomPercent.value >= 200) return 20;
-    return zoomStep.value;
-  }
-
   function onMediaWheel(event) {
     if (event.target?.closest?.(".video-playback-controls, input, button, audio")) return;
     event.preventDefault();
     const direction = event.deltaY < 0 ? 1 : -1;
-    const step = getWheelZoomStep();
+    const step = resolveWheelZoomStep(zoomPercent.value, zoomStep.value);
     const previousZoom = zoomPercent.value;
     const nextZoom = Math.min(maxZoom.value, Math.max(minZoom.value, previousZoom + direction * step));
     if (nextZoom === previousZoom) return;

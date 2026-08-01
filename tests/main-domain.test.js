@@ -1,7 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-const { applyConfigPatch } = require("../src/main/application-config.js");
+const { loadConfig } = require("../src/main/application-config.js");
 const { createApplicationRuntime } = require("../src/main/application-runtime.js");
 const { createGalleryQueryService } = require("../src/main/gallery-query.js");
 const {
@@ -23,21 +26,41 @@ const IDS = {
   unknownTag: "00000000-0000-4000-8000-000000000006",
 };
 
-test("application config patches preserve nested settings and normalize bounded values", () => {
-  const current = {
-    thumbnail: { size: 320, webpQuality: 80 },
-    media: { ffmpegDir: "tools" },
-    backup: { retentionCount: 10 },
-    ui: { gallery: { minCardWidth: 190 }, viewer: { zoom: { minPercent: 10, maxPercent: 1000 } } },
-  };
-  const result = applyConfigPatch(current, {
-    backup: { retentionCount: 0 },
-    ui: { gallery: { pageSize: 999 }, viewer: { zoom: { maxPercent: 800 } } },
-  }, (media) => media);
-  assert.equal(result.backup.retentionCount, 10);
-  assert.deepEqual(result.ui.viewer.zoom, { minPercent: 10, maxPercent: 800 });
-  assert.equal(result.ui.gallery.minCardWidth, 190);
-  assert.equal(Object.hasOwn(result.ui.gallery, "pageSize"), false);
+const CONFIG_DEFAULTS = {
+  thumbnail: { size: 320 },
+  media: { ffmpegDir: "tools" },
+  backup: { retentionCount: 10 },
+  ui: {
+    gallery: { minCardWidth: 190 },
+    viewer: {
+      panelRatio: { left: 1, center: 3, right: 1 },
+      panels: { showLeft: true, showRight: true },
+      zoom: { minPercent: 10, maxPercent: 1000, stepPercent: 10 },
+    },
+  },
+};
+
+test("application config creation and fallback preserve the on-disk contract", (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "photo-manager-config-"));
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
+  const configPath = path.join(tempDir, "config.yml");
+  const normalizeMedia = (media) => ({ ...CONFIG_DEFAULTS.media, ...(media || {}) });
+
+  const created = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
+  assert.deepEqual(created, { config: CONFIG_DEFAULTS, warning: "" });
+  assert.equal(fs.existsSync(configPath), true);
+
+  fs.writeFileSync(configPath, "ui:\n  language: en-US\n  gallery:\n    minCardWidth: 240\n", "utf8");
+  const normalized = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
+  assert.equal(normalized.config.ui.gallery.minCardWidth, 240);
+  assert.equal(Object.hasOwn(normalized.config.ui, "language"), false);
+
+  const invalidSource = "ui: [\n";
+  fs.writeFileSync(configPath, invalidSource, "utf8");
+  const fallback = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
+  assert.deepEqual(fallback.config, CONFIG_DEFAULTS);
+  assert.match(fallback.warning, /^Invalid config\.yml, fallback to default\./);
+  assert.equal(fs.readFileSync(configPath, "utf8"), invalidSource);
 });
 
 test("application runtime creates isolated mutable library sessions", () => {
