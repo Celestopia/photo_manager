@@ -78,7 +78,6 @@
             @durationchange="onVideoDurationChange"
             @error="onVideoPlaybackError"
             @volumechange="onVideoVolumeChange"
-            @ratechange="onVideoRateChange"
             @playing="onMediaPlaying"
             @pause="onMediaPaused"
             @ended="onMediaEnded"
@@ -128,7 +127,6 @@
           @loadedmetadata="onAudioLoadedMetadata"
           @error="onAudioPlaybackError"
           @volumechange="onVideoVolumeChange"
-          @ratechange="onVideoRateChange"
           @playing="onMediaPlaying"
           @pause="onMediaPaused"
           @ended="onMediaEnded"
@@ -147,7 +145,7 @@
       <button v-if="!isSelectedVideo" @click="contextCopyImage">复制到剪贴板</button><button @click="contextCopyPath">复制文件路径</button><button @click="contextCopyJson">复制媒体元信息 JSON</button><button @click="openCurrentWithSystem">使用系统默认程序打开</button><button @click="showCurrentInFolder">在资源管理器中显示</button>
     </div>
   </section>
-  <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel }">
+  <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
     <h3>个性化信息</h3>
     <label>标题</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">是否保存修改？ ——</span><button class="btn btn-primary" @click="confirmEdit">是</button><button class="btn" @click="cancelEdit">否</button></div>
@@ -276,6 +274,19 @@
     <button class="btn icon-btn" data-tip="显示/隐藏个性化信息" @click="toggleRightPanel"><img class="icon" :src="ICONS.customization" alt="显示/隐藏个性化信息" /></button>
   </div>
 </footer>
+<div class="tag-modal-backdrop" v-if="pendingViewerTransition.visible" @click="cancelViewerTransition">
+  <section class="library-confirm-modal viewer-unsaved-modal" role="dialog" aria-modal="true" aria-labelledby="viewer-unsaved-title" @click.stop>
+    <header class="tag-manager-header"><h3 id="viewer-unsaved-title">尚未保存修改</h3></header>
+    <div class="library-confirm-body">
+      <p>当前媒体的个性化信息尚未保存。你可以先保存再继续，也可以放弃本次修改。</p>
+      <div class="tag-create-actions">
+        <button class="btn" :disabled="saving" @click="cancelViewerTransition">取消</button>
+        <button class="btn" :disabled="saving" @click="discardAndContinueViewerTransition">放弃修改</button>
+        <button class="btn btn-primary" :disabled="saving" @click="saveAndContinueViewerTransition">{{ saving ? '正在保存' : '保存并继续' }}</button>
+      </div>
+    </div>
+  </section>
+</div>
 </template>
 
 <script setup>
@@ -340,8 +351,10 @@ const {
   isSelectedVideo,
   showContextMenu,
   contextPosition,
+  pendingViewerTransition,
   editDraft,
   editingDirty,
+  saving,
   activeEditField,
   saveNotice,
   STAR_LEVELS,
@@ -360,6 +373,9 @@ const {
   endDrag,
   openContextMenu,
   switchPhoto,
+  cancelViewerTransition,
+  saveAndContinueViewerTransition,
+  discardAndContinueViewerTransition,
   startDrag,
   toggleFullscreen,
   buildImageUrl,
@@ -377,7 +393,6 @@ const {
   onAudioLoadedMetadata,
   onAudioPlaybackError,
   onVideoVolumeChange,
-  onVideoRateChange,
   onMediaPlaying,
   onMediaPaused,
   onMediaEnded,

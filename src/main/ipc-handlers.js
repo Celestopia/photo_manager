@@ -154,7 +154,6 @@ function registerIpcHandlers(options) {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle("maintenance:get-state", async () => toSerializable(runtime.maintenanceState));
   ipcMain.handle("maintenance:start", async (_, payload) => {
     const operation = String(payload?.operation || "");
     if (!["update", "verify", "thumbnails", "export"].includes(operation)) return { ok: false, error: "Unknown maintenance operation" };

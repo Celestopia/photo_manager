@@ -25,6 +25,7 @@ export function useMediaEditor({
     HiddenDescription: "",
   });
   const editingDirty = ref(false);
+  const saving = ref(false);
   const activeEditField = ref("");
 
   function autoGrowFieldTextarea(element) {
@@ -92,13 +93,15 @@ export function useMediaEditor({
   }
 
   function cancelEdit() {
+    if (saving.value) return;
     saveNotice.visible = false;
     saveNotice.field = "";
     setDraftFromItem(selectedItem.value);
   }
 
   async function confirmEdit() {
-    if (!selectedItem.value) return;
+    if (!selectedItem.value || saving.value) return false;
+    saving.value = true;
     const saveField = activeEditField.value || "Title";
     const payload = {
       mediaId: selectedItem.value.MediaId,
@@ -114,21 +117,34 @@ export function useMediaEditor({
       },
       location: { LocationId: editDraft.LocationId, Detail: editDraft.LocationDetail },
     };
-    const result = await api.updateCustomization(payload);
-    if (result.ok) {
-      selectedItem.value = result.item;
-      syncUpdatedItems?.([result.item]);
-      setDraftFromItem(result.item, true);
-      activeEditField.value = saveField;
-      showSaveNotice("已修改", saveField);
-      await refreshRegistries?.();
-    } else {
+    try {
+      const result = await api.updateCustomization(payload);
+      if (result.ok) {
+        selectedItem.value = result.item;
+        syncUpdatedItems?.([result.item]);
+        setDraftFromItem(result.item, true);
+        activeEditField.value = saveField;
+        showSaveNotice("已修改", saveField);
+        try {
+          await refreshRegistries?.();
+        } catch (error) {
+          showToastMessage(`修改已保存，但注册表刷新失败：${error?.message || "未知错误"}`);
+        }
+        return true;
+      }
       showToastMessage(`修改失败：${result?.error || "未知错误"}`);
+      return false;
+    } catch (error) {
+      showToastMessage(`修改失败：${error?.message || "未知错误"}`);
+      return false;
+    } finally {
+      saving.value = false;
     }
   }
 
   function resetEditorState() {
     editingDirty.value = false;
+    saving.value = false;
     activeEditField.value = "";
     Object.assign(editDraft, {
       Title: "",
@@ -178,6 +194,7 @@ export function useMediaEditor({
   return {
     editDraft,
     editingDirty,
+    saving,
     activeEditField,
     setDraftFromItem,
     requestEdit,

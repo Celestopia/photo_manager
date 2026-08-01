@@ -4,6 +4,7 @@ const {
   assertUuidV4,
 } = require("./identity-schema.js");
 const { assertCustomization } = require("./customization-schema.js");
+const { assertExactObjectKeys } = require("./object-schema.js");
 
 function requireTrimmedText(value, context) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${context} must be a non-empty string`);
@@ -25,6 +26,7 @@ function validateSimpleRegistryEntries(entries, options) {
   for (let index = 0; index < entries.length; index += 1) {
     const item = entries[index];
     const context = `${kind} registry record ${index + 1}`;
+    assertExactObjectKeys(item, [idKey, labelKey, "Description", "CreatedAt", "UpdatedAt"], context);
     const id = assertUuidV4(item?.[idKey], `${idKey} in ${context}`);
     const label = requireTrimmedText(item?.[labelKey], `${labelKey} in ${context}`);
     if (byId.has(id)) throw new Error(`${kind} registry contains duplicate ${idKey}: ${id}`);
@@ -68,6 +70,9 @@ function validateLocationRegistryEntries(entries) {
   for (let index = 0; index < entries.length; index += 1) {
     const item = entries[index];
     const context = `location registry record ${index + 1}`;
+    assertExactObjectKeys(item, [
+      "LocationId", "Name", "Country", "Province", "City", "ParentId", "Description", "CreatedAt", "UpdatedAt",
+    ], context);
     const id = assertUuidV4(item?.LocationId, `LocationId in ${context}`);
     if (byId.has(id)) throw new Error(`Location registry contains duplicate LocationId: ${id}`);
     requireTrimmedText(item?.Name, `Name in ${context}`);
@@ -138,9 +143,9 @@ function validateMediaEntries(entries, registries = {}) {
       if (!knownPeople.has(id)) throw new Error(`Unknown PersonId for ${filePath}: ${id}`);
     }
 
-    if (!item.Location || typeof item.Location !== "object" || Array.isArray(item.Location)) {
-      throw new Error(`Location must be an object for ${filePath}`);
-    }
+    if (!item.Location || typeof item.Location !== "object" || Array.isArray(item.Location)) throw new Error(`Location must be an object for ${filePath}`);
+    const unknownLocationFields = Object.keys(item.Location).filter((field) => !["LocationId", "Detail"].includes(field));
+    if (unknownLocationFields.length) throw new Error(`Location contains unsupported field for ${filePath}: ${unknownLocationFields.join(", ")}`);
     if (!Object.prototype.hasOwnProperty.call(item.Location, "LocationId")) {
       throw new Error(`LocationId is required for ${filePath}`);
     }

@@ -27,10 +27,15 @@ function snapshot() {
 
 function customization(values = {}) {
   return {
+    Title: "",
     Privacy: 1,
+    Rating: 1,
     AlbumId: null,
     TagIds: [],
     PersonIds: [],
+    Description: "",
+    HiddenDescription: "",
+    MetadataUpdateDate: null,
     ...values,
   };
 }
@@ -51,13 +56,12 @@ test("rebuilt records preserve user-authored customization and location", () => 
   };
   const old = {
     MediaId: MEDIA_IDS.current,
-    Customization: customization({ Title: "Saved", Category: "legacy" }),
+    Customization: customization({ Title: "Saved" }),
     Location: { LocationId: locationId, Detail: "A" },
   };
   const result = preserveUserFields(built, old);
   assert.equal(result.MediaId, MEDIA_IDS.current);
   assert.equal(result.Customization.Title, "Saved");
-  assert.equal(Object.hasOwn(result.Customization, "Category"), false);
   assert.deepEqual(result.Location, { LocationId: locationId, Detail: "A" });
 });
 

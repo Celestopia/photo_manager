@@ -15,6 +15,7 @@ export function useGallerySelection({
   const gallerySelection = ref(new Set());
   const batchEdit = reactive({ title: "", rating: null, privacy: null, albumId: null, tagIds: [], personIds: [], locationId: null });
   const batchStatus = reactive({ visible: false, tone: "info", message: "" });
+  const applyingBatchEdit = ref(false);
 
   const selectedGalleryCount = computed(() => gallerySelection.value.size);
   const batchHasChanges = computed(() => (
@@ -26,7 +27,7 @@ export function useGallerySelection({
     || batchEdit.personIds.length > 0
     || Boolean(batchEdit.locationId)
   ));
-  const canApplyBatchEdit = computed(() => selectedGalleryCount.value > 0 && batchHasChanges.value);
+  const canApplyBatchEdit = computed(() => !applyingBatchEdit.value && selectedGalleryCount.value > 0 && batchHasChanges.value);
 
   function enterSelectionMode() {
     isSelectionMode.value = true;
@@ -113,6 +114,7 @@ export function useGallerySelection({
   }
 
   async function applyBatchEdit() {
+    if (applyingBatchEdit.value) return;
     const mediaIds = [...gallerySelection.value];
     if (!mediaIds.length) {
       showToastMessage("请先选择媒体");
@@ -133,26 +135,39 @@ export function useGallerySelection({
       return;
     }
 
-    const result = await api.batchUpdateMetadata({ mediaIds, addTagIds, addPersonIds, locationPatch, customizationPatch });
-    if (!result?.ok) {
-      const message = `批量修改失败：${result?.error || "未知错误"}`;
+    applyingBatchEdit.value = true;
+    try {
+      const result = await api.batchUpdateMetadata({ mediaIds, addTagIds, addPersonIds, locationPatch, customizationPatch });
+      if (!result?.ok) {
+        const message = `批量修改失败：${result?.error || "未知错误"}`;
+        showToastMessage(message);
+        setBatchStatus("error", message);
+        return;
+      }
+
+      const updatedItems = Array.isArray(result.items) ? result.items : [];
+      syncUpdatedItemsIntoGallery(updatedItems);
+      try {
+        await refreshRegistries?.();
+      } catch (error) {
+        showToastMessage(`批量修改已保存，但注册表刷新失败：${error?.message || "未知错误"}`);
+      }
+      const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
+      const missingCount = Number(result.missingCount || 0);
+      const requestedCount = Number(result.requestedCount || mediaIds.length || 0);
+      const detail = missingCount > 0
+        ? `批量修改完成：成功 ${updatedCount} 个，失败 ${missingCount} 个（请求 ${requestedCount} 个）`
+        : `批量修改完成：成功 ${updatedCount} 个媒体`;
+      showToastMessage(detail);
+      clearBatchEditInputs({ keepStatus: true });
+      setBatchStatus(missingCount > 0 ? "warning" : "success", detail);
+    } catch (error) {
+      const message = `批量修改失败：${error?.message || "未知错误"}`;
       showToastMessage(message);
       setBatchStatus("error", message);
-      return;
+    } finally {
+      applyingBatchEdit.value = false;
     }
-
-    const updatedItems = Array.isArray(result.items) ? result.items : [];
-    syncUpdatedItemsIntoGallery(updatedItems);
-    await refreshRegistries?.();
-    const updatedCount = Number(result.updatedCount || updatedItems.length || 0);
-    const missingCount = Number(result.missingCount || 0);
-    const requestedCount = Number(result.requestedCount || mediaIds.length || 0);
-    const detail = missingCount > 0
-      ? `批量修改完成：成功 ${updatedCount} 个，失败 ${missingCount} 个（请求 ${requestedCount} 个）`
-      : `批量修改完成：成功 ${updatedCount} 个媒体`;
-    showToastMessage(detail);
-    clearBatchEditInputs({ keepStatus: true });
-    setBatchStatus(missingCount > 0 ? "warning" : "success", detail);
   }
 
   return {
@@ -160,6 +175,7 @@ export function useGallerySelection({
     gallerySelection,
     batchEdit,
     batchStatus,
+    applyingBatchEdit,
     selectedGalleryCount,
     batchHasChanges,
     canApplyBatchEdit,

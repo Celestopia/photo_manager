@@ -241,14 +241,14 @@ function parseMediaDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-async function inspectMediaFile(filePath, workspaceRoot) {
+async function inspectMediaFile(filePath, libraryRoot) {
   const ext = path.extname(filePath);
   const type = extensionType(ext);
   if (!type) return null;
   const stat = await fsp.stat(filePath);
   return {
     filePath,
-    relativePath: path.relative(workspaceRoot, filePath).replace(/\\/g, "/"),
+    relativePath: path.relative(libraryRoot, filePath).replace(/\\/g, "/"),
     ext,
     type,
     stat,
@@ -261,8 +261,8 @@ async function inspectMediaFile(filePath, workspaceRoot) {
  * Build one metadata record from an on-disk file.
  * Reads filesystem stats, hash, and EXIF fields (for images).
  */
-async function buildMetadata(filePath, workspaceRoot, options = {}) {
-  const snapshot = options.snapshot || await inspectMediaFile(filePath, workspaceRoot);
+async function buildMetadata(filePath, libraryRoot, options = {}) {
+  const snapshot = options.snapshot || await inspectMediaFile(filePath, libraryRoot);
   if (!snapshot) return null;
   const { ext, type, stat, creation, modified, relativePath } = snapshot;
   const hash = options.hash || await sha256File(filePath);

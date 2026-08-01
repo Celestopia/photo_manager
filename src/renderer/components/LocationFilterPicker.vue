@@ -74,13 +74,8 @@ function openDropdown() {
     closeDropdown();
     return;
   }
-  window.dispatchEvent(new CustomEvent("gallery-filter-picker-open", { detail: pickerId }));
   window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: pickerId }));
   dropdownOpen.value = true;
-}
-
-function closeFromOtherPicker(event) {
-  if (event.detail !== pickerId) closeDropdown();
 }
 
 function closeFromOtherSurface(event) {
@@ -104,13 +99,11 @@ async function selectRegion(region) {
 
 onMounted(() => {
   window.addEventListener("click", closeDropdown);
-  window.addEventListener("gallery-filter-picker-open", closeFromOtherPicker);
   window.addEventListener("gallery-transient-open", closeFromOtherSurface);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("click", closeDropdown);
-  window.removeEventListener("gallery-filter-picker-open", closeFromOtherPicker);
   window.removeEventListener("gallery-transient-open", closeFromOtherSurface);
 });
 

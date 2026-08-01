@@ -50,10 +50,12 @@ test("application config creation and fallback preserve the on-disk contract", (
   assert.deepEqual(created, { config: CONFIG_DEFAULTS, warning: "" });
   assert.equal(fs.existsSync(configPath), true);
 
-  fs.writeFileSync(configPath, "ui:\n  language: en-US\n  gallery:\n    minCardWidth: 240\n", "utf8");
+  fs.writeFileSync(configPath, "thumbnail:\n  size: 480\n  obsolete: true\nui:\n  language: en-US\n  gallery:\n    minCardWidth: 240\n    pageSize: 100\n", "utf8");
   const normalized = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
+  assert.deepEqual(normalized.config.thumbnail, { size: 480 });
   assert.equal(normalized.config.ui.gallery.minCardWidth, 240);
   assert.equal(Object.hasOwn(normalized.config.ui, "language"), false);
+  assert.equal(Object.hasOwn(normalized.config.ui.gallery, "pageSize"), false);
 
   const invalidSource = "ui: [\n";
   fs.writeFileSync(configPath, invalidSource, "utf8");
@@ -282,8 +284,7 @@ test("simple registry updates names atomically without rewriting media reference
     kind: "Tag", keyLabel: "Tag text", idKey: "TagId", definitionKey: "Text",
     responseItemKey: "tag", responseListKey: "tags", dataFileName: "tag_registry.jsonl",
     descriptionRequired: false, normalize: (value) => String(value ?? "").trim(),
-    readKey: (payload) => payload?.text, readId: (payload) => payload?.tagId,
-    readDescription: (payload) => payload?.description, getRegistry: () => registry,
+    payloadKey: "text", payloadIdKey: "tagId", getRegistry: () => registry,
     setRegistry: () => {}, getMetadata: () => metadata, setMetadata: () => {},
     requireOpenLibrary: () => {}, prepareLibraryWrite: async () => {},
     saveRegistry: async () => { saveCount += 1; if (failWrite) throw new Error("disk full"); },
@@ -302,6 +303,10 @@ test("simple registry updates names atomically without rewriting media reference
   assert.equal(renamed.tag.CreatedAt, createdAt);
   assert.notEqual(renamed.tag.UpdatedAt, createdAt);
   assert.deepEqual([...metadata.entries()], metadataBefore);
+
+  const obsoletePayload = await service.update({ TagId: IDS.tag, Text: "旧接口", Description: "" });
+  assert.equal(obsoletePayload.ok, false);
+  assert.match(obsoletePayload.error, /unsupported field/);
 
   const duplicate = await service.update({ tagId: IDS.tag, text: "校园", description: "" });
   assert.equal(duplicate.ok, false);
@@ -367,6 +372,13 @@ test("location updates names while preserving IDs and rebuilding descendant path
   assert.equal(result.location.CreatedAt, createdAt);
   assert.deepEqual(result.locations.find((location) => location.LocationId === IDS.dining).Path, ["清华园", "清芬园食堂"]);
   assert.deepEqual([...metadata.entries()], metadataBefore);
+
+  const obsoletePayload = await service.update({
+    LocationId: IDS.campus, Name: "旧接口", Country: "中国", Province: "", City: "北京",
+    ParentId: null, Description: "",
+  });
+  assert.equal(obsoletePayload.ok, false);
+  assert.match(obsoletePayload.error, /unsupported field/);
 
   const duplicate = await service.update({
     locationId: IDS.campus, name: "东门", country: "中国", province: "", city: "北京",

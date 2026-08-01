@@ -1,4 +1,7 @@
 const { assertUuidV4, createEntityId } = require("../shared/identity-schema.js");
+const { assertExactObjectKeys } = require("../shared/object-schema.js");
+
+const LOCATION_CREATE_FIELDS = Object.freeze(["name", "country", "province", "city", "parentId", "description"]);
 
 function createLocationRegistryService(options) {
   const {
@@ -30,12 +33,17 @@ function createLocationRegistryService(options) {
 
   async function create(payload) {
     requireOpenLibrary({ writable: true });
-    const name = normalizeName(payload?.name ?? payload?.Name);
+    try {
+      assertExactObjectKeys(payload, LOCATION_CREATE_FIELDS, "Location create payload");
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+    const name = normalizeName(payload.name);
     if (!name) return { ok: false, error: "Location name is required" };
     const locationId = createId();
     let parentValidation;
     try {
-      parentValidation = validateParent(locationId, payload?.parentId ?? payload?.ParentId);
+      parentValidation = validateParent(locationId, payload.parentId);
     } catch (error) {
       return { ok: false, error: error.message };
     }
@@ -45,11 +53,11 @@ function createLocationRegistryService(options) {
     const location = {
       LocationId: locationId,
       Name: name,
-      Country: normalizeField(payload?.country ?? payload?.Country),
-      Province: normalizeField(payload?.province ?? payload?.Province),
-      City: normalizeField(payload?.city ?? payload?.City),
+      Country: normalizeField(payload.country),
+      Province: normalizeField(payload.province),
+      City: normalizeField(payload.city),
       ParentId: parentValidation.parentId,
-      Description: normalizeField(payload?.description ?? payload?.Description),
+      Description: normalizeField(payload.description),
       CreatedAt: now,
       UpdatedAt: now,
     };
@@ -75,18 +83,19 @@ function createLocationRegistryService(options) {
     requireOpenLibrary({ writable: true });
     let locationId;
     try {
-      locationId = assertUuidV4(payload?.locationId ?? payload?.LocationId, "LocationId");
+      assertExactObjectKeys(payload, ["locationId", ...LOCATION_CREATE_FIELDS], "Location update payload");
+      locationId = assertUuidV4(payload.locationId, "LocationId");
     } catch (error) {
       return { ok: false, error: error.message };
     }
     const registry = getRegistry();
     const current = registry.get(locationId);
     if (!current) return { ok: false, error: "Location not found" };
-    const name = normalizeName(payload?.name ?? payload?.Name);
+    const name = normalizeName(payload.name);
     if (!name) return { ok: false, error: "Location name is required" };
     let parentValidation;
     try {
-      parentValidation = validateParent(locationId, payload?.parentId ?? payload?.ParentId);
+      parentValidation = validateParent(locationId, payload.parentId);
     } catch (error) {
       return { ok: false, error: error.message };
     }
@@ -96,11 +105,11 @@ function createLocationRegistryService(options) {
     const next = {
       ...current,
       Name: name,
-      Country: normalizeField(payload?.country ?? payload?.Country),
-      Province: normalizeField(payload?.province ?? payload?.Province),
-      City: normalizeField(payload?.city ?? payload?.City),
+      Country: normalizeField(payload.country),
+      Province: normalizeField(payload.province),
+      City: normalizeField(payload.city),
       ParentId: parentValidation.parentId,
-      Description: normalizeField(payload?.description ?? payload?.Description),
+      Description: normalizeField(payload.description),
       UpdatedAt: new Date().toISOString(),
     };
     if (findDuplicate(next, locationId)) return { ok: false, error: "Location already exists in the same administrative and parent context" };
@@ -120,7 +129,8 @@ function createLocationRegistryService(options) {
     requireOpenLibrary({ writable: true });
     let locationId;
     try {
-      locationId = assertUuidV4(payload?.locationId ?? payload?.LocationId, "LocationId");
+      assertExactObjectKeys(payload, ["locationId"], "Location delete payload");
+      locationId = assertUuidV4(payload.locationId, "LocationId");
     } catch (error) {
       return { ok: false, error: error.message };
     }

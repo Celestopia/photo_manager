@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from "vue";
 import { resolveHorizontalArrowAction } from "../video-playback.mjs";
+import { allowsViewerGlobalShortcut } from "../domain/viewer-keyboard.mjs";
 
 /** Owns one viewer navigation session, shell panels, context actions, and global shortcuts. */
 export function useMediaViewer({
@@ -10,9 +11,11 @@ export function useMediaViewer({
   orderedItems,
   gallerySettingsOpen,
   editingDirty,
+  saving,
   showToastMessage,
   setDraftFromItem,
   confirmEdit,
+  cancelEdit,
   closeRegistryDropdowns,
   resetMediaTransform,
   releaseCurrentMedia,
@@ -29,6 +32,7 @@ export function useMediaViewer({
   const selectedGlobalIndex = ref(-1);
   const showContextMenu = ref(false);
   const contextPosition = reactive({ x: 0, y: 0 });
+  const pendingViewerTransition = reactive({ visible: false, type: "", direction: 0 });
   const showLeftPanel = ref(true);
   const showRightPanel = ref(true);
   let videoClickTimer = null;
@@ -64,7 +68,7 @@ export function useMediaViewer({
     view.value = "viewer";
   }
 
-  function closeViewer() {
+  function performCloseViewer() {
     clearVideoClickTimer();
     releaseCurrentMedia();
     onReturnToGallery?.(selectedItem.value?.MediaId);
@@ -72,7 +76,7 @@ export function useMediaViewer({
     showContextMenu.value = false;
   }
 
-  function switchPhoto(direction) {
+  function performSwitchPhoto(direction) {
     const next = selectedGlobalIndex.value + direction;
     if (next < 0) {
       showToastMessage("已经是第一个媒体");
@@ -89,6 +93,56 @@ export function useMediaViewer({
     setDraftFromItem(selectedItem.value);
     resetMediaTransform();
     resetVideoPlaybackState(selectedItem.value);
+  }
+
+  function requestViewerTransition(type, direction = 0) {
+    if (!editingDirty.value) {
+      if (type === "close") performCloseViewer();
+      if (type === "switch") performSwitchPhoto(direction);
+      return;
+    }
+    closeTransientPanels();
+    Object.assign(pendingViewerTransition, { visible: true, type, direction });
+  }
+
+  function closeViewer() {
+    requestViewerTransition("close");
+  }
+
+  function switchPhoto(direction) {
+    const next = selectedGlobalIndex.value + direction;
+    if (next < 0) {
+      showToastMessage("已经是第一个媒体");
+      return;
+    }
+    if (next >= orderedItems.value.length) {
+      showToastMessage("已经是最后一个媒体");
+      return;
+    }
+    requestViewerTransition("switch", direction);
+  }
+
+  function cancelViewerTransition() {
+    if (saving.value) return;
+    Object.assign(pendingViewerTransition, { visible: false, type: "", direction: 0 });
+  }
+
+  function completePendingViewerTransition() {
+    const { type, direction } = pendingViewerTransition;
+    cancelViewerTransition();
+    if (type === "close") performCloseViewer();
+    if (type === "switch") performSwitchPhoto(direction);
+  }
+
+  async function saveAndContinueViewerTransition() {
+    if (saving.value) return;
+    if (await confirmEdit()) completePendingViewerTransition();
+  }
+
+  function discardAndContinueViewerTransition() {
+    if (saving.value) return;
+    cancelEdit();
+    completePendingViewerTransition();
   }
 
   function openContextMenu(event) {
@@ -166,20 +220,21 @@ export function useMediaViewer({
   function onGlobalKeydown(event) {
     if (view.value !== "viewer") return;
     const active = document.activeElement;
-    const isTypingTarget = Boolean(
-      active
-      && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT" || active.isContentEditable),
-    );
-    const isTextarea = Boolean(active && active.tagName === "TEXTAREA");
-    const isTagInput = Boolean(active?.classList?.contains("tag-input"));
-    const isButtonControl = Boolean(active && (active.tagName === "BUTTON" || active.tagName === "SELECT"));
-    if (event.key === "Enter" && editingDirty.value && !event.isComposing && !isTextarea && !isTagInput) {
+    if (pendingViewerTransition.visible) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cancelViewerTransition();
+      }
+      return;
+    }
+    const allowsGlobalShortcut = allowsViewerGlobalShortcut(active);
+    if (event.key === "Enter" && editingDirty.value && !saving.value
+      && !event.isComposing && !event.repeat && allowsGlobalShortcut) {
       event.preventDefault();
       confirmEdit();
       return;
     }
-    if (isTypingTarget) return;
-    if (isButtonControl && (event.key === " " || event.key === "Enter")) return;
+    if (!allowsGlobalShortcut) return;
     if (isSelectedVideo.value) {
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
@@ -237,12 +292,14 @@ export function useMediaViewer({
     selectedItem.value = null;
     selectedGlobalIndex.value = -1;
     showContextMenu.value = false;
+    cancelViewerTransition();
   }
 
   return {
     selectedGlobalIndex,
     showContextMenu,
     contextPosition,
+    pendingViewerTransition,
     showLeftPanel,
     showRightPanel,
     ratioStyle,
@@ -250,6 +307,9 @@ export function useMediaViewer({
     openViewer,
     closeViewer,
     switchPhoto,
+    cancelViewerTransition,
+    saveAndContinueViewerTransition,
+    discardAndContinueViewerTransition,
     openContextMenu,
     closeTransientPanels,
     toggleLeftPanel,

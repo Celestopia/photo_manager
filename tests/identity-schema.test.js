@@ -49,7 +49,8 @@ function media(overrides = {}) {
       TagIds: [IDS.tag],
       PersonIds: [IDS.person],
       Description: "",
-      PrivateNote: "",
+      HiddenDescription: "",
+      MetadataUpdateDate: null,
     },
     Location: { LocationId: IDS.locationA, Detail: "" },
     ...overrides,
@@ -103,6 +104,9 @@ test("simple registries require unique IDs and globally unique display names", (
     first,
     simpleDefinition("TagId", IDS.tag, "Text", "食堂"),
   ], { idKey: "TagId", labelKey: "Text", kind: "Tag" }), /duplicate TagId/);
+  assert.throws(() => validateSimpleRegistryEntries([
+    { ...first, LegacyName: "旧字段" },
+  ], { idKey: "TagId", labelKey: "Text", kind: "Tag" }), /unsupported field: LegacyName/);
 });
 
 test("locations allow the same name in distinct contexts but reject exact duplicates", () => {
@@ -146,6 +150,9 @@ test("location registries reject unknown parents and parent cycles", () => {
     definition(IDS.locationA, "甲", IDS.locationB),
     definition(IDS.locationB, "乙", IDS.locationA),
   ]), /cycle/);
+  assert.throws(() => validateLocationRegistryEntries([
+    { ...definition(IDS.locationA, "甲", null), ChildrenIds: [] },
+  ]), /unsupported field: ChildrenIds/);
 });
 
 test("media validation accepts ID references and rejects unknown references", () => {
@@ -194,4 +201,14 @@ test("fixed ID reference fields cannot be omitted", () => {
   emptyReferences.Customization.AlbumId = "";
   emptyReferences.Location.LocationId = "";
   assert.throws(() => validateMediaEntries([emptyReferences], indexes), /AlbumId.*must be null/);
+});
+
+test("media validation rejects obsolete customization and extra location fields", () => {
+  const indexes = registries();
+  assert.throws(() => validateMediaEntries([
+    media({ Customization: { ...media().Customization, PrivateNote: "legacy" } }),
+  ], indexes), /unsupported field: PrivateNote/);
+  assert.throws(() => validateMediaEntries([
+    media({ Location: { LocationId: IDS.locationA, Detail: "", Country: "中国" } }),
+  ], indexes), /Location contains unsupported field/);
 });

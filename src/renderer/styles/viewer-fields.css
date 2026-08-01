@@ -1,5 +1,8 @@
 /* Viewer layout, metadata panels, and collapsible field details. */
 
+.viewer-unsaved-modal { width: min(520px, calc(100vw - 48px)); }
+.side-panel.is-saving { cursor: progress; }
+
 .viewer-main { height: calc(100% - 124px); display: grid; gap: 10px; padding: 10px; transition: grid-template-columns 260ms ease; }
 .side-panel { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-card); padding: 12px; overflow: auto; transition: transform 260ms ease, opacity 260ms ease, padding 260ms ease, border-width 260ms ease; }
 .side-panel.left-panel.collapsed { opacity: 0; transform: translateX(-16px) scale(0.96); padding: 0; border-width: 0; pointer-events: none; overflow: hidden; }

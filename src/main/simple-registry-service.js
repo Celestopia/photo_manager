@@ -1,4 +1,5 @@
 const { createEntityId, assertUuidV4 } = require("../shared/identity-schema.js");
+const { assertExactObjectKeys } = require("../shared/object-schema.js");
 
 function createSimpleRegistryService(options) {
   const {
@@ -11,9 +12,8 @@ function createSimpleRegistryService(options) {
     dataFileName,
     descriptionRequired,
     normalize,
-    readKey,
-    readId,
-    readDescription,
+    payloadKey,
+    payloadIdKey,
     getRegistry,
     setRegistry,
     getMetadata,
@@ -46,8 +46,13 @@ function createSimpleRegistryService(options) {
 
   async function create(payload) {
     requireOpenLibrary({ writable: true });
-    const key = normalize(readKey(payload));
-    const description = normalize(readDescription(payload));
+    try {
+      assertExactObjectKeys(payload, [payloadKey, "description"], `${kind} create payload`);
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+    const key = normalize(payload[payloadKey]);
+    const description = normalize(payload.description);
     if (!key || (descriptionRequired && !description)) {
       return { ok: false, error: descriptionRequired ? `${keyLabel} and description are required` : `${keyLabel} is required` };
     }
@@ -72,12 +77,13 @@ function createSimpleRegistryService(options) {
     requireOpenLibrary({ writable: true });
     let id;
     try {
-      id = assertUuidV4(readId(payload), idKey);
+      assertExactObjectKeys(payload, [payloadIdKey, payloadKey, "description"], `${kind} update payload`);
+      id = assertUuidV4(payload[payloadIdKey], idKey);
     } catch (error) {
       return { ok: false, error: error.message };
     }
-    const key = normalize(readKey(payload));
-    const description = normalize(readDescription(payload));
+    const key = normalize(payload[payloadKey]);
+    const description = normalize(payload.description);
     const registry = getRegistry();
     const current = registry.get(id);
     if (!key || (descriptionRequired && !description)) {
@@ -109,7 +115,8 @@ function createSimpleRegistryService(options) {
     requireOpenLibrary({ writable: true });
     let id;
     try {
-      id = assertUuidV4(readId(payload), idKey);
+      assertExactObjectKeys(payload, [payloadIdKey], `${kind} delete payload`);
+      id = assertUuidV4(payload[payloadIdKey], idKey);
     } catch (error) {
       return { ok: false, error: error.message };
     }

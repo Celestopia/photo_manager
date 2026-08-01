@@ -45,9 +45,6 @@ function preserveUserFields(built, existing) {
   built.MediaId = existing.MediaId;
   built.Customization = existing.Customization || built.Customization;
   built.Location = { ...(built.Location || {}), ...(existing.Location || {}) };
-  if (built.Customization && Object.prototype.hasOwnProperty.call(built.Customization, "Category")) {
-    delete built.Customization.Category;
-  }
   return built;
 }
 
@@ -68,9 +65,6 @@ function cloneMovedRecord(existing, snapshot, hash) {
     ModificationTimeStamp: snapshot.modified.stamp,
     ModificationTimeMs: snapshot.stat.mtimeMs,
   };
-  if (moved.Customization && Object.prototype.hasOwnProperty.call(moved.Customization, "Category")) {
-    delete moved.Customization.Category;
-  }
   return moved;
 }
 

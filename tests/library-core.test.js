@@ -49,9 +49,9 @@ test("library manifest round-trips with a validated UUID and name", async (t) =>
   await writeLibraryManifest(paths, manifest);
   assert.deepEqual(await readLibraryManifest(paths), manifest);
 
-  const descriptiveVersion = { ...manifest, schemaVersion: 17 };
-  await writeLibraryManifest(paths, descriptiveVersion);
-  assert.deepEqual(await readLibraryManifest(paths), descriptiveVersion);
+  await assert.rejects(writeLibraryManifest(paths, { ...manifest, schemaVersion: 17 }), /Unsupported library schemaVersion/);
+  await assert.rejects(writeLibraryManifest(paths, { ...manifest, schemaVersion: undefined }), /Unsupported library schemaVersion/);
+  await assert.rejects(writeLibraryManifest(paths, { ...manifest, legacyPath: root }), /unsupported field: legacyPath/);
 });
 
 test("strict JSONL rejects invalid lines and duplicate keys", async (t) => {

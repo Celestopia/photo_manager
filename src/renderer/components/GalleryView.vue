@@ -106,7 +106,7 @@
       </template>
     </section>
   </section>
-  <aside class="side-panel batch-panel" v-if="isSelectionMode">
+  <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': applyingBatchEdit }" :inert="applyingBatchEdit ? '' : undefined" :aria-busy="applyingBatchEdit">
     <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
     <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 个媒体</div>
     <label>批量设置标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
@@ -136,7 +136,7 @@
     <LocationPicker target="batch" placeholder="搜索已有地点" />
     <div class="batch-actions">
       <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges">清空输入</button>
-      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">应用到所选媒体</button>
+      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">{{ applyingBatchEdit ? '正在应用' : '应用到所选媒体' }}</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>
@@ -184,6 +184,7 @@ const {
   selectedGalleryCount,
   batchEdit,
   batchStatus,
+  applyingBatchEdit,
   total,
   galleryGroups,
   loading,

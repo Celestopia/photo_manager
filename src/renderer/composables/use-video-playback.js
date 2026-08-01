@@ -43,7 +43,6 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   const hasVideoPlaybackStarted = ref(false);
   const videoVolume = ref(readStoredNumber("photoManager.videoVolume", 1, 0, 1));
   const videoMuted = ref(readStoredBoolean("photoManager.videoMuted", false));
-  const videoPlaybackRate = ref(readStoredNumber("photoManager.videoPlaybackRate", 1, 0.25, 4));
   let resumeAfterSeek = false;
 
   const isSelectedVideo = computed(() => selectedItem.value?.FileSystem?.FileType === "video");
@@ -79,7 +78,6 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     if (!element) return;
     element.volume = Math.min(1, Math.max(0, Number(videoVolume.value)));
     element.muted = Boolean(videoMuted.value);
-    element.playbackRate = Math.min(4, Math.max(0.25, Number(videoPlaybackRate.value)));
   }
 
   function resetRuntimePlaybackState() {
@@ -230,21 +228,6 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     videoMuted.value = element.muted;
     savePreference("photoManager.videoVolume", videoVolume.value);
     savePreference("photoManager.videoMuted", videoMuted.value);
-  }
-
-  function onVideoRateChange(event) {
-    const element = currentPlaybackElement(
-      event,
-      event?.currentTarget?.tagName === "AUDIO" ? audioElementRef : videoElementRef,
-    );
-    if (!element || !Number.isFinite(element.playbackRate)) return;
-    const rate = Math.min(4, Math.max(0.25, element.playbackRate));
-    if (element.playbackRate !== rate) {
-      element.playbackRate = rate;
-      return;
-    }
-    videoPlaybackRate.value = rate;
-    savePreference("photoManager.videoPlaybackRate", rate);
   }
 
   function onMediaPlaying(event) {
@@ -426,7 +409,6 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     hasVideoPlaybackStarted,
     videoVolume,
     videoMuted,
-    videoPlaybackRate,
     isSelectedVideo,
     canStepVideoBackward,
     canStepVideoForward,
@@ -441,7 +423,6 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     onAudioLoadedMetadata,
     onAudioPlaybackError,
     onVideoVolumeChange,
-    onVideoRateChange,
     onMediaPlaying,
     onMediaPaused,
     onMediaEnded,

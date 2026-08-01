@@ -48,7 +48,7 @@ async function run(options = {}) {
     validateMetadataPaths(paths, existing.values());
     const mediaItems = [...existing.values()].filter((item) => ["image", "video"].includes(item?.FileSystem?.FileType));
     const stats = await ensureThumbnailsForItems(mediaItems, {
-      workspaceRoot: paths.root,
+      libraryRoot: paths.root,
       cacheDir: paths.thumbnailDir,
       options: thumbnailConfig,
       maxConcurrency: thumbnailConfig.maxConcurrency,

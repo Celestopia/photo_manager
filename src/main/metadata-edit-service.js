@@ -1,4 +1,11 @@
-const { assertPrivacy } = require("../shared/customization-schema.js");
+const {
+  EDITABLE_CUSTOMIZATION_FIELDS,
+  assertCustomizationPatch,
+} = require("../shared/customization-schema.js");
+const { assertUuidArray, assertUuidV4 } = require("../shared/identity-schema.js");
+const { assertExactObjectKeys } = require("../shared/object-schema.js");
+
+const BATCH_CUSTOMIZATION_FIELDS = Object.freeze(["Title", "Rating", "Privacy", "AlbumId"]);
 
 function createMetadataEditService(options) {
   const {
@@ -15,7 +22,7 @@ function createMetadataEditService(options) {
   } = options;
 
   function validateCustomizationReferences(customization) {
-    if (Object.prototype.hasOwnProperty.call(customization, "Privacy")) assertPrivacy(customization.Privacy);
+    assertCustomizationPatch(customization, EDITABLE_CUSTOMIZATION_FIELDS);
     if (Object.prototype.hasOwnProperty.call(customization, "TagIds")) {
       const validation = normalizeRegisteredTags(customization.TagIds);
       if (validation.unknown.length) throw new Error(`Unknown TagId: ${validation.unknown.join(", ")}`);
@@ -35,10 +42,25 @@ function createMetadataEditService(options) {
 
   async function updateCustomization(payload) {
     requireOpenLibrary({ writable: true });
-    const mediaId = String(payload?.mediaId || "").trim();
-    const customization = payload?.customization && typeof payload.customization === "object"
-      ? { ...payload.customization }
-      : {};
+    try {
+      assertExactObjectKeys(payload, ["mediaId", "customization", "location"], "Metadata update payload");
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+    let mediaId;
+    try {
+      mediaId = assertUuidV4(payload.mediaId, "mediaId");
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+    if (payload.customization !== undefined && (!payload.customization || typeof payload.customization !== "object" || Array.isArray(payload.customization))) {
+      return { ok: false, error: "customization must be an object" };
+    }
+    if (payload.location !== undefined && payload.location !== null
+      && (typeof payload.location !== "object" || Array.isArray(payload.location))) {
+      return { ok: false, error: "location must be an object or null" };
+    }
+    const customization = { ...(payload.customization || {}) };
     const location = payload?.location;
     const metadata = getMetadata();
     const current = metadata.get(mediaId);
@@ -54,6 +76,8 @@ function createMetadataEditService(options) {
     let normalizedLocation = null;
     if (location && typeof location === "object") {
       try {
+        assertExactObjectKeys(location, ["LocationId", "Detail"], "Location patch");
+        if (typeof location.Detail !== "string") throw new Error("Location patch.Detail must be a string");
         const validation = normalizeRegisteredLocation(location);
         if (validation.unknown.length) return { ok: false, error: `Unknown LocationId: ${validation.unknown.join(", ")}` };
         normalizedLocation = validation.location;
@@ -67,7 +91,6 @@ function createMetadataEditService(options) {
       ...customization,
       MetadataUpdateDate: new Date().toISOString(),
     };
-    delete current.Customization.Category;
     if (normalizedLocation) current.Location = normalizedLocation;
     metadata.set(mediaId, current);
 
@@ -83,16 +106,36 @@ function createMetadataEditService(options) {
 
   async function batchUpdate(payload) {
     requireOpenLibrary({ writable: true });
-    const mediaIds = Array.isArray(payload?.mediaIds) ? payload.mediaIds : [];
-    const addTagIds = Array.isArray(payload?.addTagIds) ? payload.addTagIds : [];
-    const addPersonIds = Array.isArray(payload?.addPersonIds) ? payload.addPersonIds : [];
-    const locationPatch = payload?.locationPatch && typeof payload.locationPatch === "object" ? { ...payload.locationPatch } : {};
-    const customizationPatch = payload?.customizationPatch && typeof payload.customizationPatch === "object" ? { ...payload.customizationPatch } : {};
+    try {
+      assertExactObjectKeys(
+        payload,
+        ["mediaIds", "addTagIds", "addPersonIds", "locationPatch", "customizationPatch"],
+        "Batch metadata update payload",
+      );
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+    if (!Array.isArray(payload.mediaIds) || !Array.isArray(payload.addTagIds) || !Array.isArray(payload.addPersonIds)) {
+      return { ok: false, error: "mediaIds, addTagIds, and addPersonIds must be arrays" };
+    }
+    if (!payload.locationPatch || typeof payload.locationPatch !== "object" || Array.isArray(payload.locationPatch)
+      || !payload.customizationPatch || typeof payload.customizationPatch !== "object" || Array.isArray(payload.customizationPatch)) {
+      return { ok: false, error: "locationPatch and customizationPatch must be objects" };
+    }
+    const mediaIds = [...payload.mediaIds];
+    const addTagIds = [...payload.addTagIds];
+    const addPersonIds = [...payload.addPersonIds];
+    const locationPatch = { ...payload.locationPatch };
+    const customizationPatch = { ...payload.customizationPatch };
     if (!mediaIds.length) return { ok: false, error: "No target MediaIds" };
 
     let tagValidation;
     let peopleValidation;
     try {
+      assertUuidArray(mediaIds, "mediaIds");
+      assertUuidArray(addTagIds, "addTagIds");
+      assertUuidArray(addPersonIds, "addPersonIds");
+      assertCustomizationPatch(customizationPatch, BATCH_CUSTOMIZATION_FIELDS, "Batch customization patch");
       validateCustomizationReferences(customizationPatch);
       tagValidation = normalizeRegisteredTags(addTagIds);
       peopleValidation = normalizeRegisteredPeople(addPersonIds);
@@ -103,6 +146,11 @@ function createMetadataEditService(options) {
     if (peopleValidation.unknown.length) return { ok: false, error: `Unknown PersonId: ${peopleValidation.unknown.join(", ")}` };
 
     let normalizedLocationPatch = null;
+    try {
+      assertExactObjectKeys(locationPatch, ["LocationId"], "Batch location patch");
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
     if (Object.prototype.hasOwnProperty.call(locationPatch, "LocationId")) {
       try {
         const validation = normalizeRegisteredLocation({ LocationId: locationPatch.LocationId, Detail: "" });
@@ -136,7 +184,6 @@ function createMetadataEditService(options) {
         PersonIds: mergedPersonIds,
         MetadataUpdateDate: new Date().toISOString(),
       };
-      delete current.Customization.Category;
       current.Location = normalizeLocationObject(current.Location);
       if (normalizedLocationPatch) current.Location.LocationId = normalizedLocationPatch.LocationId;
       metadata.set(mediaId, current);

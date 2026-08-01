@@ -35,7 +35,7 @@ npm start
 
 `npm start` builds the Vue renderer and launches Electron. If the shell has set `ELECTRON_RUN_AS_NODE`, the project launcher clears it automatically.
 
-The application opens the last successfully used library when possible. Otherwise it shows the library entry page:
+The application always starts on the library entry page and prefills the last successfully used library when available:
 
 1. Select an existing library root to open it.
 2. Select an ordinary directory to initialize a new library.
@@ -74,7 +74,7 @@ The gallery mixes images and videos on one shooting-time timeline. Its collapsib
 
 Thumbnail generation is explicit. Opening a library and updating metadata do not generate thumbnails automatically; media without a cached thumbnail use image or video placeholders until **Generate Thumbnails** is run from the gallery settings menu or the maintenance script.
 
-The viewer shares title, rating, privacy level, album, location, people, tags, description, and hidden-description fields across both media types. Privacy is an integer from 1 (lowest privacy requirement) to 5 (highest) and defaults to 1. Its controls are collapsed below rating by default and remain expanded or collapsed while browsing between media. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu.
+The viewer shares title, rating, privacy level, album, location, people, tags, description, and hidden-description fields across both media types. Privacy is an integer from 1 (lowest privacy requirement) to 5 (highest) and defaults to 1. Its controls are collapsed below rating by default and remain expanded or collapsed while browsing between media. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu. Leaving the current media with an unsaved draft requires an explicit choice to save, discard, or remain in place.
 
 Each media record has a stable lowercase UUID v4 `MediaId`. Album, tag, person, and location references also use registry UUIDs rather than display text. Moving or renaming a file inside one library preserves its `MediaId`; a coexisting duplicate or a file imported into another library receives a new one. `FilePath` remains the current relative location and SHA-256 remains the content fingerprint, so neither is treated as the record identity.
 
@@ -104,11 +104,11 @@ Videos use a fixed in-app control bar over Electron's native video element, with
 - After playback, scrubbing, or frame stepping starts the playback session, `Left/Right` seeks 5 seconds even while paused; `Shift+Left/Right` browses media.
 - `Space` toggles play/pause.
 - `,` and `.` step approximately one frame backward/forward.
-- Volume, mute, and playback rate persist; playback position does not.
+- Volume and mute persist; playback rate and playback position do not.
 
 ## Command-Line Maintenance
 
-Every script requires an explicit library root. No script reads a workspace path from `config.yml`.
+Every script requires an explicit library root. No script infers a library path from `config.yml`.
 
 ```powershell
 npm run init-metadata -- --library "D:\Media\Example Library"
@@ -139,7 +139,7 @@ Library paths and internal data directories are intentionally not configurable. 
 
 ## Data Safety
 
-- JSONL is loaded strictly; invalid JSON, duplicate paths or globally duplicated IDs, unknown registry references, missing fixed fields/files, an invalid manifest, or a Privacy value outside integer levels 1-5 rejects the entire library.
+- Library data is loaded strictly; invalid JSON, duplicate paths or globally duplicated IDs, unknown registry references, missing current fields, unknown manifest/registry/customization/location fields, an unsupported manifest schema version, or Rating/Privacy outside integer levels 1-5 rejects the entire library. Historical schema variants require an explicit one-time conversion and are not accepted through permanent compatibility paths.
 - Individual files are written through temporary-file replacement.
 - User data writes create automatic library backups first.
 - Global registry deletion uses a recoverable multi-file transaction because it can change both a registry and media metadata.
@@ -157,4 +157,4 @@ npm run verify-metadata -- --library "D:\Media\Example Library"
 git diff --check
 ```
 
-The automated suite covers library boundaries, strict JSONL, Privacy validation and editing, locks, backups, transaction rollback, FFmpeg integration, metadata normalization, incremental updates, CSV export, thumbnails, and video keyboard/frame behavior.
+The automated suite covers library boundaries, strict current schemas and mutation payloads, Rating/Privacy validation and editing, locks, backups, transaction rollback, FFmpeg integration, metadata normalization, incremental updates, CSV export, thumbnails, and viewer/video keyboard behavior.

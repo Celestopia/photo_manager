@@ -57,7 +57,7 @@ test("bundled FFmpeg probes a generated MP4 and creates a WebP thumbnail", { tim
     assert.equal(item.Video.DisplayHeight, 180);
 
     const generated = await ensureThumbnailForItem(item, {
-      workspaceRoot: tempRoot,
+      libraryRoot: tempRoot,
       cacheDir,
       options: normalizeThumbnailConfig({ size: 160 }),
       mediaConfig,

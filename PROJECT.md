@@ -120,8 +120,8 @@ updatedAt: '2026-07-12T17:13:02.959Z'
 - `libraryId` 是创建图库时生成的 UUID，是图库的稳定身份。
 - 图库移动到新路径后 UUID 不变，仍视为同一图库。
 - `name` 是可编辑的显示名称，长度为 1 到 100 个字符。
-- `schemaVersion` 是说明图库数据契约的提示字段；当前新图库写入 `4`，运行时不根据该值选择解析、兼容或迁移逻辑。
-- manifest 无法解析、UUID 非法或时间字段非法时，图库直接判定为损坏。
+- `schemaVersion` 必须严格等于当前版本 `4`。应用不包含历史版本解析、兼容或自动迁移逻辑；其它版本必须先通过一次性工具转换，才能由当前应用打开。
+- manifest 只允许上述五个固定字段；字段缺失、出现额外字段、无法解析、UUID 非法或时间字段非法时，图库直接判定为损坏。
 - 五个固定 JSONL 文件缺失时拒绝打开。
 
 ## 5. 图库边界规则
@@ -380,9 +380,9 @@ FFmpeg 不可用时应用仍能显示入口页和错误原因，但禁止初始�
 - `HiddenDescription`：折叠显示的隐藏描述。
 - `MetadataUpdateDate`：最近一次用户字段更新的 ISO 时间。
 
-Privacy 是描述性元数据，不构成访问控制，但参与画廊的显式等级筛选；画廊默认只选择等级 1，用户可切换为全部或任意多个等级。Privacy 不限制剪贴板、系统打开或 CSV 导出。主进程和维护脚本始终按当前结构处理元数据：Privacy 缺失、不是数字整数或超出 1 到 5 时，图库加载或相应维护操作失败并指出具体媒体；manifest 的 `schemaVersion` 不改变这套规则。
+`Customization` 只允许上述九个固定字段，全部字段都必须存在。三个文本字段必须是字符串，Rating 和 Privacy 必须是 1 到 5 的整数，两个多值 ID 数组不得重复，`MetadataUpdateDate` 只能是 `null` 或规范 ISO 时间。`Category`、`PrivateNote` 等旧字段和其它未知字段不会被静默保留或删除，而会使严格加载失败。主进程的单媒体和批量编辑入口只接受相应的可编辑字段白名单，更新时间只由主进程生成，renderer 不能提交任意附加属性。
 
-旧的 `Category` 字段不再使用；任何写入路径都会移除它。
+Privacy 是描述性元数据，不构成访问控制，但参与画廊的显式等级筛选；画廊默认只选择等级 1，用户可切换为全部或任意多个等级。Privacy 不限制剪贴板、系统打开或 CSV 导出。
 
 ### 9.7 `Location`
 
@@ -393,9 +393,11 @@ Privacy 是描述性元数据，不构成访问控制，但参与画廊的显式
 - `LocationId`：零个或一个注册地点 ID；`null` 表示没有主地点。
 - `Detail`：自由文本位置细节，不进入注册表，不参与地点筛选或搜索。
 
+`Location` 只允许 `LocationId` 和 `Detail` 两个字段；行政区属性只属于地点注册表，不能作为媒体地点对象的冗余字段写入。
+
 ## 10. 注册表模型
 
-注册表定义同时保存稳定 ID 和可读名称。媒体只持久化 ID 引用，显示名称由 renderer 从当前注册表解析。ID 不在普通 UI 中展示，但会出现在 JSON、CSV 和诊断信息中。主进程是约束执行边界：即使绕过 UI，格式非法、未知或跨类型冲突的 ID 也不能写入元数据。
+注册表定义同时保存稳定 ID 和可读名称。媒体只持久化 ID 引用，显示名称由 renderer 从当前注册表解析。ID 不在普通 UI 中展示，但会出现在 JSON、CSV 和诊断信息中。四类注册表记录只允许各自模型中定义的固定持久化字段，不能保存 UI 派生属性或旧字段。主进程是约束执行边界：即使绕过 UI，格式非法、未知或跨类型冲突的 ID 也不能写入元数据。
 
 ID 创建后不可变，显示名称可以在对应管理面板中修改。改名只原子更新注册表定义的显示字段、说明和 `UpdatedAt`，保留 ID 与 `CreatedAt`，不遍历或重写媒体元数据。筛选、最近使用、批量草稿及媒体引用继续保存 ID，因此改名后仍保持原选择并从刷新后的注册表解析新名称。四类注册表 ID 与 `MediaId` 共享同一个全局 UUID 命名空间。
 
@@ -536,15 +538,14 @@ min(max(DurationSeconds * 0.1, 1), 10, DurationSeconds / 2)
 
 ### 13.2 播放状态和偏好
 
-跨会话保存应用级音量、静音和倍速：
+跨会话只保存应用级音量和静音：
 
 ```text
 photoManager.videoVolume
 photoManager.videoMuted
-photoManager.videoPlaybackRate
 ```
 
-虽然界面不提供独立倍速控件，运行时变更仍按上述键持久化。播放位置不记忆；切换媒体后从 0 开始，但继承音量、静音和倍速。
+播放位置和倍速不记忆；切换媒体后从 0 开始，并继承音量和静音。
 
 切换、关闭或销毁播放器前必须暂停、移除 `src` 并调用 `load()`，避免后台残留声音和文件句柄。
 
@@ -619,6 +620,8 @@ photoManager.videoPlaybackRate
 图片和可解码视频均支持缩放、拖动、旋转、水平镜像、复原和全屏；视频另外保留逐帧和系统播放器图标。视频不提供复制视频二进制、定位文件或倍速按钮，音频降级与不可播放状态不显示画面变换工具。
 
 右栏字段：标题、评级、隐私等级、相册、地点、位置细节、人物、标签、描述、隐藏描述。小标题使用粗体。标题、位置细节、描述和隐藏描述文本框在出现保存确认后支持 `Ctrl+Enter` 直接确认保存；普通 Enter 继续用于输入换行，`Escape` 只退出当前文本框焦点并保留尚未确认的草稿。隐私等级默认折叠，由“评级”标题右侧的控制按钮展开；展开后显示独立小标题和五级 `PrivacyLevelPicker`，等级 N 累计点亮前 N 个圆圈。位置细节和隐藏描述采用同类折叠交互，控制分别放在所属主字段标题右侧；位置细节文本框展开后缩进，隐私等级和隐藏描述不缩进。三者的折叠状态在当前查看器实例内跨媒体共享，退出查看器后恢复默认状态。
+
+查看器存在未确认草稿时，切换媒体或返回画廊必须显示“保存并继续 / 放弃修改 / 取消”三选确认，不能隐式丢弃。普通 Enter 仅在焦点不属于输入框、文本域、选择框、按钮或可编辑元素时执行当前保存；聚焦控件保留自身 Enter 行为。单媒体保存和批量应用期间设置提交锁，阻止重复请求及继续编辑，直到本次 IPC 完成。
 
 相册、地点、人物和标签均使用“只读触发框 + 菜单内搜索 + 外置新建/管理按钮”。同一时刻只允许一个下拉菜单打开，点击当前菜单及触发框以外的区域会关闭它。相册、标签和人物的平面选项菜单统一由 `RegistryOptionsMenu.vue` 渲染搜索、可选的固定项与分区提示、最近使用、全部列表、选中态、空状态及键盘行为；各外层 picker 继续分别拥有单值、多值 chip 和筛选语义，并按场景决定是否显示最近使用和分区提示。地点因行政区和父子树交互继续使用独立的 `LocationTreeMenu.vue`。
 
@@ -738,21 +741,20 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 - 图库生命周期：`library:get-state`、`library:choose-directory`、`library:inspect`、`library:open`、`library:initialize`、`library:close`、`library:update-info`。
 - 初始化辅助：`library:cancel-scan`、`library:cancel-initialization`、`library:cleanup-failed-initialization`、`library:recheck-media-tools`。
 - 文件夹入口：`library:open-root`、`library:open-manager-dir`、`library:open-log-dir`。
-- 维护：`maintenance:get-state`、`maintenance:start`、`maintenance:show-output`。
+- 维护：`maintenance:start`、`maintenance:show-output`。
 - 查询和编辑：`gallery:query`、`photo:update-customization`、`photo:batch-update`。
 - 四类注册表：各自的 list/create/update/delete-global。
 - 桌面能力：`photo:copy-path`、`photo:copy-json`、`photo:copy-image`、`photo:open-default`、`photo:show-in-folder`、`clipboard:write-text`。
 - 视频诊断：`photo:report-playback`。
 - 窗口：`window:action`、`window:get-state`。
 
-媒体级 IPC 以 `MediaId` 为目标参数；批量编辑传 `mediaIds`。注册表 CRUD 分别使用 `TagId`、`AlbumId`、`PersonId` 和 `LocationId`。`FilePath` 不接受为编辑或桌面操作目标，主进程只在通过 ID 命中内存记录后解析其当前路径。
+媒体级 IPC 以 `MediaId` 为目标参数；批量编辑传 `mediaIds`。持久化数据中的 ID 字段使用 PascalCase，但 renderer 发往主进程的 mutation payload 属性统一使用 camelCase，例如 `mediaId`、`tagId`、`albumId`、`personId`、`locationId`、`parentId`。主进程按每个通道的当前字段白名单拒绝未知属性，不接受旧 PascalCase payload 别名。`FilePath` 不接受为编辑或桌面操作目标，主进程只在通过 ID 命中内存记录后解析其当前路径。
 
 事件通道：
 
 - `library:state-changed`
 - `library:progress`
 - `maintenance:progress`
-- `maintenance:completed`
 - `window:state-changed`
 
 所有媒体路径相关 IPC 必须先从当前 `metadataIndex` 找到记录，再验证最终路径仍在活动图库内。不能接受渲染器直接传入任意绝对路径来执行系统打开或图像复制。
@@ -783,7 +785,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 
 - `main.js`：主进程组合根。创建运行时状态，装配各领域服务，协调图库生命周期、索引加载和维护 worker；不再直接承载成组的 IPC CRUD 或窗口构造细节。
 - `application-runtime.js`：创建单一主进程运行时对象，集中保存活动窗口、活动图库、五类内存索引、维护状态和 worker。每次调用必须返回彼此隔离的新状态，模块不得另建同语义的全局单例。
-- `application-config.js`：读取、规范化、深度合并并保存应用级 `config.yml`。该模块不读取图库数据。
+- `application-config.js`：创建、读取并按当前字段白名单规范化应用级 `config.yml`。该模块不读取图库数据，也不提供运行时配置写入。
 - `simple-registry-catalog.js`：标签、人物和相册共享的严格 ID 注册表加载、使用量统计、排序、写回和引用校验逻辑。
 - `simple-registry-service.js`：标签、人物和相册共享的创建、修改说明、全局删除、备份及内存回滚流程；字段名和删除媒体引用的方式由显式配置传入。
 - `location-domain.js`：不执行 I/O 的地点规范化、父子图、后代集合、路径和循环校验逻辑。
@@ -795,7 +797,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 - `window-manager.js`：BrowserWindow 创建、渲染器诊断、最大化状态通知、维护期间关闭拦截和初始化取消确认。
 - `preload.js`：`contextIsolation` 下唯一允许的 renderer bridge。
 
-`src/shared/identity-schema.js` 定义 UUID v4 创建与验证；`src/shared/customization-schema.js` 定义个性化固定引用字段；`src/shared/library-data-schema.js` 负责跨五个 JSONL 的 ID 全局唯一性、引用完整性、地点重复上下文和父链校验。主进程与 CLI 必须复用这些契约，不得各自实现宽松版本。
+`src/shared/object-schema.js` 提供固定对象字段白名单校验；`src/shared/identity-schema.js` 定义 UUID v4 创建与验证；`src/shared/customization-schema.js` 定义完整个性化字段及编辑补丁契约；`src/shared/library-data-schema.js` 负责跨五个 JSONL 的固定字段、ID 全局唯一性、引用完整性、地点重复上下文和父链校验。主进程与 CLI 必须复用这些契约，不得各自实现宽松版本。
 
 主进程依赖方向固定为：`main.js` 负责装配，`ipc-handlers.js` 调用领域服务，领域服务通过显式 getter/setter 访问 `application-runtime.js` 中的活动会话和索引，底层再调用 `scripts/library-*` 持久化工具。领域模块不能反向导入 IPC 注册器或主窗口。
 
@@ -837,10 +839,10 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 | `use-library-session.js` | 当前一级视图、活动图库摘要、入口页选择/初始化状态、图库信息、设置菜单和维护任务 | 图库初始化与维护进度 IPC 订阅 |
 | `use-gallery-query.js` | 完整查询条件、筛选抽屉会话状态、一次性查看器返回目标、日期分组、顺序媒体集合、统计、筛选项和 `MediaId` 索引 | 请求序号用于丢弃过期响应 |
 | `use-gallery-selection.js` | 选择模式、完整结果上的选中集合、含可选评级和 Privacy 补丁的批量编辑草稿及批量结果 | 无文档级监听器 |
-| `use-media-viewer.js` | 当前媒体索引、查看器左右面板、右键菜单、媒体导航和上下文操作 | 文档点击、键盘快捷键和窗口失焦处理 |
-| `use-media-editor.js` | 单媒体个性化草稿、dirty 状态、活动编辑字段、保存确认和文本域自适应 | 无常驻全局监听器 |
+| `use-media-viewer.js` | 当前媒体索引、查看器左右面板、右键菜单、媒体导航、未保存草稿离开确认和上下文操作 | 文档点击和键盘快捷键 |
+| `use-media-editor.js` | 单媒体个性化草稿、dirty 状态、活动编辑字段、保存确认、提交锁和文本域自适应 | 无常驻全局监听器 |
 | `use-media-transform.js` | 图片/视频共用的适配尺寸、缩放、平移、旋转、镜像、拖动阈值和临时复原状态 | 文档 `mousemove`/`mouseup`；媒体区域 `ResizeObserver` |
-| `use-video-playback.js` | video/audio 元素、固定控件状态、进度拖动、缓冲、播放/音频降级、逐帧、音量、静音和倍速偏好 | 媒体元素事件；偏好写入 `localStorage` |
+| `use-video-playback.js` | video/audio 元素、固定控件状态、进度拖动、缓冲、播放/音频降级、逐帧、音量和静音偏好 | 媒体元素事件；偏好写入 `localStorage` |
 | `use-tag-registry.js` | 标签列表、选择器、创建面板和管理面板 | 标签 IPC，不拥有其它注册表状态 |
 | `use-album-registry.js` | 单值相册列表、选择器、创建面板和管理面板 | 相册 IPC |
 | `use-person-registry.js` | 人物列表、选择器、创建面板和管理面板 | 人物 IPC |
@@ -870,7 +872,7 @@ components/* -> context/renderer-contexts.js -> composition root 提供的能力
 - `LibraryEntryView.vue`：选择图库、媒体工具错误、初始化/加载进度和重试。
 - `GalleryView.vue`：不分页的混合媒体画廊、默认展开的两行可折叠筛选/排序抽屉、单实例右键详情浮层和覆盖完整查询结果的批量编辑；卡片缩略图使用浏览器原生懒加载。
 - `GalleryLevelFilter.vue`：评级和 Privacy 共用的 `全部 + 1..5` 多选分段控件，只展示选择集合并转发全部/等级点击意图。
-- `ViewerView.vue`：图片/视频媒体区域、左右信息面板、查看器工具栏和技术信息；个性化保存由 editor composable 完成。
+- `ViewerView.vue`：图片/视频媒体区域、左右信息面板、查看器工具栏、技术信息和未保存草稿离开确认；个性化保存由 editor composable 完成。
 - `VideoPlaybackControls.vue`：固定视频播放控件，只展示 playback composable 提供的状态并转发播放、进度和音量意图，不直接操作媒体元素。
 - `GallerySettingsMenu.vue`：图库设置入口，只发起管理面板和维护任务动作。
 - `GalleryMediaDetailsMenu.vue`：只读媒体详情行、菜单内部滚动和视口边界定位。
@@ -928,7 +930,7 @@ renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或
 自动化测试使用 Node 内置 `node:test`：
 
 - CSV 列和转义。
-- 图库路径、manifest、严格 JSONL、嵌套边界。
+- 图库路径、当前 manifest 版本、固定字段、严格 JSONL 和嵌套边界。
 - 图片损坏探测。
 - 独占锁和备份保留。
 - 多文件事务部分提交回滚。
@@ -938,8 +940,9 @@ renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或
 - 视频逐帧、时间轴边界、缓冲比例和键盘状态规则。
 - 图片/视频初始适配、90°/270° 旋转适配和拖动阈值。
 - 主进程配置合并、运行时隔离、地点层级、画廊组合筛选和通用注册表统计。
-- UUID 格式、固定 ID 字段、跨注册表与媒体的全局唯一性、未知引用拒绝和地点同名上下文约束。
-- Privacy 当前契约、默认值、严格写入、批量补丁、画廊评级/Privacy 多选筛选和 CSV 列顺序。
+- UUID 格式、注册表/个性化/地点固定字段、跨注册表与媒体的全局唯一性、未知引用拒绝和地点同名上下文约束。
+- Rating/Privacy 当前契约、默认值、严格 mutation payload、批量补丁、画廊多选筛选和 CSV 列顺序。
+- 查看器全局快捷键焦点边界，以及指针锚定缩放和自适应滚轮步长。
 - renderer 详情字段的图片/视频差异、固定顺序、空值和标签连接格式。
 
 提交前最低验证：

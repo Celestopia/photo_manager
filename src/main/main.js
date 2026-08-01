@@ -544,7 +544,7 @@ async function openLibrary(rawRoot, options = {}) {
     error.code = "MAINTENANCE_RUNNING";
     throw error;
   }
-  if (state.activeLibrary) await closeLibrary({ preserveLastPath: true });
+  if (state.activeLibrary) await closeLibrary();
   const paths = resolveLibraryPaths(rawRoot);
   emitLibraryState({ state: "opening", openingPath: paths.root });
   let lock = null;
@@ -585,7 +585,7 @@ async function openLibrary(rawRoot, options = {}) {
   }
 }
 
-async function closeLibrary(options = {}) {
+async function closeLibrary() {
   if (state.maintenanceState.running) {
     const error = new Error("Cannot close the library while maintenance is running");
     error.code = "MAINTENANCE_RUNNING";
@@ -599,9 +599,6 @@ async function closeLibrary(options = {}) {
   state.activeLibrary = null;
   clearLibraryIndexes();
   await releaseLibraryLock(closing.paths, closing.sessionId).catch((error) => appendLog(`lock-release failed: ${error.message}`));
-  if (!options.preserveLastPath) {
-    // Returning to the entry screen intentionally keeps lastLibraryPath for the next launch.
-  }
   emitLibraryState();
   return getLibraryState();
 }
@@ -688,7 +685,6 @@ function runOperationWorker(operation, root, options = {}) {
     worker.stderr?.on("data", (chunk) => appendOperationLog(operation, root, `worker-${operation}-stderr ${String(chunk).trim()}`));
     worker.on("message", (message) => {
       if (message?.type === "progress" || message?.type === "log") {
-        state.maintenanceState.progress = message;
         if (message.message) appendOperationLog(operation, root, `worker-${operation} ${message.level || "info"}: ${message.message}`);
         state.mainWindow?.webContents.send(operation === "initialize" ? "library:progress" : "maintenance:progress", toSerializable(message));
       }
@@ -718,26 +714,22 @@ function runOperationWorker(operation, root, options = {}) {
 
 async function runMaintenanceOperation(operation, options = {}) {
   const library = requireOpenLibrary({ writable: true });
-  state.maintenanceState = { running: true, operation, progress: null, report: null };
+  state.maintenanceState = { running: true };
   emitLibraryState();
   try {
     const result = await runOperationWorker(operation, library.paths.root, options);
-    state.maintenanceState.report = result;
     if (operation === "update") {
-      // The child process has released its operation lock. Clear the read-only
-      // flag before reloading because legacy registry backfill may persist data.
+      // The worker has released its inherited operation lock, so the main
+      // process can leave read-only mode before rebuilding the in-memory indexes.
       state.maintenanceState.running = false;
       await loadAllLibraryIndexes();
     }
-    state.mainWindow?.webContents.send("maintenance:completed", { ok: true, operation, result });
     return { ok: true, result };
   } catch (error) {
     appendLog(`maintenance-${operation} failed: ${error.stack || error.message}`);
-    state.mainWindow?.webContents.send("maintenance:completed", { ok: false, operation, error: error.message });
     return { ok: false, error: error.message, code: error.code };
   } finally {
     state.maintenanceState.running = false;
-    state.maintenanceState.operation = "";
     emitLibraryState();
   }
 }
@@ -788,9 +780,8 @@ function createDomainServices() {
     dataFileName: DATA_FILE_NAMES.tags,
     descriptionRequired: false,
     normalize: normalizeTagText,
-    readKey: (payload) => payload?.text ?? payload?.Text,
-    readId: (payload) => payload?.tagId ?? payload?.TagId,
-    readDescription: (payload) => payload?.description ?? payload?.Description,
+    payloadKey: "text",
+    payloadIdKey: "tagId",
     getRegistry: () => state.tagRegistryIndex,
     setRegistry: (next) => { state.tagRegistryIndex = next; },
     saveRegistry: saveTagRegistryMap,
@@ -806,7 +797,6 @@ function createDomainServices() {
         TagIds: tagIds.filter((id) => id !== tagId),
         MetadataUpdateDate: new Date().toISOString(),
       };
-      delete item.Customization.Category;
       return true;
     },
   });
@@ -821,9 +811,8 @@ function createDomainServices() {
     dataFileName: DATA_FILE_NAMES.people,
     descriptionRequired: false,
     normalize: normalizePersonName,
-    readKey: (payload) => payload?.name ?? payload?.Name,
-    readId: (payload) => payload?.personId ?? payload?.PersonId,
-    readDescription: (payload) => payload?.description ?? payload?.Description,
+    payloadKey: "name",
+    payloadIdKey: "personId",
     getRegistry: () => state.personRegistryIndex,
     setRegistry: (next) => { state.personRegistryIndex = next; },
     saveRegistry: savePersonRegistryMap,
@@ -839,7 +828,6 @@ function createDomainServices() {
         PersonIds: personIds.filter((id) => id !== personId),
         MetadataUpdateDate: new Date().toISOString(),
       };
-      delete item.Customization.Category;
       return true;
     },
   });
@@ -854,9 +842,8 @@ function createDomainServices() {
     dataFileName: DATA_FILE_NAMES.albums,
     descriptionRequired: true,
     normalize: normalizeAlbumTitle,
-    readKey: (payload) => payload?.title ?? payload?.Title,
-    readId: (payload) => payload?.albumId ?? payload?.AlbumId,
-    readDescription: (payload) => payload?.description ?? payload?.Description,
+    payloadKey: "title",
+    payloadIdKey: "albumId",
     getRegistry: () => state.albumRegistryIndex,
     setRegistry: (next) => { state.albumRegistryIndex = next; },
     saveRegistry: saveAlbumRegistryMap,
@@ -871,7 +858,6 @@ function createDomainServices() {
         AlbumId: null,
         MetadataUpdateDate: new Date().toISOString(),
       };
-      delete item.Customization.Category;
       return true;
     },
   });

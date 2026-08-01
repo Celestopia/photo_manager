@@ -34,13 +34,11 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   openLibraryRoot: () => ipcRenderer.invoke("library:open-root"),
   openLibraryManagerDir: () => ipcRenderer.invoke("library:open-manager-dir"),
   openLibraryLogDir: () => ipcRenderer.invoke("library:open-log-dir"),
-  getMaintenanceState: () => ipcRenderer.invoke("maintenance:get-state"),
   startMaintenance: (payload) => ipcRenderer.invoke("maintenance:start", toSerializable(payload)),
   showMaintenanceOutput: () => ipcRenderer.invoke("maintenance:show-output"),
   onLibraryStateChanged: (listener) => subscribe("library:state-changed", listener),
   onLibraryProgress: (listener) => subscribe("library:progress", listener),
   onMaintenanceProgress: (listener) => subscribe("maintenance:progress", listener),
-  onMaintenanceCompleted: (listener) => subscribe("maintenance:completed", listener),
 
   // Gallery data query
   queryGallery: (query) => ipcRenderer.invoke("gallery:query", toSerializable(query)),

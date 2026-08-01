@@ -63,7 +63,6 @@ export function useLibrarySession({
   let removeLibraryStateListener = null;
   let removeLibraryProgressListener = null;
   let removeMaintenanceProgressListener = null;
-  let removeMaintenanceCompletedListener = null;
 
   function setEntryError(message) {
     entry.error = String(message || "未知错误");
@@ -347,10 +346,6 @@ export function useLibrarySession({
         }
       });
     }
-    if (typeof api.onMaintenanceCompleted === "function") {
-      removeMaintenanceCompletedListener = api.onMaintenanceCompleted(() => {});
-    }
-
     const initialState = await api.getLibraryState();
     applyLibraryState(initialState);
     if (initialState?.active) {
@@ -369,7 +364,6 @@ export function useLibrarySession({
       removeLibraryStateListener,
       removeLibraryProgressListener,
       removeMaintenanceProgressListener,
-      removeMaintenanceCompletedListener,
     ]) {
       if (typeof removeListener === "function") removeListener();
     }

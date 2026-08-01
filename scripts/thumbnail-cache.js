@@ -130,7 +130,7 @@ async function generateVideoThumbnail(item, sourcePath, targetPath, options, med
  */
 async function ensureThumbnailForItem(item, params) {
   const {
-    workspaceRoot,
+    libraryRoot,
     cacheDir,
     options,
   } = params;
@@ -140,7 +140,7 @@ async function ensureThumbnailForItem(item, params) {
   const fileType = item?.FileSystem?.FileType;
   if (!hash || !filePath || !["image", "video"].includes(fileType)) return false;
 
-  const sourcePath = path.join(workspaceRoot, filePath);
+  const sourcePath = path.join(libraryRoot, filePath);
   const targetPath = thumbnailAbsolutePath(cacheDir, hash);
   if (fs.existsSync(targetPath) && !params.force) return false;
   if (!fs.existsSync(sourcePath)) return false;
@@ -166,7 +166,7 @@ async function ensureThumbnailForItem(item, params) {
 async function ensureThumbnailsForItems(items, params) {
   const list = Array.isArray(items) ? items : [];
   const {
-    workspaceRoot,
+    libraryRoot,
     cacheDir,
     options,
     maxConcurrency,
@@ -198,7 +198,7 @@ async function ensureThumbnailsForItems(items, params) {
         const item = queue[currentIndex];
         try {
           const didGenerate = await ensureThumbnailForItem(item, {
-            workspaceRoot,
+            libraryRoot,
             cacheDir,
             options,
             mediaConfig,
@@ -212,7 +212,7 @@ async function ensureThumbnailsForItems(items, params) {
           }
         } catch (error) {
           failed += 1;
-          const sourcePath = item?.FilePath ? path.join(workspaceRoot, item.FilePath) : "";
+          const sourcePath = item?.FilePath ? path.join(libraryRoot, item.FilePath) : "";
           log(`Thumbnail generation failed for ${item?.FilePath || "unknown"}: ${sanitizeMediaError(error, sourcePath)}`);
         } finally {
           notifyProgress({ total: list.length, processed: generated + skipped + failed, generated, skipped, failed, current: item?.FilePath || "" });

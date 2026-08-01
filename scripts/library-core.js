@@ -9,6 +9,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const yaml = require("js-yaml");
+const { assertExactObjectKeys } = require("../src/shared/object-schema.js");
 
 const LIBRARY_SCHEMA_VERSION = 4;
 const MANAGER_DIR_NAME = ".photo_manager";
@@ -93,11 +94,15 @@ function createLibraryManifest(root, name = path.basename(path.resolve(root))) {
 
 function validateLibraryManifest(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("library.yml must contain an object");
+  assertExactObjectKeys(value, ["schemaVersion", "libraryId", "name", "createdAt", "updatedAt"], "library.yml");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.libraryId || ""))) {
     throw new Error("library.yml contains an invalid libraryId");
   }
+  if (value.schemaVersion !== LIBRARY_SCHEMA_VERSION) {
+    throw new Error(`Unsupported library schemaVersion: expected ${LIBRARY_SCHEMA_VERSION}, received ${String(value.schemaVersion)}`);
+  }
   const manifest = {
-    schemaVersion: Number.isInteger(value.schemaVersion) ? value.schemaVersion : LIBRARY_SCHEMA_VERSION,
+    schemaVersion: value.schemaVersion,
     libraryId: String(value.libraryId),
     name: normalizeLibraryName(value.name),
     createdAt: String(value.createdAt || ""),

@@ -30,6 +30,7 @@ import {
   normalizeQuarterTurn,
   resolveWheelZoomStep,
 } from "../src/renderer/domain/media-transform.mjs";
+import { allowsViewerGlobalShortcut } from "../src/renderer/domain/viewer-keyboard.mjs";
 import {
   applyLocationSelectionFilter,
   createDefaultGalleryFilters,
@@ -128,6 +129,15 @@ test("wheel zoom uses larger steps only after its documented thresholds", () => 
   assert.equal(resolveWheelZoomStep(200, 10), 20);
   assert.equal(resolveWheelZoomStep(500, 10), 20);
   assert.equal(resolveWheelZoomStep(501, 10), 50);
+});
+
+test("viewer global shortcuts do not override focused controls", () => {
+  assert.equal(allowsViewerGlobalShortcut(null), true);
+  assert.equal(allowsViewerGlobalShortcut({ tagName: "BODY", isContentEditable: false }), true);
+  for (const tagName of ["INPUT", "TEXTAREA", "SELECT", "BUTTON"]) {
+    assert.equal(allowsViewerGlobalShortcut({ tagName, isContentEditable: false }), false);
+  }
+  assert.equal(allowsViewerGlobalShortcut({ tagName: "DIV", isContentEditable: true }), false);
 });
 
 test("media dragging starts only after the pointer crosses its movement threshold", () => {
