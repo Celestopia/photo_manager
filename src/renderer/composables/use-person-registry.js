@@ -1,14 +1,19 @@
-import { computed, reactive, ref, triggerRef } from "vue";
+import { computed, reactive, ref } from "vue";
 import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import {
+  patchRegistryReferencesInPlace,
+  registryDeletionInvalidatesFilter,
+  removeRegistryReference,
+} from "../domain/registry-deletion.mjs";
 
 function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed people registry, picker state, and management workflow. */
 export function usePersonRegistry({
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
-  galleryGroups, gallerySettingsOpen, recentPeople, rememberRecentPerson, pruneRecentPeople,
+  gallerySettingsOpen, recentPeople, rememberRecentPerson, pruneRecentPeople,
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
-  rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
+  queryGallery,
 }) {
   const personRegistry = ref([]);
   const personSearch = reactive({ viewer: "", batch: "" });
@@ -148,29 +153,24 @@ export function usePersonRegistry({
     showToastMessage(previousName === name ? "人物已更新" : `已将人物“${previousName}”重命名为“${name}”`);
   }
 
-  function stripPersonFromItem(item, personId) {
-    const ids = Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [];
-    return ids.includes(personId)
-      ? { ...item, Customization: { ...(item.Customization || {}), PersonIds: ids.filter((id) => id !== personId) } }
-      : item;
-  }
-  function syncDeletedPersonLocally(personId) {
-    if (selectedItem.value) selectedItem.value = stripPersonFromItem(selectedItem.value, personId);
+  function syncDeletedPersonLocally(personId, patchGallery) {
+    if (selectedItem.value) selectedItem.value = removeRegistryReference(selectedItem.value, "person", personId);
     editDraft.PersonIds = editDraft.PersonIds.filter((id) => id !== personId);
     batchEdit.personIds = batchEdit.personIds.filter((id) => id !== personId);
-    orderedItems.value = orderedItems.value.map((item) => stripPersonFromItem(item, personId));
-    rebuildGalleryItemIndex();
-    for (const group of galleryGroups.value) group.items = group.items.map((item) => galleryItemIndex.get(item.MediaId) || item);
-    triggerRef(galleryGroups);
+    if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "person", personId);
   }
   async function deletePersonGlobally(person) {
     const usage = Number(person?.UsageCount || 0);
     if (!window.confirm(`确定全局删除人物“${person.Name}”？这会从 ${usage} 个媒体中移除。`)) return;
     const result = await api.deletePersonGlobally({ personId: person.PersonId });
     if (!result?.ok) { showToastMessage(`删除人物失败：${result?.error || "未知错误"}`); return; }
+    const filterBeforeDelete = query.filters.person;
+    const shouldRefreshGallery = registryDeletionInvalidatesFilter(
+      filterBeforeDelete, person.PersonId, unassignedFilter, result.updatedCount,
+    );
     applyPersonRegistry(result.people);
-    syncDeletedPersonLocally(person.PersonId);
-    if (query.filters.person === person.PersonId) { query.filters.person = ""; await queryGallery(); }
+    syncDeletedPersonLocally(person.PersonId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
+    if (shouldRefreshGallery) await queryGallery();
     showToastMessage(`已全局删除人物“${person.Name}”`);
   }
 

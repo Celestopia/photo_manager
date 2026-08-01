@@ -343,7 +343,6 @@ export function useRendererApplication() {
       batchEdit,
       selectedItem,
       orderedItems,
-      galleryGroups,
       gallerySettingsOpen,
       recentTags,
       rememberRecentTag,
@@ -351,8 +350,6 @@ export function useRendererApplication() {
       showToastMessage,
       closeOtherRegistryDropdowns: () => closeAllRegistryDropdowns(),
       requestEdit: (field) => requestEdit(field),
-      rebuildGalleryItemIndex,
-      galleryItemIndex,
       queryGallery,
     });
     const {
@@ -389,7 +386,6 @@ export function useRendererApplication() {
       batchEdit,
       selectedItem,
       orderedItems,
-      galleryGroups,
       gallerySettingsOpen,
       recentPeople,
       rememberRecentPerson,
@@ -397,8 +393,6 @@ export function useRendererApplication() {
       showToastMessage,
       closeOtherRegistryDropdowns: () => closeAllRegistryDropdowns(),
       requestEdit: (field) => requestEdit(field),
-      rebuildGalleryItemIndex,
-      galleryItemIndex,
       queryGallery,
     });
     const {
@@ -435,13 +429,10 @@ export function useRendererApplication() {
       batchEdit,
       selectedItem,
       orderedItems,
-      galleryGroups,
       gallerySettingsOpen,
       showToastMessage,
       closeOtherRegistryDropdowns: () => closeAllRegistryDropdowns(),
       requestEdit: (field) => requestEdit(field),
-      rebuildGalleryItemIndex,
-      galleryItemIndex,
       queryGallery,
     });
     const {
@@ -489,7 +480,6 @@ export function useRendererApplication() {
       batchEdit,
       selectedItem,
       orderedItems,
-      galleryGroups,
       gallerySettingsOpen,
       recentLocations,
       rememberRecentLocation,
@@ -497,8 +487,6 @@ export function useRendererApplication() {
       showToastMessage,
       closeOtherRegistryDropdowns: () => closeAllRegistryDropdowns(),
       requestEdit: (field) => requestEdit(field),
-      rebuildGalleryItemIndex,
-      galleryItemIndex,
       queryGallery,
       applyFilterSort,
     });

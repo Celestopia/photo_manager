@@ -1,13 +1,18 @@
-import { computed, reactive, ref, triggerRef } from "vue";
+import { computed, reactive, ref } from "vue";
 import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import {
+  patchRegistryReferencesInPlace,
+  registryDeletionInvalidatesFilter,
+  removeRegistryReference,
+} from "../domain/registry-deletion.mjs";
 
 function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed single-valued album registry and management workflow. */
 export function useAlbumRegistry({
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem,
-  orderedItems, galleryGroups, gallerySettingsOpen, showToastMessage,
-  closeOtherRegistryDropdowns, requestEdit, rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
+  orderedItems, gallerySettingsOpen, showToastMessage,
+  closeOtherRegistryDropdowns, requestEdit, queryGallery,
 }) {
   const albumRegistry = ref([]);
   const albumSearch = reactive({ viewer: "", batch: "" });
@@ -145,28 +150,24 @@ export function useAlbumRegistry({
     showToastMessage(previousTitle === title ? "相册已更新" : `已将相册“${previousTitle}”重命名为“${title}”`);
   }
 
-  function clearAlbumFromItem(item, albumId) {
-    return item?.Customization?.AlbumId === albumId
-      ? { ...item, Customization: { ...(item.Customization || {}), AlbumId: null } }
-      : item;
-  }
-  function syncDeletedAlbumLocally(albumId) {
-    if (selectedItem.value) selectedItem.value = clearAlbumFromItem(selectedItem.value, albumId);
+  function syncDeletedAlbumLocally(albumId, patchGallery) {
+    if (selectedItem.value) selectedItem.value = removeRegistryReference(selectedItem.value, "album", albumId);
     if (editDraft.AlbumId === albumId) editDraft.AlbumId = null;
     if (batchEdit.albumId === albumId) batchEdit.albumId = null;
-    orderedItems.value = orderedItems.value.map((item) => clearAlbumFromItem(item, albumId));
-    rebuildGalleryItemIndex();
-    for (const group of galleryGroups.value) group.items = group.items.map((item) => galleryItemIndex.get(item.MediaId) || item);
-    triggerRef(galleryGroups);
+    if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "album", albumId);
   }
   async function deleteAlbumGlobally(album) {
     const usage = Number(album?.UsageCount || 0);
     if (!window.confirm(`确定全局删除相册“${album.Title}”？这会清空 ${usage} 个媒体的相册字段。`)) return;
     const result = await api.deleteAlbumGlobally({ albumId: album.AlbumId });
     if (!result?.ok) { showToastMessage(`删除相册失败：${result?.error || "未知错误"}`); return; }
+    const filterBeforeDelete = query.filters.album;
+    const shouldRefreshGallery = registryDeletionInvalidatesFilter(
+      filterBeforeDelete, album.AlbumId, unassignedFilter, result.updatedCount,
+    );
     applyAlbumRegistry(result.albums);
-    syncDeletedAlbumLocally(album.AlbumId);
-    if (query.filters.album === album.AlbumId) { query.filters.album = ""; await queryGallery(); }
+    syncDeletedAlbumLocally(album.AlbumId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
+    if (shouldRefreshGallery) await queryGallery();
     showToastMessage(`已全局删除相册“${album.Title}”`);
   }
 

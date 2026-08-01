@@ -9,7 +9,6 @@ function createLocationRegistryService(options) {
     getRegistry,
     setRegistry,
     getMetadata,
-    setMetadata,
     normalizeName,
     normalizeField,
     validateParent,
@@ -144,7 +143,7 @@ function createLocationRegistryService(options) {
 
     const metadata = getMetadata();
     const previousRegistry = new Map(registry);
-    const previousMetadata = new Map([...metadata.entries()].map(([mediaId, item]) => [mediaId, structuredClone(item)]));
+    const previousMetadata = new Map();
     let updatedCount = 0;
     let orphanedChildren = 0;
     const now = new Date().toISOString();
@@ -156,9 +155,12 @@ function createLocationRegistryService(options) {
     }
     for (const [mediaId, item] of metadata.entries()) {
       if (item?.Location?.LocationId !== locationId) continue;
-      item.Location = { LocationId: null, Detail: "" };
-      item.Customization = { ...(item.Customization || {}), MetadataUpdateDate: now };
-      metadata.set(mediaId, item);
+      previousMetadata.set(mediaId, item);
+      metadata.set(mediaId, {
+        ...item,
+        Location: { LocationId: null, Detail: "" },
+        Customization: { ...(item.Customization || {}), MetadataUpdateDate: now },
+      });
       updatedCount += 1;
     }
 
@@ -167,7 +169,7 @@ function createLocationRegistryService(options) {
       return { ok: true, deletedId: locationId, updatedCount, orphanedChildren, locations: listDefinitions() };
     } catch (error) {
       setRegistry(previousRegistry);
-      setMetadata(previousMetadata);
+      for (const [mediaId, item] of previousMetadata.entries()) metadata.set(mediaId, item);
       appendLog(`Failed to delete location globally: ${error.message}`);
       return { ok: false, error: "Failed to delete location" };
     }

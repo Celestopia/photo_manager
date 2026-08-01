@@ -1,5 +1,10 @@
-import { computed, reactive, ref, triggerRef } from "vue";
+import { computed, reactive, ref } from "vue";
 import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import {
+  patchRegistryReferencesInPlace,
+  registryDeletionInvalidatesFilter,
+  removeRegistryReference,
+} from "../domain/registry-deletion.mjs";
 
 function normalizeText(value) {
   return String(value ?? "").trim();
@@ -8,9 +13,9 @@ function normalizeText(value) {
 /** Owns the ID-backed tag registry, picker state, and tag-management workflow. */
 export function useTagRegistry({
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
-  galleryGroups, gallerySettingsOpen, recentTags, rememberRecentTag, pruneRecentTags,
+  gallerySettingsOpen, recentTags, rememberRecentTag, pruneRecentTags,
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
-  rebuildGalleryItemIndex, galleryItemIndex, queryGallery,
+  queryGallery,
 }) {
   const tagRegistry = ref([]);
   const tagSearch = reactive({ viewer: "", batch: "" });
@@ -162,29 +167,24 @@ export function useTagRegistry({
     showToastMessage(previousText === text ? "标签已更新" : `已将标签“${previousText}”重命名为“${text}”`);
   }
 
-  function stripTagFromItem(item, tagId) {
-    const ids = Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [];
-    return ids.includes(tagId)
-      ? { ...item, Customization: { ...(item.Customization || {}), TagIds: ids.filter((id) => id !== tagId) } }
-      : item;
-  }
-  function syncDeletedTagLocally(tagId) {
-    if (selectedItem.value) selectedItem.value = stripTagFromItem(selectedItem.value, tagId);
+  function syncDeletedTagLocally(tagId, patchGallery) {
+    if (selectedItem.value) selectedItem.value = removeRegistryReference(selectedItem.value, "tag", tagId);
     editDraft.TagIds = editDraft.TagIds.filter((id) => id !== tagId);
     batchEdit.tagIds = batchEdit.tagIds.filter((id) => id !== tagId);
-    orderedItems.value = orderedItems.value.map((item) => stripTagFromItem(item, tagId));
-    rebuildGalleryItemIndex();
-    for (const group of galleryGroups.value) group.items = group.items.map((item) => galleryItemIndex.get(item.MediaId) || item);
-    triggerRef(galleryGroups);
+    if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "tag", tagId);
   }
   async function deleteTagGlobally(tag) {
     const usage = Number(tag?.UsageCount || 0);
     if (!window.confirm(`确定全局删除标签“${tag.Text}”？这会从 ${usage} 个媒体中移除。`)) return;
     const result = await api.deleteTagGlobally({ tagId: tag.TagId });
     if (!result?.ok) { showToastMessage(`删除标签失败：${result?.error || "未知错误"}`); return; }
+    const filterBeforeDelete = query.filters.tag;
+    const shouldRefreshGallery = registryDeletionInvalidatesFilter(
+      filterBeforeDelete, tag.TagId, unassignedFilter, result.updatedCount,
+    );
     applyTagRegistry(result.tags);
-    syncDeletedTagLocally(tag.TagId);
-    if (query.filters.tag === tag.TagId) { query.filters.tag = ""; await queryGallery(); }
+    syncDeletedTagLocally(tag.TagId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
+    if (shouldRefreshGallery) await queryGallery();
     showToastMessage(`已全局删除标签“${tag.Text}”`);
   }
 

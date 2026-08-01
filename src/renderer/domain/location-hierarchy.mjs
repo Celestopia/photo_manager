@@ -97,6 +97,21 @@ export function filterLocationsWithAncestors(locations, keywordValue) {
   return locations.filter((location) => includedIds.has(location.LocationId));
 }
 
+export function isLocationWithinSubtree(locations, locationId, rootLocationId) {
+  const targetId = normalizeLocationName(locationId);
+  const rootId = normalizeLocationName(rootLocationId);
+  if (!targetId || !rootId) return false;
+  const byId = new Map((locations || []).map((location) => [location.LocationId, location]));
+  let current = byId.get(targetId);
+  const ancestryGuard = new Set();
+  while (current?.LocationId && !ancestryGuard.has(current.LocationId)) {
+    if (current.LocationId === rootId) return true;
+    ancestryGuard.add(current.LocationId);
+    current = current.ParentId ? byId.get(current.ParentId) : null;
+  }
+  return false;
+}
+
 export function getLocationManagerRowContext(row) {
   if (row?.Location) return getLocationRegionParts(row.Location).join(" | ");
   if (Array.isArray(row?.ContextParts) && row.ContextParts.length) return row.ContextParts.filter(Boolean).join(" | ");

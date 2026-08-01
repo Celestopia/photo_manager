@@ -15,6 +15,7 @@ import {
   getLocationRegionFilterLabel,
   getLocationManagerRowContext,
   getVisibleLocationHierarchyRows,
+  isLocationWithinSubtree,
   sameLocationRegionFilter,
 } from "../src/renderer/domain/location-hierarchy.mjs";
 import {
@@ -39,6 +40,11 @@ import {
   normalizeGalleryLevels,
   toggleGalleryLevel,
 } from "../src/renderer/domain/gallery-filter-state.mjs";
+import {
+  patchRegistryReferencesInPlace,
+  registryDeletionInvalidatesFilter,
+  removeRegistryReference,
+} from "../src/renderer/domain/registry-deletion.mjs";
 
 test("gallery level filters normalize multi-select values and return to all", () => {
   assert.deepEqual(normalizeGalleryLevels([4, 2, 4, 9, "1"]), [1, 2, 4]);
@@ -69,6 +75,48 @@ test("unassigned registry filters survive refresh and location selection clears 
   };
   applyLocationSelectionFilter(filters, unassigned);
   assert.deepEqual(filters, { location: unassigned, locationRegion: null });
+});
+
+test("registry deletion patches only referenced gallery items without replacing collection identity", () => {
+  const tagId = "tag-id";
+  const referenced = {
+    MediaId: "media-a",
+    Customization: { AlbumId: null, TagIds: [tagId, "other-tag"], PersonIds: [] },
+    Location: { LocationId: null, Detail: "" },
+  };
+  const untouched = {
+    MediaId: "media-b",
+    Customization: { AlbumId: null, TagIds: ["other-tag"], PersonIds: [] },
+    Location: { LocationId: null, Detail: "" },
+  };
+  const items = [referenced, untouched];
+
+  assert.equal(patchRegistryReferencesInPlace(items, "tag", tagId), 1);
+  assert.equal(items[0], referenced);
+  assert.equal(items[1], untouched);
+  assert.deepEqual(referenced.Customization.TagIds, ["other-tag"]);
+  assert.equal(removeRegistryReference(untouched, "tag", tagId), untouched);
+});
+
+test("registry deletion refreshes exact and newly unassigned filter results", () => {
+  const unassigned = "__UNASSIGNED__";
+  assert.equal(registryDeletionInvalidatesFilter("deleted-id", "deleted-id", unassigned, 0), true);
+  assert.equal(registryDeletionInvalidatesFilter(unassigned, "deleted-id", unassigned, 2), true);
+  assert.equal(registryDeletionInvalidatesFilter(unassigned, "deleted-id", unassigned, 0), false);
+  assert.equal(registryDeletionInvalidatesFilter("other-id", "deleted-id", unassigned, 2), false);
+});
+
+test("location subtree membership follows registered parent IDs", () => {
+  const locations = [
+    { LocationId: "campus", ParentId: null },
+    { LocationId: "building", ParentId: "campus" },
+    { LocationId: "room", ParentId: "building" },
+    { LocationId: "other", ParentId: null },
+  ];
+  assert.equal(isLocationWithinSubtree(locations, "room", "campus"), true);
+  assert.equal(isLocationWithinSubtree(locations, "campus", "campus"), true);
+  assert.equal(isLocationWithinSubtree(locations, "other", "campus"), false);
+  assert.equal(isLocationWithinSubtree(locations, "missing", "campus"), false);
 });
 
 test("renderer media formatters preserve display semantics", () => {

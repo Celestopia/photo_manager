@@ -17,7 +17,6 @@ function createSimpleRegistryService(options) {
     getRegistry,
     setRegistry,
     getMetadata,
-    setMetadata,
     requireOpenLibrary,
     prepareLibraryWrite,
     saveRegistry,
@@ -26,7 +25,7 @@ function createSimpleRegistryService(options) {
     getUsageCounts,
     sortEntries,
     findByLabel,
-    mutateMetadataOnDelete,
+    updateMetadataOnDelete,
     appendLog,
     createId = createEntityId,
   } = options;
@@ -130,12 +129,15 @@ function createSimpleRegistryService(options) {
 
     const metadata = getMetadata();
     const previousRegistry = new Map(registry);
-    const previousMetadata = new Map([...metadata.entries()].map(([mediaId, item]) => [mediaId, structuredClone(item)]));
+    const previousMetadata = new Map();
     registry.delete(id);
     let updatedCount = 0;
+    const now = new Date().toISOString();
     for (const [mediaId, item] of metadata.entries()) {
-      if (!mutateMetadataOnDelete(item, id)) continue;
-      metadata.set(mediaId, item);
+      const updated = updateMetadataOnDelete(item, id, now);
+      if (!updated) continue;
+      previousMetadata.set(mediaId, item);
+      metadata.set(mediaId, updated);
       updatedCount += 1;
     }
 
@@ -144,7 +146,7 @@ function createSimpleRegistryService(options) {
       return { ok: true, deletedId: id, updatedCount, [responseListKey]: listDefinitions() };
     } catch (error) {
       setRegistry(previousRegistry);
-      setMetadata(previousMetadata);
+      for (const [mediaId, item] of previousMetadata.entries()) metadata.set(mediaId, item);
       appendLog(`Failed to delete ${kind.toLowerCase()} globally: ${error.message}`);
       return { ok: false, error: `Failed to delete ${kind.toLowerCase()}` };
     }

@@ -1,8 +1,13 @@
-import { computed, nextTick, reactive, ref, triggerRef, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import {
   applyLocationSelectionFilter,
   isRegistryFilterValueValid,
 } from "../domain/gallery-filter-state.mjs";
+import {
+  patchRegistryReferencesInPlace,
+  registryDeletionInvalidatesFilter,
+  removeRegistryReference,
+} from "../domain/registry-deletion.mjs";
 import {
   buildLocationCreateParentPatch,
   buildLocationHierarchyRows,
@@ -11,6 +16,7 @@ import {
   getLocationManagerRowContext,
   getLocationPathLabel,
   getLocationRegionLabel,
+  isLocationWithinSubtree,
   locationMatchesRegionFilter,
   locationMatchesKeyword,
   normalizeLocationField,
@@ -20,9 +26,9 @@ import {
 /** Owns ID-backed hierarchical location pickers, context bars, and registry mutations. */
 export function useLocationRegistry({
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
-  galleryGroups, gallerySettingsOpen, recentLocations, rememberRecentLocation,
+  gallerySettingsOpen, recentLocations, rememberRecentLocation,
   pruneRecentLocations, showToastMessage, closeOtherRegistryDropdowns, requestEdit,
-  rebuildGalleryItemIndex, galleryItemIndex, queryGallery, applyFilterSort,
+  queryGallery, applyFilterSort,
 }) {
   const locationRegistry = ref([]);
   const locationSearch = reactive({ viewer: "", batch: "" });
@@ -334,17 +340,11 @@ export function useLocationRegistry({
     showToastMessage(previous?.Name === name ? "地点已更新" : `已将地点“${previous?.Name || ""}”重命名为“${name}”`);
   }
 
-  function clearLocationFromItem(item, locationId) {
-    return item?.Location?.LocationId === locationId ? { ...item, Location: { LocationId: null, Detail: "" } } : item;
-  }
-  function syncDeletedLocationLocally(locationId) {
-    if (selectedItem.value) selectedItem.value = clearLocationFromItem(selectedItem.value, locationId);
+  function syncDeletedLocationLocally(locationId, patchGallery) {
+    if (selectedItem.value) selectedItem.value = removeRegistryReference(selectedItem.value, "location", locationId);
     if (editDraft.LocationId === locationId) { editDraft.LocationId = null; editDraft.LocationDetail = ""; }
     if (batchEdit.locationId === locationId) batchEdit.locationId = null;
-    orderedItems.value = orderedItems.value.map((item) => clearLocationFromItem(item, locationId));
-    rebuildGalleryItemIndex();
-    for (const group of galleryGroups.value) group.items = group.items.map((item) => galleryItemIndex.get(item.MediaId) || item);
-    triggerRef(galleryGroups);
+    if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "location", locationId);
   }
   async function deleteLocationGlobally(location) {
     const usage = Number(location?.UsageCount || 0);
@@ -352,12 +352,18 @@ export function useLocationRegistry({
     if (!window.confirm(`确定全局删除地点“${location.Name}”？这会清空 ${usage} 个媒体的地点信息，并让 ${childCount} 个直接子地点变为无父节点。`)) return;
     const result = await api.deleteLocationGlobally({ locationId: location.LocationId });
     if (!result?.ok) { showToastMessage(`删除地点失败：${result?.error || "未知错误"}`); return; }
-    const regionFilterWasActive = Boolean(query.filters.locationRegion);
-    const exactFilterWasActive = query.filters.location === location.LocationId;
+    const filterBeforeDelete = query.filters.location;
+    const updatedCount = Number(result.updatedCount || 0);
+    const filteredSubtreeChanged = filterBeforeDelete
+      && filterBeforeDelete !== unassignedFilter
+      && updatedCount > 0
+      && isLocationWithinSubtree(locationRegistry.value, location.LocationId, filterBeforeDelete);
+    const shouldRefreshGallery = registryDeletionInvalidatesFilter(
+      filterBeforeDelete, location.LocationId, unassignedFilter, updatedCount,
+    ) || filteredSubtreeChanged || Boolean(query.filters.locationRegion);
     applyLocationRegistry(result.locations);
-    syncDeletedLocationLocally(location.LocationId);
-    if (exactFilterWasActive) query.filters.location = "";
-    if (regionFilterWasActive || exactFilterWasActive) await queryGallery();
+    syncDeletedLocationLocally(location.LocationId, updatedCount > 0 && !shouldRefreshGallery);
+    if (shouldRefreshGallery) await queryGallery();
     showToastMessage(`已全局删除地点“${location.Name}”`);
   }
 

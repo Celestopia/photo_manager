@@ -731,7 +731,6 @@ function queryGallery(query) {
 function createDomainServices() {
   const commonRegistryOptions = {
     getMetadata: () => state.metadataIndex,
-    setMetadata: (next) => { state.metadataIndex = next; },
     requireOpenLibrary,
     prepareLibraryWrite,
     saveTransaction: saveRegistryAndMetadataTransaction,
@@ -758,15 +757,17 @@ function createDomainServices() {
     getUsageCounts: getTagUsageCounts,
     findByLabel: tagCatalog.findByLabel,
     sortEntries: (values) => [...values].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN")),
-    mutateMetadataOnDelete: (item, tagId) => {
+    updateMetadataOnDelete: (item, tagId, now) => {
       const tagIds = Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [];
-      if (!tagIds.includes(tagId)) return false;
-      item.Customization = {
-        ...(item.Customization || {}),
-        TagIds: tagIds.filter((id) => id !== tagId),
-        MetadataUpdateDate: new Date().toISOString(),
+      if (!tagIds.includes(tagId)) return null;
+      return {
+        ...item,
+        Customization: {
+          ...(item.Customization || {}),
+          TagIds: tagIds.filter((id) => id !== tagId),
+          MetadataUpdateDate: now,
+        },
       };
-      return true;
     },
   });
   const personService = createSimpleRegistryService({
@@ -789,15 +790,17 @@ function createDomainServices() {
     getUsageCounts: getPersonUsageCounts,
     findByLabel: personCatalog.findByLabel,
     sortEntries: (values) => [...values].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")),
-    mutateMetadataOnDelete: (item, personId) => {
+    updateMetadataOnDelete: (item, personId, now) => {
       const personIds = Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [];
-      if (!personIds.includes(personId)) return false;
-      item.Customization = {
-        ...(item.Customization || {}),
-        PersonIds: personIds.filter((id) => id !== personId),
-        MetadataUpdateDate: new Date().toISOString(),
+      if (!personIds.includes(personId)) return null;
+      return {
+        ...item,
+        Customization: {
+          ...(item.Customization || {}),
+          PersonIds: personIds.filter((id) => id !== personId),
+          MetadataUpdateDate: now,
+        },
       };
-      return true;
     },
   });
   const albumService = createSimpleRegistryService({
@@ -820,14 +823,16 @@ function createDomainServices() {
     getUsageCounts: getAlbumUsageCounts,
     findByLabel: albumCatalog.findByLabel,
     sortEntries: (values) => [...values].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN")),
-    mutateMetadataOnDelete: (item, albumId) => {
-      if (item?.Customization?.AlbumId !== albumId) return false;
-      item.Customization = {
-        ...(item.Customization || {}),
-        AlbumId: null,
-        MetadataUpdateDate: new Date().toISOString(),
+    updateMetadataOnDelete: (item, albumId, now) => {
+      if (item?.Customization?.AlbumId !== albumId) return null;
+      return {
+        ...item,
+        Customization: {
+          ...(item.Customization || {}),
+          AlbumId: null,
+          MetadataUpdateDate: now,
+        },
       };
-      return true;
     },
   });
   const locationService = createLocationRegistryService({

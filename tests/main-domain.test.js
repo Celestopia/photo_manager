@@ -367,14 +367,14 @@ test("simple registry updates names atomically without rewriting media reference
     responseItemKey: "tag", responseListKey: "tags", dataFileName: "tag_registry.jsonl",
     descriptionRequired: false, normalize: (value) => String(value ?? "").trim(),
     payloadKey: "text", payloadIdKey: "tagId", getRegistry: () => registry,
-    setRegistry: () => {}, getMetadata: () => metadata, setMetadata: () => {},
+    setRegistry: () => {}, getMetadata: () => metadata,
     requireOpenLibrary: () => {}, prepareLibraryWrite: async () => {},
     saveRegistry: async () => { saveCount += 1; if (failWrite) throw new Error("disk full"); },
     saveTransaction: async () => {}, listDefinitions,
     getUsageCounts: () => new Map([[IDS.tag, 1]]),
     sortEntries: (values) => [...values],
     findByLabel: (label) => [...registry.values()].find((definition) => definition.Text === label) || null,
-    mutateMetadataOnDelete: () => false, appendLog: () => {},
+    updateMetadataOnDelete: () => null, appendLog: () => {},
   });
 
   const renamed = await service.update({ tagId: IDS.tag, text: "餐饮", description: "新说明" });
@@ -431,7 +431,7 @@ test("location updates names while preserving IDs and rebuilding descendant path
   }));
   const service = createLocationRegistryService({
     dataFileName: "location_registry.jsonl", getRegistry: () => registry, setRegistry: () => {},
-    getMetadata: () => metadata, setMetadata: () => {}, normalizeName: normalizeLocationName,
+    getMetadata: () => metadata, normalizeName: normalizeLocationName,
     normalizeField: normalizeLocationField, validateParent: domain.validateLocationParent,
     getDepth: domain.getLocationDepth, buildPath: domain.buildLocationPath, listDefinitions,
     findDuplicate: (candidate, excludeId) => [...registry.values()].find((location) => (
@@ -477,4 +477,98 @@ test("location updates names while preserving IDs and rebuilding descendant path
   assert.equal(failed.ok, false);
   assert.equal(registry.get(IDS.campus).Name, "清华园");
   assert.equal(registry.get(IDS.campus).Description, "校园");
+});
+
+test("simple registry global deletion rolls back only changed metadata records", async () => {
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  let registry = new Map([[
+    IDS.tag,
+    { TagId: IDS.tag, Text: "美食", Description: "", CreatedAt: createdAt, UpdatedAt: createdAt },
+  ]]);
+  const affected = { MediaId: IDS.campus, Customization: { TagIds: [IDS.tag], MetadataUpdateDate: null } };
+  const untouched = { MediaId: IDS.dining, Customization: { TagIds: [], MetadataUpdateDate: null } };
+  const metadata = new Map([[IDS.campus, affected], [IDS.dining, untouched]]);
+  let failWrite = true;
+  let includeMetadata = null;
+  const service = createSimpleRegistryService({
+    kind: "Tag", keyLabel: "Tag text", idKey: "TagId", definitionKey: "Text",
+    responseItemKey: "tag", responseListKey: "tags", dataFileName: "tag_registry.jsonl",
+    descriptionRequired: false, normalize: (value) => String(value ?? "").trim(),
+    payloadKey: "text", payloadIdKey: "tagId", getRegistry: () => registry,
+    setRegistry: (next) => { registry = next; }, getMetadata: () => metadata,
+    requireOpenLibrary: () => {}, prepareLibraryWrite: async () => {}, saveRegistry: async () => {},
+    saveTransaction: async (_file, _entries, _reason, include) => {
+      includeMetadata = include;
+      if (failWrite) throw new Error("disk full");
+    },
+    listDefinitions: () => [...registry.values()], getUsageCounts: () => new Map(),
+    sortEntries: (values) => [...values], findByLabel: () => null,
+    updateMetadataOnDelete: (item, tagId, now) => {
+      if (!item.Customization.TagIds.includes(tagId)) return null;
+      return {
+        ...item,
+        Customization: { ...item.Customization, TagIds: [], MetadataUpdateDate: now },
+      };
+    },
+    appendLog: () => {},
+  });
+
+  const failed = await service.deleteGlobal({ tagId: IDS.tag });
+  assert.equal(failed.ok, false);
+  assert.equal(registry.has(IDS.tag), true);
+  assert.equal(metadata.get(IDS.campus), affected);
+  assert.equal(metadata.get(IDS.dining), untouched);
+  assert.equal(includeMetadata, true);
+
+  failWrite = false;
+  const deleted = await service.deleteGlobal({ tagId: IDS.tag });
+  assert.equal(deleted.ok, true);
+  assert.equal(deleted.updatedCount, 1);
+  assert.equal(registry.has(IDS.tag), false);
+  assert.notEqual(metadata.get(IDS.campus), affected);
+  assert.deepEqual(metadata.get(IDS.campus).Customization.TagIds, []);
+  assert.equal(metadata.get(IDS.dining), untouched);
+});
+
+test("location global deletion restores changed records and child links after transaction failure", async () => {
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  let registry = new Map([
+    [IDS.campus, {
+      LocationId: IDS.campus, Name: "校园", Country: "中国", Province: "", City: "北京",
+      ParentId: null, Description: "", CreatedAt: createdAt, UpdatedAt: createdAt,
+    }],
+    [IDS.dining, {
+      LocationId: IDS.dining, Name: "食堂", Country: "中国", Province: "", City: "北京",
+      ParentId: IDS.campus, Description: "", CreatedAt: createdAt, UpdatedAt: createdAt,
+    }],
+  ]);
+  const affected = {
+    MediaId: IDS.tag,
+    Location: { LocationId: IDS.campus, Detail: "二层" },
+    Customization: { MetadataUpdateDate: null },
+  };
+  const untouched = {
+    MediaId: IDS.other,
+    Location: { LocationId: IDS.dining, Detail: "" },
+    Customization: { MetadataUpdateDate: null },
+  };
+  const metadata = new Map([[IDS.tag, affected], [IDS.other, untouched]]);
+  const domain = createLocationDomain(() => registry);
+  const service = createLocationRegistryService({
+    dataFileName: "location_registry.jsonl", getRegistry: () => registry,
+    setRegistry: (next) => { registry = next; }, getMetadata: () => metadata,
+    normalizeName: normalizeLocationName, normalizeField: normalizeLocationField,
+    validateParent: domain.validateLocationParent, getDepth: domain.getLocationDepth,
+    buildPath: domain.buildLocationPath, listDefinitions: () => [...registry.values()],
+    findDuplicate: () => null, sortEntries: (values) => [...values], requireOpenLibrary: () => {},
+    prepareLibraryWrite: async () => {}, saveRegistry: async () => {},
+    saveTransaction: async () => { throw new Error("disk full"); }, appendLog: () => {},
+  });
+
+  const result = await service.deleteGlobal({ locationId: IDS.campus });
+  assert.equal(result.ok, false);
+  assert.equal(registry.has(IDS.campus), true);
+  assert.equal(registry.get(IDS.dining).ParentId, IDS.campus);
+  assert.equal(metadata.get(IDS.tag), affected);
+  assert.equal(metadata.get(IDS.other), untouched);
 });
