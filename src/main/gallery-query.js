@@ -17,57 +17,65 @@ function createGalleryQueryService({
   getLocationIdsForRegion,
   unassignedFilter,
 }) {
-  function filterAndSort(list, options) {
+  function execute(list, options) {
     const { filters, search, sortBy, sortOrder } = options;
     if (sortBy !== "shootingTime") throw new Error(`Unsupported gallery sort: ${sortBy}`);
-    let output = [...list];
-
-    if (filters.mediaType === "image" || filters.mediaType === "video") {
-      output = output.filter((item) => item?.FileSystem?.FileType === filters.mediaType);
-    }
-    if (filters.album === unassignedFilter) {
-      output = output.filter((item) => item?.Customization?.AlbumId === null);
-    } else if (filters.album) {
-      output = output.filter((item) => item?.Customization?.AlbumId === filters.album);
-    }
-    if (filters.tag === unassignedFilter) {
-      output = output.filter((item) => Array.isArray(item?.Customization?.TagIds) && item.Customization.TagIds.length === 0);
-    } else if (filters.tag) {
-      output = output.filter((item) => Array.isArray(item?.Customization?.TagIds) && item.Customization.TagIds.includes(filters.tag));
-    }
-    if (filters.person === unassignedFilter) {
-      output = output.filter((item) => Array.isArray(item?.Customization?.PersonIds) && item.Customization.PersonIds.length === 0);
-    } else if (filters.person) {
-      output = output.filter((item) => Array.isArray(item?.Customization?.PersonIds) && item.Customization.PersonIds.includes(filters.person));
-    }
     if (filters.location && filters.locationRegion) {
       throw new Error("Location and administrative region filters are mutually exclusive");
     }
+    let allowedLocationIds = null;
     if (filters.locationRegion) {
-      const allowed = new Set(getLocationIdsForRegion(filters.locationRegion));
-      output = output.filter((item) => allowed.has(item?.Location?.LocationId));
-    } else if (filters.location === unassignedFilter) {
-      output = output.filter((item) => item?.Location?.LocationId === null);
+      allowedLocationIds = new Set(getLocationIdsForRegion(filters.locationRegion));
     } else if (filters.location) {
-      const allowed = new Set([filters.location, ...getLocationDescendants(filters.location)]);
-      output = output.filter((item) => allowed.has(item?.Location?.LocationId));
+      allowedLocationIds = filters.location === unassignedFilter
+        ? null
+        : new Set([filters.location, ...getLocationDescendants(filters.location)]);
     }
     const ratingLevels = selectedLevels(filters.ratingLevels, "Rating");
-    if (ratingLevels.size) {
-      output = output.filter((item) => ratingLevels.has(item?.Customization?.Rating));
-    }
     const privacyLevels = selectedLevels(filters.privacyLevels, "Privacy");
-    if (privacyLevels.size) {
-      output = output.filter((item) => privacyLevels.has(item?.Customization?.Privacy));
-    }
-    if (search?.value && search?.field) {
-      output = output.filter((item) => {
+    const requestedMediaType = filters.mediaType === "image" || filters.mediaType === "video"
+      ? filters.mediaType
+      : "";
+    const searchActive = Boolean(search?.value && search?.field);
+    const output = [];
+    const mediaCounts = { all: 0, images: 0, videos: 0 };
+
+    for (const item of list) {
+      const customization = item?.Customization;
+      const locationId = item?.Location?.LocationId;
+      if (filters.album === unassignedFilter) {
+        if (customization?.AlbumId !== null) continue;
+      } else if (filters.album && customization?.AlbumId !== filters.album) continue;
+
+      if (filters.tag === unassignedFilter) {
+        if (!Array.isArray(customization?.TagIds) || customization.TagIds.length !== 0) continue;
+      } else if (filters.tag && (!Array.isArray(customization?.TagIds) || !customization.TagIds.includes(filters.tag))) continue;
+
+      if (filters.person === unassignedFilter) {
+        if (!Array.isArray(customization?.PersonIds) || customization.PersonIds.length !== 0) continue;
+      } else if (filters.person && (!Array.isArray(customization?.PersonIds) || !customization.PersonIds.includes(filters.person))) continue;
+
+      if (filters.locationRegion && !allowedLocationIds.has(locationId)) continue;
+      if (filters.location === unassignedFilter) {
+        if (locationId !== null) continue;
+      } else if (filters.location && !allowedLocationIds.has(locationId)) continue;
+
+      if (ratingLevels.size && !ratingLevels.has(customization?.Rating)) continue;
+      if (privacyLevels.size && !privacyLevels.has(customization?.Privacy)) continue;
+
+      if (searchActive) {
         let fieldValue = "";
-        if (search.field === "title") fieldValue = item?.Customization?.Title || "";
+        if (search.field === "title") fieldValue = customization?.Title || "";
         if (search.field === "filename") fieldValue = path.basename(item?.FilePath || "");
-        if (search.field === "description") fieldValue = item?.Customization?.Description || "";
-        return fieldValue.includes(search.value);
-      });
+        if (search.field === "description") fieldValue = customization?.Description || "";
+        if (!fieldValue.includes(search.value)) continue;
+      }
+
+      const fileType = item?.FileSystem?.FileType;
+      mediaCounts.all += 1;
+      if (fileType === "image") mediaCounts.images += 1;
+      if (fileType === "video") mediaCounts.videos += 1;
+      if (!requestedMediaType || fileType === requestedMediaType) output.push(item);
     }
 
     output.sort((a, b) => {
@@ -77,7 +85,7 @@ function createGalleryQueryService({
       if (first > second) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
-    return output;
+    return { items: output, mediaCounts };
   }
 
   function groupByDate(list) {
@@ -90,7 +98,7 @@ function createGalleryQueryService({
     return [...grouped.entries()].map(([date, items]) => ({ date, items }));
   }
 
-  return { filterAndSort, groupByDate };
+  return { execute, groupByDate };
 }
 
 module.exports = { createGalleryQueryService };

@@ -20,6 +20,7 @@ const {
   normalizeLocationObject,
 } = require("./location-domain.js");
 const { createGalleryQueryService } = require("./gallery-query.js");
+const { createGalleryItemEnricher } = require("./gallery-item-enricher.js");
 const { createSimpleRegistryService } = require("./simple-registry-service.js");
 const { createSimpleRegistryCatalog } = require("./simple-registry-catalog.js");
 const { createLocationCatalog } = require("./location-catalog.js");
@@ -390,38 +391,17 @@ function normalizeRegisteredAlbum(rawAlbum) {
   return { albumId: validation.value, unknown: validation.unknown };
 }
 
-const { filterAndSort, groupByDate } = createGalleryQueryService({
+const { execute: executeGalleryQuery, groupByDate } = createGalleryQueryService({
   getLocationDescendants,
   getLocationIdsForRegion,
   unassignedFilter: UNASSIGNED_FILTER,
 });
-
-/**
- * Inject renderer-facing helper fields:
- * - absolute file path for image loading/copy
- * - date grouping key for gallery sections
- */
-function enrichItem(item) {
-  const library = requireOpenLibrary();
-  const absPath = assertPathInsideLibrary(library.paths, path.join(library.paths.root, item.FilePath));
-  const thumbPath = item?.SHA256Hash ? thumbnailAbsolutePath(library.paths.thumbnailDir, item.SHA256Hash) : "";
-  let thumbnailModifiedTimeMs = 0;
-  if (thumbPath) {
-    try {
-      thumbnailModifiedTimeMs = fs.statSync(thumbPath).mtimeMs;
-    } catch {
-      thumbnailModifiedTimeMs = 0;
-    }
-  }
-  return {
-    ...item,
-    __absolutePath: absPath,
-    __thumbnailPath: thumbPath,
-    __thumbnailAvailable: thumbnailModifiedTimeMs > 0,
-    __thumbnailModifiedTimeMs: thumbnailModifiedTimeMs,
-    __groupDate: (item?.FileSystem?.ShootingTimeString || "").slice(0, 10) || "Unknown",
-  };
-}
+const { enrichItem, clearThumbnailStatusCache } = createGalleryItemEnricher({
+  getLibrary: requireOpenLibrary,
+  assertPathInsideLibrary,
+  thumbnailAbsolutePath,
+  listThumbnailFiles: (directory) => fs.readdirSync(directory, { withFileTypes: true }),
+});
 
 function resolveIndexedMediaPath(rawMediaId) {
   const mediaId = String(rawMediaId || "").trim();
@@ -463,6 +443,7 @@ async function saveRegistryAndMetadataTransaction(registryFileName, registryEntr
 }
 
 function clearLibraryIndexes() {
+  clearThumbnailStatusCache();
   state.metadataIndex.clear();
   state.mediaPathIndex.clear();
   state.tagRegistryIndex.clear();
@@ -512,6 +493,7 @@ async function checkMediaTools() {
 }
 
 async function loadAllLibraryIndexes() {
+  clearThumbnailStatusCache();
   await loadTagRegistryIndex();
   await loadAlbumRegistryIndex();
   await loadPersonRegistryIndex();
@@ -729,6 +711,7 @@ async function runMaintenanceOperation(operation, options = {}) {
     appendLog(`maintenance-${operation} failed: ${error.stack || error.message}`);
     return { ok: false, error: error.message, code: error.code };
   } finally {
+    if (operation === "update" || operation === "thumbnails") clearThumbnailStatusCache();
     state.maintenanceState.running = false;
     emitLibraryState();
   }
@@ -736,20 +719,12 @@ async function runMaintenanceOperation(operation, options = {}) {
 
 function queryGallery(query) {
   requireOpenLibrary();
-  const all = [...state.metadataIndex.values()].map(enrichItem);
-  const filtered = filterAndSort(all, query);
-  const mediaCountBase = filterAndSort(all, {
-    ...query,
-    filters: { ...(query.filters || {}), mediaType: "" },
-  });
+  const result = executeGalleryQuery(state.metadataIndex.values(), query);
+  const items = result.items.map(enrichItem);
   return {
-    total: filtered.length,
-    mediaCounts: {
-      all: mediaCountBase.length,
-      images: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "image").length,
-      videos: mediaCountBase.filter((item) => item?.FileSystem?.FileType === "video").length,
-    },
-    groups: groupByDate(filtered),
+    total: items.length,
+    mediaCounts: result.mediaCounts,
+    groups: groupByDate(items),
   };
 }
 

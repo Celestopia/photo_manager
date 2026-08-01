@@ -308,8 +308,8 @@ function resolveGalleryImageSrc(item) {
   const thumbnailPath = item?.__thumbnailPath || "";
   if (thumbnailPath && item.__thumbnailAvailable) {
     const source = buildImageUrl(thumbnailPath);
-    const modifiedTime = Number(item.__thumbnailModifiedTimeMs || 0);
-    return modifiedTime > 0 ? `${source}?v=${modifiedTime}` : source;
+    const thumbnailVersion = Number(item.__thumbnailVersion || 0);
+    return thumbnailVersion > 0 ? `${source}?v=${thumbnailVersion}` : source;
   }
   return isVideo(item) ? ICONS.videoPlaceholder : ICONS.imagePlaceholder;
 }
