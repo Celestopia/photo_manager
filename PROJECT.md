@@ -25,6 +25,7 @@ PhotoManager 是一个 Windows 本地桌面媒体管理器，用于管理用户�
 - 渲染层：Vue 3 SFC + Vite。
 - 图片解析和缩略图：Sharp、exifr。
 - 视频探测和抽帧：项目内置 Windows x64 FFmpeg/FFprobe 8.1.2。
+- 拍摄地时区：`geo-tz` 离线坐标边界数据 + Electron/Node `Intl` IANA 时区规则；运行时不请求网络服务。
 - 配置格式：YAML。
 - 数据格式：JSONL；导出格式为 UTF-8 BOM CSV。
 - 主进程与渲染器通过显式 IPC 白名单通信；渲染器不能直接访问 Node 文件系统。
@@ -313,12 +314,21 @@ FFmpeg 不可用时应用仍能显示入口页和错误原因，但禁止初始�
 - `FileType`：`image` 或 `video`。
 - `FileExtension`：不带点的小写扩展名。
 - `FileSize`：字节数。
-- `ShootingTimeString/Zone/Stamp`：用于时间线排序的拍摄时间。
+- `ShootingTimeString/Zone/Stamp`：用于时间线排序的拍摄时间。`String` 是拍摄地墙上时间，`Zone` 是该日期实际生效的 UTC 小时偏移，`Stamp` 是同一时刻的 Unix 秒。
 - `CreationTimeString/Zone/Stamp`：文件创建时间。
 - `ModificationTimeString/Zone/Stamp`：文件修改时间。
 - `ModificationTimeMs`：毫秒修改时间，位于 `FileSystem` 最后，用于增量复用判断。
 
-图片拍摄时间优先 EXIF `DateTimeOriginal`，否则使用文件创建时间。视频拍摄时间优先容器/主流/QuickTime 创建时间，最终回退文件修改时间。
+拍摄时间不能使用运行应用的计算机时区进行隐式转换。时间来源和规范化规则如下：
+
+1. 图片读取原始 EXIF `DateTimeOriginal`，并在存在时结合 `OffsetTimeOriginal`；没有拍摄时间时回退文件创建时间。
+2. 视频保留 FFprobe 返回的 QuickTime、容器、默认视频流和默认音频流创建时间候选。带有非 UTC 显式偏移的候选优先级最高，偏移视为来源明确提供的信息；没有可用候选时回退文件修改时间。
+3. 来源只提供 UTC 绝对时刻且媒体带 GPS 时，用 `geo-tz` 将坐标离线映射为 IANA 时区，再用 `Intl.DateTimeFormat` 按拍摄日期应用该时区的历史/夏令时规则，生成当地 `String` 和当日 `Zone`。例如同一地点夏季可为 `-7`、冬季可为 `-8`；不能使用固定标准时差代替。
+4. UTC 时间没有 GPS 时保持 UTC，不依据文件路径、已注册地点或本机时区猜测拍摄地。
+5. 无时区的墙上时间在 GPS 能唯一反推出一个绝对时刻时才生成 `Zone/Stamp`。夏令时回拨的重复时段、跳时的不存在时段或时区边界返回互相冲突的结果时，只保留原始当地 `String`，`Zone/Stamp` 保存 `null`。
+6. IANA 时区名是可由 GPS 派生的技术信息，不写入媒体元数据。GPS 缺失或坐标解析失败不会创建额外持久字段。
+
+文件创建和修改时间仍由操作系统提供，并保存本机在对应时刻的文本、偏移和绝对时间戳。所有媒体元数据均按当前时间规则生成；项目不保留旧时间记录的兼容识别或修复入口。
 
 ### 9.3 `Picture`
 
@@ -486,7 +496,7 @@ ID 创建后不可变，显示名称可以在对应管理面板中修改。改�
 - `FileSize`
 - `ModificationTimeMs`
 
-命中时复用整条记录，不重新哈希、不读 EXIF、不跑 FFprobe。旧图片若缺少 `Picture.ProbeStatus`，会在第一次更新时重建一次。
+命中时复用整条记录，不重新哈希、不读 EXIF、不跑 FFprobe。增量更新假定加载的数据已经符合当前严格元数据契约，不识别或重建旧式图片、视频字段。
 
 ### 11.3 内容变化、移动和副本
 
@@ -777,6 +787,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 - `common.js`：扫描、hash、图片/视频记录构造、默认用户字段。
 - `library-data.js`：维护脚本共用的四类注册表加载与媒体引用完整性校验。
 - `media-tools.js`：FFmpeg 配置、execFile、超时、FFprobe 规范化、抽帧。
+- `media-time.js`：媒体时间文本解析、GPS 到 IANA 时区映射、按日期的夏令时换算和歧义处理。
 - `thumbnail-cache.js`：共享缩略图生成和并发队列。
 - `init-metadata.js`：新图库初始化。
 - `update-metadata.js`：增量同步。
@@ -942,7 +953,8 @@ renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或
 - 独占锁和备份保留。
 - 多文件事务部分提交回滚。
 - 内置 FFmpeg 集成、损坏视频、缩略图生成与临时文件清理。
-- FFprobe 字段规范化、日期/GPS/设备映射、超时和错误清理。
+- FFprobe 字段规范化、创建时间候选、GPS/设备映射、超时和错误清理。
+- 拍摄时间的显式偏移、UTC 本地化、夏令时、无时区墙上时间和边界歧义。
 - 增量更新的复用、变更、移动、副本和失败保留。
 - 视频逐帧、时间轴边界、缓冲比例和键盘状态规则。
 - 图片/视频初始适配、90°/270° 旋转适配和拖动阈值。

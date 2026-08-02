@@ -10,7 +10,7 @@ const {
   runMediaTool,
   sanitizeMediaError,
 } = require("../scripts/media-tools");
-const { defaultCustomization, parseMediaDate } = require("../scripts/common");
+const { defaultCustomization } = require("../scripts/common");
 
 test("normalizes the default video/audio streams and display dimensions", () => {
   const parsed = parseProbeJson({
@@ -67,7 +67,9 @@ test("normalizes the default video/audio streams and display dimensions", () => 
   assert.equal(parsed.video.VideoStreamCount, 2);
   assert.equal(parsed.video.AudioStreamCount, 1);
   assert.equal(parsed.video.AudioCodec, "aac");
-  assert.equal(parsed.creationTime, "2026-01-08T03:11:14.000000Z");
+  assert.deepEqual(parsed.creationTimes, [
+    { source: "format", value: "2026-01-08T03:11:14.000000Z" },
+  ]);
   assert.deepEqual(parsed.camera, { make: "Example", model: "Camera X" });
   assert.deepEqual(parsed.location, { latitude: 39.9042, longitude: 116.4074, altitude: 50 });
 });
@@ -82,6 +84,26 @@ test("marks containers without video streams as audio-only", () => {
   assert.equal(parsed.video.HasAudio, true);
   assert.equal(parsed.video.RotationDegrees, null);
   assert.equal(parsed.video.BitRate, null);
+});
+
+test("keeps distinct QuickTime and stream creation-time candidates", () => {
+  const parsed = parseProbeJson({
+    format: {
+      tags: {
+        creation_time: "2025-08-02T18:43:25Z",
+        "com.apple.quicktime.creationdate": "2025-08-02T11:43:25-07:00",
+      },
+    },
+    streams: [{
+      codec_type: "video",
+      tags: { creation_time: "2025-08-02T18:43:26Z" },
+    }],
+  });
+  assert.deepEqual(parsed.creationTimes, [
+    { source: "quicktime", value: "2025-08-02T11:43:25-07:00" },
+    { source: "format", value: "2025-08-02T18:43:25Z" },
+    { source: "video", value: "2025-08-02T18:43:26Z" },
+  ]);
 });
 
 test("calculates bounded video thumbnail seek times", () => {
@@ -114,15 +136,6 @@ test("keeps absent numeric fields null and preserves media rating defaults", () 
   assert.equal(defaultCustomization(".png").Rating, 1);
   assert.equal(defaultCustomization(".mp4").Privacy, 1);
   assert.equal(defaultCustomization(".jpg").Privacy, 1);
-});
-
-test("parses zoned and local media dates with the expected semantics", () => {
-  assert.equal(parseMediaDate("2026-01-08T03:11:14Z").getTime(), Date.UTC(2026, 0, 8, 3, 11, 14));
-  const local = parseMediaDate("2026-01-08T11:11:14");
-  assert.equal(local.getFullYear(), 2026);
-  assert.equal(local.getMonth(), 0);
-  assert.equal(local.getDate(), 8);
-  assert.equal(local.getHours(), 11);
 });
 
 test("resolves relative and absolute FFmpeg directories", () => {

@@ -29,6 +29,10 @@ const {
   assertUuidV4,
   createEntityId,
 } = require("../src/shared/identity-schema.js");
+const {
+  gpsFromExif,
+  resolveMediaShootingTime,
+} = require("./media-time");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 const DEFAULT_CONFIG = {
@@ -234,13 +238,6 @@ function normalizePositiveNumber(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
-function parseMediaDate(value) {
-  if (!value) return null;
-  const raw = String(value).trim().replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 async function inspectMediaFile(filePath, libraryRoot) {
   const ext = path.extname(filePath);
   const type = extensionType(ext);
@@ -290,7 +287,10 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
         .slice(0, 500);
     }
     try {
-      exif = await exifr.parse(filePath, { translateValues: false });
+      exif = await exifr.parse(filePath, {
+        translateValues: false,
+        reviveValues: false,
+      });
     } catch {
       exif = null;
     }
@@ -300,7 +300,7 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
     } catch (error) {
       videoProbe = {
         video: failedVideoMetadata(error, filePath),
-        creationTime: null,
+        creationTimes: [],
         camera: { make: null, model: null },
         location: null,
       };
@@ -314,11 +314,22 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
     bitDepth = exif.BitsPerSample || null;
   }
 
-  const videoShootingDate = parseMediaDate(videoProbe?.creationTime);
-  const shooting = type === "video"
-    ? (videoShootingDate ? timeInfoFromDate(videoShootingDate) : modified)
-    : (exif?.DateTimeOriginal ? timeInfoFromDate(exif.DateTimeOriginal) : creation);
   const videoLocation = videoProbe?.location || null;
+  const shooting = type === "video"
+    ? resolveMediaShootingTime({
+      candidates: videoProbe?.creationTimes,
+      gps: videoLocation,
+      fallback: modified,
+    })
+    : resolveMediaShootingTime({
+      candidates: exif?.DateTimeOriginal ? [{
+        source: "exif",
+        value: exif.DateTimeOriginal,
+        offset: exif.OffsetTimeOriginal,
+      }] : [],
+      gps: gpsFromExif(exif),
+      fallback: creation,
+    });
   const output = {
     MediaId: createEntityId(),
     FilePath: relativePath,
@@ -418,7 +429,6 @@ module.exports = {
   writeAll,
   extensionType,
   timeInfoFromDate,
-  parseMediaDate,
   defaultCustomization,
   normalizeFlashUsed,
   normalizePictureBitDepth,

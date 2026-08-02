@@ -36,7 +36,6 @@ function isUnchangedRecord(existing, snapshot) {
     && Number(existing?.FileSystem?.FileSize) === Number(snapshot.stat.size)
     && Number.isFinite(Number(existing?.FileSystem?.ModificationTimeMs))
     && Number(existing.FileSystem.ModificationTimeMs) === Number(snapshot.stat.mtimeMs)
-    && (snapshot.type !== "image" || ["ok", "failed"].includes(existing?.Picture?.ProbeStatus))
   );
 }
 

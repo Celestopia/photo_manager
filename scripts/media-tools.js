@@ -235,9 +235,13 @@ function parseProbeJson(probe) {
     "location",
     "location-eng",
   ]);
-  const creationTime = firstTag([formatTags], ["creation_time"])
-    || firstTag([videoTags], ["creation_time"])
-    || firstTag(allTags, ["com.apple.quicktime.creationdate"]);
+  const creationTimes = [
+    { source: "quicktime", value: firstTag(allTags, ["com.apple.quicktime.creationdate"]) },
+    { source: "format", value: firstTag([formatTags], ["creation_time"]) },
+    { source: "video", value: firstTag([videoTags], ["creation_time"]) },
+    { source: "audio", value: firstTag([audioTags], ["creation_time"]) },
+  ].filter((entry, index, entries) => entry.value
+    && entries.findIndex((candidate) => candidate.value === entry.value) === index);
   const cameraMake = firstTag(allTags, [
     "com.apple.quicktime.make",
     "make",
@@ -281,7 +285,7 @@ function parseProbeJson(probe) {
       ColorTransfer: videoStream?.color_transfer || null,
       ColorPrimaries: videoStream?.color_primaries || null,
     },
-    creationTime,
+    creationTimes,
     camera: { make: cameraMake, model: cameraModel },
     location: parseIso6709(locationText),
   };
