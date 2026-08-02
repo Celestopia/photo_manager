@@ -1,6 +1,7 @@
 const { find: findTimeZones } = require("geo-tz");
 
 const formatterCache = new Map();
+const UTC_TIME_CONTEXT = Object.freeze({ kind: "offset", offsetMinutes: 0 });
 
 function pad(value, length = 2) {
   return String(value).padStart(length, "0");
@@ -162,6 +163,27 @@ function formatInstantInZone(stamp, timeZone) {
   };
 }
 
+function formatInstantAtOffset(stamp, offsetMinutes) {
+  const numericStamp = Number(stamp);
+  const numericOffset = Number(offsetMinutes);
+  if (!Number.isFinite(numericStamp) || !Number.isFinite(numericOffset)) return null;
+  const wholeSecondStamp = Math.trunc(numericStamp);
+  const shifted = new Date((wholeSecondStamp + numericOffset * 60) * 1000);
+  const components = {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+    hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes(),
+    second: shifted.getUTCSeconds(),
+  };
+  return {
+    text: formatComponents(components),
+    zone: numericOffset / 60,
+    stamp: wholeSecondStamp,
+  };
+}
+
 function validGps(gps) {
   if (gps?.latitude === null || gps?.latitude === undefined || gps?.latitude === "") return null;
   if (gps?.longitude === null || gps?.longitude === undefined || gps?.longitude === "") return null;
@@ -191,10 +213,26 @@ function uniqueResolution(resolutions) {
   return unique.size === 1 ? unique.values().next().value : null;
 }
 
-function resolveInstantAtGps(stamp, gps, lookup = findTimeZones) {
+function gpsTimeContext(gps, lookup = findTimeZones) {
   const zones = zonesForGps(gps, lookup);
-  if (!zones.length) return null;
-  return uniqueResolution(zones.map((zone) => formatInstantInZone(stamp, zone)));
+  return zones.length ? { kind: "iana", timeZones: zones } : null;
+}
+
+function formatInstantWithContext(stamp, context = UTC_TIME_CONTEXT) {
+  if (context?.kind === "iana") {
+    const resolved = uniqueResolution(
+      (context.timeZones || []).map((zone) => formatInstantInZone(stamp, zone)),
+    );
+    return resolved || formatInstantAtOffset(stamp, 0);
+  }
+  return formatInstantAtOffset(stamp, context?.offsetMinutes ?? 0);
+}
+
+function resolveInstantAtGps(stamp, gps, lookup = findTimeZones) {
+  const context = gpsTimeContext(gps, lookup);
+  if (!context) return null;
+  const time = uniqueResolution(context.timeZones.map((zone) => formatInstantInZone(stamp, zone)));
+  return time ? { time, context } : null;
 }
 
 function possibleInstantsForWallTime(parsed, timeZone) {
@@ -222,9 +260,16 @@ function possibleInstantsForWallTime(parsed, timeZone) {
 }
 
 function resolveWallTimeAtGps(parsed, gps, lookup = findTimeZones) {
-  const zones = zonesForGps(gps, lookup);
-  if (!zones.length) return null;
-  return uniqueResolution(zones.flatMap((zone) => possibleInstantsForWallTime(parsed, zone)));
+  const context = gpsTimeContext(gps, lookup);
+  if (!context) return null;
+  const time = uniqueResolution(
+    context.timeZones.flatMap((zone) => possibleInstantsForWallTime(parsed, zone)),
+  );
+  return time ? { time, context } : null;
+}
+
+function withTimeContext(time, context) {
+  return time ? { ...time, context } : null;
 }
 
 /**
@@ -242,18 +287,38 @@ function resolveMediaShootingTime({ candidates = [], gps = null, fallback = null
     .filter(Boolean);
 
   const offsetCandidate = parsedCandidates.find(({ parsed }) => parsed.hasExplicitZone && parsed.zone !== 0);
-  if (offsetCandidate) return offsetCandidate.parsed;
+  if (offsetCandidate) {
+    return withTimeContext(offsetCandidate.parsed, {
+      kind: "offset",
+      offsetMinutes: offsetCandidate.parsed.zone * 60,
+    });
+  }
 
   const absoluteCandidate = parsedCandidates.find(({ parsed }) => parsed.hasExplicitZone);
   if (absoluteCandidate) {
-    return resolveInstantAtGps(absoluteCandidate.parsed.stamp, gps, lookup) || absoluteCandidate.parsed;
+    const gpsResolution = resolveInstantAtGps(absoluteCandidate.parsed.stamp, gps, lookup);
+    return gpsResolution
+      ? withTimeContext(gpsResolution.time, gpsResolution.context)
+      : withTimeContext(absoluteCandidate.parsed, UTC_TIME_CONTEXT);
   }
 
   for (const { parsed } of parsedCandidates) {
     const resolved = resolveWallTimeAtGps(parsed, gps, lookup);
-    if (resolved) return resolved;
+    if (resolved) return withTimeContext(resolved.time, resolved.context);
   }
-  return parsedCandidates[0]?.parsed || fallback;
+  if (parsedCandidates[0]?.parsed) {
+    return withTimeContext(
+      parsedCandidates[0].parsed,
+      gpsTimeContext(gps, lookup) || UTC_TIME_CONTEXT,
+    );
+  }
+  if (fallback) {
+    const gpsResolution = resolveInstantAtGps(fallback.stamp, gps, lookup);
+    return gpsResolution
+      ? withTimeContext(gpsResolution.time, gpsResolution.context)
+      : withTimeContext(fallback, UTC_TIME_CONTEXT);
+  }
+  return null;
 }
 
 function dmsToDecimal(value, reference) {
@@ -272,9 +337,40 @@ function gpsFromExif(exif) {
   return validGps({ latitude, longitude });
 }
 
+function gpsFromStoredMetadata(gps) {
+  const latitude = dmsToDecimal(gps?.Latitude, gps?.LatitudeRef);
+  const longitude = dmsToDecimal(gps?.Longitude, gps?.LongitudeRef);
+  return validGps({ latitude, longitude });
+}
+
+function resolveStoredMediaTimeContext(item, lookup = findTimeZones) {
+  const fileSystem = item?.FileSystem || {};
+  const gpsContext = gpsTimeContext(gpsFromStoredMetadata(item?.GPS), lookup);
+  const hasStamp = fileSystem.ShootingTimeStamp !== null
+    && fileSystem.ShootingTimeStamp !== undefined
+    && fileSystem.ShootingTimeStamp !== ""
+    && Number.isFinite(Number(fileSystem.ShootingTimeStamp));
+  const hasZone = fileSystem.ShootingTimeZone !== null
+    && fileSystem.ShootingTimeZone !== undefined
+    && fileSystem.ShootingTimeZone !== ""
+    && Number.isFinite(Number(fileSystem.ShootingTimeZone));
+  const stamp = hasStamp ? Number(fileSystem.ShootingTimeStamp) : null;
+  const zone = hasZone ? Number(fileSystem.ShootingTimeZone) : null;
+  if (gpsContext) {
+    if (!hasStamp || !hasZone) return gpsContext;
+    const gpsTime = formatInstantWithContext(stamp, gpsContext);
+    if (gpsTime.text === fileSystem.ShootingTimeString && gpsTime.zone === zone) return gpsContext;
+  }
+  if (hasZone) return { kind: "offset", offsetMinutes: zone * 60 };
+  return UTC_TIME_CONTEXT;
+}
+
 module.exports = {
+  UTC_TIME_CONTEXT,
   parseMediaTimestamp,
   formatInstantInZone,
+  formatInstantWithContext,
   resolveMediaShootingTime,
+  resolveStoredMediaTimeContext,
   gpsFromExif,
 };

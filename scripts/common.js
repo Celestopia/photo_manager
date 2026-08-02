@@ -30,6 +30,8 @@ const {
   createEntityId,
 } = require("../src/shared/identity-schema.js");
 const {
+  UTC_TIME_CONTEXT,
+  formatInstantWithContext,
   gpsFromExif,
   resolveMediaShootingTime,
 } = require("./media-time");
@@ -140,20 +142,15 @@ function extensionType(ext) {
   return null;
 }
 
-// Normalize Date object into three stored fields used by metadata schema.
+// Normalize a filesystem Date into deterministic UTC schema fields.
 /**
- * Normalize Date into schema fields: formatted text, timezone, and unix timestamp.
- * Ensures consistent time representation across metadata records.
+ * Filesystems expose an absolute instant, not the timezone where the operation
+ * occurred. Media-specific formatting is applied later once its reference
+ * timezone has been resolved.
  */
 function timeInfoFromDate(date) {
-  const pad = (n) => String(n).padStart(2, "0");
-  const local = new Date(date);
-  const tz = -local.getTimezoneOffset() / 60;
-  return {
-    text: `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())} ${pad(local.getHours())}:${pad(local.getMinutes())}:${pad(local.getSeconds())}`,
-    zone: tz,
-    stamp: Math.floor(local.getTime() / 1000),
-  };
+  const stamp = Math.floor(new Date(date).getTime() / 1000);
+  return formatInstantWithContext(stamp, UTC_TIME_CONTEXT);
 }
 
 // Default user-editable metadata values.
@@ -261,7 +258,14 @@ async function inspectMediaFile(filePath, libraryRoot) {
 async function buildMetadata(filePath, libraryRoot, options = {}) {
   const snapshot = options.snapshot || await inspectMediaFile(filePath, libraryRoot);
   if (!snapshot) return null;
-  const { ext, type, stat, creation, modified, relativePath } = snapshot;
+  const {
+    ext,
+    type,
+    stat,
+    creation: scannedCreation,
+    modified: scannedModification,
+    relativePath,
+  } = snapshot;
   const hash = options.hash || await sha256File(filePath);
 
   let exif = null;
@@ -319,7 +323,7 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
     ? resolveMediaShootingTime({
       candidates: videoProbe?.creationTimes,
       gps: videoLocation,
-      fallback: modified,
+      fallback: scannedModification,
     })
     : resolveMediaShootingTime({
       candidates: exif?.DateTimeOriginal ? [{
@@ -328,8 +332,10 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
         offset: exif.OffsetTimeOriginal,
       }] : [],
       gps: gpsFromExif(exif),
-      fallback: creation,
+      fallback: scannedCreation,
     });
+  const creation = formatInstantWithContext(scannedCreation.stamp, shooting.context);
+  const modified = formatInstantWithContext(scannedModification.stamp, shooting.context);
   const output = {
     MediaId: createEntityId(),
     FilePath: relativePath,

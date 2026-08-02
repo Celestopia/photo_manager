@@ -84,6 +84,37 @@ test("moved records retain media metadata while refreshing path and file stats",
   assert.equal(moved.Customization.Privacy, 4);
 });
 
+test("moved records format refreshed filesystem times in their media timezone", () => {
+  const shootingStamp = Date.UTC(2025, 7, 27, 23, 14, 43) / 1000;
+  const modificationStamp = shootingStamp + 1;
+  const old = {
+    MediaId: MEDIA_IDS.moved,
+    FilePath: "old/video.mp4",
+    SHA256Hash: "hash",
+    FileSystem: {
+      FileType: "video",
+      ShootingTimeString: "2025-08-27 16:14:43",
+      ShootingTimeZone: -7,
+      ShootingTimeStamp: shootingStamp,
+    },
+    GPS: {
+      LatitudeRef: "N",
+      Latitude: [38, 32, 43.44],
+      LongitudeRef: "W",
+      Longitude: [121, 45, 15.84],
+    },
+    Customization: customization(),
+  };
+  const moved = cloneMovedRecord(old, {
+    ...snapshot(),
+    creation: { text: "unused", zone: 0, stamp: modificationStamp },
+    modified: { text: "unused", zone: 0, stamp: modificationStamp },
+  }, "hash");
+  assert.equal(moved.FileSystem.ModificationTimeString, "2025-08-27 16:14:44");
+  assert.equal(moved.FileSystem.ModificationTimeZone, -7);
+  assert.equal(moved.FileSystem.ModificationTimeStamp, modificationStamp);
+});
+
 function quietLogger() {
   return { warn() {} };
 }

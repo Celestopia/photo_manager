@@ -17,6 +17,10 @@ const {
   extensionType,
 } = require("./common");
 const { validateMediaTools } = require("./media-tools");
+const {
+  formatInstantWithContext,
+  resolveStoredMediaTimeContext,
+} = require("./media-time");
 const { parseLibraryArgument, writeLibraryManifest } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createLibraryBackup } = require("./library-backup");
@@ -49,6 +53,9 @@ function preserveUserFields(built, existing) {
 
 function cloneMovedRecord(existing, snapshot, hash) {
   const moved = structuredClone(existing);
+  const timeContext = resolveStoredMediaTimeContext(existing);
+  const creation = formatInstantWithContext(snapshot.creation.stamp, timeContext);
+  const modified = formatInstantWithContext(snapshot.modified.stamp, timeContext);
   moved.FilePath = snapshot.relativePath;
   moved.SHA256Hash = hash;
   moved.FileSystem = {
@@ -56,12 +63,12 @@ function cloneMovedRecord(existing, snapshot, hash) {
     FileType: snapshot.type,
     FileExtension: snapshot.ext.replace(".", "").toLowerCase(),
     FileSize: snapshot.stat.size,
-    CreationTimeString: snapshot.creation.text,
-    CreationTimeZone: snapshot.creation.zone,
-    CreationTimeStamp: snapshot.creation.stamp,
-    ModificationTimeString: snapshot.modified.text,
-    ModificationTimeZone: snapshot.modified.zone,
-    ModificationTimeStamp: snapshot.modified.stamp,
+    CreationTimeString: creation.text,
+    CreationTimeZone: creation.zone,
+    CreationTimeStamp: creation.stamp,
+    ModificationTimeString: modified.text,
+    ModificationTimeZone: modified.zone,
+    ModificationTimeStamp: modified.stamp,
     ModificationTimeMs: snapshot.stat.mtimeMs,
   };
   return moved;

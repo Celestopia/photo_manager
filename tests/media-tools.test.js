@@ -10,7 +10,7 @@ const {
   runMediaTool,
   sanitizeMediaError,
 } = require("../scripts/media-tools");
-const { defaultCustomization } = require("../scripts/common");
+const { defaultCustomization, timeInfoFromDate } = require("../scripts/common");
 
 test("normalizes the default video/audio streams and display dimensions", () => {
   const parsed = parseProbeJson({
@@ -136,6 +136,14 @@ test("keeps absent numeric fields null and preserves media rating defaults", () 
   assert.equal(defaultCustomization(".png").Rating, 1);
   assert.equal(defaultCustomization(".mp4").Privacy, 1);
   assert.equal(defaultCustomization(".jpg").Privacy, 1);
+});
+
+test("normalizes raw filesystem dates to UTC before a media timezone is known", () => {
+  assert.deepEqual(timeInfoFromDate(new Date("2025-08-27T23:14:44Z")), {
+    text: "2025-08-27 23:14:44",
+    zone: 0,
+    stamp: Date.UTC(2025, 7, 27, 23, 14, 44) / 1000,
+  });
 });
 
 test("resolves relative and absolute FFmpeg directories", () => {
