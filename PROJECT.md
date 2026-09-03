@@ -1,108 +1,108 @@
-# PhotoManager 项目设计说明
+# PhotoManager Project Design
 
-本文档是 PhotoManager 的实现级项目说明，面向维护者、代码审查者和后续 AI Agent。它记录当前代码已经采用的架构、数据契约、交互约束和故障处理策略。若代码与本文档不一致，应先确认差异是否为未完成迁移或实现缺陷，不应默默引入第二套规则。
+This is the implementation-level specification for PhotoManager, intended for maintainers, reviewers, and future AI agents. It records the architecture, data contracts, interaction constraints, and failure-handling strategies implemented by the current code. If the code and this document disagree, first determine whether the difference is an incomplete migration or a defect; do not silently introduce a second set of rules.
 
-## 1. 产品定位
+## 1. Product Scope
 
-PhotoManager 是一个 Windows 本地桌面媒体管理器，用于管理用户选择的独立图库。图库可以位于计算机上的任意普通目录，不要求位于项目目录内。
+PhotoManager is a local Windows desktop media manager for user-selected, independent libraries. A library may be any ordinary directory on the computer and does not need to be inside the project directory.
 
-当前产品能力包括：
+Current capabilities include:
 
-- 在同一时间线中管理图片和视频。
-- 查看图片，播放视频，编辑共享的个性化信息。
-- 按媒体类型、评级、隐私等级、相册、标签、人物和层级地点筛选。
-- 对图片和视频混合批量设置标题、评级、隐私等级、相册、标签、人物和主地点。
-- 以注册表管理标签、相册、人物和地点，禁止媒体元数据引用未注册值。
-- 为每个图库独立保存元数据、注册表、缩略图、日志和备份。
-- 在应用内执行初始化、增量更新、完整性检查、缩略图生成和 CSV 导出。
+- Managing images and videos on one timeline.
+- Viewing images, playing videos, and editing shared customization fields.
+- Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
+- Batch-setting titles, ratings, privacy levels, albums, tags, people, and primary locations across mixed images and videos.
+- Managing tags, albums, people, and locations through registries, while preventing metadata from referencing unregistered values.
+- Keeping metadata, registries, thumbnails, logs, and backups separate for every library.
+- Running initialization, incremental updates, integrity verification, thumbnail generation, and CSV export inside the application.
 
-本项目坚持 local-first：核心浏览和管理流程不依赖网络服务，不把图库数据上传到远端，也不使用数据库。JSONL 是当前的数据事实来源。
+The project is local-first. Core browsing and management do not depend on network services, library data are never uploaded, and no database is used. JSONL is the current source of truth.
 
-## 2. 平台、技术栈与边界
+## 2. Platform, Technology, and Boundaries
 
-- 目标平台：Windows 10/11 x64。
-- 桌面容器：Electron 35。
-- 渲染层：Vue 3 SFC + Vite。
-- 图片解析和缩略图：Sharp、exifr。
-- 视频探测和抽帧：项目内置 Windows x64 FFmpeg/FFprobe 8.1.2。
-- 拍摄地时区：`geo-tz` 离线坐标边界数据 + Electron/Node `Intl` IANA 时区规则；运行时不请求网络服务。
-- 配置格式：YAML。
-- 数据格式：JSONL；导出格式为 UTF-8 BOM CSV。
-- 主进程与渲染器通过显式 IPC 白名单通信；渲染器不能直接访问 Node 文件系统。
+- Target: Windows 10/11 x64.
+- Desktop container: Electron 35.
+- Renderer: Vue 3 SFC and Vite.
+- Image parsing and thumbnails: Sharp and exifr.
+- Video probing and frame extraction: bundled Windows x64 FFmpeg/FFprobe 8.1.2.
+- Capture-location time zones: offline `geo-tz` coordinate boundaries plus Electron/Node `Intl` IANA time-zone rules; no runtime network request is made.
+- Configuration: YAML.
+- Persistence: JSONL; export: UTF-8 BOM CSV.
+- The main process and renderer communicate through an explicit IPC allowlist. The renderer cannot access Node or the filesystem directly.
 
-当前支持的媒体扩展名：
+Supported media extensions:
 
-- 图片：`.jpg`、`.jpeg`、`.png`、`.bmp`、`.webp`、`.gif`。
-- 视频：`.mp4`、`.mov`、`.mkv`、`.avi`。
+- Images: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`, `.gif`.
+- Videos: `.mp4`, `.mov`, `.mkv`, `.avi`.
 
-扩展名只决定是否纳入扫描。文件内容损坏或编码不兼容时，记录仍可存在，并通过 `Picture.ProbeStatus` 或 `Video.ProbeStatus` 表示技术解析状态。
+An extension only determines scan eligibility. A record may still exist when its contents are damaged or its codec is unsupported; `Picture.ProbeStatus` or `Video.ProbeStatus` represents the technical parsing state.
 
-## 3. 应用级配置与图库级数据
+## 3. Application Configuration and Library Data
 
-### 3.1 应用级配置
+### 3.1 Application Configuration
 
-`%APPDATA%\PhotoManager\app-data\config.yml` 只保存所有图库共享、适合随用户配置漫游的应用参数：
+`%APPDATA%\PhotoManager\app-data\config.yml` contains only application settings shared by every library and suitable for roaming with the user:
 
-- `thumbnail`：缩略图尺寸、WebP 质量、极端长宽比阈值、图片并发数。
-- `media`：FFmpeg 目录、探测超时、抽帧超时、视频缩略图并发数。
-- `backup.retentionCount`：每个图库最多保留的备份快照目录数，最小为 1。
-- `ui`：画廊卡片宽度、查看器面板比例、默认可见性、缩放范围。
+- `thumbnail`: dimensions, WebP quality, extreme-aspect threshold, and image concurrency.
+- `media`: FFmpeg directory, probe timeout, extraction timeout, and video-thumbnail concurrency.
+- `backup.retentionCount`: maximum retained backup snapshots per library, with a minimum of 1.
+- `ui`: gallery card width, viewer panel ratios and default visibility, and zoom range.
 
-`config.yml` 不保存图库路径、数据目录、缩略图目录或日志目录。不同图库不能覆盖缩略图参数和 UI 参数。安装目录只包含程序、依赖和 FFmpeg 等程序资源，不保存活动配置或运行状态。
+`config.yml` does not contain library paths or data, thumbnail, or log directories. Individual libraries cannot override thumbnail or UI settings. The installation directory contains only programs, dependencies, and program resources such as FFmpeg; it contains no live configuration or runtime state.
 
-应用和独立维护脚本启动时通过同一个配置模块读取该文件。文件不存在时，入口会创建父目录并写入完整默认配置后继续运行；文件存在但 YAML 无效时，不覆盖原文件，而是仅在本次运行中回退到默认值。配置目前没有运行时编辑界面，渲染进程只能读取规范化后的配置。
+The application and standalone maintenance scripts use the same configuration module. When the file is absent, the caller creates its parent directory, writes the complete defaults, and continues. Invalid YAML is left untouched and defaults are used for that run. There is no runtime configuration UI; the renderer can only read normalized configuration.
 
-`media.ffmpegDir` 为绝对路径时直接使用；为相对路径时始终相对于应用安装根目录解析，不能因 `config.yml` 移入 AppData 而改为相对于配置文件目录。开发环境中的应用根目录是项目根目录；未来打包入口若改变程序资源位置，应显式向媒体工具解析器传入打包资源根目录。
+An absolute `media.ffmpegDir` is used directly. A relative value is always resolved from the application installation root, never from the relocated AppData configuration directory. In development the application root is the project root. A future packaged entry point must explicitly pass the packaged resource root if that location changes.
 
-### 3.2 应用私有状态
+### 3.2 Private Application State
 
-全局应用数据按“可漫游配置”和“机器相关状态”拆分：
+Global data are split between roaming configuration and machine-specific state:
 
 ```text
 %APPDATA%\PhotoManager\
   app-data\
     config.yml
-  electron\                 # Electron userData 和少量内部偏好
+  electron\                 # Electron userData and small internal preferences
 
 %LOCALAPPDATA%\PhotoManager\
   app-data\
     state.json
-  logs\                     # 尚未打开图库时的启动诊断日志
-  session-data\             # localStorage、Chromium 缓存和会话状态
+  logs\                     # startup diagnostics produced before a library opens
+  session-data\             # localStorage, Chromium cache, and session state
   crash-dumps\
 ```
 
-`state.json` 只保存最后一次成功打开的图库路径。该路径属于当前机器，不进入 roaming 目录。视频音量、静音和按图库 UUID 隔离的最近标签、人物、地点仍使用 renderer `localStorage`，其物理存储随 Electron `sessionData` 固定在本机 Local AppData。缓存和崩溃转储也不能污染 roaming 目录。
+`state.json` contains only the last successfully opened library path. Because that path is machine-specific, it is not stored under roaming data. Video volume and mute plus the recent tags, people, and locations namespaced by library UUID remain in renderer `localStorage`, whose physical storage follows Electron `sessionData` into Local AppData. Cache and crash dumps must not pollute roaming data.
 
-主进程必须在 Electron `ready` 之前创建这些目录并显式设置 `userData`、`sessionData`、`crashDumps` 和日志路径。`scripts/application-paths.js` 是 Electron 和独立 CLI 共用的唯一全局路径规则；其它模块不得重新拼接 AppData 路径。应用不长期读取旧安装目录中的 `config.yml`，升级到 v0.25.0 时由用户一次性复制自定义配置；低价值的最近使用和播放偏好允许重置。
+Before Electron becomes ready, the main process must create these directories and explicitly set `userData`, `sessionData`, `crashDumps`, and the log path. `scripts/application-paths.js` is the only shared source of global path rules for Electron and standalone CLI tools. Other modules must not reconstruct AppData paths. The application does not permanently read the former installation-root `config.yml`; upgrading to v0.25.0 requires a one-time manual copy of customized configuration. Low-value recent-choice and playback preferences may reset.
 
-应用不维护最近图库列表。启动后始终停留在图库入口页；若保存了上次成功使用的图库路径，则从该图库的 `library.yml` 读取并显示图库名称，同时显示完整路径。用户点击“进入图库”后才开始加载，也可以重新选择其他图库。
+The application does not maintain a recent-library list. Startup always shows the library-entry page. If a last successful path exists, its real name is read from `library.yml` and displayed with the full path, but the library is not loaded until the user chooses to enter it.
 
-### 3.3 图库目录
+### 3.3 Library Directory
 
-一个图库就是用户选择的媒体根目录。所有属于该图库的 PhotoManager 数据必须位于：
+A library is the selected media root. All PhotoManager data belonging to it must be inside:
 
 ```text
 <library-root>/.photo_manager/
 ```
 
-标准结构：
+Standard layout:
 
 ```text
 <library-root>/
   media files and user directories...
   .photo_manager/
     library.yml
-    library.lock                  # 仅在图库被打开或脚本运行时存在
-    initialization.json          # 仅初始化中或初始化失败后存在
-    transaction.json             # 仅跨文件提交未完成时存在
+    library.lock                  # exists only while open or while a script runs
+    initialization.json          # exists only during/after failed initialization
+    transaction.json             # exists only while a cross-file commit is incomplete
     data/
       photo_metadata.jsonl
       tag_registry.jsonl
       album_registry.jsonl
       person_registry.jsonl
       location_registry.jsonl
-      photo_metadata.csv          # 执行导出后可存在
+      photo_metadata.csv          # may exist after export
     thumb_cache/
       cache_manifest.json
       <SHA256Hash>.webp
@@ -113,17 +113,17 @@ PhotoManager 是一个 Windows 本地桌面媒体管理器，用于管理用户�
         manifest.json
     logs/
       YYYY-MM-DD.log
-      initialization-failed.log   # 初始化失败时可存在
+      initialization-failed.log   # may exist after failed initialization
     temp/
       transactions/
-      video thumbnail temporary files...
+      temporary video-thumbnail files...
 ```
 
-`.photo_manager` 不设置 Windows 隐藏属性。扫描器只排除图库根目录下这个保留目录；其它普通隐藏目录仍会被扫描。
+`.photo_manager` is not given the Windows hidden attribute. The scanner excludes only this reserved directory at the library root; other ordinary hidden directories are still scanned.
 
-## 4. 图库身份与 manifest
+## 4. Library Identity and Manifest
 
-`library.yml` 是识别图库的必要文件，格式为：
+`library.yml` is required to identify a library:
 
 ```yaml
 schemaVersion: 4
@@ -133,174 +133,139 @@ createdAt: '2026-07-12T17:11:52.985Z'
 updatedAt: '2026-07-12T17:13:02.959Z'
 ```
 
-设计约束：
+Constraints:
 
-- `libraryId` 是创建图库时生成的 UUID，是图库的稳定身份。
-- 图库移动到新路径后 UUID 不变，仍视为同一图库。
-- `name` 是可编辑的显示名称，长度为 1 到 100 个字符。
-- `schemaVersion` 必须严格等于当前版本 `4`。应用不包含历史版本解析、兼容或自动迁移逻辑；其它版本必须先通过一次性工具转换，才能由当前应用打开。
-- manifest 只允许上述五个固定字段；字段缺失、出现额外字段、无法解析、UUID 非法或时间字段非法时，图库直接判定为损坏。
-- 五个固定 JSONL 文件缺失时拒绝打开。
+- `libraryId` is the UUID generated when the library is created and is its stable identity.
+- Moving the library does not change its UUID or identity.
+- `name` is an editable display name from 1 to 100 characters.
+- `schemaVersion` must equal the current version, `4`. The application contains no historical parser, compatibility layer, or automatic migration. Other versions require an explicit one-time conversion before opening.
+- Only the five fields above are allowed. Missing or extra fields, parse failures, invalid UUIDs, or invalid timestamps make the library corrupt.
+- Opening is rejected if any of the five fixed JSONL files is missing.
 
-## 5. 图库边界规则
+## 5. Library Boundary Rules
 
-所有入口和 CLI 维护脚本必须遵守同一组边界规则：
+Every entry point and CLI maintenance script follows the same boundaries:
 
-1. 图库根目录必须存在、可写且不是 Windows 驱动器根目录。
-2. 图库根目录不能是符号链接。
-3. 扫描时不跟随文件或目录符号链接。
-4. 不能在一个已存在图库的子目录中创建或打开另一个图库。
-5. 一个图库内部不能包含另一个 `.photo_manager`。
-6. 只管理图库根目录内的媒体；元数据中的 `FilePath` 必须是不能逃逸根目录的相对路径。
-7. 路径键按字符串区分大小写。Windows 文件系统本身通常不允许仅大小写不同的两个实体，但应用层不主动折叠键。
-8. 不实时监控文件系统。媒体发生增删改名后，用户需要执行“更新元数据”。
+1. The root must exist, be writable, and not be a Windows drive root.
+2. The root cannot be a symbolic link.
+3. Scanning does not follow symbolic-link files or directories.
+4. A library cannot be created or opened below another library.
+5. A library cannot contain another `.photo_manager` directory.
+6. Only media inside the root are managed. Metadata `FilePath` values must be relative paths that cannot escape it.
+7. Path keys are case-sensitive strings. Windows normally prevents entities that differ only by case, but the application does not collapse them.
+8. There is no live filesystem monitoring. Users run “Update Metadata” after adding, removing, moving, or renaming media.
 
-`scripts/library-core.js` 是路径解析、manifest、严格 JSONL 和原子文本写入的唯一共享实现；不要在其它模块中重新拼接图库内部目录规则。
+`scripts/library-core.js` is the sole shared implementation of path resolution, manifests, strict JSONL, and atomic text writes. Do not reconstruct internal library paths elsewhere.
 
-## 6. 图库生命周期
+## 6. Library Lifecycle
 
-### 6.1 应用启动
+### 6.1 Application Startup
 
-1. 获取 Electron 单实例锁；第二个进程不会创建第二个窗口，而会激活已有窗口。
-2. 在 Electron ready 前设置 roaming/local 全局目录，并读取、规范化 roaming `config.yml`。
-3. 检查 `ffmpeg.exe` 和 `ffprobe.exe`。
-4. 创建窗口并显示图库入口页。
-5. 若保存了上次成功图库路径，从其 `library.yml` 读取名称，并在入口页预填真实图库名称和完整路径，不自动加载。
-6. 用户点击“进入图库”或选择已有图库后，才验证并加载图库。
-7. 只有图库锁、manifest、五个 JSONL 和全部内存索引加载成功后，才进入画廊，并更新“上次图库路径”。
+1. Acquire Electron's single-instance lock; a second process activates the existing window.
+2. Before Electron is ready, configure roaming/local global directories and read and normalize roaming `config.yml`.
+3. Validate `ffmpeg.exe` and `ffprobe.exe`.
+4. Create the window and show the library-entry page.
+5. If a last successful path exists, read the actual name from its manifest and prefill the name and full path without loading it.
+6. Validate and load only after the user enters or selects an existing library.
+7. Enter the gallery and update the last-library path only after the lock, manifest, five JSONL files, and all memory indexes load successfully.
 
-FFmpeg 不可用时应用仍能显示入口页和错误原因，但禁止初始化或打开任何图库。
+When FFmpeg is unavailable, the entry page and error remain available, but no library can be initialized or opened.
 
-### 6.2 选择目录
+### 6.2 Directory Selection
 
-选择目录后，主进程先检查：
+After selection, the main process checks:
 
-- 若存在有效 `.photo_manager`，进入打开流程。
-- 若存在失败初始化标记，展示失败原因；用户可确认清理失败数据后直接重新扫描并重试。
-- 若不存在 `.photo_manager`，执行快速扫描，统计支持的媒体数量，再展示初始化确认。
-- 若保留目录存在但不构成有效图库，不把它当作空目录重新初始化，而是报告损坏。
+- A valid `.photo_manager` enters the open flow.
+- A failed-initialization marker displays its reason and allows explicit cleanup, rescan, and retry.
+- Without `.photo_manager`, a cancellable quick scan counts supported media before showing initialization confirmation.
+- A reserved directory that is not a valid library is reported as corruption rather than treated as uninitialized.
 
-快速扫描可取消，不写入任何图库数据。
+The quick scan writes no library data.
 
-### 6.3 初始化
+### 6.3 Initialization
 
-初始化前必须展示详细警告并要求用户显式确认。警告应说明：
+Initialization requires an explicit warning and confirmation stating that it will recursively scan supported media, calculate full SHA-256 hashes, read EXIF, run FFprobe, create the management structure, leave original media untouched, potentially take a long time, remove incomplete data on cancellation, and reject nested libraries.
 
-- 将递归扫描支持的图片和视频。
-- 将计算完整 SHA-256、读取 EXIF、运行 FFprobe。
-- 将创建 `.photo_manager` 及数据、缓存、日志、备份和临时目录。
-- 不会移动、改名、修改或删除原始媒体。
-- 大图库耗时较长，期间不应断开磁盘或改变目录权限。
-- 初始化可以取消，取消后删除本轮未完成数据。
-- 图库不能与其它图库嵌套。
+Flow:
 
-初始化流程：
+1. Revalidate paths, parent/child nesting, and FFmpeg.
+2. Create the manifest, directories, initialization marker, and exclusive lock.
+3. Scan and build records one media file at a time.
+4. Skip unreadable or unhashable new media and report them; retain readable but corrupt images/videos as failed-probe records.
+5. Report duplicate SHA-256 values without rejecting initialization.
+6. Atomically write metadata and four empty registries.
+7. Write a committed marker and perform minimum read-back validation.
+8. Remove the marker, release the initialization lock, and open normally through the main process.
 
-1. 重新验证路径、父级/子级嵌套和 FFmpeg。
-2. 创建 manifest、目录、初始化标记和独占锁。
-3. 扫描媒体，逐个构造记录。
-4. 无法读取或哈希的新媒体会跳过并进入最终警告报告；损坏但可读取的图片/视频会保留失败探测记录。
-5. 记录重复 SHA-256，但不因此阻止初始化。
-6. 原子写入元数据和四个空注册表。
-7. 写入 committed 标记并做最低限度回读验证。
-8. 删除初始化标记，释放初始化锁，再由主进程正常打开图库。
+Cancellation deletes the complete `.photo_manager` directory. Other failures retain `library.yml`, `initialization.json`, and the error log while removing incomplete data, caches, and temporary content for explicit diagnosis and retry.
 
-取消时删除整个 `.photo_manager`。非取消失败时保留 `library.yml`、`initialization.json` 和错误日志，删除其它未完成的数据、缓存与临时内容，以便诊断和显式重试。
+### 6.4 Opening and Closing
 
-### 6.4 打开与关闭
+Opening validates before acquiring the exclusive lock. Only its holder can write. If a crash left a cross-file transaction, the journal is used to roll it back or finish cleanup before strict loading. After main-process indexes load, the renderer requests all four registries in parallel and then performs its first gallery query.
 
-打开流程先验证图库，再获取独占锁。只有锁的持有者可以写入。打开过程中若发现上次崩溃留下的跨文件事务，会先按事务日志完成回滚或收尾，然后严格加载数据。主进程完成图库索引加载后，renderer 并行请求相册、标签、人物和地点定义，再发起首次画廊查询。
+Returning to the entry page requires confirmation, is blocked by an unresolved viewer draft or running maintenance, clears renderer state and memory indexes, and releases the lock. The last-library path remains for a future manual entry. The application uses one instance, one window, and one active library.
 
-返回入口页会：
+## 7. Locking and Concurrency
 
-- 要求二次确认。
-- 阻止在未处理查看器草稿或维护任务运行时切换。
-- 清空当前图库的渲染器状态和内存索引。
-- 释放锁，但保留“上次图库路径”，供入口页下次显示并由用户手动进入。
+`library.lock` contains `LibraryId`, `SessionId`, `ProcessId`, `ProcessStartedAt`, `HostName`, and `ApplicationStartedAt`.
 
-应用采用单实例、单窗口、单活动图库模型。
+The lock is created with `wx`, allowing one holder per path. On Windows, PID and process start time are checked together to reduce false live-lock detection after PID reuse.
 
-## 7. 锁与并发
+- A live lock can never be forcibly removed, including through low-level IPC.
+- A corrupt or dead-process lock may be forcibly removed only after displaying the risk and lock details and receiving confirmation.
+- The main process retains the lock while a maintenance worker runs and passes its random `SessionId`; the worker verifies that the parent still owns that lock.
+- Standalone CLI tools acquire the same lock and cannot maintain a library concurrently with the application.
+- Maintenance cannot be cancelled. While it runs, the library is read-only and cannot be switched or closed.
 
-`library.lock` 包含：
+## 8. Persistence, Backups, and Transactions
 
-- `LibraryId`
-- `SessionId`
-- `ProcessId`
-- `ProcessStartedAt`
-- `HostName`
-- `ApplicationStartedAt`
+### 8.1 Strict JSONL
 
-锁使用 `wx` 创建，保证同一路径上只有一个持有者。Windows 上会同时检查 PID 和进程启动时间，降低 PID 被复用时误判活锁的风险。
+Every JSONL file contains one object per line. Opening strictly requires:
 
-规则：
+- Every non-empty line to be a valid JSON object.
+- Every media record to have non-empty, unique `MediaId` and `FilePath` values.
+- Tag, album, person, and location definitions to have `TagId`, `AlbumId`, `PersonId`, and `LocationId` respectively.
+- Every entity ID to be a lowercase UUID v4 globally unique across media and all four registries.
+- Tag `Text`, album `Title`, and person `Name` to be non-empty and unique within their registries.
+- Locations may share names, but identical `(Name, Country, Province, City, ParentId)` contexts are forbidden.
+- Every media registry reference and every location `ParentId` to resolve, with no parent cycle.
+- Any invalid line or duplicate key to reject the entire library rather than skipping bad rows.
 
-- 活锁不能强制移除，即使调用底层 IPC 也必须拒绝。
-- 锁文件损坏或进程已不存在时，可在显示风险和锁信息后由用户确认强制解锁。
-- 主进程运行维护 worker 时继续持有图库锁，并把随机 `SessionId` 传给子进程；worker 必须验证父进程仍拥有同一把锁。
-- 独立 CLI 脚本自行获取锁，不能与应用并发维护同一图库。
-- 维护任务不可取消，运行期间图库只读，禁止切换图库或关闭窗口。
+Partial loading could cause a later write to overwrite unloaded data, so explicit rejection is the safer policy.
 
-## 8. 持久化、备份和事务
+### 8.2 Atomic Single-File Writes
 
-### 8.1 严格 JSONL
+`writeTextAtomic` and `writeJsonlAtomic` create a unique temporary file beside the target, write it completely, replace the target by rename, and clean residual temporary files in `finally`. Main-process Maps are active-session query indexes; JSONL remains persistent truth.
 
-所有 JSONL 采用一行一个对象。打开图库时严格检查：
+### 8.3 Automatic Backups
 
-- 每个非空行必须是合法 JSON 对象。
-- 每条媒体必须有非空且唯一的 `MediaId` 与 `FilePath`。
-- 标签、相册、人物和地点必须分别有 `TagId`、`AlbumId`、`PersonId` 和 `LocationId`。
-- 所有实体 ID 都必须是小写 UUID v4，并在媒体及四个注册表组成的整个图库命名空间中全局唯一。
-- 标签 `Text`、相册 `Title`、人物 `Name` 必须非空且在各自注册表中全局唯一。
-- 地点允许同名，但 `(Name, Country, Province, City, ParentId)` 完全相同的地点定义不能重复。
-- 每个媒体的相册、标签、人物和地点 ID 必须能在相应注册表中解析；地点 `ParentId` 也必须存在且不能形成循环。
-- 任一非法行或重复键都会拒绝整个图库加载，不跳过坏行继续运行。
+A backup must precede every user-data write:
 
-这是刻意的数据安全策略：部分加载会让后续写回覆盖未加载数据，比明确失败更危险。
+- Ordinary edits and registry creation/update create the first daily snapshot of that day.
+- Global deletion and library-name changes create an immediate snapshot every time.
+- Incremental metadata update creates an update snapshot every time.
 
-### 8.2 单文件原子写入
+A snapshot includes `library.yml` and all five JSONL files, but not original media, thumbnails, CSV, logs, or temporary files. `backup.retentionCount` counts snapshot directories; the oldest are removed beyond the limit. Backup failure blocks the real write. The current UI has no restore operation; backups support manual diagnosis and future recovery tooling.
 
-`writeTextAtomic` / `writeJsonlAtomic` 的步骤是：
+### 8.4 Multi-File Transactions
 
-1. 在目标目录创建唯一临时文件。
-2. 完整写入内容。
-3. 通过 rename 替换目标文件。
-4. 在 `finally` 清理残留临时文件。
+Global tag, person, album, or location deletion normally changes both a registry and `photo_metadata.jsonl`. `scripts/library-transaction.js` performs:
 
-主进程内存 Map 只是活动会话的查询索引；JSONL 才是持久化事实来源。
+1. Write old and new versions of every target under `temp/transactions/<uuid>`.
+2. Atomically write `transaction.json` in the prepared state.
+3. Atomically replace each target, updating the applied count after each one.
+4. Mark committed and clean the transaction directory and journal.
+5. On an exception, immediately restore every old version.
+6. On the next open after a crash, roll back an incomplete commit or clean an entirely applied commit according to the journal.
 
-### 8.3 自动备份
+An unparseable journal or missing rollback file rejects opening rather than guessing. Main-process global deletion keeps old in-memory objects only for media whose references actually change and transacts with copied replacements; unaffected media preserve object and Map identity. Do not deep-clone the entire active metadata set merely to simplify rollback.
 
-任何用户数据写入前必须先创建备份：
+## 9. Media Metadata Model
 
-- 普通编辑和注册表创建/修改：每天第一次写入前创建 daily 快照。
-- 全局删除、图库名称修改：每次创建 immediate 快照。
-- 元数据增量更新：每次创建 update 快照。
+Each line of `photo_metadata.jsonl` is one media record. Images and videos share the top-level structure and are distinguished by `FileSystem.FileType`.
 
-备份包含 `library.yml` 和五个 JSONL，不包含原始媒体、缩略图、CSV、日志或临时文件。`backup.retentionCount` 统计快照目录，不按单文件计数；超出后删除最旧快照。备份失败必须阻止正式写入。
-
-当前 UI 不提供备份恢复功能，备份用于人工诊断和后续恢复工具。
-
-### 8.4 多文件事务
-
-全局删除标签、人物、相册或地点时，通常需要同时改写注册表和 `photo_metadata.jsonl`。这些路径使用 `scripts/library-transaction.js`：
-
-1. 在 `temp/transactions/<uuid>` 写入每个目标的新版本和旧版本。
-2. 原子写入 `transaction.json`，标记 prepared。
-3. 逐个原子替换目标文件，每次更新已应用数量。
-4. 全部完成后标记 committed 并清理事务目录和 journal。
-5. 中途异常立即从旧版本回滚所有目标。
-6. 进程崩溃后，下次打开图库根据 journal 判断回滚未完成提交，或清理已经全部应用的提交。
-
-无法解析 journal 或缺少回滚文件时拒绝打开，避免猜测数据状态。
-
-主进程执行注册表全局删除时采用按需内存回滚：只为实际发生引用变化的媒体保留旧对象，并以复制后的新对象参与事务；未引用该定义的媒体保持原对象和 Map 身份。不能为回滚便利而深拷贝整个活动图库元数据。
-
-## 9. 媒体元数据模型
-
-`photo_metadata.jsonl` 中每个媒体是一条记录。图片和视频共用顶层结构，通过 `FileSystem.FileType` 区分。
-
-### 9.1 顶层键
+### 9.1 Top-Level Keys
 
 ```json
 {
@@ -316,74 +281,66 @@ FFmpeg 不可用时应用仍能显示入口页和错误原因，但禁止初始�
 }
 ```
 
-图片记录使用 `Picture`，不创建空 `Video`；视频记录使用 `Video`，不创建空 `Picture`。
+Images use `Picture` and do not create an empty `Video`; videos use `Video` and do not create an empty `Picture`.
 
-三个看似都能标识媒体的字段承担不同职责：
+- `MediaId`: stable lowercase UUID v4 identity within the library, used by main-process indexes, IPC edits, selection, viewer navigation, and frontend keys.
+- `FilePath`: current path relative to the root; mutable after moves or renames and used only to locate and label the file.
+- `SHA256Hash`: content fingerprint used for integrity, move recognition, duplicate detection, and thumbnail cache names. Same-content copies may share a hash but require distinct `MediaId` values.
 
-- `MediaId`：媒体在当前图库内的稳定身份，小写 UUID v4。主进程索引、IPC 编辑、选择集合、查看器导航和前端列表 key 均使用它。
-- `FilePath`：媒体相对于图库根目录的当前位置，可以因移动或改名而变化，只用于定位文件和展示文件名。
-- `SHA256Hash`：文件内容指纹，用于完整性校验、移动识别、重复检测和缩略图缓存名；相同内容副本可拥有相同 hash，但必须有不同 `MediaId`。
-
-将媒体在同一图库内移动或改名时保留 `MediaId`。复制出第二个仍共存的文件会生成新 `MediaId`。只把原始媒体文件复制到另一个独立图库时，由于没有携带该图库的元数据记录，目标图库也会分配新 `MediaId`。
+Moving or renaming within one library preserves `MediaId`. A second coexisting copy receives a new ID. Copying only the original file to another library also produces a new ID because no source-library metadata accompanies it.
 
 ### 9.2 `FileSystem`
 
-- `FileType`：`image` 或 `video`。
-- `FileExtension`：不带点的小写扩展名。
-- `FileSize`：字节数。
-- `ShootingTimeString/Zone/Stamp`：用于时间线排序的拍摄时间。`String` 是拍摄地墙上时间，`Zone` 是该日期实际生效的 UTC 小时偏移，`Stamp` 是同一时刻的 Unix 秒。
-- `CreationTimeString/Zone/Stamp`：文件系统创建时刻；文本和偏移使用媒体参考时区。
-- `ModificationTimeString/Zone/Stamp`：文件系统修改时刻；文本和偏移使用媒体参考时区。
-- `ModificationTimeMs`：毫秒修改时间，位于 `FileSystem` 最后，用于增量复用判断。
+- `FileType`: `image` or `video`.
+- `FileExtension`: lowercase extension without the dot.
+- `FileSize`: bytes.
+- `ShootingTimeString/Zone/Stamp`: capture time for timeline sorting. `String` is wall-clock time at the capture location, `Zone` is the UTC-hour offset active on that date, and `Stamp` is Unix seconds for the same instant.
+- `CreationTimeString/Zone/Stamp`: filesystem creation instant rendered in the media reference time zone.
+- `ModificationTimeString/Zone/Stamp`: filesystem modification instant rendered in the media reference time zone.
+- `ModificationTimeMs`: millisecond modification time, stored last in `FileSystem` for incremental reuse.
 
-拍摄时间不能使用运行应用的计算机时区进行隐式转换。时间来源和规范化规则如下：
+Capture time must not be implicitly converted through the current computer's time zone:
 
-1. 图片读取原始 EXIF `DateTimeOriginal`，并在存在时结合 `OffsetTimeOriginal`；没有拍摄时间时回退文件创建时间。
-2. 视频保留 FFprobe 返回的 QuickTime、容器、默认视频流和默认音频流创建时间候选。带有非 UTC 显式偏移的候选优先级最高，偏移视为来源明确提供的信息；没有可用候选时回退文件修改时间。
-3. 来源只提供 UTC 绝对时刻且媒体带 GPS 时，用 `geo-tz` 将坐标离线映射为 IANA 时区，再用 `Intl.DateTimeFormat` 按拍摄日期应用该时区的历史/夏令时规则，生成当地 `String` 和当日 `Zone`。例如同一地点夏季可为 `-7`、冬季可为 `-8`；不能使用固定标准时差代替。
-4. UTC 时间没有 GPS 时保持 UTC，不依据文件路径、已注册地点或本机时区猜测拍摄地。
-5. 无时区的墙上时间在 GPS 能唯一反推出一个绝对时刻时才生成 `Zone/Stamp`。夏令时回拨的重复时段、跳时的不存在时段或时区边界返回互相冲突的结果时，只保留原始当地 `String`，`Zone/Stamp` 保存 `null`。
-6. IANA 时区名是可由 GPS 派生的技术信息，不写入媒体元数据。GPS 缺失或坐标解析失败不会创建额外持久字段。
+1. Images use raw EXIF `DateTimeOriginal` plus `OffsetTimeOriginal` when present, otherwise filesystem creation time.
+2. Videos preserve FFprobe QuickTime, container, default-video-stream, and default-audio-stream creation candidates. Candidates with explicit non-UTC offsets have highest priority. Without a candidate, use file modification time.
+3. When a source provides only an absolute UTC instant and GPS exists, `geo-tz` maps coordinates offline to an IANA zone and `Intl.DateTimeFormat` applies historical/daylight rules for that capture date. Never substitute a fixed standard offset.
+4. UTC time without GPS remains UTC; do not infer capture location from paths, registered locations, or the host time zone.
+5. A floating wall time receives `Zone/Stamp` only when GPS uniquely determines one instant. Repeated fall-back hours, nonexistent spring-forward times, or conflicting boundary zones retain the original `String` and store `null` for `Zone/Stamp`.
+6. Derived IANA names are technical intermediates and are not persisted. Missing or invalid GPS creates no extra fields.
 
-操作系统只为文件创建和修改时间提供绝对时刻，不能恢复文件操作实际发生地点的时区。PhotoManager 因此采用一个确定的“媒体参考时区”统一展示三个时间组：拍摄来源带有明确非 UTC 偏移时使用该固定偏移；否则使用 GPS 唯一解析出的 IANA 时区；仍无法确定时使用 UTC。创建和修改时间分别在自己的绝对时刻上计算参考时区偏移，因此跨越夏令时边界时可以与拍摄时间具有不同 `Zone`。三个 `Stamp` 始终保存绝对 Unix 秒，不因显示时区改变。
+One deterministic media reference time zone renders all three time groups: an explicit non-UTC source offset wins; otherwise use a uniquely GPS-resolved IANA zone; otherwise use UTC. Creation and modification offsets are calculated at their own instants, so they may differ from capture offset across daylight-saving boundaries. All three `Stamp` values remain absolute Unix seconds.
 
-媒体参考时区不采用运行应用的电脑时区，也不持久化额外时区名。文件在图库内移动时，新的创建/修改时刻通过现有拍摄时间和 GPS 重建同一参考时区后格式化。所有元数据均按当前规则生成；项目不保留旧时间记录的兼容识别或修复入口。
+Moving media refreshes creation/modification times using the reference zone reconstructed from existing capture time and GPS. All metadata follow current rules; no compatibility recognition or repair path exists for older time records.
 
 ### 9.3 `Picture`
 
-- `ProbeStatus`：`ok` 或 `failed`。
-- `ProbeError`：成功时为 `null`，失败时为清理并截断后的错误。
-- `Width`、`Height`：正整数或 `null`。
-- `Dpi`：正数或 `null`。字段使用 PascalCase，不存在旧式 `dpi` 键。
-- `BitDepth`：单个正整数或 `null`。当 EXIF `BitsPerSample` 是各通道同值的数组或 TypedArray 时折叠为单个数字；通道值不同或来源无效时保存 `null`。
+- `ProbeStatus`: `ok` or `failed`.
+- `ProbeError`: `null` on success, otherwise a sanitized, truncated error.
+- `Width`, `Height`: positive integers or `null`.
+- `Dpi`: positive number or `null`; the key is PascalCase and legacy `dpi` is forbidden.
+- `BitDepth`: one positive integer or `null`. An EXIF `BitsPerSample` array/TypedArray collapses only when every channel is equal; differing or invalid values become `null`.
 
-图片解析失败不会删除记录。画廊显示统一占位图，查看器展示探测错误，个性化字段仍可编辑。
+Probe failure does not remove the record. The gallery shows an image placeholder, the viewer reports the error, and customization remains editable.
 
 ### 9.4 `Video`
 
-视频规范字段包括：
+Canonical fields include:
 
-- 状态：`ProbeStatus`、`ProbeError`。
-- 时间和尺寸：`DurationSeconds`、编码 `Width/Height`、`DisplayWidth/DisplayHeight`、`RotationDegrees`、`SampleAspectRatio`。
-- 帧率：`FrameRate`、`FrameRateRatio`。
-- 视频流：`VideoCodec`、`VideoProfile`、`PixelFormat`、`BitDepth`、`BitRate`。
-- 容器与流数：`ContainerFormat`、`VideoStreamCount`、`AudioStreamCount`。
-- 音频：`HasAudio`、`AudioCodec`、`AudioChannels`、`AudioSampleRate`、`AudioBitRate`。
-- 色彩：`ColorSpace`、`ColorTransfer`、`ColorPrimaries`。
+- Status: `ProbeStatus`, `ProbeError`.
+- Time and size: `DurationSeconds`, encoded `Width/Height`, `DisplayWidth/DisplayHeight`, `RotationDegrees`, `SampleAspectRatio`.
+- Frame rate: `FrameRate`, `FrameRateRatio`.
+- Video stream: `VideoCodec`, `VideoProfile`, `PixelFormat`, `BitDepth`, `BitRate`.
+- Container and stream counts: `ContainerFormat`, `VideoStreamCount`, `AudioStreamCount`.
+- Audio: `HasAudio`, `AudioCodec`, `AudioChannels`, `AudioSampleRate`, `AudioBitRate`.
+- Color: `ColorSpace`, `ColorTransfer`, `ColorPrimaries`.
 
-`ProbeStatus` 取值：
+`ProbeStatus` is `ok` for a normalized primary video stream, `audio-only` for a parseable container without video, and `failed` for timeout, corruption, or parse failure. Missing strings/numbers are `null`; stream counts are non-negative integers and `HasAudio` is Boolean. Prefer a stream with `disposition.default = 1`, otherwise the first stream of that type.
 
-- `ok`：存在并成功规范化主视频流。
-- `audio-only`：容器可解析，但没有视频流。
-- `failed`：FFprobe 超时、容器损坏或无法解析。
+### 9.5 `GPS` and `Camera`
 
-缺失的数值和字符串保存为 `null`，流数量是非负整数，`HasAudio` 是布尔值。主流优先选择 `disposition.default = 1`，否则使用同类型第一个流。
+`GPS` retains EXIF-style directions and DMS/rational arrays. Videos attempt to parse QuickTime ISO 6709. `GPS.AltitudeRef` preserves its parser-provided shape and is not edited, filtered, or calculated.
 
-### 9.5 `GPS` 和 `Camera`
-
-`GPS` 保存 EXIF 风格的方向和 DMS/有理数数组。视频尝试解析 QuickTime ISO 6709。`GPS.AltitudeRef` 当前保留解析器提供的源形状，不参与地点筛选、计算或编辑。
-
-`Camera` 保存品牌、型号、焦距、光圈、ISO、曝光时间和闪光灯状态。`FlashUsed` 是严格三态：`true` 表示 EXIF 明确记录闪光灯已触发，`false` 表示明确未触发，`null` 表示缺失或无法可靠判断；禁止用布尔强制转换把“未知”写成 `false`，也不能把非零 EXIF Flash 状态码一概写成 `true`。查看器分别显示“是”“否”和 `-`，CSV 对 `null` 输出空单元格。视频通常只能从容器标签取得品牌和型号，且没有可靠的 Flash 来源，因此当前视频的 `FlashUsed` 为 `null`，视频查看器不展示图片专用的相机参数表格。
+`Camera` stores make, model, focal length, aperture, ISO, exposure time, and flash state. `FlashUsed` is strictly tri-state: `true` means EXIF explicitly says flash fired, `false` means explicitly not fired, and `null` means absent or unreliable. Do not coerce unknown to false or treat every nonzero EXIF Flash code as true. The viewer displays yes, no, and `-`; CSV renders `null` as an empty cell. Videos usually expose only make/model and no reliable flash source, so video `FlashUsed` is currently `null` and video views omit the image-only camera table.
 
 ### 9.6 `Customization`
 
@@ -401,85 +358,78 @@ FFmpeg 不可用时应用仍能显示入口页和错误原因，但禁止初始�
 }
 ```
 
-- `Title`：自由文本。
-- `Rating`：1 到 5；JPG/JPEG 和视频默认 2，其它图片默认 1。
-- `Privacy`：1 到 5 的整数，所有媒体默认 1。1 表示隐私要求最低、可以公开，5 表示隐私要求最高、不能公开；2 到 4 仅按数字表达中间等级。
-- `AlbumId`：零个或一个已注册相册 ID；`null` 表示无相册。
-- `TagIds`：已注册标签 ID 数组，同一 ID 不得重复。
-- `PersonIds`：已注册人物 ID 数组，同一 ID 不得重复。
-- `Description`：普通描述。
-- `HiddenDescription`：折叠显示的隐藏描述。
-- `MetadataUpdateDate`：最近一次用户字段更新的 ISO 时间。
+- `Title`, `Description`, `HiddenDescription`: free text.
+- `Rating`: integer 1–5; JPG/JPEG and video default to 2, other images to 1.
+- `Privacy`: integer 1–5, default 1. Level 1 is least restrictive/public; level 5 is most private; intermediate values have only numeric meaning.
+- `AlbumId`: zero or one registered album ID; `null` means none.
+- `TagIds`, `PersonIds`: arrays of registered IDs without duplicates.
+- `MetadataUpdateDate`: ISO timestamp of the latest user-field update.
 
-`Customization` 只允许上述九个固定字段，全部字段都必须存在。三个文本字段必须是字符串，Rating 和 Privacy 必须是 1 到 5 的整数，两个多值 ID 数组不得重复，`MetadataUpdateDate` 只能是 `null` 或规范 ISO 时间。`Category`、`PrivateNote` 等旧字段和其它未知字段不会被静默保留或删除，而会使严格加载失败。主进程的单媒体和批量编辑入口只接受相应的可编辑字段白名单，更新时间只由主进程生成，renderer 不能提交任意附加属性。
+Exactly these nine fields must exist. Text values must be strings; rating/privacy must be valid integers; multi-value IDs cannot repeat; update date is `null` or canonical ISO. Obsolete `Category`, `PrivateNote`, or any unknown field makes strict loading fail. Main-process single and batch edit entry points accept only their editable-field allowlists, generate update timestamps themselves, and reject extra renderer properties.
 
-Privacy 是描述性元数据，不构成访问控制，但参与画廊的显式等级筛选；画廊默认只选择等级 1，用户可切换为全部或任意多个等级。Privacy 不限制剪贴板、系统打开或 CSV 导出。
+Privacy is descriptive metadata, not access control. It participates in explicit gallery filtering, whose default selects only level 1, but does not restrict clipboard, system-open, or CSV export.
 
 ### 9.7 `Location`
 
 ```json
-{"LocationId":"d9f1ea44-4eb8-4e5b-876c-6ae2e36d36e3","Detail":"四楼站点披萨"}
+{"LocationId":"d9f1ea44-4eb8-4e5b-876c-6ae2e36d36e3","Detail":"fourth-floor pizza station"}
 ```
 
-- `LocationId`：零个或一个注册地点 ID；`null` 表示没有主地点。
-- `Detail`：自由文本位置细节，不进入注册表，不参与地点筛选或搜索。
+- `LocationId`: zero or one registered location ID; `null` means no primary location.
+- `Detail`: free-text detail, outside the registry and excluded from location filtering/search.
 
-`Location` 只允许 `LocationId` 和 `Detail` 两个字段；行政区属性只属于地点注册表，不能作为媒体地点对象的冗余字段写入。
+Only `LocationId` and `Detail` are allowed. Administrative fields belong solely to the location registry and must not be redundantly persisted per media.
 
-## 10. 注册表模型
+## 10. Registry Models
 
-注册表定义同时保存稳定 ID 和可读名称。媒体只持久化 ID 引用，显示名称由 renderer 从当前注册表解析。ID 不在普通 UI 中展示，但会出现在 JSON、CSV 和诊断信息中。四类注册表记录只允许各自模型中定义的固定持久化字段，不能保存 UI 派生属性或旧字段。主进程是约束执行边界：即使绕过 UI，格式非法、未知或跨类型冲突的 ID 也不能写入元数据。
+Registry definitions store stable IDs and readable names. Media persist only ID references; the renderer resolves current display names. IDs are hidden in ordinary UI but appear in JSON, CSV, and diagnostics. Each registry permits only its fixed persisted fields; UI-derived and legacy fields are forbidden. The main process enforces these constraints even if the UI is bypassed.
 
-ID 创建后不可变，显示名称可以在对应管理面板中修改。改名只原子更新注册表定义的显示字段、说明和 `UpdatedAt`，保留 ID 与 `CreatedAt`，不遍历或重写媒体元数据。筛选、最近使用、批量草稿及媒体引用继续保存 ID，因此改名后仍保持原选择并从刷新后的注册表解析新名称。四类注册表 ID 与 `MediaId` 共享同一个全局 UUID 命名空间。
+IDs are immutable while names/descriptions may change. Renaming atomically updates only the registry's display fields, description, and `UpdatedAt`, preserving ID and `CreatedAt` without rewriting media. Filters, recent choices, batch drafts, and media references therefore remain selected and resolve the new name. Registry IDs and `MediaId` share one global UUID namespace.
 
-### 10.1 标签
+### 10.1 Tags
 
 ```json
-{"TagId":"...","Text":"美食","Description":"","CreatedAt":"...","UpdatedAt":"..."}
+{"TagId":"...","Text":"Food","Description":"","CreatedAt":"...","UpdatedAt":"..."}
 ```
 
-- `Text` 全局唯一且不可为空。
-- `Text` 可在标签管理面板中修改；改名与说明通过一次 `tag:update` 原子提交。
-- `Description` 允许为空，可后续编辑。
-- 一个媒体可有多个标签。
-- 从某个媒体移除标签不删除注册表定义。
-- 全局删除会从所有媒体的 `Customization.TagIds` 移除该 ID。
+- `Text` is non-empty and globally unique within the registry.
+- `tag:update` atomically changes text and description.
+- Description may be empty.
+- Media may have multiple tags; removing one assignment does not delete its definition.
+- Global deletion removes the ID from every `Customization.TagIds` array.
 
-### 10.2 相册
+### 10.2 Albums
 
 ```json
-{"AlbumId":"...","Title":"Camera","Description":"相机拍摄内容","CreatedAt":"...","UpdatedAt":"..."}
+{"AlbumId":"...","Title":"Camera","Description":"Camera captures","CreatedAt":"...","UpdatedAt":"..."}
 ```
 
-- `Title` 全局唯一。
-- `Title` 可在相册管理面板中修改；更新时标题与说明仍必须同时有效。
-- 标题和说明创建时都必填，说明可后续修改但不可清空。
-- 一个媒体至多属于一个相册。
-- 全局删除会把所有精确引用的 `Customization.AlbumId` 设为 `null`。
+- `Title` is globally unique within the registry and editable.
+- Title and description are required at creation and must remain valid together; description cannot later be emptied.
+- Media belongs to at most one album.
+- Global deletion sets every exact `Customization.AlbumId` reference to `null`.
+- Albums are categorization only; there is no cover or detail page.
 
-相册当前是数据归类结构，不提供封面或相册详情页。
-
-### 10.3 人物
+### 10.3 People
 
 ```json
-{"PersonId":"...","Name":"张三","Description":"","CreatedAt":"...","UpdatedAt":"..."}
+{"PersonId":"...","Name":"Alex","Description":"","CreatedAt":"...","UpdatedAt":"..."}
 ```
 
-- `Name` 全局唯一且不可为空。
-- `Name` 可在人物管理面板中修改。
-- `Description` 允许为空。
-- 一个媒体可以关联多个人物。
-- 全局删除会从所有媒体的 `Customization.PersonIds` 移除该 ID。
+- `Name` is non-empty, unique within the registry, and editable.
+- Description may be empty.
+- Media may reference multiple people.
+- Global deletion removes the ID from every `Customization.PersonIds` array.
 
-### 10.4 地点
+### 10.4 Locations
 
 ```json
 {
   "LocationId":"...",
-  "Name":"清华大学清芬园食堂",
-  "Country":"中国",
+  "Name":"Campus Dining Hall",
+  "Country":"China",
   "Province":"",
-  "City":"北京",
+  "City":"Beijing",
   "ParentId":"...",
   "Description":"",
   "CreatedAt":"...",
@@ -487,272 +437,107 @@ ID 创建后不可变，显示名称可以在对应管理面板中修改。改�
 }
 ```
 
-- `LocationId` 是稳定主键；`Name` 是显示名称，不承担引用身份。
-- 不同行政区或父节点下允许同名地点。只有名称、国家、省、市和父节点 ID 全部相同的定义才视为重复。
-- `Name` 可修改，`LocationId`、媒体引用和子节点 `ParentId` 保持不变；所有后代的展示路径由 ID 父链重新计算。
-- `Country`、`Province`、`City`、`Description` 允许为空，`ParentId` 允许为 `null`。
-- 国家、省、市是地点的行政区属性，不单独构成注册表节点。若要把“南京”本身设为媒体地点，需要创建 `Name = 南京` 的普通地点记录。
-- `ParentId` 最多指向一个已注册地点，不能指向自身，也不能形成循环。
-- 不持久化 `ChildrenIds`；列表时根据 `ParentId` 动态计算子节点、深度和路径。
-- 地点树允许任意多层。
-- 删除地点会把精确使用该地点的媒体位置重置为 `{LocationId:null, Detail:""}`，并把所有直接子节点的 `ParentId` 设为 `null`；不递归删除子节点。
-- 地点筛选包含选中地点及所有后代，但不包含祖先、兄弟或 `Detail` 文本。
+- `LocationId` is the stable key; `Name` is only display text.
+- Names may repeat across different administrative or parent contexts. Only an identical `(Name, Country, Province, City, ParentId)` is a duplicate.
+- Renaming preserves IDs, media references, and child `ParentId` values; descendant paths are recomputed from the ID chain.
+- `Country`, `Province`, `City`, and `Description` may be empty; `ParentId` may be `null`.
+- Country/province/city are attributes, not registry nodes. To assign “Nanjing” itself, create an ordinary location named Nanjing.
+- `ParentId` references at most one registered location and cannot reference self or form a cycle.
+- Never persist `ChildrenIds`; derive children, depth, and paths from `ParentId`. Depth is unlimited.
+- Deleting a location resets exact media assignments to `{LocationId:null, Detail:""}` and detaches direct children by setting their `ParentId` to `null`; it does not recursively delete descendants.
+- Filtering by a location includes it and all descendants, but not ancestors, siblings, or `Detail`.
 
-地点列表按国家、省、市分组，再在行政区内采用父节点优先的深度优先顺序。省字段为空时，其城市分组排在有省份分组之前。子节点必须紧跟父节点及其整个子树，不能被名称相似但无父子关系的地点插入。
+Location lists group by country, province, and city, then use parent-first depth-first order within each administrative group. Empty-province city groups precede non-empty provinces. A complete subtree must immediately follow its parent and cannot be interrupted by similarly named unrelated locations.
 
-## 11. 扫描和增量更新
+## 11. Scanning and Incremental Updates
 
-### 11.1 完整初始化
+Initialization fully hashes every medium, reads image EXIF/Sharp data, and probes video with FFprobe. New videos default to rating 2.
 
-每个媒体计算完整 SHA-256。图片读取 EXIF 和 Sharp 技术信息；视频运行 FFprobe。新视频默认评级 2。
+An update reuses an entire same-path record without hashing or probing only when `FilePath`, `FileType`, `FileSize`, and `ModificationTimeMs` match. Existing data must already satisfy the current strict schema.
 
-### 11.2 增量复用
+- A changed same-path file is rebuilt while preserving `Customization` and `Location`.
+- A new path is fully hashed. If its hash matches one vanished old path, it is a move/rename: retain `MediaId`, technical/user data, and refresh path/filesystem data.
+- If the matching old path still exists, the new file is a copy: create a new `MediaId` and default user fields.
+- Multiple candidates are paired one-to-one in stable path order.
+- A temporary rebuild failure retains the same-path old record; a failed new record is skipped and reported.
+- Removed records are deleted, along with hash thumbnails unused by any remaining record.
 
-`update-metadata` 用以下四项判断同路径文件是否未变化：
+Duplicate hashes are valid and logged. Operations needing one source choose the first stable path.
 
-- 相对 `FilePath`
-- `FileSystem.FileType`
-- `FileSize`
-- `ModificationTimeMs`
+## 12. Thumbnail Pipeline
 
-命中时复用整条记录，不重新哈希、不读 EXIF、不跑 FFprobe。增量更新假定加载的数据已经符合当前严格元数据契约，不识别或重建旧式图片、视频字段。
+Thumbnails are `.photo_manager/thumb_cache/<SHA256Hash>.webp`, shared by equal content. `cache_manifest.json` stores size, quality, extreme-aspect threshold, and generator version; mismatches make the cache stale.
 
-### 11.3 内容变化、移动和副本
+Ordinary images are center-cropped square; extremely tall images crop from the top and extremely wide images from the left. Videos extract a PNG frame and pass it through Sharp. Target time is `min(max(DurationSeconds * 0.1, 1), 10, DurationSeconds / 2)`; failure retries frame zero, then uses the video placeholder. Failed images use the image placeholder. Video workers default to serial; image concurrency is configured.
 
-- 同路径发生变化：重新完整哈希和探测，保留原 `Customization` 与 `Location`。
-- 新路径：先完整哈希。
-- 若哈希匹配一个已经消失的旧路径，视为移动/改名，保留原 `MediaId`，继承旧技术信息和用户字段，只刷新路径与文件系统信息。
-- 若同哈希旧路径仍存在，新文件视为副本，分配新 `MediaId` 并使用默认用户字段，不错误继承原文件归类。
-- 多个候选按路径稳定排序后一对一匹配。
-- 重建临时失败时保留同路径旧记录并报告；新媒体构建失败则跳过并报告。
-- 磁盘上已消失且不可归类为临时读取失败的旧记录会被移除，其不再被任何记录使用的 hash 缩略图也被清理。
+Only an explicit maintenance action or `build-thumbnails` generates thumbnails. Opening, initialization, and metadata updates do not. Missing/damaged cache entries use bundled placeholders, never original media. The main process indexes thumbnail filenames once per active cache state and supplies a shared URL version; closing/switching, updates, and thumbnail maintenance invalidate it. The renderer requeries after generation.
 
-重复 SHA-256 允许存在。日志列出重复路径；需要按 hash 选择源文件时，使用稳定顺序中的第一个，其它副本不影响浏览。
+## 13. Video Playback
 
-## 12. 缩略图管线
+The main `<video preload="metadata">` has no native controls; `VideoPlaybackControls.vue` provides fixed play, time, timeline, mute, and volume controls. Poster is not autoplayed or looped. A center play control appears before play and while paused/ended, except during buffering, seeking, or stepping. Surface click is delayed 220 ms to distinguish double-click fullscreen, and dragging beyond threshold suppresses click. Seeking pauses and resumes only if previously playing.
 
-缩略图固定存为：
+Decode failure with known audio falls back to native `<audio controls>`; otherwise show an unplayable state, reason, poster/placeholder, and system-player action. Chromium-incompatible codecs use the Windows player. No proxy is generated and runtime errors are not persisted.
 
-```text
-.photo_manager/thumb_cache/<SHA256Hash>.webp
-```
+Only volume and mute persist (`photoManager.videoVolume`, `photoManager.videoMuted`). Position and rate do not. Before replacement/destruction, pause, remove `src`, and call `load()` to release sound and handles.
 
-同内容媒体共享缓存文件。`cache_manifest.json` 记录尺寸、质量、极端长宽比阈值和生成器版本；配置或生成器版本变化时，缓存视为 stale 并重建。
+Before a video session begins, arrows browse media. After playback, seeking, or stepping begins it, arrows seek five seconds and Shift+arrows browse. Space toggles play; comma/period step approximately `1 / FrameRate`, disabled without frame rate. Editable/focused controls suppress shortcuts.
 
-- 普通图片：Sharp 中心裁切为正方形。
-- 极高图片：优先裁切顶部正方形区域。
-- 极宽图片：优先裁切左侧正方形区域。
-- 视频：FFmpeg 抽取代表帧为临时 PNG，再由 Sharp 生成 WebP。
+Images and decodable videos share temporary 10–1000% zoom, pan, quarter rotation, mirror, and restore. Wheel zoom anchors at the pointer; step is configured below 200%, 20 points through 500%, then 50. Other controls zoom around center. CSS-only transforms reset on media/viewer changes and never alter files, metadata, time, or thumbnails. Image EXIF dimensions and 88% fit remain respected. Videos fit normalized display dimensions, use full space at 100%, and compensate quarter turns. Drag threshold is 4 px. Fixed playback controls remain in media fullscreen; audio/error modes have no transforms.
 
-视频目标帧时间：
+## 14. Gallery Query and Filtering
 
-```text
-min(max(DurationSeconds * 0.1, 1), 10, DurationSeconds / 2)
-```
+`gallery:query` filters the in-memory index in this order: media type; unioned rating/privacy levels intersected with other dimensions; album/tag/person/location including `__UNASSIGNED__`; case-sensitive title, filename-only, or description substring; shooting-time order; capture-date grouping. Empty level arrays mean all; rating defaults all and privacy defaults `[1]`. Location includes descendants; administrative filters resolve exact country/province/city sets. Invalid regions are rejected. `Detail` never participates.
 
-目标时间失败时回退第一帧；仍失败则使用视频占位图。图片解析失败使用图片占位图。视频缩略图默认串行，图片使用应用级并发数。
+Every query returns the complete result and all/image/video counts, without registries or pagination. One metadata pass applies common filters/counts; matched records are enriched and sorted once. Renderer uses shallow collections, creates all cards, and relies on native `loading="lazy"`; future virtualization must preserve complete-result semantics. Increasing request IDs discard stale responses.
 
-缩略图只由用户显式执行“生成缩略图”维护任务或 `build-thumbnails` 脚本生成。打开图库、初始化图库和更新元数据都不会自动生成缩略图。画廊发现缓存缺失或损坏时，图片和视频分别显示项目内置占位图，不回退读取原始媒体充当缩略图。主进程为当前活动图库按需读取一次缩略图目录，缓存文件名集合，并为本轮集合生成统一的 URL 版本值，避免每次筛选或每个媒体都同步访问缓存文件；切换/关闭图库以及更新元数据、生成缩略图维护任务结束时清空该索引。手动任务完成后 renderer 重新查询画廊，读取新缓存状态并替换占位图。
+Registry composables exclusively own their lists. They load in parallel on open/update and update directly from registry IPC results. Media edits do not reload registries; manager opening refreshes usage counts. Returning from viewer records one `MediaId`, centers that card after layout, then clears the target.
 
-## 13. 视频播放
+One `GalleryMediaDetailsMenu` serves all cards and shows fixed metadata, constrained to the viewport. Outside interaction, scroll, resize, Escape, or repeated right-click closes it; detail, filters, and settings are mutually exclusive.
 
-### 13.1 固定播放控件与降级
+Select-all covers the full result. Batch edit can set title/rating/privacy/album/location and add people/tags. `null` rating/privacy means unchanged; level 1 is valid. Escape closes the foremost overlay before selection mode.
 
-- 主视频使用 `<video preload="metadata">` 解码，但不启用原生 controls；`VideoPlaybackControls.vue` 在画面底部持续显示固定的播放/暂停、当前时间、进度、总时长、静音和音量控件。封面作为 poster，不自动播放，不循环。
-- 视频尚未开始播放、播放结束或中途暂停时，视口中央显示独立播放按钮；缓冲、进度拖动和逐帧处理中隐藏。中央按钮与底部播放按钮、空格键复用同一播放动作和状态。
-- 单击视频画面切换播放/暂停，双击进入媒体区域全屏。单击延迟 220 ms 执行，以便双击不会意外切换播放状态；超过拖动阈值的指针操作不会再触发单击播放。
-- 进度拖动开始时记录原播放状态并暂停，拖动期间直接预览目标画面；结束时仅在原先处于播放状态时恢复播放。
-- 原生画面解码失败但元数据表明有音轨时，尝试 `<audio controls>` 播放同一文件，并提示仅播放音频。
-- 音频也失败、无音轨或探测失败时，显示不可播放状态、封面/占位图、错误原因和“用系统播放器打开”。
-- MKV、AVI、HEVC 等 Chromium 不支持的编码可以通过 Windows 默认播放器作为正式回退路径。
-- 不生成代理视频，不把运行时播放错误写回媒体 JSONL。
+The always-visible search sits above a normally expanded two-row filter drawer that occupies layout space. Its expanded state survives viewer navigation but resets on library exit. A status dot compares against defaults: all media/registries/ratings, privacy 1, descending shooting time. Reset restores defaults and exits selection without changing drawer expansion.
 
-### 13.2 播放状态和偏好
+Registry filters use read-only triggers with internal search. “All” and “Unassigned” precede complete options; location shows its tree. Rating/privacy use `All + 1..5` multi-select segments. Concrete location, administrative region, and unassigned location are mutually exclusive. Administrative paths distinguish identical names and exact empty provinces. `__UNASSIGNED__` is query-only and must never enter metadata, registries, recent history, or persistence.
 
-跨会话只保存应用级音量和静音：
+## 15. Viewer and Customization Editing
 
-```text
-photoManager.videoVolume
-photoManager.videoMuted
-```
+The viewer has technical information left, media center, and shared customization right: title, rating, privacy, album, location/detail, people, tags, description, hidden description. Privacy, location detail, and hidden description are independently collapsible and retain state only within the current viewer instance.
 
-播放位置和倍速不记忆；切换媒体后从 0 开始，并继承音量和静音。
+A dirty draft requires Save and Continue, Discard, or Cancel before navigation. `Ctrl+Enter` confirms supported text fields; ordinary Enter preserves editing behavior and Escape blurs without discarding. Enter saves only when focus is not interactive. Submission locks prevent duplicate requests and edits.
 
-切换、关闭或销毁播放器前必须暂停、移除 `src` 并调用 `load()`，避免后台残留声音和文件句柄。
+Registry fields use read-only triggers, menu search, and separate create/manage buttons. Only one menu opens. `RegistryOptionsMenu.vue` owns shared flat-menu behavior; locations use `LocationTreeMenu.vue`. Tag/person/location assignment shows three library-UUID-scoped recent values; filters do not. Albums have no recent list.
 
-### 13.3 键盘和逐帧
+## 16. Location Hierarchy Display
 
-需要区分“尚未开始播放”和“已经开始过”：
+All location selectors, filters, parent selectors, and managers share `buildLocationHierarchyRows()`: country, province (empty first), city (direct-under-country cities keep city indentation), then stable root locations with complete parent-first subtrees.
 
-- 新进入视频，尚未播放、拖动或逐帧：`←/→` 切换上一/下一媒体。
-- 视频一旦播放过、进度被拖离起点或执行逐帧，即使当前暂停或播放结束：`←/→` 快退/快进 5 秒。
-- 已开始过的视频使用 `Shift+←/Shift+→` 切换媒体。
-- `Space` 播放/暂停。
-- `,` / `.` 或底栏图标执行上一帧/下一帧。
-- 逐帧使用 `1 / FrameRate` 近似定位；未知帧率时禁用，可变帧率不建立精确索引。
-- 双击媒体区域进入全屏。
+`LocationTreeMenu.vue` renders pure selection; the manager uses the same rows but its own usage/edit layout. Country/province start expanded while concrete locations start hidden. Administrative and concrete expansion keys are separate; reopening resets them. Arrow and label hit areas are separate. Only the gallery filter may select administrative rows.
 
-输入框、文本域、选择器、弹窗或其它可编辑控件获得焦点时，不触发媒体快捷键。
+Search scans the full registry, adds every location ancestor, and reveals matching paths without changing manual expansion. Recent entries sit outside the tree. Parent selection excludes the edited node and descendants. Manager cards indent by depth and use a fixed context strip based on the first visible card. `Location.Detail` is excluded.
 
-### 13.4 视频画面变换
+## 17. Registry Management
 
-图片和可解码视频共享临时视图变换：10%–1000% 缩放、任意缩放级别下拖动、90° 步进旋转、水平镜像和复原。鼠标滚轮围绕当前光标所指的画面位置缩放：低于 200% 时使用配置的基础步长，200%–500%（含边界）使用 20 个百分点，大于 500% 时使用 50 个百分点；底栏按钮、数值框和滑块仍以画面中心缩放，其中按钮始终使用配置的基础步长。变换仅通过 CSS 作用于当前画面，不修改视频文件、媒体元数据、播放时间轴或缩略图，并在切换媒体、关闭查看器或打开另一媒体时复原。
+All four managers search name/description, show usage, atomically edit allowed fields, confirm global deletion with affected count, create through a nested modal, and block close/switch/resubmit during requests. Enter saves names; Ctrl+Enter saves multiline descriptions; Escape cancels editing.
 
-`use-media-transform.js` 保留图片由浏览器按 EXIF 朝向解释的固有尺寸和既有 88% 适配规则，避免用原始像素宽高拉伸带方向信息的图片；视频根据中间媒体区域和规范化显示尺寸计算初始适配大小。视频在 100% 时使用完整可用区域；旋转到 90°/270° 时额外计算适配系数，保证旋转后的画面仍完整位于视口内，再在此基础上应用用户缩放。拖动需越过 4 px 阈值才成立，用于区分点击播放与拖动画面。
+Location create/edit shares the parent picker. Selecting a parent during creation copies its exact administrative fields, which remain editable; clearing it does not clear them. Changing parent while editing does not rewrite administrative fields. Main-process validation rechecks requirements, uniqueness/context duplication, parent existence, and cycles.
 
-固定播放控件始终覆盖在视频画面底部，全屏时继续可用；查看器底栏中的缩放、旋转、镜像、逐帧等编辑视图控件不进入媒体区域全屏。音频降级和不可播放状态不提供画面变换。
+Rename refreshes only the registry and preserves IDs/media. Global deletion keeps the manager open and synchronizes definitions, filters, viewer, and gallery cache. If result membership is unchanged, referenced items are patched in place without replacing arrays/indexes; otherwise the gallery requeries.
 
-## 14. 画廊查询和筛选
+## 18. Library Settings and Maintenance
 
-`gallery:query` 在主进程内存索引上按顺序执行：
+The gallery settings menu, visible only in normal gallery mode, exposes library information/directories, metadata update, verification, thumbnail generation, CSV export, registry management, and return to entry.
 
-1. 应用媒体类型筛选：全部、图片、视频。
-2. 应用评级和 Privacy 等级筛选。同一等级维度内的多个选择取并集；评级与 Privacy 以及其它筛选维度取交集。空等级集合表示全部，默认评级为空集合、Privacy 为 `[1]`。
-3. 应用相册、标签、人物、具体地点或行政区筛选，多个维度取交集。相册、标签、人物和地点各自支持常驻的“未设置”特殊条件，分别匹配 `AlbumId = null`、空 `TagIds`、空 `PersonIds` 和 `LocationId = null`；地点自由文本 `Detail` 不改变“未设置地点”的判断。
-4. 应用区分大小写的文本子串搜索。搜索字段由用户单选标题、文件名或描述；标题和描述分别读取 `Customization.Title`、`Customization.Description`，文件名只匹配 `FilePath` 的末级名称，不匹配目录部分。
-5. 按拍摄时间排序，方向为顺序或逆序。排序依据下拉菜单保留扩展边界，但当前唯一合法值是 `shootingTime`。
-6. 按拍摄日期分组。
+`scripts/maintenance-worker.js` runs operations as child processes with structured progress, logs, and results. The UI shows phase/count/current path and supports copying reports or opening outputs/logs.
 
-图片和视频在同一时间线混排。总数文案使用“媒体”。卡片显示封面、标题、评级和显示分辨率；视频画面右下角显示时长，卡片底栏不重复显示时长。
+- Update: create an update backup, incrementally replace metadata, strictly reload indexes, and refresh without generating thumbnails.
+- Verify: read-only rescan and full hashes; report missing metadata/files, changes, type mismatches, probe/read failures. Optional probe compares video status, duration, dimensions, and codec.
+- Thumbnails: generate missing/stale or forcibly rebuild all, without editing metadata; then requery.
+- CSV: fixed output at `.photo_manager/data/photo_metadata.csv`, overwrite confirmation, UTF-8 BOM, flattened user/technical fields, IDs plus resolved names, type-specific blank columns, and location ID/name/detail without duplicated administrative fields.
 
-画廊不执行应用级分页。每次查询都只返回当前筛选、搜索和排序条件下的完整匹配结果及媒体数量统计，不重复携带四类注册表定义。主进程在一次元数据遍历中应用除媒体类型外的公共条件，同时统计全部、图片和视频数量，并只把符合当前媒体类型的记录加入结果；结果仅排序一次，renderer 专用路径、缩略图状态和日期分组字段也只为命中记录构造。renderer 将完整结果保存为浅响应式集合并一次创建全部卡片。缩略图元素保留浏览器原生 `loading="lazy"`，因此完整结果、全选和查看器导航不受可见范围限制，但 Chromium 可以延迟读取和解码远离视口的缩略图。当前实现不使用虚拟网格；如果未来图库规模需要虚拟化，应保持完整结果语义，只替换卡片渲染层。
+## 19. CLI Maintenance
 
-四个注册表 composable 分别拥有其定义列表，composition root 只为画廊筛选器组装一个只读候选项视图，不维护第二份同步副本。打开图库和元数据更新维护任务完成后并行加载四类定义；创建、编辑和全局删除注册项时，由对应 composable 直接应用 IPC 返回的新列表。单媒体保存和批量编辑只改变媒体引用，不重新加载注册表。注册表管理面板每次打开都会重新请求对应列表，因此其使用数量以打开时的最新媒体索引为准。
-
-从查看器返回画廊时，以退出时最后查看媒体的 `MediaId` 作为一次性返回目标。`GalleryView` 重新挂载并完成布局后，将对应卡片即时滚动到画廊可视区域中央，然后消费并清除目标；不添加选中状态或临时视觉高亮。退出图库会随画廊查询状态一起清除此目标，不能跨图库恢复。
-
-画廊右键详情使用单一 `GalleryMediaDetailsMenu` 实例，不为每张卡片创建隐藏浮层。详情直接读取查询结果中的元数据，固定展示文件名、拍摄日期、修改日期、文件大小、显示分辨率、视频帧率/时长、主地点和标签；空值显示 `-`，标签按注册表文本顺序使用 `, ` 连接，不显示自由位置细节。浮层以光标为基准并限制在视口内，最大高度内滚动。再次右键同一卡片、点击或右键外部区域、滚动画廊、调整窗口尺寸和按 `Escape` 均关闭；筛选器、图库设置和详情浮层通过 renderer 内部事件保持互斥。
-
-“全选”表示选择当前完整查询结果中的全部媒体，而不是仅选择可见卡片。查看器直接复用同一有序结果，首尾判断基于完整结果长度。查询请求使用递增序号，较早请求即使较晚返回，也不能覆盖用户最后一次筛选或排序产生的结果。
-
-选择模式中，选中至少一个媒体后显示批量元信息侧栏，可批量设置标题、评级、Privacy、相册和主地点，并批量添加人物、标签。批量评级和 Privacy 草稿均以 `null` 表示“不修改”，等级 1 是独立的有效写入值；点击等级 N 后累计点亮前 N 个星形或圆形按钮，“清空输入”将两者恢复为 `null`。焦点不在输入框、文本域、选择器或可编辑区域时，按 `Escape` 退出选择模式；若画廊右键详情或选择器下拉菜单处于打开状态，`Escape` 优先关闭当前浮层，不同时退出选择模式。
-
-顶部搜索栏始终可见。其下的筛选、选择模式和排序控件位于默认展开的右侧抽屉中：折叠时只显示最右侧向左箭头竖条，展开后竖条移动到最左侧并改为向右箭头，面板占据正常布局空间并将画廊向下推，不覆盖媒体。点击面板外部不会自动收起。展开状态只在当前图库会话内保留，从查看器返回时不变，退出图库后恢复展开。
-
-抽屉第一行包含相册、标签、人物、地点、选择模式和排序；第二行依次包含媒体类型、评级和隐私等级。相册、标签、人物、地点筛选器使用只读触发框，搜索框位于下拉菜单内部。四个菜单顶部始终依次显示“全部”和对应的“未设置……”条件，再以分隔线直接连接完整注册表选项或地点树；画廊筛选菜单不显示“最近使用”快捷项，也不显示“全部相册 / 标签 / 人物 / 地点”分区提示。两个固定条件不受搜索词过滤，也不显示使用数量。当前选择和 hover 使用不同深浅的半透明蓝色背景。地点菜单展示行政区层级和地点树。评级和 Privacy 使用 `全部 + 1..5` 分段按钮：点击数字进入可多选状态，点击已选数字可取消；取消最后一个数字或点击“全部”均回到空集合所表示的全部状态。
-
-抽屉折叠按钮在控件偏离默认基线时显示状态点。基线是媒体类型及四类注册表筛选全部、评级全部、Privacy 仅等级 1、拍摄时间逆序；搜索栏和选择模式不参与该提示判断。“还原画廊状态”恢复这套基线并退出选择模式，但不改变抽屉当前展开状态。
-
-顶部地点筛选器支持两种互斥条件：
-
-- 具体地点条件保存 `LocationId`，匹配该地点以及地点父子树中的全部后代。
-- 行政区条件是查询期派生值，不写入媒体元数据或地点注册表引用。条件保存 `level + country + province + city`，国家匹配同国全部地点，省精确匹配国家和省，市精确匹配国家、省和市。
-
-行政区菜单行均可点击。触发框使用完整路径显示当前条件，例如 `中国 / 江苏 / 南京`；完整路径也用于区分不同上级下的同名行政区。北京等省字段为空的城市以空省值精确匹配，不会并入其它省份中的同名城市。某行政区行同时关联 `Name` 与行政区同名的注册地点时，点击该行仍选择范围更大的行政区条件，而不是只选择该注册地点。具体地点、未设置地点和行政区条件在 renderer 状态及主进程查询中都必须互斥；主进程从当前地点注册表解析行政区对应的 `LocationId` 集合，并拒绝结构无效或无法解析的行政区条件。行政区条件和未设置地点都不进入“最近使用地点”，因为它们不是可赋给媒体的注册表定义。
-
-四类“未设置”条件共用查询协议特殊值 `__UNASSIGNED__`。该值仅存在于画廊查询状态，不是注册表 ID，不得写入媒体元数据、注册表、最近使用记录或其它持久化数据。注册表刷新和删除具体定义时必须把该值视为合法筛选状态；选择“还原画廊状态”才会将四类条件恢复为“全部”。
-
-## 15. 查看器和个性化编辑
-
-查看器三栏：
-
-- 左栏：文件信息和媒体类型专属技术参数。
-- 中栏：图片操作区或视频/音频播放器。
-- 右栏：图片和视频共用的个性化信息。
-
-图片和可解码视频均支持缩放、拖动、旋转、水平镜像、复原和全屏；视频另外保留逐帧和系统播放器图标。视频不提供复制视频二进制、定位文件或倍速按钮，音频降级与不可播放状态不显示画面变换工具。
-
-右栏字段：标题、评级、隐私等级、相册、地点、位置细节、人物、标签、描述、隐藏描述。小标题使用粗体。标题、位置细节、描述和隐藏描述文本框在出现保存确认后支持 `Ctrl+Enter` 直接确认保存；普通 Enter 继续用于输入换行，`Escape` 只退出当前文本框焦点并保留尚未确认的草稿。隐私等级默认折叠，由“评级”标题右侧的控制按钮展开；展开后显示独立小标题和五级 `PrivacyLevelPicker`，等级 N 累计点亮前 N 个圆圈。位置细节和隐藏描述采用同类折叠交互，控制分别放在所属主字段标题右侧；位置细节文本框展开后缩进，隐私等级和隐藏描述不缩进。三者的折叠状态在当前查看器实例内跨媒体共享，退出查看器后恢复默认状态。
-
-查看器存在未确认草稿时，切换媒体或返回画廊必须显示“保存并继续 / 放弃修改 / 取消”三选确认，不能隐式丢弃。普通 Enter 仅在焦点不属于输入框、文本域、选择框、按钮或可编辑元素时执行当前保存；聚焦控件保留自身 Enter 行为。单媒体保存和批量应用期间设置提交锁，阻止重复请求及继续编辑，直到本次 IPC 完成。
-
-相册、地点、人物和标签均使用“只读触发框 + 菜单内搜索 + 外置新建/管理按钮”。同一时刻只允许一个下拉菜单打开，点击当前菜单及触发框以外的区域会关闭它。相册、标签和人物的平面选项菜单统一由 `RegistryOptionsMenu.vue` 渲染搜索、可选的固定项与分区提示、最近使用、全部列表、选中态、空状态及键盘行为；各外层 picker 继续分别拥有单值、多值 chip 和筛选语义，并按场景决定是否显示最近使用和分区提示。地点因行政区和父子树交互继续使用独立的 `LocationTreeMenu.vue`。
-
-人物、标签和地点的媒体赋值菜单显示当前图库 UUID 隔离的最近使用三项；选择真实地点作为新建或编辑地点的父节点时，也会更新同一份最近使用地点记录。提示标签使用圆角小标签并与全部列表用分隔线区分。画廊顶部的四类筛选菜单不显示最近使用，也不因筛选操作更新最近使用历史。相册不记录或显示最近使用项。地点菜单不额外生成“当前选择”快捷区，当前值只在最近使用或完整地点树中的原始位置出现。地点下拉菜单不显示额外的行政区上下文条，用户通过当前展开的国家、省、市树层级判断地点归属。
-
-## 16. 地点层级展示
-
-地点选择、顶部地点筛选、地点创建/编辑的父节点选择和地点管理主列表必须共享相同的完整层级构造与排序基础：
-
-- 第一层国家顶格。
-- 第二层省；空省份分组排在同国其它省之前。
-- 第三层城市。北京、上海、天津、重庆、香港、澳门等省字段为空的市级单位在结构上直属国家，但视觉缩进仍固定为市级，不得降为省级深度。
-- 行政区内，根地点按稳定名称序排列。
-- 每个父地点后立即排列全部子树；缩进按地点深度增加。
-
-纯选择菜单由 `LocationTreeMenu.vue` 统一渲染，媒体查看器、批量编辑、画廊顶部筛选器以及创建/编辑地点时的父节点控件不得复制另一套地点树模板。`LocationParentPicker.vue` 负责不可编辑触发框、清空父节点和共享树菜单；地点管理主列表因为包含编辑、删除和使用量，不属于纯选择菜单，只复用完整层级数据，不复用菜单布局。
-
-选择菜单采用逐级展开规则：
-
-- 初次打开时国家和省处于展开状态，因此默认可见到市级，但所有具体地点仍隐藏；没有行政区属性的地点归入“未设置行政区”。
-- 国家、省、市均可通过左侧箭头收起或展开。收起国家会隐藏其全部省和市；重新展开国家至少恢复各省以及北京、香港等没有省字段、结构上直属国家的市级单位。收起省会隐藏该省下的城市和地点。
-- 行政区展开状态与该行政区直属地点的显示使用独立派生键，保证“国家和省默认展开行政区、具体地点默认折叠”可以同时成立。用户主动展开行政区后可显示其直属根地点；地点行左侧箭头只展开该地点的直接子地点，新显示的下一级保持折叠。
-- 展开箭头和文字选择是两个独立命中区域。查看器、批量编辑和父节点选择器只能选择真实 `LocationId`；画廊顶部筛选器点击国家、省、市文字时选择行政区条件，点击箭头时只展开。
-- 每个菜单实例独立保存本次打开期间的展开集合，关闭后重置，不写入图库数据或应用设置。
-- 搜索必须覆盖完整地点注册表，不能截取固定数量的候选项。命中地点时同时补入它的全部地点父节点，并临时显示完整命中路径；清空搜索后恢复用户手动展开的状态。
-- 最近使用是树外快捷项，不参与展开关系。媒体地点选择和创建/编辑地点时的父节点选择使用“最近使用 + 全部地点”分区；画廊地点筛选在固定的“全部 / 未设置地点”之后直接显示完整地点树，不显示这两个分区。父节点菜单中的最近项仍必须先排除当前编辑地点及其全部后代，并服从当前搜索词。
-
-完整层级行由 `buildLocationHierarchyRows()` 生成；菜单可见行由展开集合和搜索状态派生。完整构造仍保持父节点紧跟完整子树，因此地点管理面板可以继续展开显示全部记录。`Location.Detail` 始终不参与地点或行政区筛选。
-
-地点管理面板中的卡片不重复显示底部行政区、父节点或说明块。说明与名称同一行，过长时换行；卡片左边缘按地点层级缩进。滚动区域上方的固定上下文条根据当前可见第一张卡片显示其国家、省、市，避免覆盖卡片造成计算偏差。
-
-## 17. 注册表管理面板
-
-标签、相册、人物、地点管理面板均支持：
-
-- 搜索定义和说明。
-- 显示媒体使用数量。
-- 在一次保存中原子修改显示名称、说明及该类型允许编辑的其它属性。
-- 二次确认全局删除，并明确影响媒体数量。
-- 右上角 `+` 创建尚未被任何媒体使用的新定义。
-- 右上角 `×` 关闭。
-
-从管理面板创建时，创建表单是独立悬浮在管理面板之上的 modal；关闭创建表单不能关闭下层管理面板。地点创建和编辑表单共用同一套不可编辑父节点触发框、内置搜索框及按行政区和父子关系缩进的树形菜单；当前地点及其后代不会出现在可选父节点中。新建地点时选择或更换父节点，会把该直接父地点自身的国家、省、市精确复制到可编辑文本框，包含空字段；用户随后可以自由覆盖。清空父节点只解除父节点引用，不清空已经填入的行政区草稿；编辑已有地点时更换父节点不自动改写其行政区字段。
-
-简单注册表分别通过 `tag:update`、`album:update`、`person:update` 提交名称与说明；地点通过 `location:update` 同时提交名称、行政区、父节点和说明。保存前主进程重新执行必填项、名称唯一性、地点上下文重复、父节点存在性和循环引用校验。保存成功只刷新注册表内存列表；除全局删除外，注册表编辑不会写入 `photo_metadata.jsonl`。标签、相册和人物名称在各自注册表中保持全局唯一；地点仅在 `Name + Country + Province + City + ParentId` 完全相同时视为重复。
-
-管理面板同一时间只编辑一个定义。名称输入框支持 `Enter` 保存和 `Esc` 取消，说明文本框使用 `Ctrl+Enter` 保存并保留普通换行；请求进行中禁用关闭、切换编辑和重复提交。改名后管理面板保留当前搜索词，若新名称不再匹配，该定义自然退出当前结果列表。
-
-全局删除成功后管理面板保持打开，列表、筛选项、当前查看媒体和画廊本地缓存同步更新。若当前筛选结果成员不变，renderer 只原地清理命中媒体的注册表引用，不替换画廊结果数组、不重建 `MediaId` 索引，也不触发全部卡片重渲染；若删除使当前精确筛选、地点子树/行政区筛选或“未设置”筛选的结果成员发生变化，才重新查询画廊。
-
-## 18. 图库设置菜单和维护任务
-
-画廊右下角齿轮仅在画廊普通模式显示。菜单使用图标加文本，提供：
-
-- 图库信息：名称、完整路径、UUID、创建时间、更新时间、媒体统计；可打开图库根目录和管理目录。
-- 更新元数据。
-- 检查元数据。
-- 生成缩略图。
-- 导出元数据 CSV。
-- 相册、地点、人物、标签管理。
-- 退出当前图库并返回图库入口。
-
-维护任务通过 `scripts/maintenance-worker.js` 在 child process 中运行，向主进程发送结构化进度、日志和结果。UI 展示阶段、计数、当前相对路径和最终 JSON 报告，可复制报告或打开日志目录。CSV 完成后可在资源管理器中定位文件。
-
-### 18.1 更新元数据
-
-- 增量扫描并原子替换完整 metadata JSONL。
-- 执行前创建 update 备份。
-- 完成后主进程重新严格加载全部索引并刷新画廊。
-- 不生成缩略图；新增或内容变化的媒体保持占位图，直到用户另行执行“生成缩略图”。
-
-### 18.2 检查元数据
-
-只读，不修复：
-
-- 扫描全部支持媒体并重算完整 SHA-256。
-- 报告 metadata 缺失项、磁盘缺失项、hash 变化、类型不符、探测失败和读取失败。
-- 可选 `--probe` / UI 复选框重新运行 FFprobe，并比较状态、时长、主流尺寸和编码。
-
-### 18.3 生成缩略图
-
-- 默认只生成缺失或因 manifest 不匹配而 stale 的缓存。
-- 可选强制重建全部缓存。
-- 不修改媒体元数据。
-- 完成后重新查询画廊，使新生成的缓存立即显示。
-
-### 18.4 CSV 导出
-
-- UI 固定输出 `.photo_manager/data/photo_metadata.csv`。
-- 文件存在时必须二次确认覆盖。
-- CSV 展平用户字段、地点、文件系统、图片/视频技术字段、GPS 和相机字段。
-- CSV 同时导出 `MediaId`、四类注册表引用 ID，以及通过当前注册表解析出的相册、标签、人物和地点显示文本。
-- 图片行的视频列为空，视频行的图片列为空。
-- 地点导出 `LocationId`、解析后的地点名和 `Location.Detail`，不把国家/省/市复制进每个媒体行。
-
-## 19. CLI 维护接口
-
-所有图库脚本都要求显式 `--library`，不读取旧式路径配置：
+Every script requires `--library` and shares path, lock, strict loading, and FFmpeg configuration:
 
 ```powershell
 npm run init-metadata -- --library "D:\Media\My Library"
@@ -764,275 +549,89 @@ npm run build-thumbnails -- --library "D:\Media\My Library" --force
 npm run export-metadata-csv -- --library "D:\Media\My Library"
 ```
 
-缺少 `--library` 必须立即失败。独立脚本和应用 UI 使用同一 library path、锁、严格加载和 FFmpeg 配置模块。
+Missing `--library` fails immediately. No script infers a path from configuration.
 
-## 20. IPC 契约
+## 20. IPC Contract
 
-主要请求通道：
+Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directories, and info; `maintenance:start/show-output`; `gallery:query`; `photo:update-customization/batch-update`; list/create/update/delete-global for four registries; clipboard/system media actions; `photo:report-playback`; and `window:action/get-state`. Events are `library:state-changed`, `library:progress`, `maintenance:progress`, and `window:state-changed`.
 
-- 配置：`app:get-config`。
-- 图库生命周期：`library:get-state`、`library:choose-directory`、`library:inspect`、`library:open`、`library:initialize`、`library:close`、`library:update-info`。
-- 初始化辅助：`library:cancel-scan`、`library:cancel-initialization`、`library:cleanup-failed-initialization`、`library:recheck-media-tools`。
-- 文件夹入口：`library:open-root`、`library:open-manager-dir`、`library:open-log-dir`。
-- 维护：`maintenance:start`、`maintenance:show-output`。
-- 查询和编辑：`gallery:query`、`photo:update-customization`、`photo:batch-update`。
-- 四类注册表：各自的 list/create/update/delete-global。
-- 桌面能力：`photo:copy-path`、`photo:copy-json`、`photo:copy-image`、`photo:open-default`、`photo:show-in-folder`、`clipboard:write-text`。
-- 视频诊断：`photo:report-playback`。
-- 窗口：`window:action`、`window:get-state`。
+Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation payloads camelCase, and each channel rejects unknown fields and obsolete PascalCase aliases. `FilePath` is never an action target: the main process resolves `MediaId` through its current index and verifies the resulting path remains inside the active library before any filesystem operation.
 
-媒体级 IPC 以 `MediaId` 为目标参数；批量编辑传 `mediaIds`。持久化数据中的 ID 字段使用 PascalCase，但 renderer 发往主进程的 mutation payload 属性统一使用 camelCase，例如 `mediaId`、`tagId`、`albumId`、`personId`、`locationId`、`parentId`。主进程按每个通道的当前字段白名单拒绝未知属性，不接受旧 PascalCase payload 别名。`FilePath` 不接受为编辑或桌面操作目标，主进程只在通过 ID 命中内存记录后解析其当前路径。
-
-事件通道：
-
-- `library:state-changed`
-- `library:progress`
-- `maintenance:progress`
-- `window:state-changed`
-
-所有媒体路径相关 IPC 必须先从当前 `metadataIndex` 找到记录，再验证最终路径仍在活动图库内。不能接受渲染器直接传入任意绝对路径来执行系统打开或图像复制。
-
-## 21. 源码职责
+## 21. Source Responsibilities
 
 ### 21.1 `scripts/`
 
-- `application-paths.js`：解析 roaming/local 全局目录，创建目录并在 ready 前配置 Electron 存储路径。
-- `application-config.js`：集中定义完整默认配置，创建、读取并按当前字段白名单规范化 roaming `config.yml`；桌面端与 CLI 共用。
-- `library-core.js`：图库路径、manifest、严格 JSONL、原子写入、嵌套检测。
-- `library-access.js`：现有图库验证、CLI/worker 授权。
-- `library-lock.js`：锁创建、活性检查、释放和强制解锁边界。
-- `library-backup.js`：快照和保留数量。
-- `library-transaction.js`：多文件提交 journal、回滚和崩溃恢复。
-- `operation-progress.js`：统一进度和 warning/error 收集。
-- `maintenance-worker.js`：Electron 维护子进程入口。
-- `common.js`：扫描、hash、图片/视频记录构造、默认用户字段。
-- `library-data.js`：维护脚本共用的四类注册表加载与媒体引用完整性校验。
-- `media-tools.js`：FFmpeg 配置、execFile、超时、FFprobe 规范化、抽帧。
-- `media-time.js`：媒体时间文本解析、媒体参考时区、GPS 到 IANA 时区映射、任意时刻的夏令时换算和歧义处理。
-- `thumbnail-cache.js`：共享缩略图生成和并发队列。
-- `init-metadata.js`：新图库初始化。
-- `update-metadata.js`：增量同步。
-- `verify-metadata.js`：只读完整性检查。
-- `build-thumbnails.js`：缓存生成。
-- `export-metadata-csv.js`：CSV 导出。
-- `start-electron.js`：清理不应继承的 Electron 环境变量并启动桌面进程。
+- `application-paths.js`: roaming/local paths and pre-ready Electron storage setup.
+- `application-config.js`: complete defaults and shared strict configuration loading.
+- `library-core.js`, `library-access.js`, `library-lock.js`, `library-backup.js`, `library-transaction.js`: boundaries, authorization, locking, snapshots, atomic writes, transactions, and recovery.
+- `operation-progress.js`, `maintenance-worker.js`: structured operation reporting and child-process dispatch.
+- `common.js`, `library-data.js`: scanning, hashing, record creation, registry loading, and reference validation.
+- `media-tools.js`, `media-time.js`, `thumbnail-cache.js`: FFmpeg execution/normalization, reference-time-zone logic, and thumbnail queues.
+- `init-metadata.js`, `update-metadata.js`, `verify-metadata.js`, `build-thumbnails.js`, `export-metadata-csv.js`: maintenance operations.
+- `start-electron.js`: sanitize the inherited environment and launch Electron.
 
 ### 21.2 `src/main/`
 
-- `main.js`：主进程组合根。创建运行时状态，装配各领域服务，协调图库生命周期、索引加载和维护 worker；不再直接承载成组的 IPC CRUD 或窗口构造细节。
-- `application-runtime.js`：创建单一主进程运行时对象，集中保存活动窗口、活动图库、五类内存索引、维护状态和 worker。每次调用必须返回彼此隔离的新状态，模块不得另建同语义的全局单例。
-- `application-state.js`：读取和原子写入 Local AppData 中的 `state.json`，只接受最后图库路径字段。
-- `simple-registry-catalog.js`：标签、人物和相册共享的严格 ID 注册表加载、使用量统计、排序、写回和引用校验逻辑。
-- `simple-registry-service.js`：标签、人物和相册共享的创建、修改说明、全局删除、备份及内存回滚流程；字段名和删除媒体引用的方式由显式配置传入。
-- `location-domain.js`：不执行 I/O 的地点规范化、父子图、后代集合、路径和循环校验逻辑。
-- `location-catalog.js`：地点注册表严格加载、ID 父子关系、媒体地点结构规范化、使用量统计和持久化协调。
-- `location-registry-service.js`：地点创建、编辑和全局删除。地点保留专门服务，因为删除父节点、解除子节点父关系和清空媒体地点不符合简单注册表模型。
-- `gallery-query.js`：不执行 I/O 的画廊单遍过滤与媒体类型计数、结果排序和完整结果日期分组逻辑；地点筛选通过注入的后代查询实现，不包含分页职责。
-- `gallery-item-enricher.js`：为查询命中项添加 renderer 使用的绝对路径、缩略图状态和日期键，并缓存活动图库的缩略图目录索引与 URL 版本；缓存失效由主进程生命周期协调。
-- `metadata-edit-service.js`：单媒体和批量个性化信息更新、注册表引用校验、保存失败后的内存回滚。
-- `ipc-handlers.js`：显式注册 renderer 可访问的 IPC 白名单，将参数转交领域服务，并封装剪贴板、系统打开和资源管理器定位等 Electron 能力。它不拥有活动图库状态。
-- `window-manager.js`：BrowserWindow 创建、渲染器诊断、最大化状态通知、维护期间关闭拦截和初始化取消确认。
-- `preload.js`：`contextIsolation` 下唯一允许的 renderer bridge。
+`main.js` is the composition root. `application-runtime.js` creates isolated runtime state; `application-state.js` handles atomic local state. Simple registry catalog/service modules share tag/person/album logic; location domain/catalog/service modules own hierarchy-specific behavior. `gallery-query.js` is pure filtering/counting/grouping; `gallery-item-enricher.js` adds renderer paths and cached thumbnail status. `metadata-edit-service.js` owns validated edits and rollback. `ipc-handlers.js` registers the allowlist without owning state; `window-manager.js` owns BrowserWindow lifecycle; `preload.js` is the only renderer bridge.
 
-`src/shared/object-schema.js` 提供固定对象字段白名单校验；`src/shared/identity-schema.js` 定义 UUID v4 创建与验证；`src/shared/customization-schema.js` 定义完整个性化字段及编辑补丁契约；`src/shared/library-data-schema.js` 负责跨五个 JSONL 的固定字段、ID 全局唯一性、引用完整性、地点重复上下文和父链校验。主进程与 CLI 必须复用这些契约，不得各自实现宽松版本。
-
-主进程依赖方向固定为：`main.js` 负责装配，`ipc-handlers.js` 调用领域服务，领域服务通过显式 getter/setter 访问 `application-runtime.js` 中的活动会话和索引，底层再调用 `scripts/library-*` 持久化工具。领域模块不能反向导入 IPC 注册器或主窗口。
+Shared schema modules enforce exact keys, UUID v4 identity, customization patches, global uniqueness, references, location contexts, and parent chains. Dependency direction is `main.js` assembly → IPC → domain services through explicit runtime accessors → `scripts/library-*` persistence. Domain modules never import the IPC registrar or window.
 
 ### 21.3 `src/renderer/`
 
-渲染层采用“声明式根组件 + 应用组合根 + 领域 composable + 纯函数 + 展示组件”的结构。这里的拆分以状态所有权和生命周期边界为依据，不以模板行数机械拆分。
+The renderer is a declarative `App.vue` shell, application composition root, state-owning composables, pure domain functions, and presentation components. Components consume narrow contexts and never reverse-import the composition root. Pure functions import no Vue/DOM/Electron; composables import no page components and collaborate only through callbacks/refs wired at the root.
 
-#### 21.3.1 分层和依赖方向
+State owners are: library session; gallery query and stale-request suppression; full-result selection; viewer navigation/shortcuts; editor drafts/locks; media transform listeners/observer; video element lifecycle/preferences; one composable per registry; library-scoped recent history; window controls; and UI feedback. Every owner of a global listener, timer, observer, element, or IPC subscription exposes idempotent cleanup called on unmount.
 
-- `App.vue`：声明式外壳。只负责在入口、画廊和查看器三个一级页面之间切换，并挂载全局 dialog/feedback 组件；不得重新承载业务状态、IPC 调用或文档级事件监听。
-- `application/use-renderer-application.js`：renderer composition root。实例化 composable，以显式 ref 和 callback 连接跨领域协作，集中组装组件需要的窄上下文，并在 Vue 挂载/卸载阶段启动和释放各模块。该文件可以较长，但内容应是依赖装配，不应复制领域算法或注册表 CRUD。
-- `context/renderer-contexts.js`：所有 `provide`/`inject` 键的唯一声明位置。页面和控件只注入自己需要的上下文，不允许恢复一个包含全部 renderer 状态的巨型 context。
-- `composables/`：有状态的前端领域控制器。每个 composable 拥有一组内聚状态、相关 IPC 调用和该领域产生的副作用，并通过参数显式接收其它领域能力。
-- `domain/`：不依赖 Vue、DOM、Electron 和 IPC 的确定性函数。格式化、地点层级构造、画廊等级筛选默认值与切换规则等逻辑放在这里，以便直接使用 `node:test` 测试。
-- `components/`：页面和可复用交互控件。组件负责模板、DOM 事件转发和局部展示判断，不直接建立第二份业务状态。
-- `components/dialogs/`：跨一级页面存在的图库、维护任务、注册表管理和全局反馈弹窗。弹窗关闭或提交时调用所属 context 的动作，不自行写注册表。
-- `constants/ui-constants.mjs`：图标、评级、特殊筛选值和窗口动作等静态常量。
-- `video-playback.mjs`：逐帧目标、时间轴边界、缓冲比例和方向键状态规则的纯函数；播放器 DOM 生命周期仍由 `use-video-playback.js` 管理。
-- `styles.css` 与 `styles/`：全局样式入口及按职责拆分的样式模块。入口只声明稳定的导入顺序，具体规则由对应模块持有。
+Contexts are split into library, gallery, gallery-filter, viewer, settings, four registries, and UI feedback. Components render and forward intent. Shared picker/menu components retain their single-value, multi-value, filter, and hierarchy semantics.
 
-依赖方向固定为：
+Global CSS remains deliberate. `styles.css` alone imports tokens, library, base, gallery, viewer fields, registry controls, customization, viewer media, registry overlays, feedback, then responsive overrides. Keep tokens centralized, place rules with the DOM owner, preserve import order, and add a module only for a stable new visual responsibility.
 
-```text
-App.vue
-  -> application/use-renderer-application.js
-       -> composables/*
-            -> domain/*、video-playback.mjs、preload API
-       -> context/renderer-contexts.js
+For extensions: put deterministic algorithms in pure modules with `node:test`; give each state one lifecycle owner; coordinate cross-domain effects at the composition root; expose actions through the narrow existing context; use preload IPC only; use `shallowRef` for normalized full-result collections and separate edit drafts; verify listener cleanup during behavior-preserving refactors.
 
-components/* -> context/renderer-contexts.js -> composition root 提供的能力
-```
+## 22. Tests and Acceptance
 
-组件不能反向导入 composition root；纯函数不能导入 Vue 或组件；composable 不能创建或导入页面组件。跨 composable 协作必须在 composition root 中通过 ref、getter 或 callback 显式连接，以便看出数据流和副作用来源。
+The `node:test` suite covers CSV schema/escaping; library boundaries, manifests, strict JSONL, locks, backups, and rollback; image/video probing, FFmpeg integration, thumbnail cleanup, and time-zone/DST ambiguity; incremental reuse/change/move/copy/failure behavior; playback, frame stepping, transforms, and keyboard focus; configuration/runtime isolation; gallery filters/counts/grouping; UUID and registry schemas; rating/privacy mutations; renderer details; and location hierarchy/search.
 
-#### 21.3.2 状态和副作用所有权
-
-| 模块 | 所有状态与职责 | 所有的全局资源 |
-| --- | --- | --- |
-| `use-library-session.js` | 当前一级视图、活动图库摘要、入口页选择/初始化状态、图库信息、设置菜单和维护任务 | 图库初始化与维护进度 IPC 订阅 |
-| `use-gallery-query.js` | 完整查询条件、筛选抽屉会话状态、一次性查看器返回目标、日期分组、顺序媒体集合、统计和 `MediaId` 索引 | 请求序号用于丢弃过期响应 |
-| `use-gallery-selection.js` | 选择模式、完整结果上的选中集合、含可选评级和 Privacy 补丁的批量编辑草稿及批量结果 | 无文档级监听器 |
-| `use-media-viewer.js` | 当前媒体索引、查看器左右面板、右键菜单、媒体导航、未保存草稿离开确认和上下文操作 | 文档点击和键盘快捷键 |
-| `use-media-editor.js` | 单媒体个性化草稿、dirty 状态、活动编辑字段、保存确认、提交锁和文本域自适应 | 无常驻全局监听器 |
-| `use-media-transform.js` | 图片/视频共用的适配尺寸、缩放、平移、旋转、镜像、拖动阈值和临时复原状态 | 文档 `mousemove`/`mouseup`；媒体区域 `ResizeObserver` |
-| `use-video-playback.js` | video/audio 元素、固定控件状态、进度拖动、缓冲、播放/音频降级、逐帧、音量和静音偏好 | 媒体元素事件；偏好写入 `localStorage` |
-| `use-tag-registry.js` | 标签列表、选择器、创建面板和管理面板 | 标签 IPC，不拥有其它注册表状态 |
-| `use-album-registry.js` | 单值相册列表、选择器、创建面板和管理面板 | 相册 IPC |
-| `use-person-registry.js` | 人物列表、选择器、创建面板和管理面板 | 人物 IPC |
-| `use-location-registry.js` | 完整地点列表、搜索父链、选择候选、创建/编辑/管理状态 | 地点管理列表滚动观察及地点 IPC；菜单展开状态归共享组件所有 |
-| `use-recent-registry-history.js` | 按图库 UUID 隔离的最近标签、人物和地点 | 对 `localStorage` 中该图库命名空间的读写 |
-| `use-window-controls.js` | 最大化状态及标题栏按钮行为 | 窗口状态 IPC 订阅 |
-| `use-ui-feedback.js` | toast、保存确认和动态 tooltip | 文档 tooltip 指针事件和计时器 |
-
-四类注册表列表只能由各自 composable 修改。composition root 将这些 ref 组合为 `GALLERY_FILTER_CONTEXT` 中的只读候选项视图；`use-gallery-query.js` 不拥有、复制或刷新注册表状态。普通媒体保存和批量编辑不刷新注册表，使用数量由各管理面板打开时的重新加载更新。
-
-每个安装全局监听器或 IPC listener 的模块都必须同时暴露幂等的 `dispose()`，并由 composition root 在 `onBeforeUnmount` 调用。切换图库时只重置图库相关状态；销毁 renderer 时才释放文档级监听器。新增监听器应放进实际拥有该交互状态的 composable，不能集中堆到 `App.vue`。
-
-#### 21.3.3 上下文边界
-
-当前上下文按消费面拆分：
-
-- `LIBRARY_CONTEXT`：入口页和图库生命周期弹窗。
-- `GALLERY_CONTEXT`：画廊结果、选择模式和批量编辑。
-- `GALLERY_FILTER_CONTEXT`：顶部筛选控件需要的查询值和候选项。
-- `VIEWER_CONTEXT`：媒体查看器、技术信息、编辑草稿、共享媒体变换和视频播放。
-- `SETTINGS_CONTEXT`：画廊右下角设置菜单及其入口动作。
-- `TAG_CONTEXT`、`ALBUM_CONTEXT`、`PERSON_CONTEXT`、`LOCATION_CONTEXT`：各注册表的选择、创建和管理能力。
-- `UI_FEEDBACK_CONTEXT`：toast、保存提示和 tooltip 的只读展示状态。
-
-上下文对象可以共享 composition root 中的同一个 ref，但组件不得替换 context 或复制其状态。给某个组件增加能力时，优先扩充其已有窄 context；只有出现新的独立消费边界时才新增 context。不要因为传参方便而把所有 composable 返回值合并后整体 `provide`。
-
-#### 21.3.4 页面和组件职责
-
-- `LibraryEntryView.vue`：选择图库、媒体工具错误、初始化/加载进度和重试。
-- `GalleryView.vue`：不分页的混合媒体画廊、默认展开的两行可折叠筛选/排序抽屉、单实例右键详情浮层和覆盖完整查询结果的批量编辑；卡片缩略图使用浏览器原生懒加载。
-- `GalleryLevelFilter.vue`：评级和 Privacy 共用的 `全部 + 1..5` 多选分段控件，只展示选择集合并转发全部/等级点击意图。
-- `ViewerView.vue`：图片/视频媒体区域、左右信息面板、查看器工具栏、技术信息和未保存草稿离开确认；个性化保存由 editor composable 完成。
-- `VideoPlaybackControls.vue`：固定视频播放控件，只展示 playback composable 提供的状态并转发播放、进度和音量意图，不直接操作媒体元素。
-- `GallerySettingsMenu.vue`：图库设置入口，只发起管理面板和维护任务动作。
-- `GalleryMediaDetailsMenu.vue`：只读媒体详情行、菜单内部滚动和视口边界定位。
-- `PrivacyLevelPicker.vue`：查看器和批量编辑共用的五级 Privacy 单选控件，只发出数值变更，不拥有保存状态。
-- `AlbumPicker.vue`、`PeoplePicker.vue`、`TagPicker.vue`、`LocationPicker.vue`：查看器/批量选择控件。
-- `RegistryFilterPicker.vue`、`LocationFilterPicker.vue`：画廊筛选控件。
-- `RegistryOptionsMenu.vue`：相册、标签和人物共用的平面注册表菜单主体；统一搜索、可配置的固定项与最近使用/全部分区、选项行、空状态和键盘交互，不拥有外层字段语义。
-- `LocationTreeMenu.vue`：所有纯地点选择场景共用的折叠树、搜索和快捷区；`LocationParentPicker.vue` 在其外层提供父节点只读触发框。
-- `dialogs/LibraryDialogs.vue`：初始化确认、图库信息和维护任务弹窗。
-- `dialogs/*ManagerDialog.vue`：四类注册表管理与嵌套创建弹窗。
-- `dialogs/UiFeedbackOverlay.vue`：全局 toast、字段保存确认和动态 tooltip。
-
-#### 21.3.5 样式架构
-
-renderer 继续使用一套全局 CSS，而不在本轮改成 Vue scoped CSS 或 CSS Modules。多个页面共享标题栏、按钮、注册表选择器和弹窗结构，全局设计令牌与稳定级联更适合当前单窗口应用；强行把这些选择器复制到 SFC 会造成重复和覆盖顺序不透明。
-
-`styles.css` 是唯一加载入口，`index.html` 不直接引用 `styles/` 下的任何文件。入口中的 `@import` 顺序属于渲染契约，当前顺序完整保留了拆分前单文件样式表的级联结果：
-
-| 模块 | 职责 |
-| --- | --- |
-| `styles/tokens.css` | 颜色、边框、圆角和阴影等全局设计令牌 |
-| `styles/library.css` | 图库入口以及初始化、图库信息和维护任务弹窗 |
-| `styles/base.css` | reset、应用外壳、标题栏、按钮、图标和输入框等共享基础控件 |
-| `styles/gallery.css` | 画廊工具栏、筛选器、媒体卡片、选择模式、批量编辑、底栏和图库设置菜单 |
-| `styles/viewer-fields.css` | 查看器三栏布局、元数据面板和可折叠字段细节 |
-| `styles/registry-controls.css` | 相册、地点、人物和标签的受控选择器、chip、下拉菜单及创建 popover |
-| `styles/customization.css` | 评级、隐私等级、隐藏描述和字段保存反馈 |
-| `styles/viewer-media.css` | 图片/视频舞台、媒体导航、右键菜单和查看器底栏 |
-| `styles/registry-overlays.css` | 注册表管理/创建弹窗以及地点层级列表的后置样式 |
-| `styles/feedback.css` | 位于普通页面和弹窗之上的全局动态 tooltip |
-| `styles/responsive.css` | 影响多个一级视图的最终响应式覆盖，必须保持最后导入 |
-
-样式修改遵循以下边界：
-
-1. 设计令牌只在 `tokens.css` 定义，功能模块使用变量，不在多个文件重复声明同语义颜色。
-2. 按实际拥有该 DOM 的页面或控件选择模块；跨页面基础控件放入 `base.css`，不能因为某个页面首先使用就放入该页面文件。
-3. 注册表的通用选择控件放入 `registry-controls.css`，管理弹窗和需要后置覆盖层级的规则放入 `registry-overlays.css`。四类注册表不得分别复制同一套 dropdown 样式。
-4. 只影响单一模块的媒体查询可以留在所属文件；同时改变画廊、查看器等多个一级布局的断点放入 `responsive.css`。
-5. 不从 SFC 单独导入这些全局模块。所有页面经 `styles.css` 获得同一顺序，避免组件挂载先后改变级联结果或重复打包。
-6. 不随意调整 `styles.css` 中的 import 顺序。确需改变优先级时，应明确记录被覆盖的选择器，并通过构建产物或视觉回归确认不是无意的样式变化。
-7. 新模块必须对应新的稳定视觉职责；只有少量规则时优先并入现有所有者，避免重新形成大量无法理解顺序的碎片文件。
-
-#### 21.3.6 修改和扩展规则
-
-1. 新增确定性算法时先放入 `domain/` 或已有纯函数模块，并补 `node:test`；不要把可测试算法藏在 SFC 的 `setup()` 中。
-2. 新增状态时先确定唯一所有者。状态应放入最接近其生命周期的 composable；只有纯 DOM 展示状态才留在组件内部。
-3. 一个操作跨图库、画廊、查看器或注册表时，在 composition root 注入 callback 协调刷新。composable 不直接导入另一个 composable，也不依赖隐式全局变量。
-4. 组件需要新动作时通过对应窄 context 暴露；避免跨多层模板透传大量 props，也避免巨型 context。
-5. IPC 调用只能经 `window.photoManagerApi` 的 preload 白名单。composable 可以调用 API，但组件不应拼装持久化 payload 或假设主进程内部索引结构。
-6. `shallowRef` 用于完整画廊结果这类主进程已规范化的大集合，避免对每条媒体记录建立不必要的深层代理；编辑时使用独立 draft，不原地修改查询结果。
-7. 行为保持型重构必须先锁定纯逻辑测试，再执行 `npm test` 和 `npm run build:renderer`；涉及播放器、下拉菜单或图库切换时还需手工验证监听器不会重复安装。
-
-## 22. 测试与验收
-
-自动化测试使用 Node 内置 `node:test`：
-
-- CSV 列和转义。
-- 图库路径、当前 manifest 版本、固定字段、严格 JSONL 和嵌套边界。
-- 图片损坏探测。
-- 独占锁和备份保留。
-- 多文件事务部分提交回滚。
-- 内置 FFmpeg 集成、损坏视频、缩略图生成与临时文件清理。
-- FFprobe 字段规范化、创建时间候选、GPS/设备映射、超时和错误清理。
-- 拍摄/文件时间的参考时区、显式偏移、UTC 本地化、夏令时、无时区墙上时间和边界歧义。
-- 增量更新的复用、变更、移动、副本和失败保留。
-- 视频逐帧、时间轴边界、缓冲比例和键盘状态规则。
-- 图片/视频初始适配、90°/270° 旋转适配和拖动阈值。
-- 主进程配置合并、运行时隔离、地点层级、画廊组合筛选、媒体类型计数、缩略图状态缓存和通用注册表统计。
-- UUID 格式、注册表/个性化/地点固定字段、跨注册表与媒体的全局唯一性、未知引用拒绝和地点同名上下文约束。
-- Rating/Privacy 当前契约、默认值、严格 mutation payload、批量补丁、画廊多选筛选和 CSV 列顺序。
-- 查看器全局快捷键焦点边界，以及指针锚定缩放和自适应滚轮步长。
-- renderer 详情字段的图片/视频差异、固定顺序、空值和标签连接格式。
-
-提交前最低验证：
+Minimum checks:
 
 ```powershell
 npm test
 npm run build:renderer
 node --check src/main/main.js
 node --check src/main/preload.js
-node --check scripts/*.js  # PowerShell 中应逐文件执行或使用可靠循环
+node --check scripts/*.js  # use a reliable per-file PowerShell loop
 npm run verify-metadata -- --library "<library-path>"
 git diff --check
 ```
 
-桌面端还应手工检查入口页预填与手动进入、锁提示、画廊设置菜单、维护任务进度、返回入口、图片查看和视频播放降级。
+Desktop acceptance also covers entry prefilling/manual open, lock warnings, settings and maintenance progress, returning to entry, image viewing, and video fallback.
 
-## 23. 开发约束和不变量
+## 23. Development Invariants
 
-后续修改必须维持：
+1. Do not restore project-level library/data/log paths or configurable internal filenames.
+2. Never write library-owned data outside its root.
+3. Renderer never accesses the filesystem directly.
+4. Media never store unregistered album/tag/person/location references or registry display text.
+5. `Location.Detail` is neither registry data nor a location filter.
+6. Derive children from `ParentId`; reject cycles.
+7. Maintenance never guesses a missing `--library` path.
+8. Never skip corrupt JSONL lines and continue opening.
+9. Global deletion must use a recoverable transaction; backup failure blocks writes.
+10. Probe failure does not remove customization access.
+11. Do not rehash/reprobe unchanged large videos.
+12. Media/library changes must clear old sound, menus, transforms, and library-scoped recents.
+13. Use `MediaId`, not `FilePath` or hash, for media state, IPC, and relationships.
+14. All entity IDs are lowercase UUID v4 and globally unique across media and registries.
 
-1. 不重新引入项目级 `workspaceRoot`、`dataDir`、`logDir` 或可配置数据文件名。
-2. 不在图库根目录外写入图库专属数据。
-3. 不允许渲染器直接读写文件系统。
-4. 不允许媒体保存未注册标签、相册、人物或主地点。
-5. 不把 `Location.Detail` 纳入地点注册表或地点筛选。
-6. 不把地点 `ChildrenIds` 持久化；它必须由 `ParentId` 派生。
-7. 不允许地点父链循环。
-8. 不允许维护脚本在缺少显式 `--library` 时猜测路径。
-9. 不在 JSONL 损坏时跳过行继续打开。
-10. 不在全局删除时用两个无恢复关系的独立写入替代事务。
-11. 不在备份失败后继续正式写入。
-12. 不因技术探测失败而剥夺媒体的个性化编辑能力。
-13. 不对未变化的大视频重复完整哈希或 FFprobe。
-14. 不在切换媒体或图库后保留视频声音、旧下拉菜单或旧图库最近使用状态。
-15. 不把 `FilePath` 或 `SHA256Hash` 当作媒体稳定身份；所有媒体级状态、IPC 和关联必须使用 `MediaId`。
-16. 不把注册表显示文本持久化为媒体引用；媒体只保存四类注册表 ID。
-17. 不允许任何实体 ID 在媒体及四类注册表之间重复，也不允许写入非小写 UUID v4。
+## 24. Explicitly Out of Scope
 
-## 24. 当前明确不做的功能
+- Database, cloud sync, multi-user or cross-process collaborative editing.
+- Recent-library lists, nested libraries, symlink media, or external media references.
+- Automatic filesystem monitoring.
+- Album detail pages/covers or photo-group structures.
+- Video proxy transcoding, subtitles, chapters, track switching, manual covers, remembered position, looping, screenshots, or exact variable-frame-rate indexing.
+- In-application backup restoration.
 
-- 数据库、云同步、多用户和跨进程协同编辑。
-- 最近图库列表。
-- 图库嵌套、符号链接媒体和图库外媒体引用。
-- 自动文件系统监控。
-- 相册详情页、相册封面。
-- 照片组数据结构。
-- 视频代理转码、字幕、章节、多音轨切换、手动封面、播放位置记忆、循环和截图。
-- 精确可变帧率逐帧索引。
-- UI 内备份恢复。
+## 25. Architecture Summary
 
-## 25. 架构总结
-
-PhotoManager 当前采用“应用级代码与配置 + 用户选择的独立图库 + 图库内自包含管理目录”的模型。Electron 主进程持有唯一活动图库会话和所有写权限；维护脚本共享图库边界、锁和持久化模块；Vue 渲染层只处理交互与可序列化状态。每个图库可连同 `.photo_manager` 一起移动和备份，不依赖项目目录中的数据路径。
+PhotoManager combines application code and global settings with user-selected independent libraries whose management data are self-contained. The Electron main process owns the only active library session and all writes; maintenance tools share its boundary, lock, and persistence modules; Vue owns interaction and serializable UI state. A library can be moved or backed up together with `.photo_manager` and has no dependency on data paths inside the installation directory.

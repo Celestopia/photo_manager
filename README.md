@@ -1,132 +1,57 @@
 # PhotoManager
 
-PhotoManager is a local-first Windows desktop manager for mixed image and video libraries. It is built with Electron and Vue and keeps each library self-contained: media stay in the selected directory, while metadata, registries, thumbnails, logs, and backups live under that directory's `.photo_manager/` folder.
+PhotoManager is a local-first Windows desktop application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
 
-Detailed implementation contracts are documented in [PROJECT.md](PROJECT.md).
+See [PROJECT.md](PROJECT.md) for the complete architecture, data contracts, and interaction rules.
+
+## Features
+
+- Browse images and videos on one shooting-time timeline.
+- Edit titles, ratings, privacy levels, descriptions, albums, tags, people, and hierarchical locations.
+- Filter and batch-edit the complete matching media set.
+- Play supported videos in the viewer and fall back to the Windows default player when necessary.
+- Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.
+
+Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
 ## Requirements
 
 - Windows 10 or 11, x64
 - Node.js and npm
-- Git LFS, because the bundled FFmpeg executables are LFS objects
+- Git LFS for the bundled FFmpeg executables
 
-Supported media extensions:
-
-- Images: JPG, JPEG, PNG, BMP, WebP, GIF
-- Videos: MP4, MOV, MKV, AVI
-
-## Install
-
-Fetch the FFmpeg binaries and install Node dependencies:
+## Install and Run
 
 ```powershell
 git lfs install
 git lfs pull
 npm install
-```
-
-The default FFmpeg 8.1.2 Windows x64 tools are stored in `tools/ffmpeg/bin/`. The generated `%APPDATA%\PhotoManager\app-data\config.yml` may point `media.ffmpegDir` to another absolute or installation-relative directory containing fixed filenames `ffmpeg.exe` and `ffprobe.exe`.
-
-## Start
-
-```powershell
 npm start
 ```
 
-`npm start` builds the Vue renderer and launches Electron. If the shell has set `ELECTRON_RUN_AS_NODE`, the project launcher clears it automatically.
+`npm start` builds the renderer and launches Electron. FFmpeg and FFprobe are required to initialize or open a library; the bundled Windows x64 tools live under `tools/ffmpeg/bin/`.
 
-The application always starts on the library entry page and prefills the last successfully used library when available:
+On first use, select either an existing PhotoManager library or an ordinary directory to initialize. Initialization scans supported media, calculates hashes, extracts technical metadata, and creates the library management directory. It never modifies the original media files.
 
-1. Select an existing library root to open it.
-2. Select an ordinary directory to initialize a new library.
-3. Review the scan warning and confirm initialization.
-4. Wait while PhotoManager hashes and probes supported media. Initialization can be cancelled; incomplete management data are then removed.
+## Data Locations
 
-FFmpeg and FFprobe are mandatory for opening or initializing a library. If validation fails, the entry page remains available and reports the tool error.
-
-## Library Layout
-
-PhotoManager never stores a selected library's data in the application source directory. A library has this layout:
+Each library is self-contained:
 
 ```text
-D:\Media\Example Library\
-  photos and videos...
+<library>\
+  media files...
   .photo_manager\
     library.yml
     data\
-      photo_metadata.jsonl
-      tag_registry.jsonl
-      album_registry.jsonl
-      person_registry.jsonl
-      location_registry.jsonl
-      photo_metadata.csv       # after export
     thumb_cache\
     backups\
     logs\
     temp\
 ```
 
-The library root can be moved as a unit. `library.yml` contains a UUID that identifies the library independently from its path. Libraries cannot be nested, drive roots cannot be libraries, and symbolic-link roots/media are not followed.
+The library can be moved as a unit. Libraries cannot be nested, and symbolic-link roots or media are not followed.
 
-## Using the App
-
-The gallery mixes images and videos on one shooting-time timeline. Its collapsible filter panel supports media type, multi-select rating and privacy levels, album, tag, person, and hierarchical location, plus shooting-time direction and case-sensitive substring search over a selected field: title, filename, or description. Rating defaults to all levels and privacy defaults to level 1. Each query loads the complete matching metadata set, so selection and viewer navigation cover every result; thumbnail images still use native browser lazy loading to limit unnecessary decoding.
-
-Thumbnail generation is explicit. Opening a library and updating metadata do not generate thumbnails automatically; media without a cached thumbnail use image or video placeholders until **Generate Thumbnails** is run from the gallery settings menu or the maintenance script.
-
-The viewer shares title, rating, privacy level, album, location, people, tags, description, and hidden-description fields across both media types. Privacy is an integer from 1 (lowest privacy requirement) to 5 (highest) and defaults to 1. Its controls are collapsed below rating by default and remain expanded or collapsed while browsing between media. Registry-backed fields must be selected from registered values; definitions can be created or managed from the field controls or the gallery settings menu. Leaving the current media with an unsaved draft requires an explicit choice to save, discard, or remain in place.
-
-Each media record has a stable lowercase UUID v4 `MediaId`. Album, tag, person, and location references also use registry UUIDs rather than display text. Moving or renaming a file inside one library preserves its `MediaId`; a coexisting duplicate or a file imported into another library receives a new one. `FilePath` remains the current relative location and SHA-256 remains the content fingerprint, so neither is treated as the record identity.
-
-Selection mode can batch-set title, rating, privacy level, album, and primary location, and batch-add people and tags. Rating and privacy controls both use an unset draft state so opening the panel never changes existing metadata until a level is selected. Privacy is descriptive metadata rather than access control: gallery filters may select its levels, while CSV export, clipboard, and system-open actions remain unrestricted.
-
-The gallery's bottom-right settings menu provides:
-
-- Library information and directory shortcuts
-- Incremental metadata update
-- Read-only metadata verification
-- Missing/stale or forced thumbnail generation
-- CSV export
-- Album, location, person, and tag management
-- Exit the current library and return to the library entry page
-
-Maintenance operations lock editing and library switching until completion. Reports can be copied, and logs can be opened from the result dialog.
-
-## Video Behavior
-
-Videos use a fixed in-app control bar over Electron's native video element, with play/pause, timeline, time, mute, and volume controls. Unsupported video decoding falls back to native audio-only playback when possible, then to the Windows default player. No proxy transcoding is performed.
-
-- A new video does not autoplay.
-- Before playback and while paused, a central play button mirrors the bottom-left playback control.
-- Click the video to play or pause; double-click the media area for fullscreen.
-- Decodable videos share the image viewer's temporary pan, 10–1000% zoom, quarter-turn rotation, horizontal mirror, and restore controls. These visual transforms reset when media changes and never alter files or metadata.
-- Before playback starts, `Left/Right` browses media.
-- After playback, scrubbing, or frame stepping starts the playback session, `Left/Right` seeks 5 seconds even while paused; `Shift+Left/Right` browses media.
-- `Space` toggles play/pause.
-- `,` and `.` step approximately one frame backward/forward.
-- Volume and mute persist; playback rate and playback position do not.
-
-## Command-Line Maintenance
-
-Every script requires an explicit library root. No script infers a library path from `config.yml`.
-
-```powershell
-npm run init-metadata -- --library "D:\Media\Example Library"
-npm run update-metadata -- --library "D:\Media\Example Library"
-npm run verify-metadata -- --library "D:\Media\Example Library"
-npm run verify-metadata -- --library "D:\Media\Example Library" --probe
-npm run build-thumbnails -- --library "D:\Media\Example Library"
-npm run build-thumbnails -- --library "D:\Media\Example Library" --force
-npm run export-metadata-csv -- --library "D:\Media\Example Library"
-```
-
-`init-metadata` is only for a directory without `.photo_manager`. `update-metadata` incrementally reuses unchanged records and preserves user fields. `verify-metadata` recomputes complete SHA-256 hashes but never repairs data. `--probe` additionally reruns FFprobe. CSV defaults to `.photo_manager/data/photo_metadata.csv` and requires explicit overwrite confirmation in the UI.
-
-Independent scripts acquire the same library lock as the desktop application. Close the library in PhotoManager before running them directly.
-
-## Configuration
-
-PhotoManager keeps live application data out of its installation directory. Application-wide paths on Windows are:
+Application-wide data stay outside the installation directory:
 
 ```text
 %APPDATA%\PhotoManager\
@@ -140,41 +65,30 @@ PhotoManager keeps live application data out of its installation directory. Appl
   crash-dumps\
 ```
 
-The roaming `config.yml` contains application-wide settings only:
+The generated `config.yml` controls shared thumbnail, FFmpeg, backup-retention, and UI defaults. Relative FFmpeg paths are resolved from the installation directory. When updating from a release before v0.25.0, copy any customized root `config.yml` to the roaming path before first launch; per-library data are unaffected.
 
-- Thumbnail dimensions, quality, crop threshold, and concurrency
-- FFmpeg path and timeouts
-- Backup retention count per library
-- Gallery and viewer UI defaults
+PhotoManager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See [PROJECT.md](PROJECT.md) for the exact persisted schemas and safety rules.
 
-The desktop application and maintenance scripts share this file and create it with the complete defaults if it is missing. Invalid YAML is left untouched and causes that run to fall back to defaults. Configuration is read at startup and has no in-app editor. A relative `media.ffmpegDir` remains relative to the application installation, not the AppData configuration directory.
+## Maintenance Commands
 
-`state.json`, logs, Chromium session data, caches, crash dumps, video volume/mute, and recent registry choices are machine-local. Renderer preferences live in Chromium storage below `session-data`.
+Every standalone command requires an explicit library root. Close that library in the desktop application before running a command directly.
 
-Library paths and internal data directories are intentionally not configurable. Fixed filenames and the `.photo_manager` layout are part of the library contract.
-
-### Updating from before v0.25.0
-
-The application does not permanently fall back to the old installation-root `config.yml`. Before first launch, copy any customized values into `%APPDATA%\PhotoManager\app-data\config.yml`; otherwise PhotoManager generates current defaults there. The last-library shortcut and renderer convenience preferences may be selected or configured again. Per-library `.photo_manager` data are unaffected.
-
-## Data Safety
-
-- Library data is loaded strictly; invalid JSON, duplicate paths or globally duplicated IDs, unknown registry references, missing current fields, unknown manifest/registry/customization/location fields, an unsupported manifest schema version, or Rating/Privacy outside integer levels 1-5 rejects the entire library. Historical schema variants require an explicit one-time conversion and are not accepted through permanent compatibility paths.
-- Individual files are written through temporary-file replacement.
-- User data writes create automatic library backups first.
-- Global registry deletion uses a recoverable multi-file transaction because it can change both a registry and media metadata.
-- A library lock prevents concurrent writers.
-- Corrupt images and videos remain editable records with explicit probe-failure state.
+```powershell
+npm run init-metadata -- --library "D:\Media\Example Library"
+npm run update-metadata -- --library "D:\Media\Example Library"
+npm run verify-metadata -- --library "D:\Media\Example Library"
+npm run verify-metadata -- --library "D:\Media\Example Library" --probe
+npm run build-thumbnails -- --library "D:\Media\Example Library"
+npm run build-thumbnails -- --library "D:\Media\Example Library" --force
+npm run export-metadata-csv -- --library "D:\Media\Example Library"
+```
 
 ## Development Checks
 
 ```powershell
 npm test
 npm run build:renderer
-node --check src/main/main.js
-node --check src/main/preload.js
-npm run verify-metadata -- --library "D:\Media\Example Library"
 git diff --check
 ```
 
-The automated suite covers library boundaries, strict current schemas and mutation payloads, Rating/Privacy validation and editing, locks, backups, transaction rollback, FFmpeg integration, metadata normalization, incremental updates, CSV export, thumbnails, and viewer/video keyboard behavior.
+For changed CommonJS files, also run `node --check <file>`. Metadata verification always requires an explicit test-library path.
