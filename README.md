@@ -25,7 +25,7 @@ git lfs pull
 npm install
 ```
 
-The default FFmpeg 8.1.2 Windows x64 tools are stored in `tools/ffmpeg/bin/`. `config.yml` may point `media.ffmpegDir` to another absolute or project-relative directory containing fixed filenames `ffmpeg.exe` and `ffprobe.exe`.
+The default FFmpeg 8.1.2 Windows x64 tools are stored in `tools/ffmpeg/bin/`. The generated `%APPDATA%\PhotoManager\app-data\config.yml` may point `media.ffmpegDir` to another absolute or installation-relative directory containing fixed filenames `ffmpeg.exe` and `ffprobe.exe`.
 
 ## Start
 
@@ -126,16 +126,36 @@ Independent scripts acquire the same library lock as the desktop application. Cl
 
 ## Configuration
 
-`config.yml` contains application-wide settings only:
+PhotoManager keeps live application data out of its installation directory. Application-wide paths on Windows are:
+
+```text
+%APPDATA%\PhotoManager\
+  app-data\config.yml
+  electron\
+
+%LOCALAPPDATA%\PhotoManager\
+  app-data\state.json
+  logs\
+  session-data\
+  crash-dumps\
+```
+
+The roaming `config.yml` contains application-wide settings only:
 
 - Thumbnail dimensions, quality, crop threshold, and concurrency
 - FFmpeg path and timeouts
 - Backup retention count per library
 - Gallery and viewer UI defaults
 
-The desktop application and maintenance scripts create `config.yml` with their required defaults if it is missing. Invalid YAML is left untouched and causes that run to fall back to defaults. Configuration is read at startup and has no in-app editor.
+The desktop application and maintenance scripts share this file and create it with the complete defaults if it is missing. Invalid YAML is left untouched and causes that run to fall back to defaults. Configuration is read at startup and has no in-app editor. A relative `media.ffmpegDir` remains relative to the application installation, not the AppData configuration directory.
+
+`state.json`, logs, Chromium session data, caches, crash dumps, video volume/mute, and recent registry choices are machine-local. Renderer preferences live in Chromium storage below `session-data`.
 
 Library paths and internal data directories are intentionally not configurable. Fixed filenames and the `.photo_manager` layout are part of the library contract.
+
+### Updating from before v0.25.0
+
+The application does not permanently fall back to the old installation-root `config.yml`. Before first launch, copy any customized values into `%APPDATA%\PhotoManager\app-data\config.yml`; otherwise PhotoManager generates current defaults there. The last-library shortcut and renderer convenience preferences may be selected or configured again. Per-library `.photo_manager` data are unaffected.
 
 ## Data Safety
 

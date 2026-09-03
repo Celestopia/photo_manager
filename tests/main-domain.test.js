@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { loadConfig } = require("../src/main/application-config.js");
+const { DEFAULT_CONFIG, loadConfig } = require("../scripts/application-config.js");
 const { createApplicationRuntime } = require("../src/main/application-runtime.js");
 const { createGalleryItemEnricher } = require("../src/main/gallery-item-enricher.js");
 const { createGalleryQueryService } = require("../src/main/gallery-query.js");
@@ -27,41 +27,27 @@ const IDS = {
   unknownTag: "00000000-0000-4000-8000-000000000006",
 };
 
-const CONFIG_DEFAULTS = {
-  thumbnail: { size: 320 },
-  media: { ffmpegDir: "tools" },
-  backup: { retentionCount: 10 },
-  ui: {
-    gallery: { minCardWidth: 190 },
-    viewer: {
-      panelRatio: { left: 1, center: 3, right: 1 },
-      panels: { showLeft: true, showRight: true },
-      zoom: { minPercent: 10, maxPercent: 1000, stepPercent: 10 },
-    },
-  },
-};
-
 test("application config creation and fallback preserve the on-disk contract", (t) => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "photo-manager-config-"));
   t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
   const configPath = path.join(tempDir, "config.yml");
-  const normalizeMedia = (media) => ({ ...CONFIG_DEFAULTS.media, ...(media || {}) });
-
-  const created = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
-  assert.deepEqual(created, { config: CONFIG_DEFAULTS, warning: "" });
+  const created = loadConfig(configPath);
+  assert.deepEqual(created, { config: DEFAULT_CONFIG, warning: "" });
   assert.equal(fs.existsSync(configPath), true);
 
   fs.writeFileSync(configPath, "thumbnail:\n  size: 480\n  obsolete: true\nui:\n  language: en-US\n  gallery:\n    minCardWidth: 240\n    pageSize: 100\n", "utf8");
-  const normalized = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
-  assert.deepEqual(normalized.config.thumbnail, { size: 480 });
+  const normalized = loadConfig(configPath);
+  assert.equal(normalized.config.thumbnail.size, 480);
+  assert.equal(normalized.config.thumbnail.webpQuality, DEFAULT_CONFIG.thumbnail.webpQuality);
+  assert.equal(Object.hasOwn(normalized.config.thumbnail, "obsolete"), false);
   assert.equal(normalized.config.ui.gallery.minCardWidth, 240);
   assert.equal(Object.hasOwn(normalized.config.ui, "language"), false);
   assert.equal(Object.hasOwn(normalized.config.ui.gallery, "pageSize"), false);
 
   const invalidSource = "ui: [\n";
   fs.writeFileSync(configPath, invalidSource, "utf8");
-  const fallback = loadConfig(configPath, CONFIG_DEFAULTS, normalizeMedia);
-  assert.deepEqual(fallback.config, CONFIG_DEFAULTS);
+  const fallback = loadConfig(configPath);
+  assert.deepEqual(fallback.config, DEFAULT_CONFIG);
   assert.match(fallback.warning, /^Invalid config\.yml, fallback to default\./);
   assert.equal(fs.readFileSync(configPath, "utf8"), invalidSource);
 });

@@ -1,6 +1,7 @@
 {
   "name": "photo-manager",
-  "version": "0.1.0",
+  "productName": "PhotoManager",
+  "version": "0.25.0",
   "description": "Local image and video manager built with Electron and Vue",
   "main": "src/main/main.js",
   "scripts": {
@@ -11,7 +12,7 @@
     "update-metadata": "node scripts/update-metadata.js",
     "verify-metadata": "node scripts/verify-metadata.js",
     "export-metadata-csv": "node scripts/export-metadata-csv.js",
-    "test": "node --test tests"
+    "test": "node --test \"tests/*.test.js\" \"tests/*.test.mjs\""
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",

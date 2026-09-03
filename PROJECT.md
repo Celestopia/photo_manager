@@ -41,23 +41,40 @@ PhotoManager 是一个 Windows 本地桌面媒体管理器，用于管理用户�
 
 ### 3.1 应用级配置
 
-项目根目录的 `config.yml` 只保存所有图库共享的应用参数：
+`%APPDATA%\PhotoManager\app-data\config.yml` 只保存所有图库共享、适合随用户配置漫游的应用参数：
 
 - `thumbnail`：缩略图尺寸、WebP 质量、极端长宽比阈值、图片并发数。
 - `media`：FFmpeg 目录、探测超时、抽帧超时、视频缩略图并发数。
 - `backup.retentionCount`：每个图库最多保留的备份快照目录数，最小为 1。
 - `ui`：画廊卡片宽度、查看器面板比例、默认可见性、缩放范围。
 
-`config.yml` 不保存图库路径、数据目录、缩略图目录或日志目录。不同图库不能覆盖缩略图参数和 UI 参数。
+`config.yml` 不保存图库路径、数据目录、缩略图目录或日志目录。不同图库不能覆盖缩略图参数和 UI 参数。安装目录只包含程序、依赖和 FFmpeg 等程序资源，不保存活动配置或运行状态。
 
-应用和独立维护脚本启动时都会读取项目根目录的 `config.yml`。文件不存在时，当前入口会写入自身所需的默认配置后继续运行；文件存在但 YAML 无效时，不覆盖原文件，而是仅在本次运行中回退到默认值。配置目前没有运行时编辑界面，渲染进程只能读取规范化后的配置。
+应用和独立维护脚本启动时通过同一个配置模块读取该文件。文件不存在时，入口会创建父目录并写入完整默认配置后继续运行；文件存在但 YAML 无效时，不覆盖原文件，而是仅在本次运行中回退到默认值。配置目前没有运行时编辑界面，渲染进程只能读取规范化后的配置。
+
+`media.ffmpegDir` 为绝对路径时直接使用；为相对路径时始终相对于应用安装根目录解析，不能因 `config.yml` 移入 AppData 而改为相对于配置文件目录。开发环境中的应用根目录是项目根目录；未来打包入口若改变程序资源位置，应显式向媒体工具解析器传入打包资源根目录。
 
 ### 3.2 应用私有状态
 
-Electron `userData` 中只允许保存无法归属于某个图库的少量应用状态：
+全局应用数据按“可漫游配置”和“机器相关状态”拆分：
 
-- `state.json`：最后一次成功打开的图库路径。
-- 尚未打开图库时产生的启动诊断日志。
+```text
+%APPDATA%\PhotoManager\
+  app-data\
+    config.yml
+  electron\                 # Electron userData 和少量内部偏好
+
+%LOCALAPPDATA%\PhotoManager\
+  app-data\
+    state.json
+  logs\                     # 尚未打开图库时的启动诊断日志
+  session-data\             # localStorage、Chromium 缓存和会话状态
+  crash-dumps\
+```
+
+`state.json` 只保存最后一次成功打开的图库路径。该路径属于当前机器，不进入 roaming 目录。视频音量、静音和按图库 UUID 隔离的最近标签、人物、地点仍使用 renderer `localStorage`，其物理存储随 Electron `sessionData` 固定在本机 Local AppData。缓存和崩溃转储也不能污染 roaming 目录。
+
+主进程必须在 Electron `ready` 之前创建这些目录并显式设置 `userData`、`sessionData`、`crashDumps` 和日志路径。`scripts/application-paths.js` 是 Electron 和独立 CLI 共用的唯一全局路径规则；其它模块不得重新拼接 AppData 路径。应用不长期读取旧安装目录中的 `config.yml`，升级到 v0.25.0 时由用户一次性复制自定义配置；低价值的最近使用和播放偏好允许重置。
 
 应用不维护最近图库列表。启动后始终停留在图库入口页；若保存了上次成功使用的图库路径，则从该图库的 `library.yml` 读取并显示图库名称，同时显示完整路径。用户点击“进入图库”后才开始加载，也可以重新选择其他图库。
 
@@ -145,7 +162,7 @@ updatedAt: '2026-07-12T17:13:02.959Z'
 ### 6.1 应用启动
 
 1. 获取 Electron 单实例锁；第二个进程不会创建第二个窗口，而会激活已有窗口。
-2. 读取并规范化 `config.yml`。
+2. 在 Electron ready 前设置 roaming/local 全局目录，并读取、规范化 roaming `config.yml`。
 3. 检查 `ffmpeg.exe` 和 `ffprobe.exe`。
 4. 创建窗口并显示图库入口页。
 5. 若保存了上次成功图库路径，从其 `library.yml` 读取名称，并在入口页预填真实图库名称和完整路径，不自动加载。
@@ -779,6 +796,8 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 
 ### 21.1 `scripts/`
 
+- `application-paths.js`：解析 roaming/local 全局目录，创建目录并在 ready 前配置 Electron 存储路径。
+- `application-config.js`：集中定义完整默认配置，创建、读取并按当前字段白名单规范化 roaming `config.yml`；桌面端与 CLI 共用。
 - `library-core.js`：图库路径、manifest、严格 JSONL、原子写入、嵌套检测。
 - `library-access.js`：现有图库验证、CLI/worker 授权。
 - `library-lock.js`：锁创建、活性检查、释放和强制解锁边界。
@@ -802,7 +821,7 @@ npm run export-metadata-csv -- --library "D:\Media\My Library"
 
 - `main.js`：主进程组合根。创建运行时状态，装配各领域服务，协调图库生命周期、索引加载和维护 worker；不再直接承载成组的 IPC CRUD 或窗口构造细节。
 - `application-runtime.js`：创建单一主进程运行时对象，集中保存活动窗口、活动图库、五类内存索引、维护状态和 worker。每次调用必须返回彼此隔离的新状态，模块不得另建同语义的全局单例。
-- `application-config.js`：创建、读取并按当前字段白名单规范化应用级 `config.yml`。该模块不读取图库数据，也不提供运行时配置写入。
+- `application-state.js`：读取和原子写入 Local AppData 中的 `state.json`，只接受最后图库路径字段。
 - `simple-registry-catalog.js`：标签、人物和相册共享的严格 ID 注册表加载、使用量统计、排序、写回和引用校验逻辑。
 - `simple-registry-service.js`：标签、人物和相册共享的创建、修改说明、全局删除、备份及内存回滚流程；字段名和删除媒体引用的方式由显式配置传入。
 - `location-domain.js`：不执行 I/O 的地点规范化、父子图、后代集合、路径和循环校验逻辑。

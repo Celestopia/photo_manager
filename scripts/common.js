@@ -10,21 +10,17 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const yaml = require("js-yaml");
 const exifr = require("exifr");
 const sharp = require("sharp");
+const { DEFAULT_CONFIG, loadConfig } = require("./application-config.js");
+const { resolveApplicationPaths } = require("./application-paths.js");
 const {
   DATA_FILE_NAMES,
   MANAGER_DIR_NAME,
   readJsonlStrict,
   writeJsonlAtomic,
 } = require("./library-core");
-const {
-  DEFAULT_MEDIA_CONFIG,
-  normalizeMediaConfig,
-  probeVideoFile,
-  failedVideoMetadata,
-} = require("./media-tools");
+const { probeVideoFile, failedVideoMetadata } = require("./media-tools");
 const {
   assertUuidV4,
   createEntityId,
@@ -37,42 +33,14 @@ const {
 } = require("./media-time");
 
 const APP_ROOT = path.resolve(__dirname, "..");
-const DEFAULT_CONFIG = {
-  thumbnail: {
-    size: 320,
-    webpQuality: 80,
-    extremeAspectRatio: 4,
-    maxConcurrency: 4,
-  },
-  media: { ...DEFAULT_MEDIA_CONFIG },
-  backup: { retentionCount: 10 },
-};
 
-// Load config.yml and guarantee required defaults.
 /**
- * Load config.yml and merge with defaults required by metadata scripts.
- * If config is missing or invalid, defaults are returned to keep scripts runnable.
+ * Load the shared roaming application config used by Electron and standalone
+ * maintenance scripts. Relative program-resource paths remain APP_ROOT-relative.
  */
-function resolveConfig() {
-  const configPath = path.join(APP_ROOT, "config.yml");
-  if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, yaml.dump(DEFAULT_CONFIG), "utf8");
-    return { ...DEFAULT_CONFIG };
-  }
-
-  try {
-    const parsed = yaml.load(fs.readFileSync(configPath, "utf8"));
-    return {
-      ...DEFAULT_CONFIG,
-      thumbnail: { ...DEFAULT_CONFIG.thumbnail, ...(parsed?.thumbnail || {}) },
-      media: normalizeMediaConfig(parsed?.media),
-      backup: {
-        retentionCount: Math.max(1, Math.trunc(Number(parsed?.backup?.retentionCount) || DEFAULT_CONFIG.backup.retentionCount)),
-      },
-    };
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
+function resolveConfig(options = {}) {
+  const configPath = options.configPath || resolveApplicationPaths(options.environment).configFile;
+  return loadConfig(configPath).config;
 }
 
 // DFS traversal over one selected library directory tree.

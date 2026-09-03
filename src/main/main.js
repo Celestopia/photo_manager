@@ -12,7 +12,15 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { fork } = require("node:child_process");
-const { loadConfig } = require("./application-config.js");
+const { loadConfig } = require(path.join(__dirname, "..", "..", "scripts", "application-config.js"));
+const {
+  resolveApplicationPaths,
+  configureElectronStoragePaths,
+} = require(path.join(__dirname, "..", "..", "scripts", "application-paths.js"));
+const {
+  loadApplicationState,
+  saveApplicationState,
+} = require("./application-state.js");
 const {
   createLocationDomain,
   normalizeLocationField,
@@ -36,8 +44,6 @@ const {
   thumbnailAbsolutePath,
 } = require(path.join(__dirname, "..", "..", "scripts", "thumbnail-cache.js"));
 const {
-  DEFAULT_MEDIA_CONFIG,
-  normalizeMediaConfig,
   validateMediaTools,
   sanitizeMediaError,
 } = require(path.join(__dirname, "..", "..", "scripts", "media-tools.js"));
@@ -70,39 +76,9 @@ const {
 } = require(path.join(__dirname, "..", "..", "scripts", "common.js"));
 
 const APP_ROOT = path.resolve(__dirname, "..", "..");
-const CONFIG_PATH = path.join(APP_ROOT, "config.yml");
+const APPLICATION_PATHS = resolveApplicationPaths();
+configureElectronStoragePaths(app, APPLICATION_PATHS);
 const RENDERER_INDEX_PATH = path.join(APP_ROOT, "dist", "renderer", "index.html");
-const DEFAULT_CONFIG = {
-  thumbnail: {
-    size: 320,
-    webpQuality: 80,
-    extremeAspectRatio: 4,
-    maxConcurrency: 4,
-  },
-  media: { ...DEFAULT_MEDIA_CONFIG },
-  backup: { retentionCount: 10 },
-  ui: {
-    gallery: {
-      minCardWidth: 190,
-    },
-    viewer: {
-      panelRatio: {
-        left: 1,
-        center: 3,
-        right: 1,
-      },
-      panels: {
-        showLeft: true,
-        showRight: true,
-      },
-      zoom: {
-        minPercent: 10,
-        maxPercent: 1000,
-        stepPercent: 10,
-      },
-    },
-  },
-};
 
 const state = createApplicationRuntime();
 let config = null;
@@ -147,7 +123,7 @@ function resolveDataFile(fileName) {
  */
 function appendLog(message) {
   try {
-    const logDir = state.activeLibrary?.paths?.logDir || path.join(app.getPath("userData"), "logs");
+    const logDir = state.activeLibrary?.paths?.logDir || APPLICATION_PATHS.logsDir;
     fs.mkdirSync(logDir, { recursive: true });
     const dayKey = new Date().toISOString().slice(0, 10);
     fs.appendFileSync(path.join(logDir, `${dayKey}.log`), `[${new Date().toISOString()}] ${message}\n`);
@@ -175,17 +151,8 @@ function appendOperationLog(operation, root, message) {
   }
 }
 
-function appStateFile() {
-  return path.join(app.getPath("userData"), "state.json");
-}
-
 async function loadAppState() {
-  try {
-    const parsed = JSON.parse(await fsp.readFile(appStateFile(), "utf8"));
-    appState = { lastLibraryPath: typeof parsed?.lastLibraryPath === "string" ? parsed.lastLibraryPath : "" };
-  } catch {
-    appState = { lastLibraryPath: "" };
-  }
+  appState = await loadApplicationState(APPLICATION_PATHS.stateFile);
   lastLibraryName = "";
   if (!appState.lastLibraryPath) return;
   try {
@@ -197,10 +164,7 @@ async function loadAppState() {
 }
 
 async function saveAppState() {
-  await fsp.mkdir(path.dirname(appStateFile()), { recursive: true });
-  const temp = `${appStateFile()}.tmp`;
-  await fsp.writeFile(temp, `${JSON.stringify(appState, null, 2)}\n`, "utf8");
-  await fsp.rename(temp, appStateFile());
+  await saveApplicationState(APPLICATION_PATHS.stateFile, appState);
 }
 
 function requireOpenLibrary({ writable = false } = {}) {
@@ -912,7 +876,7 @@ function registerIpcHandlers() {
  * 4) load the renderer entry; the user may then request the prefilled last library to open
  */
 async function bootstrap() {
-  const configResult = loadConfig(CONFIG_PATH, DEFAULT_CONFIG, normalizeMediaConfig);
+  const configResult = loadConfig(APPLICATION_PATHS.configFile);
   config = configResult.config;
   if (configResult.warning) appendLog(configResult.warning);
   await loadAppState();
