@@ -91,7 +91,7 @@ function createGalleryQueryService({
   function groupByDate(list) {
     const grouped = new Map();
     for (const item of list) {
-      const date = item?.__groupDate || "未知日期";
+      const date = item?.__groupDate || "Unknown date";
       if (!grouped.has(date)) grouped.set(date, []);
       grouped.get(date).push(item);
     }

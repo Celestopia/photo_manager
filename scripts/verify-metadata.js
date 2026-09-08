@@ -118,7 +118,7 @@ async function run(options = {}) {
     counts.extra += 1;
     logger.warn(`[EXTRA] ${filePath} exists in metadata but not in workspace.`);
   }
-  emit({ phase: "complete", processed: counts.checked, total: files.length, message: "元数据检查完成" });
+  emit({ phase: "complete", processed: counts.checked, total: files.length, message: "Metadata verification complete" });
   return { ...counts, warnings, errors };
   } finally {
     await authorization.release();

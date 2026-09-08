@@ -33,7 +33,7 @@ if (!API) {
   const root = document.getElementById("app");
   if (root) {
     root.innerHTML =
-      "<div style=\"padding:24px;font-family:Microsoft YaHei, sans-serif;color:#173756;\">初始化失败：未检测到 photoManagerApi。请通过 Electron 启动应用。</div>";
+      "<div style=\"padding:24px;font-family:Segoe UI, sans-serif;color:#173756;\">Initialization failed: photoManagerApi is unavailable. Start the application through Electron.</div>";
   }
   throw new Error("photoManagerApi is not available");
 }

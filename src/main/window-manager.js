@@ -60,9 +60,9 @@ async function createMainWindow(options) {
       event.preventDefault();
       dialog.showMessageBoxSync(window, {
         type: "warning",
-        title: "维护任务仍在运行",
-        message: "当前图库维护任务不能取消。请等待任务完成后再关闭应用。",
-        buttons: ["确定"],
+        title: "Maintenance Is Still Running",
+        message: "The current library maintenance task cannot be cancelled. Wait for it to finish before closing the application.",
+        buttons: ["OK"],
       });
       return;
     }
@@ -71,9 +71,9 @@ async function createMainWindow(options) {
     event.preventDefault();
     const choice = dialog.showMessageBoxSync(window, {
       type: "warning",
-      title: "取消图库初始化",
-      message: "图库仍在初始化。关闭应用将取消初始化并删除本轮创建的全部未完成数据。是否继续？",
-      buttons: ["继续初始化", "取消初始化并关闭"],
+      title: "Cancel Library Initialization",
+      message: "The library is still being initialized. Closing the application will cancel initialization and delete all incomplete data created during this attempt. Continue?",
+      buttons: ["Continue Initialization", "Cancel Initialization and Close"],
       defaultId: 0,
       cancelId: 0,
     });

@@ -52,7 +52,7 @@ function createLocationDomain(getRegistryIndex) {
       children.get(location.ParentId).push(location.LocationId);
     }
     for (const ids of children.values()) {
-      ids.sort((a, b) => registry.get(a).Name.localeCompare(registry.get(b).Name, "zh-CN"));
+      ids.sort((a, b) => registry.get(a).Name.localeCompare(registry.get(b).Name, "en-US"));
     }
     return children;
   }

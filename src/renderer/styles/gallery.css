@@ -303,5 +303,5 @@
 .gallery-settings-menu button { width: 100%; display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; border: 0; border-radius: 0; padding: 9px 14px; background: transparent; color: var(--text); text-align: left; font: inherit; cursor: default; }
 .gallery-settings-menu button:hover,
 .gallery-settings-menu button:focus-visible { background: rgba(31, 114, 204, 0.1); outline: 0; }
-.gallery-settings-menu button span { text-align: center; font-family: "Segoe UI Symbol", "Microsoft YaHei", sans-serif; }
+.gallery-settings-menu button span { text-align: center; font-family: "Segoe UI Symbol", "Segoe UI", sans-serif; }
 .gallery-settings-separator { height: 1px; margin: 5px 0; background: var(--line); }

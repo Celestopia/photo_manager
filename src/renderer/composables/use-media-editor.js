@@ -123,13 +123,13 @@ export function useMediaEditor({
         syncUpdatedItems?.([result.item]);
         setDraftFromItem(result.item, true);
         activeEditField.value = saveField;
-        showSaveNotice("已修改", saveField);
+        showSaveNotice("Changes saved", saveField);
         return true;
       }
-      showToastMessage(`修改失败：${result?.error || "未知错误"}`);
+      showToastMessage(`Could not save changes: ${result?.error || "Unknown error"}`);
       return false;
     } catch (error) {
-      showToastMessage(`修改失败：${error?.message || "未知错误"}`);
+      showToastMessage(`Could not save changes: ${error?.message || "Unknown error"}`);
       return false;
     } finally {
       saving.value = false;

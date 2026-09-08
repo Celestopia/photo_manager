@@ -10,8 +10,8 @@
       v-if="modelValue"
       type="button"
       class="album-clear-btn"
-      data-tip="清空父节点"
-      aria-label="清空父节点"
+      data-tip="Clear parent location"
+      aria-label="Clear parent location"
       :disabled="disabled"
       @click.stop="selectParent('')"
     >×</button>
@@ -21,8 +21,8 @@
       :search-text="searchText"
       :selected-location-id="modelValue || ''"
       mode="parent"
-      search-placeholder="搜索父地点"
-      empty-text="没有匹配的父地点"
+      search-placeholder="Search parent locations"
+      empty-text="No matching parent locations"
       @update:search-text="searchText = $event"
       @select-location="selectParent"
       @close="closeDropdown"
@@ -38,7 +38,7 @@ import LocationTreeMenu from "./LocationTreeMenu.vue";
 const props = defineProps({
   modelValue: { type: String, default: "" },
   excludeId: { type: String, default: "" },
-  placeholder: { type: String, default: "选择父地点，可留空" },
+  placeholder: { type: String, default: "Select a parent location (optional)" },
   disabled: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue"]);

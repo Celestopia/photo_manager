@@ -7,7 +7,7 @@
         :class="{ active: selectedLevels.length === 0 }"
         :aria-pressed="selectedLevels.length === 0"
         @click="$emit('select-all')"
-      >全部</button>
+      >All</button>
       <button
         v-for="level in levels"
         :key="level"

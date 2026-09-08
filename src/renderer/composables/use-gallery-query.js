@@ -70,7 +70,7 @@ export function useGalleryQuery({
       return true;
     } catch (error) {
       if (requestId === latestQueryId) {
-        showToastMessage(`加载画廊失败：${error?.message || "未知错误"}`);
+        showToastMessage(`Could not load gallery: ${error?.message || "Unknown error"}`);
       }
       return false;
     } finally {

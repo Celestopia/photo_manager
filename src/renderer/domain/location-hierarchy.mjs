@@ -59,7 +59,7 @@ export function getLocationPathLabel(location) {
 export function compareLocationsByRegionAndTree(a, b) {
   const keyA = [...getLocationRegionParts(a), ...getLocationPathLabel(a).split(" / "), a?.Name || ""].join("\u0001");
   const keyB = [...getLocationRegionParts(b), ...getLocationPathLabel(b).split(" / "), b?.Name || ""].join("\u0001");
-  return keyA.localeCompare(keyB, "zh-CN");
+  return keyA.localeCompare(keyB, "en-US");
 }
 
 export function locationMatchesKeyword(location, keyword) {
@@ -143,7 +143,7 @@ function getReducedLocationPath(location, groupSpecs) {
 }
 
 function compareLocationRowsByPath(a, b) {
-  return (a.Label || "").localeCompare(b.Label || "", "zh-CN");
+  return (a.Label || "").localeCompare(b.Label || "", "en-US");
 }
 
 function buildLocationTreeRows(
@@ -222,7 +222,7 @@ export function buildLocationHierarchyRows(locations) {
   const root = { Key: "root", Groups: new Map(), Locations: [], Depth: -1 };
   for (const location of locations) {
     const specs = getLocationGroupSpecs(location);
-    if (!specs.length) specs.push({ level: "unassigned", label: "未设置行政区", order: -1, depth: 0 });
+    if (!specs.length) specs.push({ level: "unassigned", label: "Unassigned administrative region", order: -1, depth: 0 });
     let parent = root;
     const groupPath = [];
     for (const spec of specs) {
@@ -270,7 +270,7 @@ export function buildLocationHierarchyRows(locations) {
       contextParts,
       locationExpansionPath,
     ));
-    const groups = [...node.Groups.values()].sort((a, b) => (a.Order - b.Order) || a.Label.localeCompare(b.Label, "zh-CN"));
+    const groups = [...node.Groups.values()].sort((a, b) => (a.Order - b.Order) || a.Label.localeCompare(b.Label, "en-US"));
     for (const group of groups) {
       const groupContextParts = [...contextParts, group.Label].filter(Boolean);
       rows.push({

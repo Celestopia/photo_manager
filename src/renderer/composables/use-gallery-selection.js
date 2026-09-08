@@ -116,7 +116,7 @@ export function useGallerySelection({
     if (applyingBatchEdit.value) return;
     const mediaIds = [...gallerySelection.value];
     if (!mediaIds.length) {
-      showToastMessage("请先选择媒体");
+      showToastMessage("Select at least one media item");
       return;
     }
 
@@ -130,7 +130,7 @@ export function useGallerySelection({
     const addTagIds = [...new Set(batchEdit.tagIds.filter(Boolean))];
     const addPersonIds = [...new Set(batchEdit.personIds.filter(Boolean))];
     if (!addTagIds.length && !addPersonIds.length && !Object.keys(locationPatch).length && !Object.keys(customizationPatch).length) {
-      showToastMessage("请先填写要批量修改的内容");
+      showToastMessage("Choose at least one change to apply");
       return;
     }
 
@@ -138,7 +138,7 @@ export function useGallerySelection({
     try {
       const result = await api.batchUpdateMetadata({ mediaIds, addTagIds, addPersonIds, locationPatch, customizationPatch });
       if (!result?.ok) {
-        const message = `批量修改失败：${result?.error || "未知错误"}`;
+        const message = `Could not apply batch changes: ${result?.error || "Unknown error"}`;
         showToastMessage(message);
         setBatchStatus("error", message);
         return;
@@ -150,13 +150,13 @@ export function useGallerySelection({
       const missingCount = Number(result.missingCount || 0);
       const requestedCount = Number(result.requestedCount || mediaIds.length || 0);
       const detail = missingCount > 0
-        ? `批量修改完成：成功 ${updatedCount} 个，失败 ${missingCount} 个（请求 ${requestedCount} 个）`
-        : `批量修改完成：成功 ${updatedCount} 个媒体`;
+        ? `Batch update complete: ${updatedCount} succeeded, ${missingCount} failed (${requestedCount} requested)`
+        : `Batch update complete: ${updatedCount} media item(s) updated`;
       showToastMessage(detail);
       clearBatchEditInputs({ keepStatus: true });
       setBatchStatus(missingCount > 0 ? "warning" : "success", detail);
     } catch (error) {
-      const message = `批量修改失败：${error?.message || "未知错误"}`;
+      const message = `Could not apply batch changes: ${error?.message || "Unknown error"}`;
       showToastMessage(message);
       setBatchStatus("error", message);
     } finally {

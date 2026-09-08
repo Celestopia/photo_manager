@@ -1,15 +1,15 @@
 <template>
 <header class="topbar">
-  <div class="left-tools"><button class="btn icon-btn" data-tip="还原画廊状态" aria-label="还原画廊状态" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
+  <div class="left-tools"><button class="btn icon-btn" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
   <div class="search-panel">
-    <select v-model="query.search.field" class="input"><option value="title">标题</option><option value="filename">文件名</option><option value="description">描述</option></select>
-    <input class="input grow" v-model="query.search.value" placeholder="输入搜索内容" @keydown.enter="applySearch" />
-    <button class="btn btn-primary" @click="applySearch">搜索</button>
+    <select v-model="query.search.field" class="input"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option></select>
+    <input class="input grow" v-model="query.search.value" placeholder="Enter search text" @keydown.enter="applySearch" />
+    <button class="btn btn-primary" @click="applySearch">Search</button>
   </div>
   <div class="window-controls">
-    <button class="btn ghost icon-btn" data-tip="最小化" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="最小化" /></button>
+    <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>
     <button class="btn ghost icon-btn" :data-tip="windowToggleTip" @click="toggleWindowMaximizeRestore"><img class="icon" :src="windowToggleIcon" :alt="windowToggleTip" /></button>
-    <button class="btn ghost danger icon-btn" data-tip="关闭" @click="doWindowAction(WINDOW_ACTIONS.close)"><img class="icon" :src="ICONS.windowClose" alt="关闭" /></button>
+    <button class="btn ghost danger icon-btn" data-tip="Close" @click="doWindowAction(WINDOW_ACTIONS.close)"><img class="icon" :src="ICONS.windowClose" alt="Close" /></button>
   </div>
 </header>
 <main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode }">
@@ -19,8 +19,8 @@
         <button
           type="button"
           class="gallery-controls-toggle"
-          :data-tip="galleryControlsExpanded ? '收起筛选与排序' : '展开筛选与排序'"
-          :aria-label="galleryControlsExpanded ? '收起筛选与排序' : '展开筛选与排序'"
+          :data-tip="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
+          :aria-label="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
           :aria-expanded="galleryControlsExpanded"
           @click="toggleGalleryControls"
         >
@@ -29,32 +29,32 @@
         </button>
         <section v-if="galleryControlsExpanded" class="gallery-controls-panel">
           <div class="gallery-controls-primary">
-            <div class="toolbar-group"><label>相册</label><RegistryFilterPicker kind="album" label="相册" /></div>
-            <div class="toolbar-group"><label>标签</label><RegistryFilterPicker kind="tag" label="标签" /></div>
-            <div class="toolbar-group"><label>人物</label><RegistryFilterPicker kind="person" label="人物" /></div>
-            <div class="toolbar-group location-filter-group"><label>地点</label><LocationFilterPicker /></div>
-            <div class="toolbar-group selection-tools" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">选择模式</button></div>
-            <div class="toolbar-group selection-tools" v-else><button class="btn" @click="selectAllGalleryPhotos">全选</button><button class="btn" @click="clearGallerySelection">全不选</button><button class="btn" @click="exitSelectionMode">退出选择</button><span class="batch-count">已选 {{ selectedGalleryCount }}</span></div>
-            <div class="toolbar-group sort-tools"><label>排序</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">拍摄时间</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">逆序</option><option value="asc">顺序</option></select></div>
+            <div class="toolbar-group"><label>Album</label><RegistryFilterPicker kind="album" label="Album" /></div>
+            <div class="toolbar-group"><label>Tags</label><RegistryFilterPicker kind="tag" label="Tags" /></div>
+            <div class="toolbar-group"><label>People</label><RegistryFilterPicker kind="person" label="People" /></div>
+            <div class="toolbar-group location-filter-group"><label>Location</label><LocationFilterPicker /></div>
+            <div class="toolbar-group selection-tools" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">Select</button></div>
+            <div class="toolbar-group selection-tools" v-else><button class="btn" @click="selectAllGalleryPhotos">Select all</button><button class="btn" @click="clearGallerySelection">Clear selection</button><button class="btn" @click="exitSelectionMode">Exit selection</button><span class="batch-count">{{ selectedGalleryCount }} selected</span></div>
+            <div class="toolbar-group sort-tools"><label>Sort</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">Date taken</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
           </div>
           <div class="gallery-controls-secondary">
             <div class="gallery-media-type-filter">
-              <span class="gallery-filter-label">媒体类型</span>
-              <div class="segmented-filter" role="group" aria-label="媒体类型">
-                <button type="button" :class="{ active: !query.filters.mediaType }" :aria-pressed="!query.filters.mediaType" @click="setMediaTypeFilter('')">全部</button>
-                <button type="button" :class="{ active: query.filters.mediaType === 'image' }" :aria-pressed="query.filters.mediaType === 'image'" @click="setMediaTypeFilter('image')">图片</button>
-                <button type="button" :class="{ active: query.filters.mediaType === 'video' }" :aria-pressed="query.filters.mediaType === 'video'" @click="setMediaTypeFilter('video')">视频</button>
+              <span class="gallery-filter-label">Media type</span>
+              <div class="segmented-filter" role="group" aria-label="Media type">
+                <button type="button" :class="{ active: !query.filters.mediaType }" :aria-pressed="!query.filters.mediaType" @click="setMediaTypeFilter('')">All</button>
+                <button type="button" :class="{ active: query.filters.mediaType === 'image' }" :aria-pressed="query.filters.mediaType === 'image'" @click="setMediaTypeFilter('image')">Images</button>
+                <button type="button" :class="{ active: query.filters.mediaType === 'video' }" :aria-pressed="query.filters.mediaType === 'video'" @click="setMediaTypeFilter('video')">Videos</button>
               </div>
             </div>
             <GalleryLevelFilter
-              label="评级"
+              label="Rating"
               :levels="STAR_LEVELS"
               :selected-levels="query.filters.ratingLevels"
               @select-all="setAllGalleryLevels('ratingLevels')"
               @toggle-level="toggleGalleryLevelFilter('ratingLevels', $event)"
             />
             <GalleryLevelFilter
-              label="隐私等级"
+              label="Privacy"
               :levels="STAR_LEVELS"
               :selected-levels="query.filters.privacyLevels"
               @select-all="setAllGalleryLevels('privacyLevels')"
@@ -65,7 +65,7 @@
       </div>
     </section>
     <section ref="galleryListRef" class="gallery-list">
-      <div class="summary">{{ loading ? '正在加载媒体...' : `共 ${total} 个媒体` }}</div>
+      <div class="summary">{{ loading ? 'Loading media...' : `${total} media items` }}</div>
       <template v-for="group in galleryGroups" :key="group.date">
         <h2 class="date-title">{{ group.date }}</h2>
         <div class="photo-grid">
@@ -86,16 +86,16 @@
                 loading="lazy"
                 @error="onGalleryImageError(item, $event)"
               />
-              <span v-if="isVideo(item)" class="video-play-badge" aria-label="视频">▶</span>
+              <span v-if="isVideo(item)" class="video-play-badge" aria-label="Video">▶</span>
               <span v-if="videoFrameRateBadge(item)" class="video-frame-rate-badge">{{ videoFrameRateBadge(item) }}</span>
               <span v-if="isVideo(item) && item.Video?.DurationSeconds != null" class="video-duration-badge">{{ formatDuration(item.Video.DurationSeconds) }}</span>
-              <span v-if="isVideo(item) && item.Video?.ProbeStatus === 'failed'" class="video-error-badge" :class="{ 'below-frame-rate': videoFrameRateBadge(item) }">解析失败</span>
-              <span v-if="!isVideo(item) && item.Picture?.ProbeStatus === 'failed'" class="video-error-badge">解析失败</span>
+              <span v-if="isVideo(item) && item.Video?.ProbeStatus === 'failed'" class="video-error-badge" :class="{ 'below-frame-rate': videoFrameRateBadge(item) }">Probe failed</span>
+              <span v-if="!isVideo(item) && item.Picture?.ProbeStatus === 'failed'" class="video-error-badge">Probe failed</span>
             </div>
             <div class="card-caption">
               <div class="title" :title="item.Customization?.Title || item.FilePath.split('/').pop()">{{ item.Customization?.Title || item.FilePath.split('/').pop() }}</div>
               <div class="meta">
-                <span class="card-rating-stars" :aria-label="`评级 ${item.Customization?.Rating} 星`">
+                <span class="card-rating-stars" :aria-label="`${item.Customization?.Rating}-star rating`">
                   <span v-for="star in item.Customization?.Rating" :key="star" aria-hidden="true">★</span>
                 </span>
                 <span>{{ mediaDimensions(item) }}</span>
@@ -107,11 +107,11 @@
     </section>
   </section>
   <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': applyingBatchEdit }" :inert="applyingBatchEdit ? '' : undefined" :aria-busy="applyingBatchEdit">
-    <div class="batch-panel-header"><h3>批量编辑元信息</h3><button class="btn" @click="exitSelectionMode">关闭</button></div>
-    <div class="batch-panel-summary">已选中 {{ selectedGalleryCount }} 个媒体</div>
-    <label>批量设置标题</label><input class="input" v-model="batchEdit.title" placeholder="输入后覆盖所选媒体标题" />
-    <label>批量设置评级</label>
-    <div class="rating-stars" role="radiogroup" aria-label="批量设置评级">
+    <div class="batch-panel-header"><h3>Batch Edit Metadata</h3><button class="btn" @click="exitSelectionMode">Close</button></div>
+    <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected</div>
+    <label>Set title</label><input class="input" v-model="batchEdit.title" placeholder="Replace titles of selected media" />
+    <label>Set rating</label>
+    <div class="rating-stars" role="radiogroup" aria-label="Set rating for selected media">
       <button
         v-for="star in STAR_LEVELS"
         :key="'batch_rating_star_' + star"
@@ -119,24 +119,24 @@
         class="star-btn"
         :class="{ active: batchEdit.rating !== null && star <= batchEdit.rating }"
         :aria-checked="batchEdit.rating === star"
-        :aria-label="'评级 ' + star + ' 星'"
+        :aria-label="star + '-star rating'"
         role="radio"
         @click="batchEdit.rating = star"
       >★</button>
     </div>
-    <label>批量设置隐私等级</label>
-    <PrivacyLevelPicker v-model="batchEdit.privacy" aria-label="批量设置隐私等级" />
-    <label>批量设置相册</label>
-    <AlbumPicker target="batch" placeholder="搜索已有相册" />
-    <label>批量添加标签</label>
-    <TagPicker target="batch" placeholder="搜索已有标签" />
-    <label>批量添加人物</label>
-    <PeoplePicker target="batch" placeholder="搜索已有人物" />
-    <label>批量设置地点</label>
-    <LocationPicker target="batch" placeholder="搜索已有地点" />
+    <label>Set privacy level</label>
+    <PrivacyLevelPicker v-model="batchEdit.privacy" aria-label="Set privacy level for selected media" />
+    <label>Set album</label>
+    <AlbumPicker target="batch" placeholder="Search albums" />
+    <label>Add tags</label>
+    <TagPicker target="batch" placeholder="Search tags" />
+    <label>Add people</label>
+    <PeoplePicker target="batch" placeholder="Search people" />
+    <label>Set location</label>
+    <LocationPicker target="batch" placeholder="Search locations" />
     <div class="batch-actions">
-      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges">清空输入</button>
-      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">{{ applyingBatchEdit ? '正在应用' : '应用到所选媒体' }}</button>
+      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges">Clear fields</button>
+      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">{{ applyingBatchEdit ? 'Applying...' : 'Apply to selected media' }}</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>

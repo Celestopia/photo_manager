@@ -13,7 +13,7 @@
       </span>
       <button type="button" class="tag-editor-trigger" @click="openPersonDropdown(target)">
         <span v-if="!selectedPersonIds.length">{{ placeholder }}</span>
-        <span v-else>选择人物</span>
+        <span v-else>Select people</span>
       </button>
         <RegistryOptionsMenu
           v-if="personDropdown[target]"
@@ -25,8 +25,8 @@
           :selected-values="selectedPersonIds"
           id-key="PersonId"
           label-key="Name"
-          all-section-label="全部人物"
-          empty-text="没有匹配的人物"
+          all-section-label="All People"
+          empty-text="No matching people"
           @update:search-text="personSearch[target] = $event"
           @select="addPersonToTarget(target, $event)"
           @close="closePersonDropdown(target)"
@@ -34,21 +34,21 @@
         />
       </div>
       <div class="tag-actions">
-        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建人物" @click.stop="openCreatePersonMenu(target)">+</button>
-        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="人物管理" @click.stop="openPersonManager">
-          <img class="icon" :src="ICONS.settings" alt="人物管理" />
+        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="Create person" @click.stop="openCreatePersonMenu(target)">+</button>
+        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="Manage people" @click.stop="openPersonManager">
+          <img class="icon" :src="ICONS.settings" alt="Manage people" />
         </button>
       </div>
     </div>
     <div class="tag-create-popover" v-if="personCreate.visible && personCreate.target === target" @click.stop>
-      <label>人物姓名</label>
+      <label>Person name</label>
       <input class="input" v-model="personCreate.name" />
-      <label>说明（可留空）</label>
+      <label>Description (optional)</label>
       <textarea class="input tag-create-description" v-model="personCreate.description"></textarea>
       <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreatePersonMenu">取消</button>
-        <button class="btn btn-primary" @click="createPersonAndSelect">创建并添加</button>
+        <button class="btn" @click="closeCreatePersonMenu">Cancel</button>
+        <button class="btn btn-primary" @click="createPersonAndSelect">Create and Add</button>
       </div>
     </div>
   </div>
@@ -61,8 +61,8 @@ import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   target: { type: String, required: true },
-  placeholder: { type: String, default: "搜索人物" },
-  searchPlaceholder: { type: String, default: "搜索人物" },
+  placeholder: { type: String, default: "Search people" },
+  searchPlaceholder: { type: String, default: "Search people" },
 });
 
 const app = inject(PERSON_CONTEXT);

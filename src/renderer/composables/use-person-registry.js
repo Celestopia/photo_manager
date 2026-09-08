@@ -25,7 +25,7 @@ export function usePersonRegistry({
 
   const managerFilteredPeople = computed(() => {
     const keyword = personManager.search.trim();
-    const source = [...personRegistry.value].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN"));
+    const source = [...personRegistry.value].sort((a, b) => a.Name.localeCompare(b.Name, "en-US"));
     return keyword ? source.filter((person) => person.Name.includes(keyword) || person.Description.includes(keyword)) : source;
   });
 
@@ -56,7 +56,7 @@ export function usePersonRegistry({
     const selected = new Set(selectedPersonIdsForTarget(target));
     return personRegistry.value
       .filter((person) => !keyword || person.Name.includes(keyword) || person.Description.includes(keyword))
-      .sort((a, b) => Number(selected.has(b.PersonId)) - Number(selected.has(a.PersonId)) || a.Name.localeCompare(b.Name, "zh-CN"));
+      .sort((a, b) => Number(selected.has(b.PersonId)) - Number(selected.has(a.PersonId)) || a.Name.localeCompare(b.Name, "en-US"));
   }
   function getPersonOptions(target) { return getPersonCandidates(target).slice(0, 50); }
   function getRecentPersonOptions(target) {
@@ -76,7 +76,7 @@ export function usePersonRegistry({
     const definition = getPersonDefinition(personId);
     if (!definition) return;
     const ids = selectedPersonIdsForTarget(target);
-    if (ids.includes(personId)) showToastMessage(`人物“${definition.Name}”已存在，添加失败`);
+    if (ids.includes(personId)) showToastMessage(`Person “${definition.Name}” is already assigned`);
     else {
       ids.push(personId);
       rememberRecentPerson(personId);
@@ -97,12 +97,12 @@ export function usePersonRegistry({
   function closeCreatePersonMenu() { Object.assign(personCreate, { visible: false, name: "", description: "", error: "" }); }
   async function createPersonAndSelect() {
     const name = normalizeText(personCreate.name);
-    if (!name) { personCreate.error = "人物姓名不能为空"; return; }
+    if (!name) { personCreate.error = "Person name is required"; return; }
     const result = await api.createPerson({ name, description: normalizeText(personCreate.description) });
-    if (!result?.ok) { personCreate.error = result?.error || "创建人物失败"; return; }
+    if (!result?.ok) { personCreate.error = result?.error || "Could not create person"; return; }
     applyPersonRegistry(result.people);
     const target = personCreate.target;
-    if (target === "manager") showToastMessage(`已创建人物“${result.person.Name}”`);
+    if (target === "manager") showToastMessage(`Created person “${result.person.Name}”`);
     else addPersonToTarget(target, result.person.PersonId);
     closeCreatePersonMenu();
   }
@@ -134,8 +134,8 @@ export function usePersonRegistry({
   async function savePersonEdit() {
     const personId = personManager.editingId;
     const name = normalizeText(personManager.editName);
-    if (!personId) { personManager.error = "人物不存在"; return; }
-    if (!name) { personManager.error = "人物姓名不能为空"; return; }
+    if (!personId) { personManager.error = "Person not found"; return; }
+    if (!name) { personManager.error = "Person name is required"; return; }
     const previousName = getPersonName(personId);
     personManager.saving = true;
     let result;
@@ -143,14 +143,14 @@ export function usePersonRegistry({
       result = await api.updatePerson({ personId, name, description: normalizeText(personManager.editDescription) });
     } catch {
       personManager.saving = false;
-      personManager.error = "保存人物失败";
+      personManager.error = "Could not save person";
       return;
     }
     personManager.saving = false;
-    if (!result?.ok) { personManager.error = result?.error || "保存人物失败"; return; }
+    if (!result?.ok) { personManager.error = result?.error || "Could not save person"; return; }
     applyPersonRegistry(result.people);
     cancelPersonEdit();
-    showToastMessage(previousName === name ? "人物已更新" : `已将人物“${previousName}”重命名为“${name}”`);
+    showToastMessage(previousName === name ? "Person updated" : `Renamed person “${previousName}” to “${name}”`);
   }
 
   function syncDeletedPersonLocally(personId, patchGallery) {
@@ -161,9 +161,9 @@ export function usePersonRegistry({
   }
   async function deletePersonGlobally(person) {
     const usage = Number(person?.UsageCount || 0);
-    if (!window.confirm(`确定全局删除人物“${person.Name}”？这会从 ${usage} 个媒体中移除。`)) return;
+    if (!window.confirm(`Delete person “${person.Name}” from the entire library? This will remove them from ${usage} media item(s).`)) return;
     const result = await api.deletePersonGlobally({ personId: person.PersonId });
-    if (!result?.ok) { showToastMessage(`删除人物失败：${result?.error || "未知错误"}`); return; }
+    if (!result?.ok) { showToastMessage(`Could not delete person: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.person;
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
       filterBeforeDelete, person.PersonId, unassignedFilter, result.updatedCount,
@@ -171,7 +171,7 @@ export function usePersonRegistry({
     applyPersonRegistry(result.people);
     syncDeletedPersonLocally(person.PersonId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
     if (shouldRefreshGallery) await queryGallery();
-    showToastMessage(`已全局删除人物“${person.Name}”`);
+    showToastMessage(`Deleted person “${person.Name}” from the library`);
   }
 
   function resetPersonState() {

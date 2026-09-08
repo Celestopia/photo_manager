@@ -6,7 +6,7 @@
         class="input location-filter-input registry-trigger"
         :data-tip="selectedLocationId ? getLocationTooltip(selectedLocationId) : selectedRegionLabel"
         @click="openDropdown"
-      ><span>{{ selectedFilterLabel || '全部' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
+      ><span>{{ selectedFilterLabel || 'All' }}</span><img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" /></button>
       <LocationTreeMenu
         v-if="dropdownOpen"
         class="location-filter-dropdown"
@@ -20,7 +20,7 @@
         show-unassigned-option
         show-fixed-options-divider
         mode="filter"
-        search-placeholder="搜索地点"
+        search-placeholder="Search locations"
         @update:search-text="searchText = $event"
         @select-location="selectLocation"
         @select-region="selectRegion"
@@ -63,7 +63,7 @@ const selectedLocationName = computed(() => getLocationName(selectedLocationId.v
 const selectedRegionLabel = computed(() => getLocationRegionFilterLabel(selectedLocationRegion.value));
 const selectedFilterLabel = computed(() => (
   selectedLocationId.value === UNASSIGNED_FILTER
-    ? "未设置地点"
+    ? "Unassigned Location"
     : selectedLocationName.value || selectedRegionLabel.value
 ));
 const filterRows = computed(() => getLocationFilterRows(searchText.value));

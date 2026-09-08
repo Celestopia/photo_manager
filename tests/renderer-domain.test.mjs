@@ -222,7 +222,7 @@ test("gallery image details resolve registry IDs into compact display text", () 
 
   assert.deepEqual(
     rows.map((row) => row.label),
-    ["文件名", "拍摄日期", "修改日期", "文件大小", "分辨率", "地点", "标签"],
+    ["File name", "Date taken", "Date modified", "File size", "Resolution", "Location", "Tags"],
   );
   assert.deepEqual(
     Object.fromEntries(rows.map((row) => [row.key, row.value])),
@@ -249,7 +249,7 @@ test("gallery video details add frame rate and duration before location", () => 
 
   assert.deepEqual(
     rows.map((row) => row.label),
-    ["文件名", "拍摄日期", "修改日期", "文件大小", "分辨率", "帧率", "时长", "地点", "标签"],
+    ["File name", "Date taken", "Date modified", "File size", "Resolution", "Frame rate", "Duration", "Location", "Tags"],
   );
   assert.equal(formatMediaResolution({ FileSystem: { FileType: "video" }, Video: { DisplayWidth: 1920, DisplayHeight: 1080 } }), "1920x1080");
   assert.equal(formatVideoFrameRate(29.97003), "29.97 fps");
@@ -324,7 +324,7 @@ test("location hierarchy emits administrative rows and stable manager context", 
 
   assert.deepEqual(
     rows.filter((row) => row.Type === "group").map((row) => [row.Label, row.Depth]),
-    [["中国", 0], ["湖南", 1], ["长沙", 2], ["江苏", 1], ["南京", 2]],
+    [["中国", 0], ["江苏", 1], ["南京", 2], ["湖南", 1], ["长沙", 2]],
   );
   const cityGroup = rows.find((row) => row.Type === "group" && row.Label === "长沙");
   assert.deepEqual(cityGroup.Region, { level: "city", country: "中国", province: "湖南", city: "长沙" });

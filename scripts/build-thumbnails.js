@@ -61,7 +61,7 @@ async function run(options = {}) {
     if (stats.failed === 0) {
       await writeTextAtomic(paths.thumbnailManifestFile, `${JSON.stringify(expectedManifest, null, 2)}\n`);
     }
-    emit({ phase: "complete", processed: stats.total, total: stats.total, message: "缩略图生成完成" });
+    emit({ phase: "complete", processed: stats.total, total: stats.total, message: "Thumbnail generation complete" });
     return { ...stats, force, warnings, errors };
   } finally {
     await authorization.release();

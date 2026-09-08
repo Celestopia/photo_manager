@@ -110,9 +110,9 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     const status = item?.Video?.ProbeStatus;
     videoPlaybackMode.value = status === "failed" ? "unsupported" : status === "audio-only" ? "audio" : "video";
     videoPlaybackMessage.value = status === "failed"
-      ? (item?.Video?.ProbeError || "视频无法解析")
+      ? (item?.Video?.ProbeError || "Could not analyze video")
       : status === "audio-only"
-        ? "此媒体不包含视频画面，当前仅播放音频"
+        ? "This media has no video track. Playing audio only."
         : "";
     resetRuntimePlaybackState();
   }
@@ -161,7 +161,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     if (!element.videoWidth && selectedItem.value?.Video?.HasAudio) {
       element.pause();
       videoPlaybackMode.value = "audio";
-      videoPlaybackMessage.value = "视频画面无法解码，当前仅播放音频";
+      videoPlaybackMessage.value = "The video track could not be decoded. Playing audio only.";
       reportPlaybackFallback("audio", videoPlaybackMessage.value);
     }
   }
@@ -196,10 +196,10 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     videoReady.value = false;
     if (selectedItem.value?.Video?.HasAudio) {
       videoPlaybackMode.value = "audio";
-      videoPlaybackMessage.value = "视频画面无法解码，当前仅播放音频";
+      videoPlaybackMessage.value = "The video track could not be decoded. Playing audio only.";
     } else {
       videoPlaybackMode.value = "unsupported";
-      videoPlaybackMessage.value = "当前播放器无法解码此视频";
+      videoPlaybackMessage.value = "This player cannot decode the video";
     }
     reportPlaybackFallback(videoPlaybackMode.value, videoPlaybackMessage.value);
   }
@@ -212,7 +212,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   function onAudioPlaybackError(event) {
     if (!currentPlaybackElement(event, audioElementRef)) return;
     videoPlaybackMode.value = "unsupported";
-    videoPlaybackMessage.value = "当前播放器无法解码此媒体";
+    videoPlaybackMessage.value = "This player cannot decode the media";
     videoPlaying.value = false;
     videoWaiting.value = false;
     reportPlaybackFallback("unsupported", videoPlaybackMessage.value);
@@ -275,7 +275,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
         await element.play();
       } catch (error) {
         videoWaiting.value = false;
-        showToastMessage(`播放失败：${error?.message || "未知错误"}`);
+        showToastMessage(`Playback failed: ${error?.message || "Unknown error"}`);
       }
     } else {
       element.pause();
@@ -327,7 +327,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
         await element.play();
       } catch (error) {
         videoWaiting.value = false;
-        showToastMessage(`播放失败：${error?.message || "未知错误"}`);
+        showToastMessage(`Playback failed: ${error?.message || "Unknown error"}`);
       }
     }
   }
@@ -381,14 +381,14 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   async function openCurrentWithSystem() {
     if (!selectedItem.value) return;
     const result = await api.openWithSystem(selectedItem.value.MediaId);
-    if (!result?.ok) showToastMessage(`打开失败：${result?.error || "未知错误"}`);
+    if (!result?.ok) showToastMessage(`Could not open media: ${result?.error || "Unknown error"}`);
     onExternalAction?.();
   }
 
   async function showCurrentInFolder() {
     if (!selectedItem.value) return;
     const result = await api.showInFolder(selectedItem.value.MediaId);
-    if (!result?.ok) showToastMessage(`定位失败：${result?.error || "未知错误"}`);
+    if (!result?.ok) showToastMessage(`Could not show media in File Explorer: ${result?.error || "Unknown error"}`);
     onExternalAction?.();
   }
 

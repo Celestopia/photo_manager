@@ -24,7 +24,7 @@ export function useAlbumRegistry({
 
   const managerFilteredAlbums = computed(() => {
     const keyword = albumManager.search.trim();
-    const source = [...albumRegistry.value].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN"));
+    const source = [...albumRegistry.value].sort((a, b) => a.Title.localeCompare(b.Title, "en-US"));
     return keyword ? source.filter((album) => album.Title.includes(keyword) || album.Description.includes(keyword)) : source;
   });
 
@@ -55,7 +55,7 @@ export function useAlbumRegistry({
     const selectedId = selectedAlbumIdForTarget(target);
     return albumRegistry.value
       .filter((album) => !keyword || album.Title.includes(keyword) || album.Description.includes(keyword))
-      .sort((a, b) => Number(b.AlbumId === selectedId) - Number(a.AlbumId === selectedId) || a.Title.localeCompare(b.Title, "zh-CN"))
+      .sort((a, b) => Number(b.AlbumId === selectedId) - Number(a.AlbumId === selectedId) || a.Title.localeCompare(b.Title, "en-US"))
       .slice(0, 50);
   }
 
@@ -93,12 +93,12 @@ export function useAlbumRegistry({
   async function createAlbumAndSelect() {
     const title = normalizeText(albumCreate.title);
     const description = normalizeText(albumCreate.description);
-    if (!title || !description) { albumCreate.error = "相册名称和说明不能为空"; return; }
+    if (!title || !description) { albumCreate.error = "Album name and description are required"; return; }
     const result = await api.createAlbum({ title, description });
-    if (!result?.ok) { albumCreate.error = result?.error || "创建相册失败"; return; }
+    if (!result?.ok) { albumCreate.error = result?.error || "Could not create album"; return; }
     applyAlbumRegistry(result.albums);
     const target = albumCreate.target;
-    if (target === "manager") showToastMessage(`已创建相册“${result.album.Title}”`);
+    if (target === "manager") showToastMessage(`Created album “${result.album.Title}”`);
     else setAlbumForTarget(target, result.album.AlbumId);
     closeCreateAlbumMenu();
   }
@@ -131,8 +131,8 @@ export function useAlbumRegistry({
     const albumId = albumManager.editingId;
     const title = normalizeText(albumManager.editTitle);
     const description = normalizeText(albumManager.editDescription);
-    if (!albumId) { albumManager.error = "相册不存在"; return; }
-    if (!title || !description) { albumManager.error = "相册名称和说明不能为空"; return; }
+    if (!albumId) { albumManager.error = "Album not found"; return; }
+    if (!title || !description) { albumManager.error = "Album name and description are required"; return; }
     const previousTitle = getAlbumTitle(albumId);
     albumManager.saving = true;
     let result;
@@ -140,14 +140,14 @@ export function useAlbumRegistry({
       result = await api.updateAlbum({ albumId, title, description });
     } catch {
       albumManager.saving = false;
-      albumManager.error = "保存相册失败";
+      albumManager.error = "Could not save album";
       return;
     }
     albumManager.saving = false;
-    if (!result?.ok) { albumManager.error = result?.error || "保存相册失败"; return; }
+    if (!result?.ok) { albumManager.error = result?.error || "Could not save album"; return; }
     applyAlbumRegistry(result.albums);
     cancelAlbumEdit();
-    showToastMessage(previousTitle === title ? "相册已更新" : `已将相册“${previousTitle}”重命名为“${title}”`);
+    showToastMessage(previousTitle === title ? "Album updated" : `Renamed album “${previousTitle}” to “${title}”`);
   }
 
   function syncDeletedAlbumLocally(albumId, patchGallery) {
@@ -158,9 +158,9 @@ export function useAlbumRegistry({
   }
   async function deleteAlbumGlobally(album) {
     const usage = Number(album?.UsageCount || 0);
-    if (!window.confirm(`确定全局删除相册“${album.Title}”？这会清空 ${usage} 个媒体的相册字段。`)) return;
+    if (!window.confirm(`Delete album “${album.Title}” from the entire library? This will clear the album field on ${usage} media item(s).`)) return;
     const result = await api.deleteAlbumGlobally({ albumId: album.AlbumId });
-    if (!result?.ok) { showToastMessage(`删除相册失败：${result?.error || "未知错误"}`); return; }
+    if (!result?.ok) { showToastMessage(`Could not delete album: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.album;
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
       filterBeforeDelete, album.AlbumId, unassignedFilter, result.updatedCount,
@@ -168,7 +168,7 @@ export function useAlbumRegistry({
     applyAlbumRegistry(result.albums);
     syncDeletedAlbumLocally(album.AlbumId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
     if (shouldRefreshGallery) await queryGallery();
-    showToastMessage(`已全局删除相册“${album.Title}”`);
+    showToastMessage(`Deleted album “${album.Title}” from the library`);
   }
 
   function resetAlbumState() {

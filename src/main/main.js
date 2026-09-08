@@ -476,7 +476,7 @@ async function loadAllLibraryIndexes() {
 
 async function openLibrary(rawRoot, options = {}) {
   if (!state.mediaToolsState.available) {
-    const error = new Error(`FFmpeg 媒体工具不可用：${state.mediaToolsState.error}`);
+    const error = new Error(`FFmpeg media tools are unavailable: ${state.mediaToolsState.error}`);
     error.code = "MEDIA_TOOLS_UNAVAILABLE";
     throw error;
   }
@@ -551,7 +551,7 @@ async function closeLibrary() {
 
 async function inspectLibraryDirectory(rawRoot) {
   if (!state.mediaToolsState.available) {
-    const error = new Error(`FFmpeg 媒体工具不可用：${state.mediaToolsState.error}`);
+    const error = new Error(`FFmpeg media tools are unavailable: ${state.mediaToolsState.error}`);
     error.code = "MEDIA_TOOLS_UNAVAILABLE";
     throw error;
   }
@@ -559,16 +559,16 @@ async function inspectLibraryDirectory(rawRoot) {
   const stat = await fsp.stat(paths.root).catch(() => null);
   if (!stat?.isDirectory()) throw new Error("The selected library directory does not exist");
   const linkStat = await fsp.lstat(paths.root);
-  if (linkStat.isSymbolicLink()) throw new Error("不能把符号链接目录用作图库根目录");
+  if (linkStat.isSymbolicLink()) throw new Error("A symbolic-link directory cannot be used as a library root");
   const parentManager = findParentManagerDirectory(paths.root);
-  if (parentManager) throw new Error(`所选目录位于另一个图库内部：${parentManager}`);
+  if (parentManager) throw new Error(`The selected directory is inside another library: ${parentManager}`);
   if (fs.existsSync(paths.managerDir)) {
     if (fs.existsSync(paths.initializationFile)) {
       const marker = JSON.parse(await fsp.readFile(paths.initializationFile, "utf8"));
       if (marker?.Status !== "committed") {
         const lockState = await inspectLibraryLock(paths);
         if (lockState.active) {
-          const error = new Error("该目录正在由另一个进程初始化，不能打开或清理");
+          const error = new Error("Another process is initializing this directory; it cannot be opened or cleaned up");
           error.code = "LIBRARY_LOCKED";
           throw error;
         }
@@ -577,7 +577,7 @@ async function inspectLibraryDirectory(rawRoot) {
           root: paths.root,
           marker: {
             ...marker,
-            Error: marker?.Error || "上一次图库初始化在完成前中断。",
+            Error: marker?.Error || "The previous library initialization stopped before completion.",
           },
         };
       }
@@ -720,7 +720,7 @@ function createDomainServices() {
     listDefinitions: listTagDefinitions,
     getUsageCounts: getTagUsageCounts,
     findByLabel: tagCatalog.findByLabel,
-    sortEntries: (values) => [...values].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN")),
+    sortEntries: (values) => [...values].sort((a, b) => a.Text.localeCompare(b.Text, "en-US")),
     updateMetadataOnDelete: (item, tagId, now) => {
       const tagIds = Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [];
       if (!tagIds.includes(tagId)) return null;
@@ -753,7 +753,7 @@ function createDomainServices() {
     listDefinitions: listPersonDefinitions,
     getUsageCounts: getPersonUsageCounts,
     findByLabel: personCatalog.findByLabel,
-    sortEntries: (values) => [...values].sort((a, b) => a.Name.localeCompare(b.Name, "zh-CN")),
+    sortEntries: (values) => [...values].sort((a, b) => a.Name.localeCompare(b.Name, "en-US")),
     updateMetadataOnDelete: (item, personId, now) => {
       const personIds = Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [];
       if (!personIds.includes(personId)) return null;
@@ -786,7 +786,7 @@ function createDomainServices() {
     listDefinitions: listAlbumDefinitions,
     getUsageCounts: getAlbumUsageCounts,
     findByLabel: albumCatalog.findByLabel,
-    sortEntries: (values) => [...values].sort((a, b) => a.Title.localeCompare(b.Title, "zh-CN")),
+    sortEntries: (values) => [...values].sort((a, b) => a.Title.localeCompare(b.Title, "en-US")),
     updateMetadataOnDelete: (item, albumId, now) => {
       if (item?.Customization?.AlbumId !== albumId) return null;
       return {

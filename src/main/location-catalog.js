@@ -21,7 +21,7 @@ function createLocationCatalog(options) {
     return [...values].sort((a, b) => {
       const first = [a.Country, a.Province, a.City, a.Name, a.LocationId].join("\u0001");
       const second = [b.Country, b.Province, b.City, b.Name, b.LocationId].join("\u0001");
-      return first.localeCompare(second, "zh-CN");
+      return first.localeCompare(second, "en-US");
     });
   }
 
@@ -48,7 +48,7 @@ function createLocationCatalog(options) {
       .sort((a, b) => {
         const first = [a.Country, a.Province, a.City, ...a.Path, a.LocationId].join("\u0001");
         const second = [b.Country, b.Province, b.City, ...b.Path, b.LocationId].join("\u0001");
-        return first.localeCompare(second, "zh-CN");
+        return first.localeCompare(second, "en-US");
       });
   }
 

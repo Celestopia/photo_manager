@@ -34,7 +34,7 @@ function registerIpcHandlers(options) {
   ipcMain.handle("library:recheck-media-tools", async () => toSerializable(await checkMediaTools()));
   ipcMain.handle("library:choose-directory", async () => {
     const result = await dialog.showOpenDialog(runtime.mainWindow, {
-      title: "选择图库根目录",
+      title: "Select Library Root Directory",
       properties: ["openDirectory"],
     });
     return result.canceled || !result.filePaths[0] ? { ok: false, canceled: true } : { ok: true, path: result.filePaths[0] };
@@ -147,7 +147,7 @@ function registerIpcHandlers(options) {
     try {
       const library = requireOpenLibrary();
       const outputFile = path.join(library.paths.dataDir, "photo_metadata.csv");
-      if (!fs.existsSync(outputFile)) return { ok: false, error: "导出的 CSV 文件不存在" };
+      if (!fs.existsSync(outputFile)) return { ok: false, error: "The exported CSV file does not exist" };
       shell.showItemInFolder(outputFile);
       return { ok: true };
     } catch (error) {

@@ -1,21 +1,21 @@
 <template>
   <div v-if="!isSelectionMode" class="gallery-settings-anchor" @click.stop>
-    <button class="btn icon-btn gallery-settings-trigger" data-tip="图库设置" :aria-expanded="gallerySettingsOpen" @click="onToggleGallerySettings">
-      <img class="icon" :src="ICONS.settings" alt="图库设置" />
+    <button class="btn icon-btn gallery-settings-trigger" data-tip="Library settings" :aria-expanded="gallerySettingsOpen" @click="onToggleGallerySettings">
+      <img class="icon" :src="ICONS.settings" alt="Library settings" />
     </button>
     <div v-if="gallerySettingsOpen" class="gallery-settings-menu">
-      <button @click="openLibraryInfo"><span>ⓘ</span>图库信息</button>
-      <button @click="openMaintenanceDialog('update')"><span>↻</span>更新元数据</button>
-      <button @click="openMaintenanceDialog('verify')"><span>✓</span>检查元数据</button>
-      <button @click="openMaintenanceDialog('thumbnails')"><span>▦</span>生成缩略图</button>
-      <button @click="openMaintenanceDialog('export')"><span>⇩</span>导出元数据 CSV</button>
+      <button @click="openLibraryInfo"><span>ⓘ</span>Library Information</button>
+      <button @click="openMaintenanceDialog('update')"><span>↻</span>Update Metadata</button>
+      <button @click="openMaintenanceDialog('verify')"><span>✓</span>Verify Metadata</button>
+      <button @click="openMaintenanceDialog('thumbnails')"><span>▦</span>Generate Thumbnails</button>
+      <button @click="openMaintenanceDialog('export')"><span>⇩</span>Export Metadata CSV</button>
       <div class="gallery-settings-separator"></div>
-      <button @click="openAlbumManager"><span>▣</span>相册管理</button>
-      <button @click="openLocationManager"><span>⌖</span>地点管理</button>
-      <button @click="openPersonManager"><span>♙</span>人物管理</button>
-      <button @click="openTagManager"><span>◇</span>标签管理</button>
+      <button @click="openAlbumManager"><span>▣</span>Manage Albums</button>
+      <button @click="openLocationManager"><span>⌖</span>Manage Locations</button>
+      <button @click="openPersonManager"><span>♙</span>Manage People</button>
+      <button @click="openTagManager"><span>◇</span>Manage Tags</button>
       <div class="gallery-settings-separator"></div>
-      <button class="danger-text" @click="returnToLibraryEntry"><span>↩</span>退出当前图库</button>
+      <button class="danger-text" @click="returnToLibraryEntry"><span>↩</span>Close Current Library</button>
     </div>
   </div>
 </template>

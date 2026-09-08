@@ -13,8 +13,8 @@
           type="button"
           class="album-clear-btn"
           v-if="selectedAlbumId"
-          data-tip="将当前媒体移出相册"
-          aria-label="将当前媒体移出相册"
+          data-tip="Remove current media from album"
+          aria-label="Remove current media from album"
           @click.stop="clearAlbumForTarget(target)"
         >×</button>
         <RegistryOptionsMenu
@@ -25,8 +25,8 @@
           :selected-values="selectedAlbumId ? [selectedAlbumId] : []"
           id-key="AlbumId"
           label-key="Title"
-          all-section-label="全部相册"
-          empty-text="没有匹配的相册"
+          all-section-label="All Albums"
+          empty-text="No matching albums"
           @update:search-text="albumSearch[target] = $event"
           @select="setAlbumForTarget(target, $event)"
           @close="closeAlbumDropdown(target)"
@@ -34,21 +34,21 @@
         />
       </div>
       <div class="tag-actions">
-        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建相册" @click.stop="openCreateAlbumMenu(target)">+</button>
-        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="相册管理" @click.stop="openAlbumManager">
-          <img class="icon" :src="ICONS.settings" alt="相册管理" />
+        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="Create album" @click.stop="openCreateAlbumMenu(target)">+</button>
+        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="Manage albums" @click.stop="openAlbumManager">
+          <img class="icon" :src="ICONS.settings" alt="Manage albums" />
         </button>
       </div>
     </div>
     <div class="tag-create-popover" v-if="albumCreate.visible && albumCreate.target === target" @click.stop>
-      <label>相册名称</label>
+      <label>Album name</label>
       <input class="input" v-model="albumCreate.title" />
-      <label>说明</label>
+      <label>Description</label>
       <textarea class="input tag-create-description" v-model="albumCreate.description"></textarea>
       <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreateAlbumMenu">取消</button>
-        <button class="btn btn-primary" @click="createAlbumAndSelect">创建并设置</button>
+        <button class="btn" @click="closeCreateAlbumMenu">Cancel</button>
+        <button class="btn btn-primary" @click="createAlbumAndSelect">Create and Set</button>
       </div>
     </div>
   </div>
@@ -61,7 +61,7 @@ import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   target: { type: String, required: true },
-  placeholder: { type: String, default: "搜索相册" },
+  placeholder: { type: String, default: "Search albums" },
 });
 
 const app = inject(ALBUM_CONTEXT);

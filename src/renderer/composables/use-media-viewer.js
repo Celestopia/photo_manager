@@ -54,7 +54,7 @@ export function useMediaViewer({
     const hour = String(Number(rawHour)).padStart(2, "0");
     const minute = String(Number(rawMinute)).padStart(2, "0");
     const second = String(Number(rawSecond)).padStart(2, "0");
-    return `${year} 年 ${month} 月 ${day} 日 ${hour}:${minute}:${second}`;
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
   });
 
   function openViewer(item) {
@@ -79,11 +79,11 @@ export function useMediaViewer({
   function performSwitchPhoto(direction) {
     const next = selectedGlobalIndex.value + direction;
     if (next < 0) {
-      showToastMessage("已经是第一个媒体");
+      showToastMessage("This is the first media item");
       return;
     }
     if (next >= orderedItems.value.length) {
-      showToastMessage("已经是最后一个媒体");
+      showToastMessage("This is the last media item");
       return;
     }
     clearVideoClickTimer();
@@ -112,11 +112,11 @@ export function useMediaViewer({
   function switchPhoto(direction) {
     const next = selectedGlobalIndex.value + direction;
     if (next < 0) {
-      showToastMessage("已经是第一个媒体");
+      showToastMessage("This is the first media item");
       return;
     }
     if (next >= orderedItems.value.length) {
-      showToastMessage("已经是最后一个媒体");
+      showToastMessage("This is the last media item");
       return;
     }
     requestViewerTransition("switch", direction);
@@ -164,16 +164,16 @@ export function useMediaViewer({
   async function contextCopyImage() {
     if (!selectedItem.value) return;
     const result = await api.copyImage(selectedItem.value.MediaId);
-    if (result?.ok) showToastMessage("已成功复制到剪贴板");
-    else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
+    if (result?.ok) showToastMessage("Image copied to the clipboard");
+    else showToastMessage(`Could not copy image: ${result?.error || "Unknown error"}`);
     closeTransientPanels();
   }
 
   async function contextCopyPath() {
     if (!selectedItem.value) return;
     const result = await api.copyPath(selectedItem.value.MediaId);
-    if (result?.ok) showToastMessage("已成功复制文件路径");
-    else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
+    if (result?.ok) showToastMessage("File path copied to the clipboard");
+    else showToastMessage(`Could not copy file path: ${result?.error || "Unknown error"}`);
     closeTransientPanels();
   }
 
@@ -181,10 +181,10 @@ export function useMediaViewer({
     if (!selectedItem.value) return;
     try {
       const result = await api.copyJson(selectedItem.value.MediaId);
-      if (result?.ok) showToastMessage("已成功复制媒体元信息");
-      else showToastMessage(`复制失败：${result?.error || "未知错误"}`);
+      if (result?.ok) showToastMessage("Media metadata copied to the clipboard");
+      else showToastMessage(`Could not copy metadata: ${result?.error || "Unknown error"}`);
     } catch (error) {
-      showToastMessage(`复制失败：${error?.message || "未知错误"}`);
+      showToastMessage(`Could not copy metadata: ${error?.message || "Unknown error"}`);
     } finally {
       closeTransientPanels();
     }

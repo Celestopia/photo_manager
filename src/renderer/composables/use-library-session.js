@@ -48,16 +48,16 @@ export function useLibrarySession({
   });
 
   const maintenanceDialogTitle = computed(() => ({
-    update: "更新元数据",
-    verify: "检查元数据",
-    thumbnails: "生成缩略图",
-    export: "导出元数据 CSV",
-  }[maintenanceDialog.operation] || "图库维护"));
+    update: "Update Metadata",
+    verify: "Verify Metadata",
+    thumbnails: "Generate Thumbnails",
+    export: "Export Metadata CSV",
+  }[maintenanceDialog.operation] || "Library Maintenance"));
   const maintenanceDialogDescription = computed(() => ({
-    update: "重新扫描当前图库中的受支持媒体，识别新增、删除、移动或内容发生变化的文件，并更新元数据。",
-    verify: "以只读方式核对图库文件与现有元数据是否匹配。此操作只生成检查报告，不修改媒体文件、注册表或元数据。",
-    thumbnails: "检查当前图库的缩略图缓存，并为缺失或过期的图片、视频封面重新生成缩略图。",
-    export: "将当前图库的文件信息、元数据和个性化信息导出为 CSV 文件。",
+    update: "Rescan supported media in the current library, detect added, removed, moved, or changed files, and update metadata.",
+    verify: "Compare the current library files with existing metadata in read-only mode. This produces a report without changing media, registries, or metadata.",
+    thumbnails: "Check the current library's thumbnail cache and regenerate missing or stale image and video thumbnails.",
+    export: "Export file information, metadata, and customizations from the current library to a CSV file.",
   }[maintenanceDialog.operation] || ""));
 
   let removeLibraryStateListener = null;
@@ -65,7 +65,7 @@ export function useLibrarySession({
   let removeMaintenanceProgressListener = null;
 
   function setEntryError(message) {
-    entry.error = String(message || "未知错误");
+    entry.error = String(message || "Unknown error");
     entry.busy = false;
     entry.cancellable = false;
   }
@@ -97,12 +97,12 @@ export function useLibrarySession({
     const result = await api.openLibrary({ path: libraryPath, force: Boolean(options.force) });
     if (!result?.ok && result?.code === "LIBRARY_LOCKED" && result?.lockState?.forceAllowed && !options.force) {
       const lock = result.lockState.lock || {};
-      const confirmed = window.confirm(`图库存在可能已经失效的锁。\n\n主机：${lock.HostName || "未知"}\n进程：${lock.ProcessId || "未知"}\n启动时间：${lock.ApplicationStartedAt || "未知"}\n\n强制解锁可能导致并发写入和数据损坏。确认继续吗？`);
+      const confirmed = window.confirm(`The library may have a stale lock.\n\nHost: ${lock.HostName || "Unknown"}\nProcess: ${lock.ProcessId || "Unknown"}\nStarted: ${lock.ApplicationStartedAt || "Unknown"}\n\nForcing an unlock may allow concurrent writes and corrupt data. Continue?`);
       if (confirmed) return openLibraryPath(libraryPath, { force: true });
     }
     if (!result?.ok) {
       entry.canOpenLibrary = true;
-      setEntryError(result?.error || "无法打开图库");
+      setEntryError(result?.error || "Could not open library");
       return false;
     }
     await enterOpenedLibrary(result.library);
@@ -133,7 +133,7 @@ export function useLibrarySession({
         entry.operation = "";
         return;
       }
-      setEntryError(inspected?.error || "无法检查所选目录");
+      setEntryError(inspected?.error || "Could not inspect the selected folder");
       return;
     }
     const inspection = inspected.inspection;
@@ -143,11 +143,11 @@ export function useLibrarySession({
       return;
     }
     if (inspection.kind === "failed-initialization") {
-      const clean = window.confirm(`该目录包含一次失败的图库初始化：\n\n${inspection.marker?.Error || "未知错误"}\n\n失败日志会保留到你确认重试为止。是否删除本次失败的管理数据，并立即重新扫描该目录以重试初始化？`);
+      const clean = window.confirm(`This folder contains data from a failed library initialization:\n\n${inspection.marker?.Error || "Unknown error"}\n\nThe failure log will remain until you confirm a retry. Delete the incomplete management data and rescan the folder now?`);
       if (clean) {
         const cleaned = await api.cleanupFailedInitialization(inspection.root);
         if (!cleaned?.ok) {
-          setEntryError(cleaned?.error || "清理失败");
+          setEntryError(cleaned?.error || "Could not clean up incomplete data");
           return;
         }
         entry.busy = true;
@@ -158,7 +158,7 @@ export function useLibrarySession({
         entry.busy = false;
         entry.cancellable = false;
         if (!rescanned?.ok || rescanned.inspection?.kind !== "uninitialized") {
-          setEntryError(rescanned?.error || "无法重新扫描图库目录");
+          setEntryError(rescanned?.error || "Could not rescan the library folder");
           return;
         }
         Object.assign(initializationConfirm, {
@@ -203,14 +203,14 @@ export function useLibrarySession({
         return;
       }
       entry.canOpenLibrary = false;
-      setEntryError(result?.error || "图库初始化失败");
+      setEntryError(result?.error || "Library initialization failed");
       return;
     }
     await enterOpenedLibrary(result.library);
   }
 
   async function cancelLibraryOperation() {
-    const confirmed = window.confirm("确定取消当前操作吗？初始化取消后，本轮创建的全部未完成管理数据都会被删除。");
+    const confirmed = window.confirm("Cancel the current operation? Any incomplete management data created during this initialization will be deleted.");
     if (!confirmed) return;
     if (entry.operation === "quick-scan") await api.cancelLibraryScan();
     if (entry.operation === "initialize") await api.cancelLibraryInitialization();
@@ -243,12 +243,12 @@ export function useLibrarySession({
   async function saveLibraryInfo() {
     const result = await api.updateLibraryInfo({ name: libraryInfo.name });
     if (!result?.ok) {
-      showToastMessage(`保存失败：${result?.error || "未知错误"}`);
+      showToastMessage(`Could not save: ${result?.error || "Unknown error"}`);
       return;
     }
     libraryState.value = { ...libraryState.value, active: result.library };
     libraryInfo.visible = false;
-    showToastMessage("图库名称已更新");
+    showToastMessage("Library name updated");
   }
 
   async function openLibraryRoot() { await api.openLibraryRoot(); }
@@ -278,7 +278,7 @@ export function useLibrarySession({
   async function startMaintenanceOperation(overwrite = false) {
     maintenanceDialog.running = true;
     maintenanceDialog.completed = false;
-    maintenanceDialog.progress = { phase: "starting", message: "正在启动任务" };
+    maintenanceDialog.progress = { phase: "starting", message: "Starting task" };
     const result = await api.startMaintenance({
       operation: maintenanceDialog.operation,
       reprobe: maintenanceDialog.reprobe,
@@ -287,37 +287,37 @@ export function useLibrarySession({
     });
     if (!result?.ok && result?.code === "OUTPUT_EXISTS" && !overwrite) {
       maintenanceDialog.running = false;
-      if (window.confirm("photo_metadata.csv 已存在。是否覆盖现有文件？")) await startMaintenanceOperation(true);
+      if (window.confirm("photo_metadata.csv already exists. Replace it?")) await startMaintenanceOperation(true);
       return;
     }
     maintenanceDialog.running = false;
     maintenanceDialog.completed = true;
     maintenanceDialog.result = result?.result || null;
-    maintenanceDialog.error = result?.ok ? "" : result?.error || "任务失败";
+    maintenanceDialog.error = result?.ok ? "" : result?.error || "Task failed";
     maintenanceDialog.reportText = JSON.stringify(result?.ok ? result.result : { error: maintenanceDialog.error }, null, 2);
     if (result?.ok) await onMaintenanceRefresh?.(maintenanceDialog.operation);
   }
 
   async function copyMaintenanceReport() {
     await api.copyText(maintenanceDialog.reportText || "");
-    showToastMessage("维护报告已复制");
+    showToastMessage("Maintenance report copied");
   }
 
   async function showMaintenanceOutput() {
     const result = await api.showMaintenanceOutput();
-    if (!result?.ok) showToastMessage(`无法定位 CSV：${result?.error || "未知错误"}`);
+    if (!result?.ok) showToastMessage(`Could not locate CSV: ${result?.error || "Unknown error"}`);
   }
 
   async function returnToLibraryEntry() {
     gallerySettingsOpen.value = false;
     if (hasUnsavedChanges?.()) {
-      showToastMessage("请先保存或放弃当前修改");
+      showToastMessage("Save or discard the current changes first");
       return;
     }
-    if (!window.confirm("确定退出当前图库吗？图库会被安全关闭并释放占用锁，随后返回图库入口；原始媒体和 .photo_manager 中的数据不会被删除。")) return;
+    if (!window.confirm("Close the current library? The library will close safely, release its lock, and return to the library entry screen. Original media and data under .photo_manager will not be deleted.")) return;
     const result = await api.closeLibrary();
     if (!result?.ok) {
-      showToastMessage(`无法关闭图库：${result?.error || "未知错误"}`);
+      showToastMessage(`Could not close library: ${result?.error || "Unknown error"}`);
       return;
     }
     await onLibraryClosed?.(result.library);

@@ -23,7 +23,7 @@ function createSimpleRegistryCatalog(options) {
     writeJsonlAtomic,
   } = options;
 
-  const sortDefinitions = (values) => [...values].sort((a, b) => a[definitionKey].localeCompare(b[definitionKey], "zh-CN"));
+  const sortDefinitions = (values) => [...values].sort((a, b) => a[definitionKey].localeCompare(b[definitionKey], "en-US"));
 
   function getUsageCounts() {
     const counts = new Map();

@@ -64,7 +64,7 @@ import { onMounted, ref } from "vue";
 
 const props = defineProps({
   searchText: { type: String, default: "" },
-  searchPlaceholder: { type: String, default: "搜索" },
+  searchPlaceholder: { type: String, default: "Search" },
   options: { type: Array, default: () => [] },
   recentOptions: { type: Array, default: () => [] },
   fixedOptions: { type: Array, default: () => [] },
@@ -72,8 +72,8 @@ const props = defineProps({
   idKey: { type: String, required: true },
   labelKey: { type: String, required: true },
   descriptionKey: { type: String, default: "Description" },
-  recentSectionLabel: { type: String, default: "最近使用" },
-  allSectionLabel: { type: String, default: "全部" },
+  recentSectionLabel: { type: String, default: "Recent" },
+  allSectionLabel: { type: String, default: "All" },
   showAllSectionLabel: { type: Boolean, default: true },
   emptyText: { type: String, required: true },
 });

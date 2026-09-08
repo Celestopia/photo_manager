@@ -5,7 +5,7 @@
     :class="{ 'is-positioned': position.ready }"
     :style="{ left: `${position.left}px`, top: `${position.top}px` }"
     role="dialog"
-    aria-label="媒体详细信息"
+    aria-label="Media details"
     @click.stop
     @pointerdown.stop
     @contextmenu.prevent.stop

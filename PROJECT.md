@@ -18,6 +18,8 @@ Current capabilities include:
 
 The project is local-first. Core browsing and management do not depend on network services, library data are never uploaded, and no database is used. JSONL is the current source of truth.
 
+The application interface is English-only; there is no localization layer or language selector. User-authored library names, titles, descriptions, registry values, paths, and other metadata remain unrestricted Unicode and are displayed exactly as stored. UI sorting and search use English (`en-US`) collation, and viewer timestamps use the fixed 24-hour `YYYY-MM-DD HH:mm:ss` format.
+
 ## 2. Platform, Technology, and Boundaries
 
 - Target: Windows 10/11 x64.

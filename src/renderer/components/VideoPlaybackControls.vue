@@ -1,10 +1,10 @@
 <template>
-  <div class="video-playback-controls" role="group" aria-label="视频播放控件">
+  <div class="video-playback-controls" role="group" aria-label="Video playback controls">
     <button
       type="button"
       class="video-control-button"
-      :data-tip="playing ? '暂停' : '播放'"
-      :aria-label="playing ? '暂停' : '播放'"
+      :data-tip="playing ? 'Pause' : 'Play'"
+      :aria-label="playing ? 'Pause' : 'Play'"
       :disabled="!ready"
       @click="$emit('toggle-play')"
     >
@@ -21,7 +21,7 @@
       :value="currentTime"
       :disabled="duration <= 0"
       :style="progressStyle"
-      aria-label="播放进度"
+      aria-label="Playback progress"
       @pointerdown="$emit('seek-start')"
       @pointerup="$emit('seek-commit', Number($event.target.value))"
       @input="$emit('seek-input', Number($event.target.value))"
@@ -31,8 +31,8 @@
     <button
       type="button"
       class="video-control-button"
-      :data-tip="muted ? '取消静音' : '静音'"
-      :aria-label="muted ? '取消静音' : '静音'"
+      :data-tip="muted ? 'Unmute' : 'Mute'"
+      :aria-label="muted ? 'Unmute' : 'Mute'"
       @click="$emit('toggle-muted')"
     >
       <img :src="muted || volume === 0 ? icons.videoMuted : icons.videoVolume" alt="" />
@@ -44,7 +44,7 @@
       max="1"
       step="0.01"
       :value="muted ? 0 : volume"
-      aria-label="音量"
+      aria-label="Volume"
       @input="$emit('volume-input', Number($event.target.value))"
     />
   </div>

@@ -137,11 +137,11 @@ export function useLocationRegistry({
     ));
     return [
       ...(recentRows.length ? [
-        { Type: "section", Key: `${keyPrefix}section:recent`, Label: "最近使用", Depth: 0 },
+        { Type: "section", Key: `${keyPrefix}section:recent`, Label: "Recent", Depth: 0 },
         ...recentRows,
       ] : []),
       ...(rows.length ? [
-        { Type: "section", Key: `${keyPrefix}section:all`, Label: "全部地点", Depth: 0 },
+        { Type: "section", Key: `${keyPrefix}section:all`, Label: "All Locations", Depth: 0 },
         ...rows,
       ] : []),
     ];
@@ -255,15 +255,15 @@ export function useLocationRegistry({
   }
   async function createLocationAndSelect() {
     const name = normalizeLocationName(locationCreate.name);
-    if (!name) { locationCreate.error = "地点名称不能为空"; return; }
+    if (!name) { locationCreate.error = "Location name is required"; return; }
     const result = await api.createLocation({
       name, country: locationCreate.country, province: locationCreate.province, city: locationCreate.city,
       parentId: locationCreate.parentId, description: locationCreate.description,
     });
-    if (!result?.ok) { locationCreate.error = result?.error || "创建地点失败"; return; }
+    if (!result?.ok) { locationCreate.error = result?.error || "Could not create location"; return; }
     applyLocationRegistry(result.locations);
     const target = locationCreate.target;
-    if (target === "manager") { showToastMessage(`已创建地点“${result.location.Name}”`); scheduleLocationManagerContextUpdate(); }
+    if (target === "manager") { showToastMessage(`Created location “${result.location.Name}”`); scheduleLocationManagerContextUpdate(); }
     else setLocationForTarget(target, result.location.LocationId);
     closeCreateLocationMenu();
   }
@@ -303,9 +303,9 @@ export function useLocationRegistry({
   }
   async function saveLocationEdit() {
     const locationId = locationManager.editingId;
-    if (!locationId) { locationManager.error = "地点不存在"; return; }
+    if (!locationId) { locationManager.error = "Location not found"; return; }
     const name = normalizeLocationName(locationManager.editName);
-    if (!name) { locationManager.error = "地点名称不能为空"; return; }
+    if (!name) { locationManager.error = "Location name is required"; return; }
     const previous = getLocation(locationId);
     const country = normalizeLocationField(locationManager.editCountry);
     const province = normalizeLocationField(locationManager.editProvince);
@@ -320,11 +320,11 @@ export function useLocationRegistry({
       });
     } catch {
       locationManager.saving = false;
-      locationManager.error = "保存地点失败";
+      locationManager.error = "Could not save location";
       return;
     }
     locationManager.saving = false;
-    if (!result?.ok) { locationManager.error = result?.error || "保存地点失败"; return; }
+    if (!result?.ok) { locationManager.error = result?.error || "Could not save location"; return; }
     const administrativeRegionChanged = Boolean(previous) && (
       previous.Country !== country || previous.Province !== province || previous.City !== city
     );
@@ -337,7 +337,7 @@ export function useLocationRegistry({
     cancelLocationEdit();
     scheduleLocationManagerContextUpdate();
     if (shouldRefreshGallery) await queryGallery();
-    showToastMessage(previous?.Name === name ? "地点已更新" : `已将地点“${previous?.Name || ""}”重命名为“${name}”`);
+    showToastMessage(previous?.Name === name ? "Location updated" : `Renamed location “${previous?.Name || ""}” to “${name}”`);
   }
 
   function syncDeletedLocationLocally(locationId, patchGallery) {
@@ -349,9 +349,9 @@ export function useLocationRegistry({
   async function deleteLocationGlobally(location) {
     const usage = Number(location?.UsageCount || 0);
     const childCount = Array.isArray(location?.ChildrenIds) ? location.ChildrenIds.length : 0;
-    if (!window.confirm(`确定全局删除地点“${location.Name}”？这会清空 ${usage} 个媒体的地点信息，并让 ${childCount} 个直接子地点变为无父节点。`)) return;
+    if (!window.confirm(`Delete location “${location.Name}” from the entire library? This will clear it from ${usage} media item(s) and detach ${childCount} direct child location(s).`)) return;
     const result = await api.deleteLocationGlobally({ locationId: location.LocationId });
-    if (!result?.ok) { showToastMessage(`删除地点失败：${result?.error || "未知错误"}`); return; }
+    if (!result?.ok) { showToastMessage(`Could not delete location: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.location;
     const updatedCount = Number(result.updatedCount || 0);
     const filteredSubtreeChanged = filterBeforeDelete
@@ -364,7 +364,7 @@ export function useLocationRegistry({
     applyLocationRegistry(result.locations);
     syncDeletedLocationLocally(location.LocationId, updatedCount > 0 && !shouldRefreshGallery);
     if (shouldRefreshGallery) await queryGallery();
-    showToastMessage(`已全局删除地点“${location.Name}”`);
+    showToastMessage(`Deleted location “${location.Name}” from the library`);
   }
 
   function resetLocationState() {

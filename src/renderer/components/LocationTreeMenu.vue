@@ -16,14 +16,14 @@
         class="tag-option location-option location-tree-all-option"
         :class="{ 'is-selected': allSelected }"
         @mousedown.prevent="emit('select-all')"
-      ><span>全部</span></button>
+      ><span>All</span></button>
       <button
         v-if="showUnassignedOption"
         type="button"
         class="tag-option location-option location-tree-unassigned-option"
         :class="{ 'is-selected': unassignedSelected }"
         @mousedown.prevent="emit('select-unassigned')"
-      ><span>未设置地点</span></button>
+      ><span>Unassigned Location</span></button>
       <div
         v-if="showFixedOptionsDivider && hasHierarchyRows"
         class="registry-section-divider"
@@ -48,8 +48,8 @@
             class="location-tree-toggle"
             :class="{ 'is-expanded': isExpanded(row.Key) }"
             :aria-expanded="isExpanded(row.Key)"
-            :aria-label="isExpanded(row.Key) ? '收起下级地点' : '展开下级地点'"
-            :data-tip="isExpanded(row.Key) ? '收起下级地点' : '展开下级地点'"
+            :aria-label="isExpanded(row.Key) ? 'Collapse lower-level locations' : 'Expand lower-level locations'"
+            :data-tip="isExpanded(row.Key) ? 'Collapse lower-level locations' : 'Expand lower-level locations'"
             @mousedown.stop.prevent="toggleExpanded(row)"
           ><img :src="ICONS.chevronDown" alt="" /></button>
           <span v-else class="location-tree-toggle-spacer" aria-hidden="true"></span>
@@ -75,8 +75,8 @@
             class="location-tree-toggle"
             :class="{ 'is-expanded': isExpanded(row.Key) }"
             :aria-expanded="isExpanded(row.Key)"
-            :aria-label="isExpanded(row.Key) ? '收起子地点' : '展开子地点'"
-            :data-tip="isExpanded(row.Key) ? '收起子地点' : '展开子地点'"
+            :aria-label="isExpanded(row.Key) ? 'Collapse child locations' : 'Expand child locations'"
+            :data-tip="isExpanded(row.Key) ? 'Collapse child locations' : 'Expand child locations'"
             @mousedown.stop.prevent="toggleExpanded(row)"
           ><img :src="ICONS.chevronDown" alt="" /></button>
           <span v-else class="location-tree-toggle-spacer" aria-hidden="true"></span>
@@ -107,7 +107,7 @@ import {
 const props = defineProps({
   rows: { type: Array, default: () => [] },
   searchText: { type: String, default: "" },
-  searchPlaceholder: { type: String, default: "搜索地点" },
+  searchPlaceholder: { type: String, default: "Search locations" },
   selectedLocationId: { type: String, default: "" },
   selectedRegion: { type: Object, default: null },
   mode: { type: String, default: "location" },
@@ -116,7 +116,7 @@ const props = defineProps({
   showUnassignedOption: { type: Boolean, default: false },
   unassignedSelected: { type: Boolean, default: false },
   showFixedOptionsDivider: { type: Boolean, default: false },
-  emptyText: { type: String, default: "没有匹配的地点" },
+  emptyText: { type: String, default: "No matching locations" },
 });
 
 const emit = defineEmits([
@@ -182,7 +182,7 @@ function isRowSelected(row) {
 
 function getGroupTooltip(row) {
   if (props.mode === "filter" && isKnownRegion(row.Region)) {
-    return `筛选 ${getLocationRegionFilterLabel(row.Region)} 下的全部地点`;
+    return `Filter all locations under ${getLocationRegionFilterLabel(row.Region)}`;
   }
   return row.Location ? getLocationTooltip(row.Location.LocationId) : "";
 }

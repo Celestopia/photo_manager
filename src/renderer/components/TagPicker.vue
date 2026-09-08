@@ -13,7 +13,7 @@
       </span>
       <button type="button" class="tag-editor-trigger" @click="openTagDropdown(target)">
         <span v-if="!selectedTagIds.length">{{ placeholder }}</span>
-        <span v-else>选择标签</span>
+        <span v-else>Select tags</span>
       </button>
         <RegistryOptionsMenu
           v-if="tagDropdown[target]"
@@ -25,8 +25,8 @@
           :selected-values="selectedTagIds"
           id-key="TagId"
           label-key="Text"
-          all-section-label="全部标签"
-          empty-text="没有匹配的标签"
+          all-section-label="All Tags"
+          empty-text="No matching tags"
           @update:search-text="tagSearch[target] = $event"
           @select="addTagToTarget(target, $event)"
           @close="closeTagDropdown(target)"
@@ -34,21 +34,21 @@
         />
       </div>
       <div class="tag-actions">
-        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="新建标签" @click.stop="openCreateTagMenu(target)">+</button>
-        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="标签管理" @click.stop="openTagManager">
-          <img class="icon" :src="ICONS.settings" alt="标签管理" />
+        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="Create tag" @click.stop="openCreateTagMenu(target)">+</button>
+        <button type="button" class="btn icon-btn tag-inline-btn" data-tip="Manage tags" @click.stop="openTagManager">
+          <img class="icon" :src="ICONS.settings" alt="Manage tags" />
         </button>
       </div>
     </div>
     <div class="tag-create-popover" v-if="tagCreate.visible && tagCreate.target === target" @click.stop>
-      <label>标签名称</label>
+      <label>Tag name</label>
       <input class="input" v-model="tagCreate.text" />
-      <label>说明（可留空）</label>
+      <label>Description (optional)</label>
       <textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
       <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreateTagMenu">取消</button>
-        <button class="btn btn-primary" @click="createTagAndSelect">创建并添加</button>
+        <button class="btn" @click="closeCreateTagMenu">Cancel</button>
+        <button class="btn btn-primary" @click="createTagAndSelect">Create and Add</button>
       </div>
     </div>
   </div>
@@ -61,7 +61,7 @@ import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
   target: { type: String, required: true },
-  placeholder: { type: String, default: "搜索标签" },
+  placeholder: { type: String, default: "Search tags" },
 });
 
 const app = inject(TAG_CONTEXT);

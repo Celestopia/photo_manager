@@ -47,7 +47,7 @@ async function run(options = {}) {
   if (rootLinkStat.isSymbolicLink()) throw new Error("A symbolic-link directory cannot be used as a library root");
   const parentManager = findParentManagerDirectory(paths.root);
   if (parentManager) throw new Error(`The selected directory is inside another PhotoManager library: ${parentManager}`);
-  emit({ phase: "validate", message: "验证图库目录" });
+  emit({ phase: "validate", message: "Validating library directory" });
   await assertDirectoryWritable(paths.root);
   const nested = await findNestedManagerDirectory(paths.root, ({ visited, current }) => {
     emit({ phase: "scan-directories", current, processed: visited });
@@ -62,7 +62,7 @@ async function run(options = {}) {
     await writeLibraryManifest(paths, manifest);
     await writeTextAtomic(paths.initializationFile, `${JSON.stringify(marker, null, 2)}\n`);
     lock = await acquireLibraryLock(paths, manifest);
-    emit({ phase: "scan", message: "扫描媒体文件" });
+    emit({ phase: "scan", message: "Scanning media files" });
     const files = await walkFiles(paths.root, {
       isCancelled: () => cancelled,
       onProgress: ({ visitedDirectories, current }) => emit({
@@ -107,7 +107,7 @@ async function run(options = {}) {
 
     validateMediaEntries(entries, {});
 
-    emit({ phase: "write", processed: entries.length, total: entries.length, message: "写入图库数据" });
+    emit({ phase: "write", processed: entries.length, total: entries.length, message: "Writing library data" });
     await writeAll(paths.metadataFile, entries);
     for (const fileName of [DATA_FILE_NAMES.tags, DATA_FILE_NAMES.albums, DATA_FILE_NAMES.people, DATA_FILE_NAMES.locations]) {
       await writeJsonlAtomic(path.join(paths.dataDir, fileName), []);
@@ -120,7 +120,7 @@ async function run(options = {}) {
     const parsed = await fsp.readFile(paths.metadataFile, "utf8");
     if (entries.length && !parsed.trim()) throw new Error("Metadata verification failed after initialization");
     await fsp.rm(paths.initializationFile, { force: true });
-    emit({ phase: "complete", processed: entries.length, total: entries.length, message: "图库初始化完成" });
+    emit({ phase: "complete", processed: entries.length, total: entries.length, message: "Library initialization complete" });
     return {
       ok: true,
       manifest,

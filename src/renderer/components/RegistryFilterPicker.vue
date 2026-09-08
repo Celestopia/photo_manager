@@ -8,14 +8,14 @@
       v-if="dropdownOpen"
       class="registry-filter-dropdown"
       :search-text="searchText"
-      :search-placeholder="`搜索${label}`"
+      :search-placeholder="`Search ${label.toLowerCase()}`"
       :options="filteredOptions"
       :fixed-options="fixedOptions"
       :selected-values="[selectedValue]"
       :id-key="optionIdKey"
       :label-key="optionLabelKey"
       :show-all-section-label="false"
-      :empty-text="`没有匹配的${label}`"
+      :empty-text="`No matching ${label.toLowerCase()}`"
       @update:search-text="searchText = $event"
       @select="selectValue"
       @close="closeDropdown"
@@ -48,9 +48,9 @@ const dropdownOpen = ref(false);
 const pickerId = Symbol(props.kind);
 const searchText = ref("");
 const selectedValue = computed(() => query.filters[props.kind] || "");
-const unassignedLabel = computed(() => `未设置${props.label}`);
+const unassignedLabel = computed(() => `Unassigned ${props.label}`);
 const fixedOptions = computed(() => [
-  { value: "", label: "全部" },
+  { value: "", label: "All" },
   { value: UNASSIGNED_FILTER, label: unassignedLabel.value },
 ]);
 const optionIdKey = computed(() => {
@@ -64,16 +64,16 @@ const optionLabelKey = computed(() => {
   return "Name";
 });
 const selectedLabel = computed(() => {
-  if (!selectedValue.value) return "全部";
+  if (!selectedValue.value) return "All";
   if (selectedValue.value === UNASSIGNED_FILTER) return unassignedLabel.value;
-  return optionLabel(options.value.find((option) => optionId(option) === selectedValue.value)) || "全部";
+  return optionLabel(options.value.find((option) => optionId(option) === selectedValue.value)) || "All";
 });
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
-const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("zh-CN"));
+const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("en-US"));
 const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
 
 function matches(value) {
-  return !normalizedSearch.value || String(value).toLocaleLowerCase("zh-CN").includes(normalizedSearch.value);
+  return !normalizedSearch.value || String(value).toLocaleLowerCase("en-US").includes(normalizedSearch.value);
 }
 
 function optionId(option) {

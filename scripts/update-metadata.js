@@ -123,7 +123,7 @@ async function synchronizeMetadata({
     movedCandidatesByHash.get(item.SHA256Hash).push(item);
   }
   for (const candidates of movedCandidatesByHash.values()) {
-    candidates.sort((a, b) => String(a.FilePath).localeCompare(String(b.FilePath), "zh-CN"));
+    candidates.sort((a, b) => String(a.FilePath).localeCompare(String(b.FilePath), "en-US"));
   }
 
   const next = new Map();
@@ -213,7 +213,7 @@ async function run(options = {}) {
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
     await recoverPendingTransaction(paths);
-    emit({ phase: "backup", message: "备份图库数据" });
+    emit({ phase: "backup", message: "Backing up library data" });
     await createLibraryBackup(paths, {
       kind: "update",
       reason: "metadata-update",
@@ -240,7 +240,7 @@ async function run(options = {}) {
     });
     validateMetadataMap(result.next, registries);
     const nextEntries = [...result.next.values()];
-    emit({ phase: "commit", processed: nextEntries.length, total: nextEntries.length, message: "原子写入元数据" });
+    emit({ phase: "commit", processed: nextEntries.length, total: nextEntries.length, message: "Writing metadata atomically" });
     await writeAll(paths.metadataFile, nextEntries);
     const retainedHashes = new Set(nextEntries.map((item) => item?.SHA256Hash).filter(Boolean));
     const staleHashes = new Set(
@@ -269,7 +269,7 @@ async function run(options = {}) {
       warnings,
       errors,
     };
-    emit({ phase: "complete", processed: summary.total, total: summary.total, message: "元数据更新完成" });
+    emit({ phase: "complete", processed: summary.total, total: summary.total, message: "Metadata update complete" });
     return summary;
   } finally {
     await authorization.release();

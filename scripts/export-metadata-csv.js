@@ -160,7 +160,7 @@ async function run(options = {}) {
   // Prefix BOM for better UTF-8 compatibility in spreadsheet apps on Windows.
   const csvText = `\uFEFF${lines.join("\r\n")}\r\n`;
   await writeTextAtomic(outputFile, csvText);
-  emit({ phase: "complete", processed: items.length, total: items.length, message: "CSV 导出完成" });
+  emit({ phase: "complete", processed: items.length, total: items.length, message: "CSV export complete" });
   return { rows: items.length, outputFile, warnings, errors };
   } finally {
     await authorization.release();

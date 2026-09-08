@@ -26,17 +26,17 @@ export function formatVideoFrameRate(value) {
 /** Build the fixed, read-only field sequence used by the gallery details popover. */
 export function buildGalleryMediaDetailRows(item, resolvers = {}) {
   const rows = [
-    { key: "filename", label: "文件名", value: getMediaFilename(item) },
-    { key: "shooting-date", label: "拍摄日期", value: displayValue(item?.FileSystem?.ShootingTimeString) },
-    { key: "modification-date", label: "修改日期", value: displayValue(item?.FileSystem?.ModificationTimeString) },
-    { key: "file-size", label: "文件大小", value: formatFileSize(item?.FileSystem?.FileSize) },
-    { key: "resolution", label: "分辨率", value: formatMediaResolution(item) },
+    { key: "filename", label: "File name", value: getMediaFilename(item) },
+    { key: "shooting-date", label: "Date taken", value: displayValue(item?.FileSystem?.ShootingTimeString) },
+    { key: "modification-date", label: "Date modified", value: displayValue(item?.FileSystem?.ModificationTimeString) },
+    { key: "file-size", label: "File size", value: formatFileSize(item?.FileSystem?.FileSize) },
+    { key: "resolution", label: "Resolution", value: formatMediaResolution(item) },
   ];
 
   if (item?.FileSystem?.FileType === "video") {
     rows.push(
-      { key: "frame-rate", label: "帧率", value: formatVideoFrameRate(item?.Video?.FrameRate) },
-      { key: "duration", label: "时长", value: formatDuration(item?.Video?.DurationSeconds) },
+      { key: "frame-rate", label: "Frame rate", value: formatVideoFrameRate(item?.Video?.FrameRate) },
+      { key: "duration", label: "Duration", value: formatDuration(item?.Video?.DurationSeconds) },
     );
   }
 
@@ -44,8 +44,8 @@ export function buildGalleryMediaDetailRows(item, resolvers = {}) {
     ? item.Customization.TagIds.map((id) => resolvers.getTagText?.(id) || "").filter(Boolean).join(", ")
     : "";
   rows.push(
-    { key: "location", label: "地点", value: displayValue(resolvers.getLocationName?.(item?.Location?.LocationId)) },
-    { key: "tags", label: "标签", value: displayValue(tags) },
+    { key: "location", label: "Location", value: displayValue(resolvers.getLocationName?.(item?.Location?.LocationId)) },
+    { key: "tags", label: "Tags", value: displayValue(tags) },
   );
   return rows;
 }

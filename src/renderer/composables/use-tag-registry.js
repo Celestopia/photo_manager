@@ -27,7 +27,7 @@ export function useTagRegistry({
 
   const managerFilteredTags = computed(() => {
     const keyword = tagManager.search.trim();
-    const source = [...tagRegistry.value].sort((a, b) => a.Text.localeCompare(b.Text, "zh-CN"));
+    const source = [...tagRegistry.value].sort((a, b) => a.Text.localeCompare(b.Text, "en-US"));
     return keyword ? source.filter((tag) => tag.Text.includes(keyword) || tag.Description.includes(keyword)) : source;
   });
 
@@ -59,7 +59,7 @@ export function useTagRegistry({
     const selected = new Set(selectedTagIdsForTarget(target));
     return tagRegistry.value
       .filter((tag) => !keyword || tag.Text.includes(keyword) || tag.Description.includes(keyword))
-      .sort((a, b) => Number(selected.has(b.TagId)) - Number(selected.has(a.TagId)) || a.Text.localeCompare(b.Text, "zh-CN"));
+      .sort((a, b) => Number(selected.has(b.TagId)) - Number(selected.has(a.TagId)) || a.Text.localeCompare(b.Text, "en-US"));
   }
 
   function getTagOptions(target) { return getTagCandidates(target).slice(0, 50); }
@@ -86,7 +86,7 @@ export function useTagRegistry({
     if (!definition) return;
     const ids = selectedTagIdsForTarget(target);
     if (ids.includes(tagId)) {
-      showToastMessage(`标签“${definition.Text}”已存在，添加失败`);
+      showToastMessage(`Tag “${definition.Text}” is already assigned`);
     } else {
       ids.push(tagId);
       rememberRecentTag(tagId);
@@ -111,12 +111,12 @@ export function useTagRegistry({
 
   async function createTagAndSelect() {
     const text = normalizeText(tagCreate.text);
-    if (!text) { tagCreate.error = "标签名称不能为空"; return; }
+    if (!text) { tagCreate.error = "Tag name is required"; return; }
     const result = await api.createTag({ text, description: normalizeText(tagCreate.description) });
-    if (!result?.ok) { tagCreate.error = result?.error || "创建标签失败"; return; }
+    if (!result?.ok) { tagCreate.error = result?.error || "Could not create tag"; return; }
     applyTagRegistry(result.tags);
     const target = tagCreate.target;
-    if (target === "manager") showToastMessage(`已创建标签“${result.tag.Text}”`);
+    if (target === "manager") showToastMessage(`Created tag “${result.tag.Text}”`);
     else addTagToTarget(target, result.tag.TagId);
     closeCreateTagMenu();
   }
@@ -148,8 +148,8 @@ export function useTagRegistry({
   async function saveTagEdit() {
     const tagId = tagManager.editingId;
     const text = normalizeText(tagManager.editText);
-    if (!tagId) { tagManager.error = "标签不存在"; return; }
-    if (!text) { tagManager.error = "标签名称不能为空"; return; }
+    if (!tagId) { tagManager.error = "Tag not found"; return; }
+    if (!text) { tagManager.error = "Tag name is required"; return; }
     const previousText = getTagText(tagId);
     tagManager.saving = true;
     let result;
@@ -157,14 +157,14 @@ export function useTagRegistry({
       result = await api.updateTag({ tagId, text, description: normalizeText(tagManager.editDescription) });
     } catch {
       tagManager.saving = false;
-      tagManager.error = "保存标签失败";
+      tagManager.error = "Could not save tag";
       return;
     }
     tagManager.saving = false;
-    if (!result?.ok) { tagManager.error = result?.error || "保存标签失败"; return; }
+    if (!result?.ok) { tagManager.error = result?.error || "Could not save tag"; return; }
     applyTagRegistry(result.tags);
     cancelTagEdit();
-    showToastMessage(previousText === text ? "标签已更新" : `已将标签“${previousText}”重命名为“${text}”`);
+    showToastMessage(previousText === text ? "Tag updated" : `Renamed tag “${previousText}” to “${text}”`);
   }
 
   function syncDeletedTagLocally(tagId, patchGallery) {
@@ -175,9 +175,9 @@ export function useTagRegistry({
   }
   async function deleteTagGlobally(tag) {
     const usage = Number(tag?.UsageCount || 0);
-    if (!window.confirm(`确定全局删除标签“${tag.Text}”？这会从 ${usage} 个媒体中移除。`)) return;
+    if (!window.confirm(`Delete tag “${tag.Text}” from the entire library? This will remove it from ${usage} media item(s).`)) return;
     const result = await api.deleteTagGlobally({ tagId: tag.TagId });
-    if (!result?.ok) { showToastMessage(`删除标签失败：${result?.error || "未知错误"}`); return; }
+    if (!result?.ok) { showToastMessage(`Could not delete tag: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.tag;
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
       filterBeforeDelete, tag.TagId, unassignedFilter, result.updatedCount,
@@ -185,7 +185,7 @@ export function useTagRegistry({
     applyTagRegistry(result.tags);
     syncDeletedTagLocally(tag.TagId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
     if (shouldRefreshGallery) await queryGallery();
-    showToastMessage(`已全局删除标签“${tag.Text}”`);
+    showToastMessage(`Deleted tag “${tag.Text}” from the library`);
   }
 
   function resetTagState() {
