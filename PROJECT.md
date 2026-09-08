@@ -174,7 +174,7 @@ Every entry point and CLI maintenance script follows the same boundaries:
 1. Acquire Electron's single-instance lock; a second process activates the existing window.
 2. Before Electron is ready, configure roaming/local global directories and read and normalize roaming `config.yml`.
 3. Validate `ffmpeg.exe` and `ffprobe.exe`.
-4. Create the window and show the library-entry page.
+4. Create the window hidden, load the library-entry page, and show it maximized.
 5. If a last successful path exists, read the actual name from its manifest and prefill the name and full path without loading it.
 6. Validate and load only after the user enters or selects an existing library.
 7. Enter the gallery and update the last-library path only after the lock, manifest, five JSONL files, and all memory indexes load successfully.

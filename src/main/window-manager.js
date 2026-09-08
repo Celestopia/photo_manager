@@ -1,7 +1,6 @@
-const { BrowserWindow, dialog } = require("electron");
 const fs = require("node:fs");
 
-async function createMainWindow(options) {
+async function createMainWindow(options, dependencies = {}) {
   const {
     rendererIndexPath,
     preloadPath,
@@ -11,11 +10,16 @@ async function createMainWindow(options) {
     getInitializationWorker,
     cancelInitializationAndClose,
   } = options;
-  const window = new BrowserWindow({
+  const electron = dependencies.electron || require("electron");
+  const BrowserWindowClass = electron.BrowserWindow;
+  const dialog = electron.dialog;
+  const rendererExists = dependencies.rendererExists || fs.existsSync;
+  const window = new BrowserWindowClass({
     width: 1600,
     height: 1000,
     minWidth: 1000,
     minHeight: 700,
+    show: false,
     frame: false,
     webPreferences: {
       preload: preloadPath,
@@ -80,7 +84,7 @@ async function createMainWindow(options) {
     if (choice === 1) cancelInitializationAndClose(worker);
   });
 
-  if (fs.existsSync(rendererIndexPath)) {
+  if (rendererExists(rendererIndexPath)) {
     await window.loadFile(rendererIndexPath);
   } else {
     const message = "Renderer bundle not found. Run `npm run build:renderer` first.";
@@ -91,6 +95,8 @@ async function createMainWindow(options) {
       )}`,
     );
   }
+  window.maximize();
+  window.show();
   emitWindowState();
   return window;
 }
