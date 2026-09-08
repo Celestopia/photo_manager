@@ -18,8 +18,9 @@ const {
   extractVideoFrame,
   sanitizeMediaError,
 } = require("./media-tools");
+const { resolveProgramResourceRoot } = require("./program-paths.js");
 
-const APP_ROOT = path.resolve(__dirname, "..");
+const APP_ROOT = resolveProgramResourceRoot();
 
 const DEFAULT_THUMBNAIL_CONFIG = {
   size: 320,

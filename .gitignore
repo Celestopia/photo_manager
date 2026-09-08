@@ -10,9 +10,6 @@ pnpm-debug.log*
 
 *.log
 
-# Local development library (all library-owned data lives under .photo_manager/)
-/photo_workspace/
-
 # Temporary files
 *.tmp
 *.temp

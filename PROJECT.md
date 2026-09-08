@@ -23,7 +23,7 @@ The application interface is English-only; there is no localization layer or lan
 ## 2. Platform, Technology, and Boundaries
 
 - Target: Windows 10/11 x64.
-- Desktop container: Electron 35.
+- Desktop container: Electron 44.
 - Renderer: Vue 3 SFC and Vite.
 - Image parsing and thumbnails: Sharp and exifr.
 - Video probing and frame extraction: bundled Windows x64 FFmpeg/FFprobe 8.1.2.
@@ -38,6 +38,14 @@ Supported media extensions:
 - Videos: `.mp4`, `.mov`, `.mkv`, `.avi`.
 
 An extension only determines scan eligibility. A record may still exist when its contents are damaged or its codec is unsupported; `Picture.ProbeStatus` or `Video.ProbeStatus` represents the technical parsing state.
+
+### 2.1 Windows Packaging
+
+`electron-builder.yml` defines an x64 NSIS assisted installer and an unpacked smoke-test target. The package contains the main process, preload, shared schemas, internal maintenance scripts, the built renderer, and production dependencies inside `app.asar`. Sharp's native packages are unpacked. FFmpeg and FFprobe are copied as executable program resources to `resources/tools/ffmpeg/bin`; they are never stored in ASAR or copied to AppData.
+
+The installed runtime distinguishes the code root from the program-resource root. The code root contains `app.asar` and is used to load the renderer, preload, and maintenance worker. The program-resource root is the repository root in development and `process.resourcesPath` when packaged. `PHOTO_MANAGER_RESOURCE_ROOT` passes that real directory to maintenance child processes, which also use it as their working directory. Standalone scripts fall back to the repository root when the variable is absent. This prevents executable lookup and child-process working directories from resolving inside the read-only ASAR virtual filesystem.
+
+`npm run pack:win` builds the renderer and creates an unpacked application under `release/win-unpacked/`. `npm run dist:win` first runs all tests, builds the renderer, and creates `release/PhotoManager-<version>-x64-Setup.exe`. Release builds require the Git LFS FFmpeg files to be materialized. Code signing is optional for local builds but required by release policy before public distribution; credentials must come from the environment and must never be committed.
 
 ## 3. Application Configuration and Library Data
 
@@ -54,7 +62,7 @@ An extension only determines scan eligibility. A record may still exist when its
 
 The application and standalone maintenance scripts use the same configuration module. When the file is absent, the caller creates its parent directory, writes the complete defaults, and continues. Invalid YAML is left untouched and defaults are used for that run. There is no runtime configuration UI; the renderer can only read normalized configuration.
 
-An absolute `media.ffmpegDir` is used directly. A relative value is always resolved from the application installation root, never from the relocated AppData configuration directory. In development the application root is the project root. A future packaged entry point must explicitly pass the packaged resource root if that location changes.
+An absolute `media.ffmpegDir` is used directly. A relative value is always resolved from the program-resource root, never from the relocated AppData configuration directory. In development that root is the project root; in an installed build it is Electron's `resources` directory.
 
 ### 3.2 Private Application State
 
@@ -564,6 +572,7 @@ Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation p
 ### 21.1 `scripts/`
 
 - `application-paths.js`: roaming/local paths and pre-ready Electron storage setup.
+- `program-paths.js`: development/packaged program-resource root resolution and worker propagation contract.
 - `application-config.js`: complete defaults and shared strict configuration loading.
 - `library-core.js`, `library-access.js`, `library-lock.js`, `library-backup.js`, `library-transaction.js`: boundaries, authorization, locking, snapshots, atomic writes, transactions, and recovery.
 - `operation-progress.js`, `maintenance-worker.js`: structured operation reporting and child-process dispatch.
@@ -607,6 +616,8 @@ git diff --check
 ```
 
 Desktop acceptance also covers entry prefilling/manual open, lock warnings, settings and maintenance progress, returning to entry, image viewing, and video fallback.
+
+Packaging acceptance additionally requires `npm run pack:win`, launch on a Windows account without Node.js, FFmpeg/FFprobe validation, image/video thumbnail generation, all four maintenance operations, paths containing spaces and Unicode, single-instance and lock behavior, and confirmation that runtime writes remain confined to AppData and the active library. Public installers must be Authenticode-signed and tested through install, upgrade, and uninstall flows.
 
 ## 23. Development Invariants
 

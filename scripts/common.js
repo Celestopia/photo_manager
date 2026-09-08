@@ -31,8 +31,9 @@ const {
   gpsFromExif,
   resolveMediaShootingTime,
 } = require("./media-time");
+const { resolveProgramResourceRoot } = require("./program-paths.js");
 
-const APP_ROOT = path.resolve(__dirname, "..");
+const APP_ROOT = resolveProgramResourceRoot();
 
 /**
  * Load the shared roaming application config used by Electron and standalone

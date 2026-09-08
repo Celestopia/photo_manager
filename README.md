@@ -14,13 +14,13 @@ See [PROJECT.md](PROJECT.md) for the complete architecture, data contracts, and 
 
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
-## Requirements
+## Install
 
-- Windows 10 or 11, x64
-- Node.js and npm
-- Git LFS for the bundled FFmpeg executables
+Run the x64 NSIS installer on Windows 10 or 11. The installed application bundles Electron, FFmpeg, FFprobe, and all runtime dependencies; Node.js is not required. Application data remain in AppData, and libraries remain in their selected directories when PhotoManager is upgraded or uninstalled.
 
-## Install and Run
+## Development
+
+Development requires Node.js 20.19 or newer (or Node.js 22.12 or newer), npm, and Git LFS for the bundled FFmpeg executables.
 
 ```powershell
 git lfs install
@@ -30,6 +30,15 @@ npm start
 ```
 
 `npm start` builds the renderer and launches Electron. FFmpeg and FFprobe are required to initialize or open a library; the bundled Windows x64 tools live under `tools/ffmpeg/bin/`.
+
+Create an unpacked Windows application for smoke testing or an installable NSIS executable with:
+
+```powershell
+npm run pack:win
+npm run dist:win
+```
+
+Both commands build the renderer first; `dist:win` also runs the complete test suite. Packaging output is written under `release/`.
 
 On first use, select either an existing PhotoManager library or an ordinary directory to initialize. Initialization scans supported media, calculates hashes, extracts technical metadata, and creates the library management directory. It never modifies the original media files.
 

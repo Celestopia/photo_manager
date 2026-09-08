@@ -1,0 +1,41 @@
+appId: com.photomanager.desktop
+productName: PhotoManager
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - package.json
+  - dist/renderer/**/*
+  - src/main/**/*
+  - src/shared/**/*
+  - scripts/**/*
+
+asar: true
+asarUnpack:
+  - node_modules/sharp/**/*
+  - node_modules/@img/**/*
+
+extraResources:
+  - from: tools/ffmpeg/bin
+    to: tools/ffmpeg/bin
+    filter:
+      - "*.exe"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.svg
+  artifactName: PhotoManager-${version}-${arch}-Setup.${ext}
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PhotoManager

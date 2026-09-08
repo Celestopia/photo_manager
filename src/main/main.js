@@ -74,11 +74,13 @@ const {
   walkFiles,
   extensionType,
 } = require(path.join(__dirname, "..", "..", "scripts", "common.js"));
+const { PROGRAM_RESOURCE_ROOT_ENV } = require(path.join(__dirname, "..", "..", "scripts", "program-paths.js"));
 
-const APP_ROOT = path.resolve(__dirname, "..", "..");
+const APP_CODE_ROOT = path.resolve(__dirname, "..", "..");
+const PROGRAM_RESOURCE_ROOT = app.isPackaged ? process.resourcesPath : APP_CODE_ROOT;
 const APPLICATION_PATHS = resolveApplicationPaths();
 configureElectronStoragePaths(app, APPLICATION_PATHS);
-const RENDERER_INDEX_PATH = path.join(APP_ROOT, "dist", "renderer", "index.html");
+const RENDERER_INDEX_PATH = path.join(APP_CODE_ROOT, "dist", "renderer", "index.html");
 
 const state = createApplicationRuntime();
 let config = null;
@@ -444,7 +446,7 @@ function getLibraryState(extra = {}) {
 
 async function checkMediaTools() {
   try {
-    const tools = await validateMediaTools(APP_ROOT, config.media);
+    const tools = await validateMediaTools(PROGRAM_RESOURCE_ROOT, config.media);
     state.mediaToolsState = { available: true, error: "", versions: tools.versions };
     appendLog(`media-tools ${tools.versions.ffmpeg}; ${tools.versions.ffprobe}`);
   } catch (error) {
@@ -612,12 +614,13 @@ function runOperationWorker(operation, root, options = {}) {
     error.code = "MAINTENANCE_RUNNING";
     return Promise.reject(error);
   }
-  const workerPath = path.join(APP_ROOT, "scripts", "maintenance-worker.js");
+  const workerPath = path.join(APP_CODE_ROOT, "scripts", "maintenance-worker.js");
   const worker = fork(workerPath, [operation, root, JSON.stringify(options)], {
-    cwd: APP_ROOT,
+    cwd: PROGRAM_RESOURCE_ROOT,
     windowsHide: true,
     env: {
       ...process.env,
+      [PROGRAM_RESOURCE_ROOT_ENV]: PROGRAM_RESOURCE_ROOT,
       PHOTO_MANAGER_LIBRARY_SESSION: operation === "initialize" ? "" : state.activeLibrary?.sessionId || "",
     },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
