@@ -2,7 +2,7 @@
 
 PhotoManager is a local-first Windows desktop application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
 
-See [PROJECT.md](PROJECT.md) for the complete architecture, data contracts, and interaction rules.
+See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detailed data contracts and interaction rules. The [documentation index](docs/README.md) lists the maintained references.
 
 ## Features
 
