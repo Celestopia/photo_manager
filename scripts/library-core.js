@@ -48,6 +48,10 @@ function resolveLibraryPaths(rawRoot) {
     backupDir: path.join(managerDir, "backups"),
     logDir: path.join(managerDir, "logs"),
     tempDir: path.join(managerDir, "temp"),
+    agentDir: path.join(managerDir, "agent"),
+    agentIndexDir: path.join(managerDir, "agent", "index"),
+    agentOperationsDir: path.join(managerDir, "agent", "operations"),
+    agentTempDir: path.join(managerDir, "temp", "agent"),
   };
 }
 
@@ -126,8 +130,11 @@ async function readLibraryManifest(paths) {
 
 async function writeLibraryManifest(paths, manifest) {
   const normalized = validateLibraryManifest(manifest);
-  await writeTextAtomic(paths.manifestFile, yaml.dump(normalized, { noRefs: true, lineWidth: 120 }));
+  await writeTextAtomic(paths.manifestFile, serializeLibraryManifest(normalized));
   return normalized;
+}
+function serializeLibraryManifest(manifest) {
+  return yaml.dump(validateLibraryManifest(manifest), { noRefs: true, lineWidth: 120 });
 }
 
 async function ensureLibraryDirectories(paths) {
@@ -249,6 +256,7 @@ module.exports = {
   validateLibraryManifest,
   readLibraryManifest,
   writeLibraryManifest,
+  serializeLibraryManifest,
   ensureLibraryDirectories,
   assertDirectoryWritable,
   writeTextAtomic,

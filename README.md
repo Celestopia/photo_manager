@@ -2,7 +2,7 @@
 
 PhotoManager is a local-first Windows desktop application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
 
-See [PROJECT.md](PROJECT.md) for the complete architecture, data contracts, and interaction rules.
+See [PROJECT.md](PROJECT.md) for the architecture overview and links to detailed data contracts and interaction rules. The [documentation index](docs/README.md) also includes the permanent [agent design](docs/agent-design/README.md), which describes planned functionality rather than current features.
 
 ## Features
 
@@ -76,9 +76,11 @@ Application-wide data stay outside the installation directory:
 
 The generated `config.yml` controls shared thumbnail, FFmpeg, backup-retention, and UI defaults. Relative FFmpeg paths are resolved from the installation directory. When updating from a release before v0.25.0, copy any customized root `config.yml` to the roaming path before first launch; per-library data are unaffected.
 
-PhotoManager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See [PROJECT.md](PROJECT.md) for the exact persisted schemas and safety rules.
+PhotoManager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See the [data model](docs/reference/data-model.md) and [library lifecycle and persistence](docs/reference/library-lifecycle.md) for the exact schemas and safety rules.
 
 ## Maintenance Commands
+
+Native agent support is being implemented. The working Assistant panel supports local semantic search, selected-media chat and reviewed metadata proposals. Indexing stays on your computer; cloud chat/analysis requires an explicit selected-content send. Local models require a separate download of about 278 MiB. Settings, index management and 30-day conditional edit undo are additional features. See [current behavior and validation status](docs/reference/agent-support.md) before using this development version.
 
 Every standalone command requires an explicit library root. Close that library in the desktop application before running a command directly.
 

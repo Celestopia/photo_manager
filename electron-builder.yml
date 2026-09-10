@@ -16,6 +16,7 @@ asar: true
 asarUnpack:
   - node_modules/sharp/**/*
   - node_modules/@img/**/*
+  - node_modules/onnxruntime-node/**/*
 
 extraResources:
   - from: tools/ffmpeg/bin

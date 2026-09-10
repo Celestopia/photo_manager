@@ -1,4 +1,4 @@
-const { clipboard, dialog, ipcMain, nativeImage, shell } = require("electron");
+const { clipboard, dialog, ipcMain: electronIpcMain, nativeImage, shell } = require("electron");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -27,6 +27,25 @@ function registerIpcHandlers(options) {
     services,
   } = options;
   const { albumService, locationService, metadataEditService, personService, tagService } = services;
+  const lifecycle = new Set(["library:open", "library:close", "library:initialize", "maintenance:start"]);
+  const mutation = channel => lifecycle.has(channel) || /:(create|update|delete-global|update-info|update-customization|batch-update)$/.test(channel);
+  const ipcMain = { handle(channel, handler) {
+    electronIpcMain.handle(channel, async (event, ...args) => {
+      if (event.sender !== runtime.mainWindow?.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error("Untrusted IPC sender");
+      if (!options.coordinator) return handler(event, ...args);
+      if (mutation(channel)) {
+        if (lifecycle.has(channel)) await options.agent?.reset();
+        else if (options.agent?.busy) return { ok: false, error: "Stop the agent operation before editing library data" };
+        const sessionId = runtime.activeLibrary?.sessionId;
+        return options.coordinator.run(() => {
+          if (!lifecycle.has(channel) && sessionId !== runtime.activeLibrary?.sessionId) return { ok: false, error: "Library session changed" };
+          return handler(event, ...args);
+        });
+      }
+      if (channel === "gallery:query" || channel.endsWith(":list") || channel === "photo:copy-json") await options.coordinator.drain();
+      return handler(event, ...args);
+    });
+  } };
 
   ipcMain.handle("app:get-config", async () => toSerializable(runtime.config));
 

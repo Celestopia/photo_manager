@@ -2,6 +2,8 @@
 
 .gallery-main { flex: 1 1 auto; height: auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px; }
 .gallery-main.with-batch-panel { grid-template-columns: minmax(0, 1fr) 320px; }
+.gallery-main.with-agent-panel { grid-template-columns: minmax(0, 1fr) 420px; }
+.agent-draft-bar { position:fixed; bottom:0; right:10px; width:400px; display:flex; align-items:center; gap:8px; padding:10px; background:#eef3f8; border-top:1px solid #ccd6e0; z-index:30; }
 .gallery-content { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: 12px; }
 .gallery-controls-host { min-width: 0; min-height: 48px; display: flex; justify-content: flex-end; align-items: flex-start; }
 .gallery-controls-drawer { width: 28px; min-width: 0; display: flex; justify-content: flex-start; align-items: center; }

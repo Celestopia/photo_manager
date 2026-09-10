@@ -7,7 +7,12 @@
  * 3) Serve IPC handlers for query/update/copy/window actions.
  * 4) Create and monitor the renderer window.
  */
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, utilityProcess, ipcMain, shell, dialog } = require("electron");
+const { createLibraryWriteCoordinator } = require("./library-write-coordinator");
+const { createAgentService } = require("./agent/agent-service");
+const { registerAgentIpc } = require("./agent/ipc");
+const { sourceToken } = require("./agent/operation-store");
+const { expireReceipts } = require("./agent/storage-maintenance");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -83,6 +88,8 @@ configureElectronStoragePaths(app, APPLICATION_PATHS);
 const RENDERER_INDEX_PATH = path.join(APP_CODE_ROOT, "dist", "renderer", "index.html");
 
 const state = createApplicationRuntime();
+const writeCoordinator = createLibraryWriteCoordinator();
+let agent = null;
 let config = null;
 let appState = { lastLibraryPath: "" };
 let lastLibraryName = "";
@@ -363,6 +370,7 @@ const { execute: executeGalleryQuery, groupByDate } = createGalleryQueryService(
   unassignedFilter: UNASSIGNED_FILTER,
 });
 const { enrichItem, clearThumbnailStatusCache } = createGalleryItemEnricher({
+  getSourceToken: item => sourceToken(item, { tags: state.tagRegistryIndex, albums: state.albumRegistryIndex, people: state.personRegistryIndex, locations: state.locationRegistryIndex }),
   getLibrary: requireOpenLibrary,
   assertPathInsideLibrary,
   thumbnailAbsolutePath,
@@ -515,6 +523,7 @@ async function openLibrary(rawRoot, options = {}) {
     });
     state.activeLibrary = { state: "opening", sessionId: lock.SessionId, paths, manifest, lock };
     const recovery = await recoverPendingTransaction(paths);
+    await expireReceipts(paths, manifest.libraryId);
     if (recovery.recovered) appendLog(`library-transaction ${recovery.action} reason=${recovery.reason || "unknown"}`);
     await loadAllLibraryIndexes();
     if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
@@ -534,6 +543,7 @@ async function openLibrary(rawRoot, options = {}) {
 }
 
 async function closeLibrary() {
+  await agent?.reset();
   if (state.maintenanceState.running) {
     const error = new Error("Cannot close the library while maintenance is running");
     error.code = "MAINTENANCE_RUNNING";
@@ -699,6 +709,7 @@ function createDomainServices() {
   const commonRegistryOptions = {
     getMetadata: () => state.metadataIndex,
     requireOpenLibrary,
+    getSourceToken: item => enrichItem(item).__sourceToken,
     prepareLibraryWrite,
     saveTransaction: saveRegistryAndMetadataTransaction,
     appendLog,
@@ -818,6 +829,8 @@ function createDomainServices() {
     saveRegistry: saveLocationRegistryMap,
   });
   const metadataEditService = createMetadataEditService({
+    persistDraft: (next, payload) => agent.saveReviewedDraft(next, payload),
+    getSourceToken: item => enrichItem(item).__sourceToken,
     getMetadata: () => state.metadataIndex,
     requireOpenLibrary,
     normalizeRegisteredTags,
@@ -837,6 +850,20 @@ function createDomainServices() {
  * Channels are intentionally explicit to keep the API surface narrow and auditable.
  */
 function registerIpcHandlers() {
+  agent = createAgentService({
+    applicationPaths: APPLICATION_PATHS, coordinator: writeCoordinator,
+    getLibrary: () => requireOpenLibrary({ writable: true }), getMetadata: () => state.metadataIndex,
+    getRegistries: () => ({ tags: state.tagRegistryIndex, albums: state.albumRegistryIndex, people: state.personRegistryIndex, locations: state.locationRegistryIndex }),
+    queryScope: query => executeGalleryQuery(state.metadataIndex.values(), query).items,
+    prepareWrite: prepareLibraryWrite, publish: next => { state.metadataIndex = next; },
+    enrichItem,
+    resourceRoot: PROGRAM_RESOURCE_ROOT, getMediaConfig: () => config.media,
+    getRuntime: () => config?.agent,
+    reloadRuntime: () => { const loaded = loadConfig(APPLICATION_PATHS.configFile); config = loaded.config; if (loaded.warning) appendLog(loaded.warning); },
+    spawnEmbeddingWorker: entry => utilityProcess.fork(entry, [], { serviceName: "PhotoManager local embeddings" }),
+    emit: snapshot => { if (!state.mainWindow?.isDestroyed()) state.mainWindow?.webContents.send("agent:state", toSerializable(snapshot)); },
+  });
+  registerAgentIpc({ ipcMain, shell, dialog, getWindow: () => state.mainWindow, agent, coordinator: writeCoordinator });
   const runtime = {
     get config() { return config; },
     set config(next) { config = next; },
@@ -848,6 +875,7 @@ function registerIpcHandlers() {
     get metadataIndex() { return state.metadataIndex; },
   };
   registerMainIpcHandlers({
+    coordinator: writeCoordinator, agent,
     runtime,
     toSerializable,
     appendLog,
@@ -879,6 +907,7 @@ function registerIpcHandlers() {
  * 4) load the renderer entry; the user may then request the prefilled last library to open
  */
 async function bootstrap() {
+  await agent?.initialize();
   const configResult = loadConfig(APPLICATION_PATHS.configFile);
   config = configResult.config;
   if (configResult.warning) appendLog(configResult.warning);
@@ -927,7 +956,13 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", () => {
+let shutdownDrained = false;
+app.on("before-quit", (event) => {
+  if (!shutdownDrained && agent) {
+    event.preventDefault();
+    agent.dispose().then(() => writeCoordinator.drain()).then(() => { shutdownDrained = true; app.quit(); }).catch(error => appendLog(`Shutdown drain failed: ${error.message}`));
+    return;
+  }
   if (state.activeLibrary) {
     const closing = state.activeLibrary;
     state.activeLibrary = null;

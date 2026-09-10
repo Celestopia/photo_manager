@@ -1,5 +1,6 @@
 // Injection keys keep component dependencies explicit without introducing a global store.
 export const LIBRARY_CONTEXT = Symbol("library-context");
+export const AGENT_CONTEXT = Symbol("agent-context");
 export const GALLERY_CONTEXT = Symbol("gallery-context");
 export const GALLERY_FILTER_CONTEXT = Symbol("gallery-filter-context");
 export const VIEWER_CONTEXT = Symbol("viewer-context");

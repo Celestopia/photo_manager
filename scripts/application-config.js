@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const yaml = require("js-yaml");
 const { DEFAULT_MEDIA_CONFIG, normalizeMediaConfig } = require("./media-tools.js");
+const { DEFAULT_AGENT_RUNTIME, validateAgentRuntime } = require('../src/shared/agent-runtime-schema');
 
 const DEFAULT_CONFIG = Object.freeze({
   thumbnail: {
@@ -12,6 +13,7 @@ const DEFAULT_CONFIG = Object.freeze({
   },
   media: { ...DEFAULT_MEDIA_CONFIG },
   backup: { retentionCount: 10 },
+  agent: structuredClone(DEFAULT_AGENT_RUNTIME),
   ui: {
     gallery: {
       minCardWidth: 190,
@@ -55,6 +57,7 @@ function normalizeConfig(parsed) {
       retentionCount: Math.max(1, Math.trunc(Number(parsed?.backup?.retentionCount) || DEFAULT_CONFIG.backup.retentionCount)),
     },
     ui: mergeKnownShape(DEFAULT_CONFIG.ui, parsed?.ui),
+    agent: validateAgentRuntime(parsed?.agent ?? DEFAULT_AGENT_RUNTIME),
   };
 }
 

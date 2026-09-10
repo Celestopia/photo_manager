@@ -11,6 +11,7 @@ function createGalleryItemEnricher({
   thumbnailAbsolutePath,
   listThumbnailFiles,
   now = Date.now,
+  getSourceToken,
 }) {
   let thumbnailDirectory = "";
   let thumbnailFileNames = null;
@@ -49,6 +50,7 @@ function createGalleryItemEnricher({
     const thumbnailStatus = getThumbnailStatus(thumbnailPath, library.paths.thumbnailDir);
     return {
       ...item,
+      ...(getSourceToken ? { __sourceToken: getSourceToken(item) } : {}),
       __absolutePath: absolutePath,
       __thumbnailPath: thumbnailPath,
       __thumbnailAvailable: thumbnailStatus.available,

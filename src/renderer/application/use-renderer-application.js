@@ -15,6 +15,8 @@ import { useAlbumRegistry } from "../composables/use-album-registry.js";
 import { useLocationRegistry } from "../composables/use-location-registry.js";
 import { useMediaEditor } from "../composables/use-media-editor.js";
 import { useMediaViewer } from "../composables/use-media-viewer.js";
+import { useAgent } from "../composables/use-agent.js";
+import { AGENT_CONTEXT } from "../context/renderer-contexts.js";
 import {
   ALBUM_CONTEXT,
   GALLERY_CONTEXT,
@@ -281,6 +283,7 @@ export function useRendererApplication() {
       saving,
       activeEditField,
       setDraftFromItem,
+      acceptAgentProposal,
       requestEdit,
       removeTagAt,
       removePersonAt,
@@ -558,6 +561,15 @@ export function useRendererApplication() {
       onReturnToGallery: requestGalleryReturn,
     });
 
+    const agent = useAgent({ api: API, getView: () => view.value,
+      getMediaIds: () => view.value === "viewer" ? (selectedItem.value ? [selectedItem.value.MediaId] : []) : [...gallerySelection.value],
+      getQuery: () => query, openMedia: item => openViewer(item), refresh: () => queryGallery(),
+      acceptDraft: acceptAgentProposal,
+      getDraft: (mediaId, field) => selectedItem.value?.MediaId === mediaId ? editDraft[field] : undefined,
+      getMediaItem: id => selectedItem.value?.MediaId === id ? selectedItem.value : orderedItems.value.find(item => item.MediaId === id),
+    });
+    provide(AGENT_CONTEXT, agent);
+
     // Application-level viewer defaults are loaded before a library can enter the gallery.
     async function loadConfig() {
       config.value = await API.getConfig();
@@ -566,6 +578,7 @@ export function useRendererApplication() {
     }
 
     function resetLibraryUiState() {
+      agent.reset();
       resetViewerState();
       resetGalleryState();
       resetTagState();
@@ -588,6 +601,7 @@ export function useRendererApplication() {
     }
 
     onMounted(async () => {
+      agent.initialize();
       // Initial render flow: application config -> library state -> entry-page prefill.
       await loadConfig();
       await initializeWindowControls();
@@ -600,6 +614,7 @@ export function useRendererApplication() {
     });
 
     onBeforeUnmount(() => {
+      agent.dispose();
       // Cleanup global listeners when app unmounts.
       releaseCurrentMedia();
       disposeMediaViewer();

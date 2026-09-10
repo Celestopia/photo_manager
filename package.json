@@ -27,10 +27,15 @@
     "vite": "^8.2.2",
     "vue": "^3.5.42"
   },
+  "overrides": {
+    "sharp": "$sharp"
+  },
   "dependencies": {
+    "@huggingface/transformers": "3.7.2",
     "exifr": "^7.1.3",
     "geo-tz": "^8.1.8",
     "js-yaml": "^4.3.2",
+    "markdown-it": "15.0.1",
     "sharp": "^0.35.4"
   }
 }

@@ -2,13 +2,14 @@
 <header class="topbar">
   <div class="left-tools"><button class="btn icon-btn" data-tip="Back to Gallery" @click="closeViewer"><img class="icon" :src="ICONS.gallery" alt="Back to Gallery" /></button></div>
   <div class="viewer-title">{{ viewerHeaderTime }}</div>
+  <button class="btn" @click="agent.toggle">Assistant</button>
   <div class="window-controls">
     <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>
     <button class="btn ghost icon-btn" :data-tip="windowToggleTip" @click="toggleWindowMaximizeRestore"><img class="icon" :src="windowToggleIcon" :alt="windowToggleTip" /></button>
     <button class="btn ghost danger icon-btn" data-tip="Close" @click="doWindowAction(WINDOW_ACTIONS.close)"><img class="icon" :src="ICONS.windowClose" alt="Close" /></button>
   </div>
 </header>
-<main class="viewer-main" :style="ratioStyle">
+<main class="viewer-main" :style="[ratioStyle, agent.state.open ? { gridTemplateColumns: `${showLeftPanel ? '240px' : '0px'} minmax(0, 1fr) 400px` } : {}]">
   <aside class="side-panel left-panel" :class="{ collapsed: !showLeftPanel }">
     <h3>{{ isSelectedVideo ? 'Video Information' : 'Image Information' }}</h3>
     <dl>
@@ -145,7 +146,9 @@
       <button v-if="!isSelectedVideo" @click="contextCopyImage">Copy Image</button><button @click="contextCopyPath">Copy File Path</button><button @click="contextCopyJson">Copy Media Metadata JSON</button><button @click="openCurrentWithSystem">Open with Default App</button><button @click="showCurrentInFolder">Show in File Explorer</button>
     </div>
   </section>
-  <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
+  <AgentPanel v-if="agent.state.open" viewer />
+  <div v-if="agent.state.open && editingDirty" class="agent-draft-bar"><span>Unsaved draft</span><button class="btn btn-primary" :disabled="saving || agent.state.running" @click="confirmEdit">Save all changes</button><button class="btn" :disabled="saving || agent.state.running" @click="cancelEdit">Discard draft</button></div>
+  <aside v-show="!agent.state.open" class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
     <h3>Customization</h3>
     <label>Title</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
@@ -290,6 +293,8 @@
 </template>
 
 <script setup>
+import AgentPanel from './AgentPanel.vue';
+import { AGENT_CONTEXT } from '../context/renderer-contexts.js';
 import { computed, inject, ref } from "vue";
 import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
@@ -300,6 +305,7 @@ import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 import VideoPlaybackControls from "./VideoPlaybackControls.vue";
 
 const app = inject(VIEWER_CONTEXT);
+const agent = inject(AGENT_CONTEXT);
 if (!app) {
   throw new Error("ViewerView must be used under App.vue provider");
 }

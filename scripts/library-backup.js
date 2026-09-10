@@ -31,7 +31,7 @@ async function createLibraryBackup(paths, options = {}) {
     for (const snapshot of snapshots) {
       try {
         const manifest = JSON.parse(await fsp.readFile(path.join(paths.backupDir, snapshot, "manifest.json"), "utf8"));
-        if (manifest.Kind === "daily" && manifest.LocalDate === localDateKey(now)) return { created: false, directory: snapshot };
+        if (manifest.SchemaVersion === 1 && manifest.Kind === "daily" && manifest.LocalDate === localDateKey(now)) return { created: false, directory: snapshot };
       } catch {
         // Invalid backup metadata does not block creation of a fresh snapshot.
       }
@@ -47,7 +47,22 @@ async function createLibraryBackup(paths, options = {}) {
     for (const source of files) {
       if (fs.existsSync(source)) await fsp.copyFile(source, path.join(directory, path.basename(source)));
     }
+    const AgentOperations = [];
+    const operationDir = paths.agentOperationsDir || path.join(paths.managerDir, "agent", "operations");
+    const operations = await fsp.readdir(operationDir, { withFileTypes: true }).catch(error => { if (error.code === "ENOENT") return []; throw error; });
+    for (const entry of operations) {
+      if (!entry.isFile() || entry.isSymbolicLink() || !/^[a-f0-9-]{36}\.json$/.test(entry.name)) throw new Error("Invalid agent receipt file");
+      const content = await fsp.readFile(path.join(operationDir, entry.name));
+      const receipt = JSON.parse(content.toString("utf8"));
+      if (!Number.isFinite(Date.parse(receipt.expiresAt))) throw new Error("Invalid receipt expiry");
+      if (Date.parse(receipt.expiresAt) <= now.getTime()) continue;
+      await fsp.mkdir(path.join(directory, "agent-operations"), { recursive: true });
+      await fsp.writeFile(path.join(directory, "agent-operations", entry.name), content);
+      AgentOperations.push({ File: entry.name, SHA256: crypto.createHash("sha256").update(content).digest("hex") });
+    }
     await writeTextAtomic(path.join(directory, "manifest.json"), `${JSON.stringify({
+      SchemaVersion: 1,
+      AgentOperations,
       CreatedAt: now.toISOString(),
       LocalDate: localDateKey(now),
       Kind: kind,

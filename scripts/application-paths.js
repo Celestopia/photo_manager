@@ -22,6 +22,8 @@ function resolveApplicationPaths(environment = process.env) {
     electronUserDataDir: path.join(roamingRoot, "electron"),
     localAppDataDir: path.join(localRoot, "app-data"),
     stateFile: path.join(localRoot, "app-data", "state.json"),
+    agentProviderFile: path.join(localRoot, "app-data", "agent-providers.yml"),
+    agentModelsDir: path.join(localRoot, "models"),
     logsDir: path.join(localRoot, "logs"),
     sessionDataDir: path.join(localRoot, "session-data"),
     crashDumpsDir: path.join(localRoot, "crash-dumps"),

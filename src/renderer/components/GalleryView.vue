@@ -5,6 +5,7 @@
     <select v-model="query.search.field" class="input"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option></select>
     <input class="input grow" v-model="query.search.value" placeholder="Enter search text" @keydown.enter="applySearch" />
     <button class="btn btn-primary" @click="applySearch">Search</button>
+    <button class="btn" @click="agent.toggle">Assistant</button>
   </div>
   <div class="window-controls">
     <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>
@@ -12,8 +13,8 @@
     <button class="btn ghost danger icon-btn" data-tip="Close" @click="doWindowAction(WINDOW_ACTIONS.close)"><img class="icon" :src="ICONS.windowClose" alt="Close" /></button>
   </div>
 </header>
-<main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode }">
-  <section class="gallery-content">
+<main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode, 'with-agent-panel': agent.state.open }">
+  <section class="gallery-content" :inert="agent.state.running ? '' : undefined">
     <section class="gallery-controls-host">
       <div class="gallery-controls-drawer" :class="{ expanded: galleryControlsExpanded }">
         <button
@@ -106,7 +107,8 @@
       </template>
     </section>
   </section>
-  <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': applyingBatchEdit }" :inert="applyingBatchEdit ? '' : undefined" :aria-busy="applyingBatchEdit">
+  <AgentPanel v-if="agent.state.open" />
+  <aside class="side-panel batch-panel" v-if="isSelectionMode && !agent.state.open" :class="{ 'is-saving': applyingBatchEdit }" :inert="applyingBatchEdit ? '' : undefined" :aria-busy="applyingBatchEdit">
     <div class="batch-panel-header"><h3>Batch Edit Metadata</h3><button class="btn" @click="exitSelectionMode">Close</button></div>
     <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected</div>
     <label>Set title</label><input class="input" v-model="batchEdit.title" placeholder="Replace titles of selected media" />
@@ -153,6 +155,8 @@
 </template>
 
 <script setup>
+import AgentPanel from './AgentPanel.vue';
+import { AGENT_CONTEXT } from '../context/renderer-contexts.js';
 import { inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
@@ -166,6 +170,7 @@ import GalleryMediaDetailsMenu from "./GalleryMediaDetailsMenu.vue";
 import GalleryLevelFilter from "./GalleryLevelFilter.vue";
 import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 import { STAR_LEVELS } from "../constants/ui-constants.mjs";
+const agent = inject(AGENT_CONTEXT);
 
 const GALLERY_DETAILS_SURFACE = Symbol("gallery-media-details");
 

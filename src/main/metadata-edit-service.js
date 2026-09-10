@@ -43,7 +43,7 @@ function createMetadataEditService(options) {
   async function updateCustomization(payload) {
     requireOpenLibrary({ writable: true });
     try {
-      assertExactObjectKeys(payload, ["mediaId", "customization", "location"], "Metadata update payload");
+      assertExactObjectKeys(payload, ["mediaId", "customization", "location", "expectedSourceToken", "agentSelections"], "Metadata update payload");
     } catch (error) {
       return { ok: false, error: error.message };
     }
@@ -65,6 +65,7 @@ function createMetadataEditService(options) {
     const metadata = getMetadata();
     const current = metadata.get(mediaId);
     if (!current) return { ok: false, error: "Metadata item not found" };
+    if (options.getSourceToken && payload.expectedSourceToken !== options.getSourceToken(current)) return { ok: false, error: "Metadata changed since this draft was opened. Reload the media before saving." };
     const previous = structuredClone(current);
 
     try {
@@ -86,17 +87,23 @@ function createMetadataEditService(options) {
       }
     }
 
-    current.Customization = {
+    const nextItem = structuredClone(current);
+    nextItem.Customization = {
       ...current.Customization,
       ...customization,
       MetadataUpdateDate: new Date().toISOString(),
     };
-    if (normalizedLocation) current.Location = normalizedLocation;
-    metadata.set(mediaId, current);
+    if (normalizedLocation) nextItem.Location = normalizedLocation;
 
     try {
-      await saveMetadata();
-      return { ok: true, item: enrichItem(current) };
+      if (options.persistDraft) {
+        const next = new Map(metadata); next.set(mediaId, nextItem);
+        await options.persistDraft(next, payload);
+      } else {
+        metadata.set(mediaId, nextItem);
+        await saveMetadata();
+      }
+      return { ok: true, item: enrichItem(nextItem) };
     } catch (error) {
       metadata.set(mediaId, previous);
       appendLog(`Failed to write metadata: ${error.message}`);

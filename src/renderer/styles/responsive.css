@@ -3,7 +3,7 @@
 @media (max-width: 1200px) {
   .topbar { grid-template-columns: 1fr; height: auto; gap: 8px; }
   .search-panel { justify-content: flex-start; }
-  .gallery-main.with-batch-panel { grid-template-columns: 1fr; }
+  .gallery-main.with-batch-panel:not(.with-agent-panel) { grid-template-columns: 1fr; }
   .viewer-main { grid-template-columns: 1fr; height: calc(100% - 180px); }
   .viewer-footer { grid-template-columns: 1fr; height: auto; }
 }

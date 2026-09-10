@@ -16,6 +16,26 @@ function toSerializable(value) {
 }
 
 contextBridge.exposeInMainWorld("photoManagerApi", {
+  agentStatus: () => ipcRenderer.invoke("agent:status"),
+  agentCancel: () => ipcRenderer.invoke("agent:cancel"),
+  agentIndex: payload => ipcRenderer.invoke("agent:index", toSerializable(payload)),
+  agentSearch: payload => ipcRenderer.invoke("agent:search", toSerializable(payload)),
+  agentPreview: payload => ipcRenderer.invoke("agent:preview", toSerializable(payload)),
+  agentChat: payload => ipcRenderer.invoke("agent:chat", toSerializable(payload)),
+  agentVerify: payload => ipcRenderer.invoke("agent:verify", toSerializable(payload)),
+  agentApply: payload => ipcRenderer.invoke("agent:apply", toSerializable(payload)),
+  agentDiscard: payload => ipcRenderer.invoke("agent:discard", toSerializable(payload)),
+  agentClearChat: payload => ipcRenderer.invoke("agent:clear-chat", toSerializable(payload)),
+  agentRevise: payload => ipcRenderer.invoke("agent:revise", toSerializable(payload)),
+  agentHistory: () => ipcRenderer.invoke("agent:history"),
+  agentUndo: payload => ipcRenderer.invoke("agent:undo", toSerializable(payload)),
+  agentReloadConfig: () => ipcRenderer.invoke("agent:reload-config"),
+  agentTestProvider: () => ipcRenderer.invoke("agent:test-provider"),
+  agentOpenConfig: () => ipcRenderer.invoke("agent:open-config"),
+  agentOpenRuntimeConfig: () => ipcRenderer.invoke("agent:open-runtime-config"),
+  agentDownloadModels: () => ipcRenderer.invoke("agent:download-models"),
+  agentImportModels: () => ipcRenderer.invoke("agent:import-models"),
+  onAgentState: listener => subscribe("agent:state", listener),
   // App/runtime config
   getConfig: () => ipcRenderer.invoke("app:get-config"),
 

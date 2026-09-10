@@ -26,6 +26,19 @@ export function useMediaEditor({
   const editingDirty = ref(false);
   const saving = ref(false);
   const activeEditField = ref("");
+  let expectedSourceToken = "";
+  const agentSelections = [];
+  function releaseAgentSelections() {
+    const proposalIds = agentSelections.splice(0).map(selection => selection.proposalId);
+    if (proposalIds.length) api.agentDiscard({ proposalIds }).catch(() => {});
+  }
+  function acceptAgentProposal(proposal) {
+    if (selectedItem.value?.MediaId !== proposal.mediaId || expectedSourceToken !== proposal.expectedSourceToken) throw new Error("Proposal belongs to a different or changed media record");
+    for (const field of proposal.selectedFields) if (!proposal.overrideFields?.includes(field) && JSON.stringify(editDraft[field]) !== JSON.stringify(proposal.before[field]) && JSON.stringify(editDraft[field]) !== JSON.stringify(proposal.patch[field])) throw new Error(`Draft conflict in ${field}; explicitly choose the proposed value or deselect this field`);
+    for (const field of proposal.selectedFields) editDraft[field] = JSON.parse(JSON.stringify(proposal.patch[field]));
+    agentSelections.push({ proposalId: proposal.proposalId, fields: [...proposal.selectedFields] });
+    requestEdit("Title");
+  }
 
   function autoGrowFieldTextarea(element) {
     if (!element) return;
@@ -39,6 +52,8 @@ export function useMediaEditor({
   }
 
   function setDraftFromItem(item, keepActiveField = false) {
+    expectedSourceToken = item?.__sourceToken || "";
+    releaseAgentSelections();
     editDraft.Title = item?.Customization?.Title || "";
     editDraft.Rating = Number(item?.Customization?.Rating || 1);
     editDraft.Privacy = Number(item?.Customization?.Privacy ?? 1);
@@ -104,6 +119,8 @@ export function useMediaEditor({
     const saveField = activeEditField.value || "Title";
     const payload = {
       mediaId: selectedItem.value.MediaId,
+      expectedSourceToken,
+      agentSelections: [...agentSelections],
       customization: {
         Title: editDraft.Title,
         Rating: Math.min(5, Math.max(1, Number(editDraft.Rating || 1))),
@@ -137,6 +154,8 @@ export function useMediaEditor({
   }
 
   function resetEditorState() {
+    releaseAgentSelections();
+    expectedSourceToken = "";
     editingDirty.value = false;
     saving.value = false;
     activeEditField.value = "";
@@ -186,6 +205,7 @@ export function useMediaEditor({
   );
 
   return {
+    acceptAgentProposal,
     editDraft,
     editingDirty,
     saving,
