@@ -1,5 +1,17 @@
 import { ref, computed, watch, onBeforeUnmount } from "vue";
-export function useChat({ api, selectedItem, libraryState, view }) {
+export function useChat({ api, copyText, selectedItem, libraryState, view }) {
+  const copiedMessage = ref(null);
+  let copyTimer;
+  async function copyMessage(message) {
+    try {
+      await copyText(message.text);
+      clearTimeout(copyTimer);
+      copiedMessage.value = message.id;
+      copyTimer = setTimeout(() => { copiedMessage.value = null; }, 1800);
+    } catch {
+      error.value = "Unable to copy this message. Please try again.";
+    }
+  }
   const session = ref(null),
     visible = ref(false),
     busy = ref(false),
@@ -360,10 +372,13 @@ export function useChat({ api, selectedItem, libraryState, view }) {
     },
   );
   onBeforeUnmount(() => {
+    clearTimeout(copyTimer);
     unsubscribe();
     void api.stop();
   });
   return {
+    copiedMessage,
+    copyMessage,
     session,
     visible,
     busy,

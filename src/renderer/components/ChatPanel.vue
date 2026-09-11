@@ -1,5 +1,5 @@
 <template>
-  <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="attachmentsOpen = false; options = false; settings = false; detailMessage = null">
+  <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="attachmentsOpen = false; options = false; settings = false">
     <header class="chat-header">
       <span class="chat-heading">{{ historyOpen ? "Conversations" : "Assistant" }}</span>
       <div>
@@ -112,7 +112,7 @@
           {{ m.attempt.notice }}
         </p>
         <p v-if="m.attempt?.error" class="chat-error">{{ m.attempt.error }}</p>
-        <button v-if="m.attempt?.inputs.length" class="chat-message-info" title="Message details" aria-label="Message details" @click="detailMessage = m"><ChatIcon name="info" /></button>
+        <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
         <button
           v-if="
             m.role === 'assistant' &&
@@ -245,15 +245,6 @@
         </fieldset>
       </div>
     </div>
-    <div v-if="detailMessage" class="chat-settings" role="dialog" aria-label="Message details" @keydown.esc="detailMessage = null">
-      <div class="chat-row"><strong>Message details</strong><button class="btn" aria-label="Close message details" @click="detailMessage = null"><ChatIcon name="close" /></button></div>
-      <p class="chat-notice">Files used to prepare this reply.</p>
-      <div v-for="(p, n) in detailMessage.attempt.inputs" :key="n" class="chat-input-detail">
-        <strong>{{ session.inputLabels?.[p.kind + ':' + p.id] || 'Attachment' }}</strong>
-        <span>{{ p.mode === 'original' ? 'Original file' : 'Optimized for chat' }} · {{ formatSize(p.sourceSize) }} · {{ p.width || '—' }} × {{ p.height || '—' }}</span>
-        <span v-for="(u, k) in p.uploads" :key="k">{{ u.transformation }} · {{ u.width }} × {{ u.height }} · {{ formatSize(u.size) }}<template v-if="u.timestamp != null"> · {{ u.timestamp.toFixed(3) }} s</template></span>
-      </div>
-    </div>
 </section>
 </template>
 <script setup>
@@ -263,6 +254,8 @@ import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 const chat = inject(CHAT_CONTEXT);
 const {
+  copiedMessage,
+  copyMessage,
   session,
   busy,
   working,
@@ -308,10 +301,6 @@ const metadataLabels = {
   hidden: "Hidden description",
   technical: "Technical details",
 };
-const formatSize = (bytes) =>
-  bytes >= 1048576
-    ? (bytes / 1048576).toFixed(1) + " MiB"
-    : Math.ceil(bytes / 1024) + " KiB";
 const attachmentsOpen = ref(false);
 const attachmentMenu = ref(null);
 function dismissAttachments(event) {
@@ -322,14 +311,14 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', dismissAttachm
 watch([historyOpen, busy, () => session.value?.sessionId], () => { attachmentsOpen.value = false; });
 const conversationElement = ref(null);
 const composerElement = ref(null);
-const detailMessage = ref(null);
+
 const renameId = ref(null);
 watch(text, async () => {
   await nextTick();
   const el = composerElement.value;
   if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
 });
-watch(() => session.value?.sessionId, () => { detailMessage.value = null; renameId.value = null; });
+watch(() => session.value?.sessionId, () => { renameId.value = null; });
 watch(
   () => session.value?.messages.map((m) => m.text).join(""),
   async () => {

@@ -1,7 +1,9 @@
 /* Run with Electron: node_modules/.bin/electron tests/helpers/chat-ui-smoke.cjs.
    All library/configuration data and the fake provider are isolated to this test. */
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, clipboard } = require("electron");
 app.disableHardwareAcceleration();
+let copiedText = null;
+clipboard.writeText = (value) => { copiedText = value; };
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const os = require("node:os");
@@ -187,6 +189,14 @@ async function run() {
     `document.querySelector('.chat-composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`,
   );
   await waitFor(`Boolean(document.querySelector('.chat-markdown strong'))`);
+  await click('.assistant .chat-message-copy');
+  await waitFor(`document.querySelector('.assistant .chat-message-copy')?.getAttribute('aria-label') === 'Copied'`);
+  assert.ok(copiedText.includes('**'), 'Copy preserves raw Markdown');
+  await click('.user .chat-message-copy');
+  await waitFor(`document.querySelector('.user .chat-message-copy')?.getAttribute('aria-label') === 'Copied'`);
+  assert.equal(copiedText, 'Describe this photo');
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('[aria-label="Message details"]'))`), false);
+
   await waitFor(
     `document.querySelector('.chat-composer .btn-primary')?.getAttribute('aria-label')==='Send message'`,
   );

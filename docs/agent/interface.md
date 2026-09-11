@@ -39,7 +39,7 @@ When any input uses Original file, show this notice beside the composer before S
 
 > Original file: larger upload and provider-dependent limits.
 
-Tiles do not show dimensions or file sizes. Processing provenance remains available in Message details after sending. Original files can contain embedded metadata and the provider may resize or process the upload. Do not silently change Original file to optimized mode if a limit is exceeded.
+Tiles do not show dimensions or file sizes. Processing provenance remains stored in session history without a technical-details UI. Original files can contain embedded metadata and the provider may resize or process the upload. Do not silently change Original file to optimized mode if a limit is exceeded.
 
 ## Explain Video and GIF Processing Before Send
 
@@ -51,7 +51,7 @@ Show these notices beside the composer while the corresponding input is present:
 
 > Animated GIF: sent as up to N sampled frames from one animation cycle. Motion between frames may be missed.
 
-N changes when the attachment selection changes. The [input rules](inputs.md) explain how frames share the request limit. After sending, attachment details show the actual number and timestamps used. The model also receives a description of the sampling limitation.
+N changes when the attachment selection changes. The [input rules](inputs.md) explain how frames share the request limit. After sending, session records retain the actual number and timestamps used. The model also receives a description of the sampling limitation.
 
 These notices are visible without opening Options. They explain the processing without adding another confirmation step.
 
@@ -85,7 +85,7 @@ The configuration accepts a base URL, API key or environment-variable name, mode
 
 The Assistant uses a compact segmented view switch, neutral colors, consistent SVG icon buttons and a rounded composer. The text box grows with the draft, up to a fixed height. Header and composer icons have accessible names and tooltips. User messages use light bubbles; assistant Markdown occupies the conversation directly. Submitted filenames appear as small attachment labels without a redundant input count.
 
-Upload processing records are available through the information icon below each reply, in a separate Message details view. Raw media UUIDs do not appear in the transcript. Original-file and video/GIF sampling notices remain visible before sending. Options contains image quality and directly visible metadata checkboxes, with no earlier-input controls; provider configuration stays in its separate settings view.
+Each nonempty user or assistant message has a Copy button. It copies the original message text, preserving assistant Markdown, and briefly shows a checkmark. Upload processing records remain stored without a technical-details button. Raw media UUIDs do not appear in the transcript. Original-file and video/GIF sampling notices remain visible before sending. Options contains image quality and directly visible metadata checkboxes, with no earlier-input controls; provider configuration stays in its separate settings view.
 
 The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.
 

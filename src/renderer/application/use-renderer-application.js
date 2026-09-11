@@ -133,7 +133,7 @@ export function useRendererApplication() {
     } = useRecentRegistryHistory({ libraryState });
 
     const selectedItem = ref(null);
-    const chat = useChat({ api: API.chat, selectedItem, libraryState, view });
+    const chat = useChat({ api: API.chat, copyText: API.copyText, selectedItem, libraryState, view });
     provide(CHAT_CONTEXT, chat);
     const {
       query,
