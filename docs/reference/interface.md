@@ -43,3 +43,9 @@ All four managers search name/description, show usage, atomically edit allowed f
 Location create/edit shares the parent picker. Selecting a parent during creation copies its exact administrative fields, which remain editable; clearing it does not clear them. Changing parent while editing does not rewrite administrative fields. Main-process validation rechecks requirements, uniqueness/context duplication, parent existence, and cycles.
 
 Rename refreshes only the registry and preserves IDs/media. Global deletion keeps the manager open and synchronizes definitions, filters, viewer, and gallery cache. If result membership is unchanged, referenced items are patched in place without replacing arrays/indexes; otherwise the gallery requeries.
+
+## Modal Backdrops
+
+Application modal dialogs dim and blur the content behind them while keeping their own content sharp. The shared `--modal-backdrop-blur` token in `tokens.css` is 3px, matching Assistant provider settings. The registry overlay styles apply it to library information, initialization, maintenance, registry managers, nested registry creation and viewer unsaved-change confirmation. Provider settings uses the same token on its native HTML dialog backdrop.
+
+A nested creation dialog blurs the manager behind it; the library beneath both layers can receive both blur passes. Keep the existing dimming and stacking order. Anchored menus, dropdowns and tooltips do not blur the surrounding workspace. Windows-native dialogs remain controlled by the operating system.

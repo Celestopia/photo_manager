@@ -315,7 +315,7 @@
 .chat-rename .input { width: 100%; min-width: 0; font-size: 12px; }
 .chat-input-detail { font-size: 12px; line-height: 1.7; padding: 12px 0; border-bottom: 1px solid #eceef1; }
 .provider-dialog { width: min(440px, calc(100vw - 48px)); max-height: calc(100vh - 64px); margin: auto; padding: 26px; border: 1px solid #e4e7ec; border-radius: 20px; background: #fff; color: #343b45; box-shadow: 0 20px 80px #10192830; font-size: 13px; overflow: auto; }
-.provider-dialog::backdrop { background: #18243555; backdrop-filter: blur(3px); }
+.provider-dialog::backdrop { background: #18243555; backdrop-filter: blur(var(--modal-backdrop-blur)); }
 .provider-dialog header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
 .provider-dialog h2 { margin: 0; font-size: 19px; font-weight: 600; }
 .provider-dialog header p { color: #858d97; margin: 7px 0 0; font-size: 12px; }

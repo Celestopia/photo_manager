@@ -11,6 +11,7 @@
   --accent-hover: #1458a0;
   --danger: #cc3344;
   --radius: 14px;
+  --modal-backdrop-blur: 3px;
   --shadow: 0 10px 24px rgba(36, 90, 150, 0.16);
 }
 
