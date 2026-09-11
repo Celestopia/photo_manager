@@ -4,7 +4,7 @@
  * Renderer cannot access Node/Electron directly (contextIsolation enabled).
  * We expose a minimal, explicit API surface through `window.photoManagerApi`.
  */
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 // Defensive conversion to plain JSON to avoid structured clone edge cases.
 /**
@@ -16,6 +16,28 @@ function toSerializable(value) {
 }
 
 contextBridge.exposeInMainWorld("photoManagerApi", {
+  chat: {
+    open: () => ipcRenderer.invoke("chat:open"),
+    create: () => ipcRenderer.invoke("chat:create"),
+    load: (sessionId) => ipcRenderer.invoke("chat:load", { sessionId }),
+    describe: (sessionId, input) => ipcRenderer.invoke("chat:describe", { sessionId, input: toSerializable(input) }),
+    send: (payload) => ipcRenderer.invoke("chat:send", toSerializable(payload)),
+    stop: () => ipcRenderer.invoke("chat:stop"),
+    rename: (sessionId, title) => ipcRenderer.invoke("chat:rename", { sessionId, title }),
+    delete: (sessionId) => ipcRenderer.invoke("chat:delete", { sessionId }),
+    removeInput: (sessionId, attachmentId) => ipcRenderer.invoke("chat:removeInput", { sessionId, attachmentId }),
+    choose: (sessionId) => ipcRenderer.invoke("chat:choose", { sessionId }),
+    importFile: (sessionId, file) => {
+      const filePath = webUtils.getPathForFile(file);
+      return filePath ? ipcRenderer.invoke("chat:importFile", { sessionId, path: filePath }) : Promise.resolve(null);
+    },
+    importBytes: (sessionId, name, bytes) => ipcRenderer.invoke("chat:importBytes", { sessionId, name, bytes }),
+    configuration: () => ipcRenderer.invoke("chat:configuration"),
+    saveConfiguration: (draft) => ipcRenderer.invoke("chat:saveConfiguration", draft),
+    openConfiguration: () => ipcRenderer.invoke("chat:openConfiguration"),
+    test: () => ipcRenderer.invoke("chat:test"),
+    onEvent: (listener) => subscribe("chat:event", listener),
+  },
   // App/runtime config
   getConfig: () => ipcRenderer.invoke("app:get-config"),
 

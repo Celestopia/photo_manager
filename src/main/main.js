@@ -37,6 +37,10 @@ const { createMetadataEditService } = require("./metadata-edit-service.js");
 const { registerIpcHandlers: registerMainIpcHandlers } = require("./ipc-handlers.js");
 const { createMainWindow } = require("./window-manager.js");
 const { createApplicationRuntime } = require("./application-runtime.js");
+const { createChatService } = require("./chat/service.js");
+const { registerChatIpc } = require("./chat/ipc.js");
+const { metadataGroups } = require("./chat/metadata.js");
+const { resolveMediaToolPaths } = require("../../scripts/media-tools.js");
 const { assertCustomization } = require("../shared/customization-schema.js");
 const { createUniqueEntityId } = require("../shared/identity-schema.js");
 const { validateMediaEntries } = require("../shared/library-data-schema.js");
@@ -379,6 +383,20 @@ function resolveIndexedMediaPath(rawMediaId) {
   return { item, absolutePath };
 }
 
+const chat = createChatService({
+  getLibrary: requireOpenLibrary,
+  resolveMedia: resolveIndexedMediaPath,
+  getMetadata: (mediaId, groups) => metadataGroups(resolveIndexedMediaPath(mediaId).item, groups, {
+    tags: state.tagRegistryIndex, people: state.personRegistryIndex,
+    locations: state.locationRegistryIndex, locationPath: buildLocationPath,
+  }),
+  configFile: APPLICATION_PATHS.chatProviderFile,
+  getTools: () => resolveMediaToolPaths(PROGRAM_RESOURCE_ROOT, config.media),
+  emit: (payload) => {
+    if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send("chat:event", payload);
+  },
+});
+
 /**
  * Persist full metadata Map back to JSONL using atomic replace:
  * write temp file -> rename.
@@ -519,6 +537,7 @@ async function openLibrary(rawRoot, options = {}) {
     await loadAllLibraryIndexes();
     if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
     state.activeLibrary.state = "open";
+    await chat.open().catch(() => appendLog("Chat recovery could not finish; library browsing remains available."));
     appState.lastLibraryPath = paths.root;
     lastLibraryName = state.activeLibrary.manifest.name;
     await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
@@ -541,6 +560,8 @@ async function closeLibrary() {
   }
   if (!state.activeLibrary) return getLibraryState();
   state.activeLibrary.state = "closing";
+  try { await chat.close(); }
+  catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
   emitLibraryState();
   const closing = state.activeLibrary;
   lastLibraryName = closing.manifest.name;
@@ -666,6 +687,7 @@ async function runMaintenanceOperation(operation, options = {}) {
   state.maintenanceState = { running: true };
   emitLibraryState();
   try {
+    await chat.close();
     const result = await runOperationWorker(operation, library.paths.root, options);
     if (operation === "update") {
       // The worker has released its inherited operation lock, so the main
@@ -837,6 +859,7 @@ function createDomainServices() {
  * Channels are intentionally explicit to keep the API surface narrow and auditable.
  */
 function registerIpcHandlers() {
+  registerChatIpc({ chat, getWindow: () => state.mainWindow, configFile: APPLICATION_PATHS.chatProviderFile });
   const runtime = {
     get config() { return config; },
     set config(next) { config = next; },
@@ -927,7 +950,13 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", () => {
+let chatShutdownComplete = false;
+app.on("before-quit", (event) => {
+  if (!chatShutdownComplete) {
+    event.preventDefault();
+    chat.close().finally(() => { chatShutdownComplete = true; app.quit(); });
+    return;
+  }
   if (state.activeLibrary) {
     const closing = state.activeLibrary;
     state.activeLibrary = null;

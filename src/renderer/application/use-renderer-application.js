@@ -15,6 +15,8 @@ import { useAlbumRegistry } from "../composables/use-album-registry.js";
 import { useLocationRegistry } from "../composables/use-location-registry.js";
 import { useMediaEditor } from "../composables/use-media-editor.js";
 import { useMediaViewer } from "../composables/use-media-viewer.js";
+import { useChat } from "../composables/use-chat.js";
+import { CHAT_CONTEXT } from "../context/renderer-contexts.js";
 import {
   ALBUM_CONTEXT,
   GALLERY_CONTEXT,
@@ -131,6 +133,8 @@ export function useRendererApplication() {
     } = useRecentRegistryHistory({ libraryState });
 
     const selectedItem = ref(null);
+    const chat = useChat({ api: API.chat, selectedItem, libraryState, view });
+    provide(CHAT_CONTEXT, chat);
     const {
       query,
       galleryControlsExpanded,

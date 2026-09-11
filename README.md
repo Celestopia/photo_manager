@@ -10,9 +10,12 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Edit titles, ratings, privacy levels, descriptions, albums, tags, people, and hierarchical locations.
 - Filter and batch-edit the complete matching media set.
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
+- Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.
 - Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.
 
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
+
+Assistant is available in the viewer's right sidebar. Open Options beside its message box to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).
 
 ## Install
 
@@ -56,6 +59,7 @@ Each library is self-contained:
     backups\
     logs\
     temp\
+    chat\                  # saved conversations and imported attachments; excluded from automatic backups
 ```
 
 The library can be moved as a unit. Libraries cannot be nested, and symbolic-link roots or media are not followed.
@@ -69,6 +73,7 @@ Application-wide data stay outside the installation directory:
 
 %LOCALAPPDATA%\PhotoManager\
   app-data\state.json
+  app-data\chat-provider.yml
   logs\
   session-data\
   crash-dumps\

@@ -13,7 +13,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 - Video probing and frame extraction: bundled Windows x64 FFmpeg/FFprobe 8.1.2.
 - Capture-location time zones: offline `geo-tz` coordinate boundaries plus Electron/Node `Intl` IANA time-zone rules; no runtime network request is made.
 - Configuration: YAML.
-- Persistence: JSONL; export: UTF-8 BOM CSV.
+- Persistence: JSONL for media/registries and JSON for chat sessions; export: UTF-8 BOM CSV.
 - The main process and renderer communicate through an explicit IPC allowlist. The renderer cannot access Node or the filesystem directly.
 
 Supported media extensions:
@@ -32,6 +32,8 @@ The installed runtime distinguishes the code root from the program-resource root
 `npm run pack:win` builds the renderer and creates an unpacked application under `release/win-unpacked/`. `npm run dist:win` first runs all tests, builds the renderer, and creates `release/PhotoManager-<version>-x64-Setup.exe`. Release builds require the Git LFS FFmpeg files to be materialized. Code signing is optional for local builds but required by release policy before public distribution; credentials must come from the environment and must never be committed.
 
 ## IPC Contract
+
+Assistant adds the `chat:*` request allowlist and `chat:event` updates through `photoManagerApi.chat`. Its main-process services, renderer composable, provider boundary and cancellation lifecycle are documented in [Viewer Chat Implementation](../agent/implementation.md).
 
 Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directories, and info; `maintenance:start/show-output`; `gallery:query`; `photo:update-customization/batch-update`; list/create/update/delete-global for four registries; clipboard/system media actions; `photo:report-playback`; and `window:action/get-state`. Events are `library:state-changed`, `library:progress`, `maintenance:progress`, and `window:state-changed`.
 

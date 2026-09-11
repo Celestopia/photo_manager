@@ -49,4 +49,6 @@ git diff --check
 
 Desktop acceptance also covers entry prefilling/manual open, lock warnings, settings and maintenance progress, returning to entry, image viewing, and video fallback.
 
+Assistant adds session, attachment, input-processing and fake-provider tests, plus isolated Electron UI and packaged-runtime smoke helpers. Their commands and validation boundaries are documented in [Viewer Chat Implementation](../agent/implementation.md#validation).
+
 Packaging acceptance additionally requires `npm run pack:win`, launch on a Windows account without Node.js, FFmpeg/FFprobe validation, image/video thumbnail generation, all four maintenance operations, paths containing spaces and Unicode, single-instance and lock behavior, and confirmation that runtime writes remain confined to AppData and the active library. Public installers must be Authenticode-signed and tested through install, upgrade, and uninstall flows.

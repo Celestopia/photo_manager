@@ -68,3 +68,13 @@ test("multi-file JSONL transactions roll back every target after a partial commi
   assert.deepEqual(JSON.parse((await fsp.readFile(metadataFile, "utf8")).trim()), { FilePath: "before.jpg" });
   await assert.rejects(fsp.access(paths.transactionFile));
 });
+
+test('automatic library backups exclude chat history and imported files',async t=>{
+  const {paths}=await createLibrary(t);
+  const chatDir=path.join(paths.managerDir,'chat','sessions');await fsp.mkdir(chatDir,{recursive:true});await fsp.writeFile(path.join(chatDir,'private-chat.txt'),'not part of backups');
+  await createLibraryBackup(paths,{kind:'test-chat',reason:'test',retentionCount:2});
+  const names=await fsp.readdir(paths.backupDir);
+  const snapshot=path.join(paths.backupDir,names[0]);
+  assert.equal((await fsp.readdir(snapshot)).includes('chat'),false);
+  assert.equal(await fsp.readFile(path.join(chatDir,'private-chat.txt'),'utf8'),'not part of backups');
+});

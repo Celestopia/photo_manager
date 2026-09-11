@@ -34,6 +34,7 @@ Global data are split between roaming configuration and machine-specific state:
 %LOCALAPPDATA%\PhotoManager\
   app-data\
     state.json
+    chat-provider.yml        # optional Assistant provider; created from its Settings menu
   logs\                     # startup diagnostics produced before a library opens
   session-data\             # localStorage, Chromium cache, and session state
   crash-dumps\
@@ -84,6 +85,9 @@ Standard layout:
     temp/
       transactions/
       temporary video-thumbnail files...
+    chat/                    # conversations and imported attachments; excluded from automatic backups
 ```
 
 `.photo_manager` is not given the Windows hidden attribute. The scanner excludes only this reserved directory at the library root; other ordinary hidden directories are still scanned.
+
+Assistant configuration and its strict conversation/attachment records are documented in the [chat implementation](../agent/implementation.md) and [session storage](../agent/sessions.md) references. Chat uses the active library lock but does not modify metadata or registries.

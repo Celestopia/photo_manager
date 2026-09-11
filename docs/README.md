@@ -14,6 +14,10 @@
 | [Interface and Editing](reference/interface.md) | Gallery queries, selection, viewer drafts, location hierarchy and registry management. |
 | [Maintenance and Acceptance](reference/maintenance-and-testing.md) | Library maintenance, explicit CLI commands, tests and Windows release checks. |
 
+## Assistant
+
+The [viewer chat reference](agent/README.md) documents the implemented Assistant, its input processing and conversation storage. Start with [Using Assistant](agent/usage.md) for provider configuration and everyday use.
+
 ## Maintenance Conventions
 
 - Keep product scope, development invariants and explicit exclusions in the root PROJECT.md.

@@ -17,8 +17,9 @@ Current capabilities include:
 - Managing tags, albums, people, and locations through registries, while preventing metadata from referencing unregistered values.
 - Keeping metadata, registries, thumbnails, logs, and backups separate for every library.
 - Running initialization, incremental updates, integrity verification, thumbnail generation, and CSV export inside the application.
+- Chatting about explicitly selected viewer media and imported attachments, with persistent library-local conversations.
 
-The project is local-first. Core browsing and management do not depend on network services, library data are never uploaded, and no database is used. JSONL is the current source of truth.
+The project is local-first. Core browsing and management do not depend on network services, and no database is used. Assistant sends only explicitly submitted conversation inputs to the configured remote API or local model server. Media and registries use JSONL; chat uses independent session JSON files.
 
 The application interface is English-only; there is no localization layer or language selector. User-authored library names, titles, descriptions, registry values, paths, and other metadata remain unrestricted Unicode and are displayed exactly as stored. UI sorting and search use English (`en-US`) collation, and viewer timestamps use the fixed 24-hour `YYYY-MM-DD HH:mm:ss` format.
 
@@ -35,6 +36,8 @@ The application interface is English-only; there is no localization layer or lan
 | [Maintenance and Acceptance](docs/reference/maintenance-and-testing.md) | Library maintenance, explicit CLI commands, tests and Windows release checks. |
 
 See the [documentation index](docs/README.md) for navigation and maintenance conventions.
+
+The [viewer chat reference](docs/agent/README.md) documents the implemented Assistant, including independent sessions, attachments, image-quality choices and request limits. The [Assistant user guide](docs/agent/usage.md) explains provider setup and everyday use.
 
 ## Development Invariants
 

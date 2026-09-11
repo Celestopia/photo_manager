@@ -146,6 +146,12 @@
     </div>
   </section>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
+    <div class="viewer-sidebar-tabs" role="group" aria-label="Viewer sidebar">
+      <button class="btn" :aria-pressed="!chat.visible.value" @click="chat.close">Metadata</button>
+      <button class="btn" :aria-pressed="chat.visible.value" @click="chat.open">Assistant</button>
+    </div>
+    <ChatPanel v-if="chat.visible.value" />
+    <div v-show="!chat.visible.value" class="viewer-metadata-fields">
     <h3>Customization</h3>
     <label>Title</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
@@ -249,6 +255,7 @@
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Description'">{{ saveNotice.message }}</div>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'HiddenDescription'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'HiddenDescription'">{{ saveNotice.message }}</div>
+    </div>
   </aside>
 </main>
 <footer class="viewer-footer">
@@ -290,7 +297,7 @@
 </template>
 
 <script setup>
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
@@ -298,6 +305,9 @@ import LocationPicker from "./LocationPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 import VideoPlaybackControls from "./VideoPlaybackControls.vue";
+import ChatPanel from "./ChatPanel.vue";
+import { CHAT_CONTEXT } from "../context/renderer-contexts.js";
+const chat = inject(CHAT_CONTEXT);
 
 const app = inject(VIEWER_CONTEXT);
 if (!app) {
@@ -426,6 +436,7 @@ const {
 const canTransformSelectedMedia = computed(() => (
   !isSelectedVideo.value || videoPlaybackMode.value === "video"
 ));
+watch(showRightPanel, (shown) => { if (!shown && chat.visible.value) void chat.close(); });
 
 const showVideoCenterPlay = computed(() => (
   videoPlaybackMode.value === "video"
