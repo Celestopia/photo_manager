@@ -15,9 +15,7 @@ export function useChat({ api, selectedItem, libraryState, view }) {
     currentOnly = ref(false),
     settings = ref(false),
     configuration = ref(null);
-  const acceptChanges = ref(false),
-    excludeInputs = ref([]),
-    renameTitle = ref("");
+  const renameTitle = ref("");
   const groups = ref({
     basic: true,
     location: false,
@@ -31,13 +29,6 @@ export function useChat({ api, selectedItem, libraryState, view }) {
         !currentOnly.value || s.mediaIds?.includes(selectedItem.value?.MediaId),
     ),
   );
-  const historicalInputs = computed(() => [
-    ...new Map(
-      (session.value?.messages || [])
-        .flatMap((m) => m.inputs)
-        .map((i) => [`${i.kind}:${i.id}`, i]),
-    ).values(),
-  ]);
   const counts = computed(() => {
     const result = inputs.value.map((i) =>
       i.mediaKind === "text" ? 0 : i.mediaKind === "image" ? 1 : 2,
@@ -130,8 +121,6 @@ export function useChat({ api, selectedItem, libraryState, view }) {
     text.value = "";
     inputs.value = [];
     quality.value = "optimized";
-    acceptChanges.value = false;
-    excludeInputs.value = [];
   }
   async function addCurrent() {
     return action(async () => {
@@ -291,8 +280,8 @@ export function useChat({ api, selectedItem, libraryState, view }) {
                 : i.override || quality.value,
             })),
           groups: retryUser?.groups || groups.value,
-          excludeInputs: excludeInputs.value,
-          acceptChanges: acceptChanges.value,
+          excludeInputs: [],
+          acceptChanges: false,
           retryOf,
         };
         session.value = await unwrap(
@@ -391,9 +380,6 @@ export function useChat({ api, selectedItem, libraryState, view }) {
     settings,
     configuration,
     groups,
-    acceptChanges,
-    excludeInputs,
-    historicalInputs,
     renameTitle,
     counts,
     hasOriginal,

@@ -218,7 +218,7 @@ function createChatService({
           r = await resolve(s, i, signal);
         } catch (e) {
           const error = new Error(
-            `Input unavailable (${i.kind}:${i.id}). Restore it or exclude it from this request in Options.`,
+            `Input unavailable (${i.kind}:${i.id}). Restore it or start a new conversation with available inputs.`,
           );
           error.code = "INPUT_UNAVAILABLE";
           throw error;
@@ -242,7 +242,7 @@ function createChatService({
           !payload.acceptChanges
         ) {
           const error = new Error(
-            "A referenced file or its supplied metadata has changed. Enable “Use current versions” in Options to continue; old history will stay unchanged.",
+            "A referenced file or its supplied metadata has changed. Start a new conversation to use the current version; old history will stay unchanged.",
           );
           error.code = "SOURCE_CHANGED";
           throw error;

@@ -4,7 +4,7 @@ Open a photo or video, then choose **Assistant** in the right sidebar. The curre
 
 ## Configure Your Provider Once
 
-Open **Options** beside the message box and choose **Provider settings**. Enter the Base URL, Model and API key in the centered dialog, then choose **Save settings**. Leave the API key blank to preserve a saved key. Advanced options contains explicit key removal, environment-variable fallback, streaming and model thinking. Closing without saving discards draft changes.
+Choose the **Provider settings** gear in the Assistant header. Enter the Base URL, Model and API key in the centered dialog, then choose **Save settings**. Leave the API key blank to preserve a saved key. Advanced options contains explicit key removal, environment-variable fallback, streaming and model thinking. Closing without saving discards draft changes.
 
 PhotoManager stores these settings in the following file; manual editing is optional:
 
@@ -32,21 +32,21 @@ Choose **Save settings**, then **Test saved connection**. The test sends a gener
 
 ## Choose What to Send
 
-Use **Attach** to choose an image or UTF-8 text file, or paste one into the composer. Library inputs remain references to their `MediaId`; imported attachments are copied into the conversation's local folder. PDF, Office, archives, audio and external video attachments are rejected with an explanation.
+Use **+ → Add text or image files** to choose an image or UTF-8 text file, or paste one into the composer. Library inputs remain references to their `MediaId`; imported attachments are copied into the conversation's local folder. PDF, Office, archives, audio and external video attachments are rejected with an explanation.
 
-**Options → Add current media** adds the photo or video currently displayed. Navigating to another item stops an active reply but keeps the conversation; the new item is not added automatically. A conversation can therefore discuss several media items over time without belonging to one particular file.
+**+ → Add current media** adds the photo or video currently displayed. Navigating to another item stops an active reply but keeps the conversation; the new item is not added automatically. A conversation can therefore discuss several media items over time without belonging to one particular file.
 
 Static images default to **Optimized for chat**, with a maximum 1,024-pixel long edge. **Original file** sends unchanged bytes, with a 20 MiB file limit and the provider's own limits. Imported image chips can override the message's quality setting. Successful submission resets the next message to optimized quality.
 
 Original bytes can contain embedded EXIF metadata regardless of the separate application-metadata choices. The provider may resize or process original uploads. Videos and animated GIFs always use sampled still frames; no original moving file or audio is sent. The composer displays their sampling notices before Send.
 
-The basic saved title, description and assigned tags are included by default. Enable location/GPS, people, hidden description or technical details under **Include saved metadata** when needed. Unsaved viewer edits are never supplied.
+The basic saved title, description and assigned tags are included by default. Enable location/GPS, people, hidden description or technical details using the directly visible **Include saved metadata** checkboxes when needed. Unsaved viewer edits are never supplied.
 
 ## Return to a Conversation
 
 **History** lists this library's conversations. Reopen one to continue, filter by the current media, rename a conversation or delete it. The complete text stays on disk even when only recent turns fit into a model request.
 
-If a source changed, Options lets you explicitly use its current version for the next request. Earlier history stays unchanged. If a source is missing, restore it or exclude it under **Inputs from earlier messages**. Excluding it changes only the next request, not saved history.
+Earlier inputs remain part of the conversation automatically. If a referenced source changed, start a new conversation to use its current version. If it is missing, restore it or start a new conversation with available inputs. Saved history remains unchanged.
 
 ## Consequences and Limits
 
@@ -56,3 +56,5 @@ Each message accepts up to eight attachments. A model request accepts up to eigh
 
 Conversations and imported attachments are saved under `<library>/.photo_manager/chat/`. They are excluded from automatic library backups. Deleting a conversation deletes its imported attachments after confirmation, but preserves original library media. If a locked file delays cleanup, the app reports it and retries on the next library open.
 
+
+The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.

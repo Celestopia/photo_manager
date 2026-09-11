@@ -150,7 +150,13 @@ async function run() {
   await click(".viewer-sidebar-tabs button:last-child");
   await waitFor(`Boolean(document.querySelector('.chat-chip'))`);
   await click('[aria-label="Options"]');
-  await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.chat-options button')).find(b => b.textContent.includes('Provider settings')).click()`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chat-options fieldset input[type=checkbox]').length`), 5);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chat-options details').length`), 0);
+  await fsp.mkdir(path.resolve('release'), { recursive: true });
+  await new Promise(resolve => setTimeout(resolve, 200));
+  await fsp.writeFile(path.resolve('release/message-options.png'), (await win.webContents.capturePage()).toPNG());
+
+  await click('[aria-label="Provider settings"]');
   await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog input[type=password]').value`), '');
   await click('.provider-save');
@@ -199,7 +205,9 @@ async function run() {
   await setValue(".viewer-title-input", "");
   await click(".viewer-sidebar-tabs button:last-child");
   await click('[aria-label="Options"]');
-  await click(".chat-options > button");
+  await click('button[aria-label="Add attachments"]');
+  await click(".chat-attachment-menu button");
+  await click('[aria-label="Options"]');
   await waitFor(`Boolean(document.querySelector('.chat-chip'))`);
   await win.webContents.executeJavaScript(
     `const e=document.querySelector('.chat-options select');e.value='original';e.dispatchEvent(new Event('change',{bubbles:true}));`,
@@ -244,9 +252,11 @@ async function run() {
   );
   await click('[aria-label="Options"]');
   await waitFor(
-    `document.querySelector('.chat-options > button')?.disabled===false`,
+    `document.querySelector('button[aria-label="Add attachments"]')?.disabled===false`,
   );
-  await click(".chat-options > button");
+  await click('button[aria-label="Add attachments"]');
+  await click(".chat-attachment-menu button");
+  await click('[aria-label="Options"]');
   await waitFor(
     `document.querySelector('.chat-chip')?.textContent.includes('second.jpg')`,
   );

@@ -16,7 +16,7 @@ New chat creates an independent conversation and adds the currently viewed media
 
 ## Add and Review Inputs
 
-Each attachment chip represents an input to the next message. It shows its name and offers details and removal. Users can paste supported images/files, use Attach to choose them, or choose Add current media to reference the photo or video currently displayed.
+Each attachment chip represents an input to the next message. It shows its name and offers details and removal. Users can paste supported images/files, use Attach to choose them, or choose + → Add current media to reference the photo or video currently displayed.
 
 Navigating to another media item stops any active reply but keeps the session open. The new media is not attached automatically. This lets the user decide whether to continue discussing the earlier input or add the new one.
 
@@ -71,13 +71,13 @@ History shows all conversations in the active library, ordered by latest activit
 
 Use the first nonempty user message as the initial title; if there is none, use the first attachment name. Reopening continues that session without automatically adding the media currently in the viewer.
 
-The full saved conversation remains readable even when it is too large to send back to the model. Show a notice when older turns are omitted from a request. If a referenced file or its supplied metadata changed, explain that the new reply will use the current version. If a required source is missing, show Media unavailable and require the user to restore it or remove it from the next request.
+The full saved conversation remains readable even when it is too large to send back to the model. Show a notice when older turns are omitted from a request. If a referenced file or its supplied metadata changed, ask the user to start a new conversation to use the current version. If a required source is missing, ask the user to restore it or start a new conversation. The menu does not expose historical-input exclusion or change-acceptance controls.
 
 Deleting a session requires confirmation because its imported files are deleted too and chat is not backed up. If file cleanup is still pending, show that status rather than reporting complete deletion.
 
 ## Configure the Model Separately
 
-Options opens a centered modal provider settings dialog over the application. Users edit Base URL, Model and API key directly, then choose Save settings. Advanced options contain environment-variable fallback, streaming, model thinking and explicit key removal. A blank key preserves the stored credential; stored keys never return to the renderer. Test saved connection uses the saved settings and a synthetic image. Opening or saving settings makes no network request. Escape or Close dismisses the dialog; keyboard focus stays inside while it is open.
+The header gear opens a centered modal provider settings dialog over the application. Users edit Base URL, Model and API key directly, then choose Save settings. Advanced options contain environment-variable fallback, streaming, model thinking and explicit key removal. A blank key preserves the stored credential; stored keys never return to the renderer. Test saved connection uses the saved settings and a synthetic image. Opening or saving settings makes no network request. Escape or Close dismisses the dialog; keyboard focus stays inside while it is open.
 
 The configuration accepts a base URL, API key or environment-variable name, model, streaming capability and optional thinking setting. The [implementation page](implementation.md) defines its location and transport rules. The model has no file-reading, registry-search or metadata-editing tools in this release.
 
@@ -85,4 +85,6 @@ The configuration accepts a base URL, API key or environment-variable name, mode
 
 The Assistant uses a compact segmented view switch, neutral colors, consistent SVG icon buttons and a rounded composer. The text box grows with the draft, up to a fixed height. Header and composer icons have accessible names and tooltips. User messages use light bubbles; assistant Markdown occupies the conversation directly. Submitted filenames appear as small attachment labels without a redundant input count.
 
-Upload processing records are available through the information icon below each reply, in a separate Message details view. Raw media UUIDs do not appear in the transcript. Original-file and video/GIF sampling notices remain visible before sending. Options contains image quality and collapsed metadata controls; provider configuration stays in its separate settings view.
+Upload processing records are available through the information icon below each reply, in a separate Message details view. Raw media UUIDs do not appear in the transcript. Original-file and video/GIF sampling notices remain visible before sending. Options contains image quality and directly visible metadata checkboxes, with no earlier-input controls; provider configuration stays in its separate settings view.
+
+The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.

@@ -1,8 +1,9 @@
 <template>
-  <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="options = false; settings = false; detailMessage = null">
+  <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="attachmentsOpen = false; options = false; settings = false; detailMessage = null">
     <header class="chat-header">
       <span class="chat-heading">{{ historyOpen ? "Conversations" : "Assistant" }}</span>
       <div>
+        <button class="btn" title="Provider settings" aria-label="Provider settings" @click="attachmentsOpen = false; showSettings()"><ChatIcon name="gear" /></button>
         <button
           class="btn"
           title="New chat"
@@ -208,9 +209,10 @@
             <button
               class="btn"
               :disabled="busy || working"
-              title="Attach image or text file"
-              aria-label="Attach image or text file"
-              @click="attach"
+              title="Add attachments"
+              aria-label="Add attachments"
+              :aria-expanded="attachmentsOpen"
+              @click="attachmentsOpen = !attachmentsOpen; options = false"
             >
               <ChatIcon name="plus" /></button
             ><button
@@ -218,7 +220,7 @@
               title="Options"
               aria-label="Options"
               :aria-expanded="options"
-              @click="options = !options"
+              @click="options = !options; attachmentsOpen = false"
             >
               <ChatIcon name="options" />
             </button>
@@ -240,6 +242,10 @@
           </button>
         </div>
       </div>
+      <div v-if="attachmentsOpen" ref="attachmentMenu" class="chat-attachment-menu" aria-label="Add attachments">
+        <button class="btn" :disabled="busy || working" @click="attachmentsOpen = false; addCurrent()"><ChatIcon name="plus" />Add current media</button>
+        <button class="btn" :disabled="busy || working" @click="attachmentsOpen = false; attach()"><ChatIcon name="file" />Add text or image files</button>
+      </div>
       <div v-if="options" class="chat-options">
         <div class="chat-row">
           <strong>Message options</strong
@@ -251,9 +257,6 @@
             <ChatIcon name="close" />
           </button>
         </div>
-        <button class="btn" :disabled="busy || working" @click="addCurrent">
-          Add current media
-        </button>
         <label
           >Image quality
           <select v-model="quality" :disabled="busy">
@@ -261,34 +264,14 @@
             <option value="original">Original file</option>
           </select></label
         >
-        <details>
-          <summary>Include saved metadata</summary>
-          <label v-for="(label, key) in metadataLabels" :key="key"
-            ><input type="checkbox" v-model="groups[key]" :disabled="busy" />
-            {{ label }}</label
-          ><small
-            >Unsaved edits are not included. Original files may contain
-            additional embedded metadata.</small
-          >
-        </details>
-        <details v-if="historicalInputs.length">
-          <summary>Inputs from earlier messages</summary>
-          <label v-for="i in historicalInputs" :key="i.kind + i.id"
-            ><input
-              type="checkbox"
-              v-model="excludeInputs"
-              :value="i.kind + ':' + i.id"
-              :disabled="busy"
-            />
-            Exclude
-            {{ session.inputLabels?.[i.kind + ":" + i.id] || i.kind }} from next
-            request</label
-          ><label
-            ><input type="checkbox" v-model="acceptChanges" :disabled="busy" />
-            Use current versions of changed inputs</label
-          >
-        </details>
-        <button class="btn" @click="showSettings">Provider settings</button>
+        <fieldset class="chat-metadata-options">
+          <legend>Include saved metadata</legend>
+          <label v-for="(label, key) in metadataLabels" :key="key">
+            <input type="checkbox" v-model="groups[key]" :disabled="busy" />
+            <span>{{ label }}</span>
+          </label>
+          <small>Saved values only. Original files may also contain embedded metadata.</small>
+        </fieldset>
       </div>
     </div>
     <div v-if="detailMessage" class="chat-settings" role="dialog" aria-label="Message details" @keydown.esc="detailMessage = null">
@@ -304,7 +287,7 @@
 </section>
 </template>
 <script setup>
-import { inject, ref, watch, nextTick } from "vue";
+import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ChatIcon from "./ChatIcon.vue";
 import ProviderSettings from "./ProviderSettings.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
@@ -326,9 +309,6 @@ const {
   settings,
   configuration,
   groups,
-  acceptChanges,
-  excludeInputs,
-  historicalInputs,
   renameTitle,
   counts,
   hasOriginal,
@@ -363,6 +343,14 @@ const formatSize = (bytes) =>
   bytes >= 1048576
     ? (bytes / 1048576).toFixed(1) + " MiB"
     : Math.ceil(bytes / 1024) + " KiB";
+const attachmentsOpen = ref(false);
+const attachmentMenu = ref(null);
+function dismissAttachments(event) {
+  if (!attachmentMenu.value?.contains(event.target) && !event.target.closest('button[aria-label="Add attachments"]')) attachmentsOpen.value = false;
+}
+onMounted(() => document.addEventListener('pointerdown', dismissAttachments));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', dismissAttachments));
+watch([historyOpen, busy, () => session.value?.sessionId], () => { attachmentsOpen.value = false; });
 const conversationElement = ref(null);
 const composerElement = ref(null);
 const detailMessage = ref(null);
