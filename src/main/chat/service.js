@@ -510,6 +510,23 @@ function createChatService({
         await fs.rm(file, { force: true });
       });
     },
+    async abandon(sid) {
+      return serial(async () => {
+        idle();
+        await current();
+        const s = await store.load(sid);
+        if (!s.messages.length) return store.remove(sid);
+        // Keep submitted inputs; discard only unsent attachment copies.
+        const used = new Set(s.messages.flatMap(m => m.inputs)
+          .filter(i => i.kind === "attachment").map(i => i.id));
+        const unused = s.attachments.filter(a => !used.has(a.id));
+        const files = await Promise.all(unused.map(a => store.attachmentPath(s, a.id)));
+        s.attachments = s.attachments.filter(a => used.has(a.id));
+        await store.save(s);
+        for (const file of files) await fs.rm(file, { force: true });
+        return { pending: false };
+      });
+    },
     async rename(sid, title) {
       return serial(async () => {
         idle();

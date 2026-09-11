@@ -269,30 +269,11 @@ async function run() {
     `document.querySelector('.left-panel dd')?.textContent==='second.jpg'`,
   );
   await waitFor(
-    `document.querySelector('.chat-conversation').textContent.includes('stopped')`,
-  );
-  assert.equal(
-    await win.webContents.executeJavaScript(
-      `document.querySelectorAll('.chat-composer .chat-attachment-tile').length`,
-    ),
-    0,
-    "Navigation must not attach the new photo",
-  );
-  await click('[aria-label="Options"]');
-  await waitFor(
-    `document.querySelector('button[aria-label="Add attachments"]')?.disabled===false`,
-  );
-  await click('button[aria-label="Add attachments"]');
-  await click(".chat-attachment-menu button");
-  await click('[aria-label="Options"]');
-  await waitFor(
     `document.querySelector('.chat-composer .chat-attachment-tile')?.getAttribute('title') === 'second.jpg'`,
   );
-  await click('[aria-label="Close options"]');
-  await click(".chat-remove-attachment");
-  await waitFor(
-    `document.querySelector('.chat-conversation').textContent.includes('stopped')`,
-  );
+  assert.equal(await win.webContents.executeJavaScript(
+    `document.querySelectorAll('.chat-markdown strong').length`), 0,
+    "Navigation opens a fresh draft");
   await click('[aria-label="History"]');
   await waitFor(`Boolean(document.querySelector('.chat-history-open'))`);
   await click(".chat-history-open");

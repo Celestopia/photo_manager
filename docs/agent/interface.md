@@ -12,13 +12,13 @@ The viewer's right sidebar has Metadata and Assistant views. Switching between t
 
 Keep interface controls English. Replies follow the user's language, with Chinese as the default when the language is unspecified. Suggestions in an empty conversation fill the input box without sending anything.
 
-New chat creates an independent conversation and adds the currently viewed media as a removable input. It does not delete the previous session. Closing Assistant or the viewer also preserves saved history.
+New chat prepares an independent draft with the current media attached. A conversation enters History only after its first user message is saved, including text-only or attachment-only submissions. New chat discards an unstarted draft and its imported copies; submitted conversations remain saved. Closing and reopening Assistant on the same media preserves the current draft or conversation.
 
 ## Add and Review Inputs
 
 Each attachment is a 40px square tile in a horizontal row inside the composer, above the text box. Images show a local thumbnail; text files show a file icon and extension. The filename is available on hover and through accessible labels. A top-right remove button replaces the expandable details view. Users can paste supported images/files, use Attach to choose them, or choose + → Add current media to reference the photo or video currently displayed.
 
-Navigating to another media item stops any active reply but keeps the session open. The new media is not attached automatically. This lets the user decide whether to continue discussing the earlier input or add the new one.
+Navigating to another media item stops and saves any active reply, discards unsent composer content and prepares a fresh draft with the new media attached. This also applies when Assistant is closed: reopening uses the newly viewed media. Resume a previous conversation explicitly through History; loading it does not attach the current media automatically.
 
 Reject unsupported files before completing their import. Explain that PDF, Office documents, archives, audio and external video attachments are not supported yet. Do not imply that the model has read a rejected file.
 

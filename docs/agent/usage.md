@@ -34,7 +34,7 @@ Choose **Save settings**, then **Test saved connection**. The test sends a gener
 
 Use **+ → Add text or image files** to choose an image or UTF-8 text file, or paste one into the composer. Library inputs remain references to their `MediaId`; imported attachments are copied into the conversation's local folder. PDF, Office, archives, audio and external video attachments are rejected with an explanation.
 
-**+ → Add current media** adds the photo or video currently displayed. Navigating to another item stops an active reply but keeps the conversation; the new item is not added automatically. A conversation can therefore discuss several media items over time without belonging to one particular file.
+**+ → Add current media** adds the photo or video currently displayed. Navigating to another item saves and stops an active reply, discards unsent text and attachments, and starts a fresh draft with that item attached. To discuss several media items together, reopen the earlier conversation through History and add the current media explicitly.
 
 Static images default to **Optimized for chat**, with a maximum 1,024-pixel long edge. **Original file** sends unchanged bytes, with a 20 MiB file limit and the provider's own limits. Imported images can override the message's quality setting in Message options. Successful submission resets the next message to optimized quality.
 
@@ -44,7 +44,7 @@ The basic saved title, description and assigned tags are included by default. En
 
 ## Return to a Conversation
 
-**History** lists this library's conversations. Reopen one to continue, filter by the current media, rename a conversation or delete it. The complete text stays on disk even when only recent turns fit into a model request.
+**History** lists only conversations with a submitted user message. Opening Assistant, typing or adding attachments does not create a history entry. Closing and reopening on the same media keeps your current draft or conversation; changing media prepares a fresh draft. Reopen one to continue, filter by the current media, rename a conversation or delete it. The complete text stays on disk even when only recent turns fit into a model request.
 
 Earlier inputs remain part of the conversation automatically. If a referenced source changed, start a new conversation to use its current version. If it is missing, restore it or start a new conversation with available inputs. Saved history remains unchanged.
 

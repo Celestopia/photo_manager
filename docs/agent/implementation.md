@@ -42,7 +42,7 @@ Session deletion first stops and drains active work, then moves the session into
 
 ## Renderer Responsibilities
 
-The application composition root creates `use-chat.js` and provides `CHAT_CONTEXT`. The composable owns the active session, composer, history, options, errors and IPC subscription. Library changes reset its library-scoped state. Viewer navigation stops generation without attaching the newly viewed medium. Reactive send values are converted into plain serializable objects before crossing preload.
+The application composition root creates `use-chat.js` and provides `CHAT_CONTEXT`. The composable owns the active session, composer, history, options, errors and IPC subscription. Library changes reset its library-scoped state. Viewer navigation drains imports and submissions, stops generation, abandons unsent inputs and prepares a new draft for the current medium. A generation counter prevents superseded transitions and previews from publishing stale state. The abandon IPC checks stored messages before deleting a draft; it never deletes a submitted conversation. History excludes drafts while recovery enumerates all records for cleanup. Reactive send values are converted into plain serializable objects before crossing preload.
 
 `ViewerView.vue` keeps the metadata fields mounted while showing `ChatPanel.vue`, preserving draft edits. `ChatPanel.vue` renders the conversation and forwards actions to the composable. Settings and metadata choices sit behind Options beside the composer. Processing notices remain visible before Send. Invalid visual allocations and oversized original images disable Send with an explanation.
 

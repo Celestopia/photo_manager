@@ -110,16 +110,25 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     if (!r.ok) throw new Error(r.error);
     return r.value;
   }
+  let generation = 0;
+  let transition = Promise.resolve();
+  const operations = new Set();
   async function action(fn) {
+    const operation = runAction(fn);
+    operations.add(operation);
+    try { return await operation; } finally { operations.delete(operation); }
+  }
+  async function runAction(fn) {
+    const epoch = generation;
     error.value = "";
     working.value = true;
     try {
       return await fn();
     } catch (e) {
-      error.value = e.message;
+      if (epoch === generation) error.value = e.message;
       return null;
     } finally {
-      working.value = false;
+      if (epoch === generation) working.value = false;
     }
   }
   const stop = async () => {
@@ -167,6 +176,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
         )
       )
         return;
+      const epoch = generation;
       const input = await unwrap(
         api.describe(session.value.sessionId, {
           kind: "media",
@@ -174,25 +184,54 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
           mode: quality.value,
         }),
       );
-      inputs.value.push({ ...input, override: "" });
+      if (epoch === generation) inputs.value.push({ ...input, override: "" });
     });
   }
-  async function newChat() {
-    return action(async () => {
+  // Drain in-flight imports/submissions before abandoning their session. Only the
+  // latest navigation may publish a replacement, including late preview results.
+  function replaceSession(sid = null, create = true) {
+    const epoch = ++generation;
+    const pending = [...operations];
+    working.value = true;
+    transition = transition.catch(() => {}).then(async () => {
+      await Promise.allSettled(pending);
+      if (epoch !== generation) return;
       await stop();
-      session.value = await unwrap(api.create());
+      if (epoch !== generation) return;
+      if (session.value) {
+        const result = await unwrap(api.abandon(session.value.sessionId));
+        if (result?.pending) notice.value = "Attachment cleanup is pending; it will retry when the library opens.";
+      }
+      session.value = null;
       clearComposer();
+      options.value = false;
       historyOpen.value = false;
-      await addCurrent();
+      if (epoch !== generation || (!sid && !create)) return;
+      const next = await unwrap(sid ? api.load(sid) : api.create());
+      if (epoch !== generation) {
+        if (!sid) await unwrap(api.abandon(next.sessionId));
+        return;
+      }
+      session.value = next;
+      renameTitle.value = next.title;
+      if (!sid) await addCurrent();
+    }).catch(e => {
+      if (epoch === generation) error.value = e.message;
+    }).finally(() => {
+      if (epoch === generation) working.value = false;
     });
+    return transition;
   }
+  async function newChat() { return replaceSession(); }
   async function open() {
     visible.value = true;
+    await transition;
     if (!session.value) await newChat();
   }
   async function close() {
-    await action(stop);
     visible.value = false;
+    await transition;
+    await action(stop);
   }
   async function showHistory() {
     return action(async () => {
@@ -201,25 +240,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
       historyOpen.value = true;
     });
   }
-  async function load(sid) {
-    return action(async () => {
-      await stop();
-      session.value = await unwrap(api.load(sid));
-      clearComposer();
-      historyOpen.value = false;
-      renameTitle.value = session.value.title;
-      const submitted = new Set(session.value.messages.flatMap((message) =>
-        message.inputs.filter((input) => input.kind === "attachment").map((input) => input.id),
-      ));
-      for (const attachment of session.value.attachments) {
-        if (submitted.has(attachment.id)) continue;
-        const restored = await unwrap(api.describe(sid, {
-          kind: "attachment", id: attachment.id, mode: "optimized",
-        }));
-        inputs.value.push({ ...restored, override: "" });
-      }
-    });
-  }
+  async function load(sid) { return replaceSession(sid); }
   async function rename(sid = session.value?.sessionId) {
     return action(async () => {
       session.value = await unwrap(
@@ -374,7 +395,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   watch(
     () => selectedItem.value?.MediaId,
     () => {
-      if (busy.value) void action(stop);
+      void replaceSession(null, visible.value && view.value === "viewer");
     },
   );
   watch(view, (value) => {
@@ -386,6 +407,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   watch(
     () => libraryState.value?.active?.libraryId,
     () => {
+      generation++;
       session.value = null;
       visible.value = false;
       busy.value = false;
@@ -394,6 +416,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     },
   );
   onBeforeUnmount(() => {
+    generation++;
     clearTimeout(copyTimer);
     unsubscribe();
     void api.stop();

@@ -33,6 +33,9 @@ test("chat stores independent sessions, recovers interruptions and deletes only 
   const original = path.join(root, "original.txt");
   await fs.writeFile(original, "preserve");
   a.messages.push(message("assistant", "partial"));
+  b.messages.push(message("user", "Hello"));
+  await store.save(b);
+  a.messages.push(message("user", "Question"));
   a.messages[0].status = "streaming";
   await store.save(a);
   await store.recover();
@@ -618,4 +621,38 @@ test('attachment previews are bounded local images and text has no preview', asy
   assert.ok(metadata.width <= 160 && metadata.height <= 160);
   assert.equal(await inputs.preview(file, { kind: 'text' }, tools), null);
   assert.equal(await inputs.preview(path.join(root, 'missing.png'), { kind: 'image' }, tools), null);
+});
+
+test("abandon and recovery remove draft attachments but preserve submitted conversations", async t => {
+  const f = await serviceFixture(t);
+  const imported = await f.chat.import(f.session.sessionId, "draft.txt", Buffer.from("draft"));
+  const file = await f.store.attachmentPath(imported.session, imported.input.id);
+  assert.equal((await f.chat.open()).sessions.length, 0);
+  await f.chat.abandon(f.session.sessionId);
+  await assert.rejects(() => fs.stat(file), { code: "ENOENT" });
+  const next = await f.chat.create();
+  await f.chat.import(next.sessionId, "leftover.txt", Buffer.from("leftover"));
+  await f.store.recover();
+  await assert.rejects(() => f.store.load(next.sessionId), { code: "ENOENT" });
+
+  const saved = await f.store.load((await f.chat.create()).sessionId);
+  saved.messages.push(message("user", "Saved question"));
+  await f.store.save(saved);
+  const unused = await f.chat.import(saved.sessionId, "unused.txt", Buffer.from("unused"));
+  const unusedFile = await f.store.attachmentPath(unused.session, unused.input.id);
+  await f.chat.abandon(saved.sessionId);
+  assert.equal((await f.store.load(saved.sessionId)).messages[0].text, "Saved question");
+  await assert.rejects(() => fs.stat(unusedFile), { code: "ENOENT" });
+  assert.equal((await f.chat.open()).sessions.length, 1);
+});
+
+test("a rejected first submission stays a draft, while provider failure preserves history", async t => {
+  const f = await serviceFixture(t, async () => new Response('', { status: 500 }));
+  await assert.rejects(() => f.chat.send({}), /Send request/);
+  assert.equal((await f.chat.open()).sessions.length, 0);
+  const s = await f.send();
+  assert.equal(s.messages[0].role, "user");
+  assert.equal((await f.chat.open()).sessions.length, 1);
+  await f.chat.abandon(s.sessionId);
+  assert.equal((await f.chat.open()).sessions.length, 1);
 });

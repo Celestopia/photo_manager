@@ -74,7 +74,7 @@ function createStore(library) {
       attachments: [],
     });
   }
-  async function list() {
+  async function list(includeDrafts = false) {
     const dir = await safePath(root, "sessions");
     const entries = await fs
       .readdir(dir, { withFileTypes: true })
@@ -87,6 +87,7 @@ function createStore(library) {
       if (!entry.isDirectory()) continue;
       try {
         const s = await load(entry.name);
+        if (!includeDrafts && !s.messages.some(m => m.role === "user")) continue;
         result.push({
           sessionId: s.sessionId,
           title: s.title,
@@ -153,7 +154,7 @@ function createStore(library) {
         pending.push(entry);
       }
     }
-    for (const row of await list()) {
+    for (const row of await list(true)) {
       if (row.error) continue;
       const s = await load(row.sessionId);
       let changed = false;
@@ -181,15 +182,20 @@ function createStore(library) {
         }
       }
     }
+    pending.push(...await cleanEmpty());
     return pending;
   }
   async function cleanEmpty() {
-    for (const row of await list())
+    const pending = [];
+    for (const row of await list(true))
       if (!row.error) {
         const s = await load(row.sessionId);
-        if (!s.messages.length && !s.attachments.length)
-          await remove(s.sessionId);
+        if (!s.messages.length) {
+          const result = await remove(s.sessionId);
+          if (result.pending) pending.push(s.sessionId);
+        }
       }
+    return pending;
   }
   return {
     root,

@@ -7,12 +7,13 @@ function registerChatIpc({ chat, getWindow, configFile }) {
   const fields = {
     load: ["sessionId"], describe: ["sessionId", "input"],
     rename: ["sessionId", "title"], removeInput: ["sessionId", "attachmentId"],
-    delete: ["sessionId"], importBytes: ["sessionId", "name", "bytes"],
+    abandon: ["sessionId"], delete: ["sessionId"], importBytes: ["sessionId", "name", "bytes"],
     importFile: ["sessionId", "path"], choose: ["sessionId"],
   };
   const handlers = {
     open: () => chat.open(),
     create: () => chat.create(),
+    abandon: (p) => chat.abandon(p.sessionId),
     load: (p) => chat.load(p.sessionId),
     describe: (p) => chat.describe(p.sessionId, p.input),
     send: (p) => chat.send(p),

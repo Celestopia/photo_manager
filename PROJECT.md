@@ -17,7 +17,7 @@ Current capabilities include:
 - Managing tags, albums, people, and locations through registries, while preventing metadata from referencing unregistered values.
 - Keeping metadata, registries, thumbnails, logs, and backups separate for every library.
 - Running initialization, incremental updates, integrity verification, thumbnail generation, and CSV export inside the application.
-- Chatting about explicitly selected viewer media and imported attachments, with persistent library-local conversations.
+- Chatting about explicitly selected viewer media and imported attachments, with persistent library-local conversations. Media navigation prepares a fresh draft; only submitted conversations appear in History (see the viewer chat reference below).
 
 The project is local-first. Core browsing and management do not depend on network services, and no database is used. Assistant sends only explicitly submitted conversation inputs to the configured remote API or local model server. Media and registries use JSONL; chat uses independent session JSON files.
 

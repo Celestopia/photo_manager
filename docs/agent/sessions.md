@@ -4,7 +4,7 @@ This page explains how conversations survive closing the viewer or restarting th
 
 ## Give Each Conversation Its Own Identity
 
-A conversation belongs to one library and has its own UUID. Its identity does not depend on a photo or video. For example, a user can start a conversation about photo A, navigate to photo B, and explicitly add B to the same conversation. Each message records its own inputs.
+A conversation belongs to one library and has its own UUID. Its identity does not depend on a photo or video. For example, a user can start a conversation about photo A, navigate to photo B, reopen the earlier conversation through History, and explicitly add B. Each message records its own inputs.
 
 Library inputs use `MediaId`, so renaming or moving a file within the library does not break the association. Imported attachments have their own IDs and belong to the conversation that imported them. This structure can support a future multi-selection entry point without changing conversation identity; that entry point is outside this release.
 
@@ -35,7 +35,7 @@ All writes use the existing exclusive library lock, validated paths and atomic p
 
 ## Save During Composition and Generation
 
-When a user imports an attachment, save it under the session. If they remove it before sending, delete that copy only when no submitted message references it. Clean up partial files after a failed import. Keep a draft session if it owns imported files; remove a truly empty draft when the application closes cleanly.
+When a user imports an attachment, save it under the session. If they remove it before sending, delete that copy only when no submitted message references it. Clean up partial files after a failed import. Drafts may have temporary session directories but never appear in History. Abandoning a draft removes its owned files, even if it has imported attachments. Library recovery and clean closure remove leftover records with no messages; unreadable records remain untouched. Submitted conversations retain referenced attachments, while abandoning their composer removes only unsent copies. A saved first user message establishes a conversation even if the model request fails or stops.
 
 Reopening a session restores its unsubmitted imported attachments to the composer with optimized quality. Unsubmitted message text and quality overrides are temporary; only submitted messages persist those choices.
 
