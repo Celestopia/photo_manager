@@ -1,4 +1,5 @@
-const { clipboard, dialog, ipcMain, nativeImage, shell } = require("electron");
+const { copyFileToClipboard } = require("./file-clipboard");
+const { clipboard, dialog, ipcMain, shell } = require("electron");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -188,32 +189,29 @@ function registerIpcHandlers(options) {
   ipcMain.handle("photo:copy-path", async (_, mediaId) => {
     try {
       const { absolutePath } = resolveIndexedMediaPath(mediaId);
-      clipboard.writeText(absolutePath);
+      await clipboard.writeText(absolutePath);
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };
     }
   });
   ipcMain.handle("clipboard:write-text", async (_, value) => {
-    clipboard.writeText(String(value ?? ""));
+    await clipboard.writeText(String(value ?? ""));
     return { ok: true };
   });
   ipcMain.handle("photo:copy-json", async (_, mediaId) => {
     try {
       const { item } = resolveIndexedMediaPath(mediaId);
-      clipboard.writeText(JSON.stringify(item, null, 2));
+      await clipboard.writeText(JSON.stringify(item, null, 2));
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle("photo:copy-image", async (_, mediaId) => {
+  ipcMain.handle("photo:copy-file", async (_, mediaId) => {
     try {
-      const resolved = resolveIndexedMediaPath(mediaId);
-      if (resolved.item?.FileSystem?.FileType !== "image") return { ok: false, error: "Only images can be copied" };
-      const image = nativeImage.createFromPath(resolved.absolutePath);
-      if (image.isEmpty()) return { ok: false, error: "Image load failed" };
-      clipboard.writeImage(image);
+      const { absolutePath } = resolveIndexedMediaPath(mediaId);
+      await copyFileToClipboard(absolutePath);
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };

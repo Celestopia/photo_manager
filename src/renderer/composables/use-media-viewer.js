@@ -161,11 +161,11 @@ export function useMediaViewer({
   function toggleLeftPanel() { showLeftPanel.value = !showLeftPanel.value; }
   function toggleRightPanel() { showRightPanel.value = !showRightPanel.value; }
 
-  async function contextCopyImage() {
+  async function contextCopyFile() {
     if (!selectedItem.value) return;
-    const result = await api.copyImage(selectedItem.value.MediaId);
-    if (result?.ok) showToastMessage("Image copied to the clipboard");
-    else showToastMessage(`Could not copy image: ${result?.error || "Unknown error"}`);
+    const result = await api.copyFile(selectedItem.value.MediaId);
+    if (result?.ok) showToastMessage("File copied to the clipboard");
+    else showToastMessage(`Could not copy file: ${result?.error || "Unknown error"}`);
     closeTransientPanels();
   }
 
@@ -314,7 +314,7 @@ export function useMediaViewer({
     closeTransientPanels,
     toggleLeftPanel,
     toggleRightPanel,
-    contextCopyImage,
+    contextCopyFile,
     contextCopyPath,
     contextCopyJson,
     toggleFullscreen,

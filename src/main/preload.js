@@ -97,7 +97,7 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   copyPath: (mediaId) => ipcRenderer.invoke("photo:copy-path", mediaId),
   copyText: (value) => ipcRenderer.invoke("clipboard:write-text", String(value ?? "")),
   copyJson: (mediaId) => ipcRenderer.invoke("photo:copy-json", mediaId),
-  copyImage: (mediaId) => ipcRenderer.invoke("photo:copy-image", mediaId),
+  copyFile: (mediaId) => ipcRenderer.invoke("photo:copy-file", mediaId),
   openWithSystem: (mediaId) => ipcRenderer.invoke("photo:open-default", mediaId),
   showInFolder: (mediaId) => ipcRenderer.invoke("photo:show-in-folder", mediaId),
   reportPlaybackIssue: (payload) => ipcRenderer.invoke("photo:report-playback", toSerializable(payload)),

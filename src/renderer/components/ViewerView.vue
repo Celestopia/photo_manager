@@ -142,7 +142,7 @@
     </div>
     <button class="nav-btn right" @click="switchPhoto(1)">▶</button>
     <div v-if="showContextMenu" class="context-menu" :style="{ left: contextPosition.x + 'px', top: contextPosition.y + 'px' }" @click.stop>
-      <button v-if="!isSelectedVideo" @click="contextCopyImage">Copy Image</button><button @click="contextCopyPath">Copy File Path</button><button @click="contextCopyJson">Copy Media Metadata JSON</button><button @click="openCurrentWithSystem">Open with Default App</button><button @click="showCurrentInFolder">Show in File Explorer</button>
+      <button @click="contextCopyFile">Copy File</button><button @click="contextCopyPath">Copy File Path</button><button @click="contextCopyJson">Copy Media Metadata JSON</button><button @click="openCurrentWithSystem">Open with Default App</button><button @click="showCurrentInFolder">Show in File Explorer</button>
     </div>
   </section>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
@@ -389,7 +389,7 @@ const {
   startDrag,
   toggleFullscreen,
   buildImageUrl,
-  contextCopyImage,
+  contextCopyFile,
   contextCopyPath,
   contextCopyJson,
   openCurrentWithSystem,
