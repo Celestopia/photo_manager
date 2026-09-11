@@ -9,10 +9,12 @@
     <PersonManagerDialog />
     <LocationManagerDialog />
     <UiFeedbackOverlay />
+    <ProviderSettings v-if="providerSettingsOpen" />
   </div>
 </template>
 
 <script>
+import ProviderSettings from "./components/ProviderSettings.vue";
 import GalleryView from "./components/GalleryView.vue";
 import ViewerView from "./components/ViewerView.vue";
 import LibraryEntryView from "./components/LibraryEntryView.vue";
@@ -27,6 +29,7 @@ import { useRendererApplication } from "./application/use-renderer-application.j
 export default {
   name: "PhotoManagerApp",
   components: {
+    ProviderSettings,
     GalleryView,
     ViewerView,
     LibraryEntryView,

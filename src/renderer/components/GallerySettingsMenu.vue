@@ -15,6 +15,8 @@
       <button @click="openPersonManager"><span>♙</span>Manage People</button>
       <button @click="openTagManager"><span>◇</span>Manage Tags</button>
       <div class="gallery-settings-separator"></div>
+      <button @click="openProviderSettings"><span>⚙</span>LLM Provider Settings</button>
+      <div class="gallery-settings-separator"></div>
       <button class="danger-text" @click="returnToLibraryEntry"><span>↩</span>Close Current Library</button>
     </div>
   </div>
@@ -22,7 +24,13 @@
 
 <script setup>
 import { inject, onBeforeUnmount, onMounted } from "vue";
-import { SETTINGS_CONTEXT } from "../context/renderer-contexts.js";
+import { SETTINGS_CONTEXT, CHAT_CONTEXT } from "../context/renderer-contexts.js";
+
+const chat = inject(CHAT_CONTEXT);
+function openProviderSettings() {
+  closeGallerySettings();
+  void chat.showSettings();
+}
 
 const GALLERY_SETTINGS_SURFACE = Symbol("gallery-settings");
 const app = inject(SETTINGS_CONTEXT);

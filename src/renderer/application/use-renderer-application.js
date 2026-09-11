@@ -721,5 +721,5 @@ export function useRendererApplication() {
     provide(VIEWER_CONTEXT, viewerContext);
     provide(UI_FEEDBACK_CONTEXT, uiFeedbackContext);
 
-    return { view };
+    return { view, providerSettingsOpen: chat.settings };
 }

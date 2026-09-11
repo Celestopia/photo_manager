@@ -283,13 +283,11 @@
         <span v-for="(u, k) in p.uploads" :key="k">{{ u.transformation }} · {{ u.width }} × {{ u.height }} · {{ formatSize(u.size) }}<template v-if="u.timestamp != null"> · {{ u.timestamp.toFixed(3) }} s</template></span>
       </div>
     </div>
-    <ProviderSettings v-if="settings" />
 </section>
 </template>
 <script setup>
 import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ChatIcon from "./ChatIcon.vue";
-import ProviderSettings from "./ProviderSettings.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 const chat = inject(CHAT_CONTEXT);

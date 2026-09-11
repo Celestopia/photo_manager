@@ -144,6 +144,11 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  await click('.gallery-settings-trigger');
+  await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('LLM Provider Settings')).click()`);
+  await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-settings-menu'))`), false);
+  await click('[aria-label="Close provider settings"]');
   await click(".photo-card");
   await waitFor(`Boolean(document.querySelector('.viewer-sidebar-tabs'))`);
   await setValue(".viewer-title-input", "Unsaved draft title");
