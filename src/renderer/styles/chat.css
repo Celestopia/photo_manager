@@ -358,3 +358,6 @@
 
 .chat-message.user { position: relative; }
 .chat-message.user .chat-message-copy { display: block; margin-left: auto; }
+
+.chat-sent-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.chat-message.user .chat-sent-tiles { justify-content: flex-end; }

@@ -83,7 +83,7 @@ The configuration accepts a base URL, API key or environment-variable name, mode
 
 ## Visual Presentation
 
-The Assistant uses a compact segmented view switch, neutral colors, consistent SVG icon buttons and a rounded composer. The text box grows with the draft, up to a fixed height. Header and composer icons have accessible names and tooltips. User messages use light bubbles; assistant Markdown occupies the conversation directly. Submitted filenames appear as small attachment labels without a redundant input count.
+The Assistant uses a compact segmented view switch, neutral colors, consistent SVG icon buttons and a rounded composer. The text box grows with the draft, up to a fixed height. Header and composer icons have accessible names and tooltips. User messages use light bubbles; assistant Markdown occupies the conversation directly. Sent attachments appear as the same 40px preview tiles used by the composer, without removal controls. Reopened conversations regenerate local previews; missing or unreadable sources show a file tile with the saved filename available on hover.
 
 Each nonempty user or assistant message has a Copy button. It copies the original message text, preserving assistant Markdown, and briefly shows a checkmark. Upload processing records remain stored without a technical-details button. Raw media UUIDs do not appear in the transcript. Original-file and video/GIF sampling notices remain visible before sending. Options contains image quality and directly visible metadata checkboxes, with no earlier-input controls; provider configuration stays in its separate settings view.
 

@@ -41,6 +41,28 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
         !currentOnly.value || s.mediaIds?.includes(selectedItem.value?.MediaId),
     ),
   );
+  const sentPreviews = ref({});
+  watch(
+    () => JSON.stringify([session.value?.sessionId, (session.value?.messages || []).flatMap(m => m.inputs).map(i => i.kind + ':' + i.id)]),
+    async (_, __, onCleanup) => {
+      let cancelled = false;
+      onCleanup(() => { cancelled = true; });
+      const currentSession = session.value;
+      sentPreviews.value = {};
+      if (!currentSession) return;
+      const unique = new Map(currentSession.messages.flatMap(m => m.inputs).map(i => [i.kind + ':' + i.id, i]));
+      for (const [key, input] of unique) {
+        if (cancelled) return;
+        const pending = inputs.value.find(i => i.kind === input.kind && i.id === input.id);
+        if (pending) { sentPreviews.value[key] = pending; continue; }
+        try {
+          const result = await api.describe(currentSession.sessionId, JSON.parse(JSON.stringify(input)));
+          if (cancelled) return;
+          if (result.ok) sentPreviews.value[key] = result.value;
+        } catch { /* Missing sources retain a readable file tile. */ }
+      }
+    },
+  );
   const counts = computed(() => {
     const result = inputs.value.map((i) =>
       i.mediaKind === "text" ? 0 : i.mediaKind === "image" ? 1 : 2,
@@ -377,6 +399,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     void api.stop();
   });
   return {
+    sentPreviews,
     copiedMessage,
     copyMessage,
     session,

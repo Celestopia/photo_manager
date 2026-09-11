@@ -98,8 +98,11 @@
           v-html="renderChatMarkdown(m.text)"
         ></div>
         <p v-else class="chat-user-text">{{ m.text }}</p>
-        <div v-if="m.inputs.length" class="chat-sent-inputs">
-          <span v-for="i in m.inputs" :key="i.kind + i.id" :title="session.inputLabels?.[i.kind + ':' + i.id] || i.kind"><ChatIcon name="file" />{{ session.inputLabels?.[i.kind + ':' + i.id] || i.kind }}</span>
+        <div v-if="m.inputs.length" class="chat-sent-tiles" aria-label="Message attachments">
+          <div v-for="i in m.inputs" :key="i.kind + i.id" class="chat-attachment-tile" :title="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'">
+            <img v-if="sentPreviews[i.kind + ':' + i.id]?.previewUrl" :src="sentPreviews[i.kind + ':' + i.id].previewUrl" :alt="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment'" />
+            <div v-else class="chat-file-tile" role="img" :aria-label="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'"><ChatIcon name="file" /><span>{{ (session.inputLabels?.[i.kind + ':' + i.id] || 'FILE').split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
+          </div>
         </div>
         <small v-if="m.status !== 'complete'">{{
           m.status === "pending"
@@ -254,6 +257,7 @@ import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 const chat = inject(CHAT_CONTEXT);
 const {
+  sentPreviews,
   copiedMessage,
   copyMessage,
   session,

@@ -155,8 +155,8 @@ async function run() {
   await waitFor(`Boolean(document.querySelector('.viewer-sidebar-tabs'))`);
   await setValue(".viewer-title-input", "Unsaved draft title");
   await click(".viewer-sidebar-tabs button:last-child");
-  await waitFor(`Boolean(document.querySelector('.chat-attachment-tile'))`);
-  await waitFor(`document.querySelector('.chat-attachment-tile img')?.naturalWidth > 0`);
+  await waitFor(`Boolean(document.querySelector('.chat-composer .chat-attachment-tile'))`);
+  await waitFor(`document.querySelector('.chat-composer .chat-attachment-tile img')?.naturalWidth > 0`);
 
   await click('[aria-label="Options"]');
   assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chat-options fieldset input[type=checkbox]').length`), 5);
@@ -189,6 +189,7 @@ async function run() {
     `document.querySelector('.chat-composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`,
   );
   await waitFor(`Boolean(document.querySelector('.chat-markdown strong'))`);
+  await waitFor(`document.querySelector('.chat-sent-tiles img')?.naturalWidth > 0`);
   await click('.assistant .chat-message-copy');
   await waitFor(`document.querySelector('.assistant .chat-message-copy')?.getAttribute('aria-label') === 'Copied'`);
   assert.ok(copiedText.includes('**'), 'Copy preserves raw Markdown');
@@ -225,7 +226,7 @@ async function run() {
   await click('button[aria-label="Add attachments"]');
   await click(".chat-attachment-menu button");
   await click('[aria-label="Options"]');
-  await waitFor(`Boolean(document.querySelector('.chat-attachment-tile'))`);
+  await waitFor(`Boolean(document.querySelector('.chat-composer .chat-attachment-tile'))`);
   await win.webContents.executeJavaScript(
     `const e=document.querySelector('.chat-options select');e.value='original';e.dispatchEvent(new Event('change',{bubbles:true}));`,
   );
@@ -262,7 +263,7 @@ async function run() {
   );
   assert.equal(
     await win.webContents.executeJavaScript(
-      `document.querySelectorAll('.chat-attachment-tile').length`,
+      `document.querySelectorAll('.chat-composer .chat-attachment-tile').length`,
     ),
     0,
     "Navigation must not attach the new photo",
@@ -275,7 +276,7 @@ async function run() {
   await click(".chat-attachment-menu button");
   await click('[aria-label="Options"]');
   await waitFor(
-    `document.querySelector('.chat-attachment-tile')?.getAttribute('title') === 'second.jpg'`,
+    `document.querySelector('.chat-composer .chat-attachment-tile')?.getAttribute('title') === 'second.jpg'`,
   );
   await click('[aria-label="Close options"]');
   await click(".chat-remove-attachment");
@@ -298,7 +299,7 @@ async function run() {
   await win.webContents.executeJavaScript(
     `(()=>{const data=new DataTransfer();data.items.add(new File([new Uint8Array(${JSON.stringify(pasted)})],'pasted.png',{type:'image/png'}));document.querySelector('.chat-composer textarea').dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true}));})()`,
   );
-  await waitFor(`Boolean(document.querySelector('.chat-attachment-tile'))`);
+  await waitFor(`Boolean(document.querySelector('.chat-composer .chat-attachment-tile'))`);
   await fsp.mkdir(path.resolve("release"), { recursive: true });
   await sleep(300);
   await fsp.writeFile(
