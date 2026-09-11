@@ -413,7 +413,23 @@ async function prepare(file, info, mode, count, { tools, signal } = {}) {
     );
   return results;
 }
+// Ephemeral local thumbnails; never persisted or included in model requests.
+async function preview(file, info, tools) {
+  if (info.kind === "text") return null;
+  try {
+    let source;
+    if (info.kind === "video" || path.extname(file).toLowerCase() === ".bmp") {
+      source = (await run(tools.ffmpegPath, ["-v", "error", "-i", file, "-frames:v", "1", "-vf", "scale=160:160:force_original_aspect_ratio=decrease", "-f", "image2pipe", "-vcodec", "png", "pipe:1"])).stdout;
+    } else source = await fs.readFile(file);
+    const bytes = await sharp(source, { page: 0, pages: 1 }).rotate().resize(160, 160, { fit: "cover", withoutEnlargement: true }).flatten({ background: "#ffffff" }).toColourspace("srgb").jpeg({ quality: 70 }).toBuffer();
+    return "data:image/jpeg;base64," + bytes.toString("base64");
+  } catch {
+    // A display preview failure must not prevent attaching an otherwise valid input.
+    return null;
+  }
+}
 module.exports = {
+  preview,
   MiB,
   hash,
   fingerprint,

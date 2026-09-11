@@ -36,7 +36,7 @@ Use **+ → Add text or image files** to choose an image or UTF-8 text file, or 
 
 **+ → Add current media** adds the photo or video currently displayed. Navigating to another item stops an active reply but keeps the conversation; the new item is not added automatically. A conversation can therefore discuss several media items over time without belonging to one particular file.
 
-Static images default to **Optimized for chat**, with a maximum 1,024-pixel long edge. **Original file** sends unchanged bytes, with a 20 MiB file limit and the provider's own limits. Imported image chips can override the message's quality setting. Successful submission resets the next message to optimized quality.
+Static images default to **Optimized for chat**, with a maximum 1,024-pixel long edge. **Original file** sends unchanged bytes, with a 20 MiB file limit and the provider's own limits. Imported images can override the message's quality setting in Message options. Successful submission resets the next message to optimized quality.
 
 Original bytes can contain embedded EXIF metadata regardless of the separate application-metadata choices. The provider may resize or process original uploads. Videos and animated GIFs always use sampled still frames; no original moving file or audio is sent. The composer displays their sampling notices before Send.
 
@@ -60,3 +60,5 @@ Conversations and imported attachments are saved under `<library>/.photo_manager
 The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.
 
 Provider settings is also available from the gallery gear menu as **LLM Provider Settings**. Both entry points open the same application-level dialog; opening it from the gallery does not create a conversation or submit media.
+
+Pending attachments appear as square tiles above the text box, with local image previews or file icons. Use the corner × to remove an attachment; hover to see its filename. Previews are generated locally and do not upload anything.

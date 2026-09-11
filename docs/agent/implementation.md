@@ -69,3 +69,5 @@ Also run `node --check` on changed CommonJS files. Metadata verification always 
 `tests/helpers/chat-package-smoke.cjs` loads chat modules from the built ASAR and tests packaged Sharp, bundled CPU FFmpeg and original-byte preservation. Run it with the packaged executable and `ELECTRON_RUN_AS_NODE=1` in a temporary shell. This does not exercise a live provider.
 
 For a development package without network downloads, electron-builder can use `--config.electronDist=node_modules/electron/dist --config.win.signAndEditExecutable=false`. That offline smoke-test build skips executable resource editing and signing; use the normal release command for distribution.
+
+Attachment descriptions include an ephemeral previewUrl for the composer. The main process prepares a bounded 160px JPEG locally from validated library or session-owned inputs; video uses a first-frame preview and GIF uses its first frame only for display. Preview failures fall back to a file icon. Previews are not persisted or included in model requests; video/GIF request sampling remains unchanged.

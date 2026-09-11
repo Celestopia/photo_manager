@@ -107,6 +107,7 @@ function createChatService({
       height: r.info.height,
       size: r.info.size,
       pages: r.info.pages || 0,
+      previewUrl: await media.preview(r.file, r.info, getTools()),
     };
   }
   async function importBytes(s, name, bytes) {
@@ -179,6 +180,7 @@ function createChatService({
           height: info.height,
           size: info.size,
           pages: info.pages || 0,
+          previewUrl: await media.preview(dest, info, getTools()),
         },
       };
     } catch (e) {

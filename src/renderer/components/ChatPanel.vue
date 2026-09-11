@@ -139,47 +139,6 @@
     </p>
     <div v-if="!historyOpen" class="chat-composition">
       <p v-if="inputLimitError" class="chat-error">{{ inputLimitError }}</p>
-      <div class="chat-attachments">
-        <details
-          v-for="(i, n) in inputs"
-          :key="i.kind + i.id"
-          class="chat-chip"
-        >
-          <summary>
-            {{ i.name }}
-            <span v-if="['gif', 'video'].includes(i.mediaKind)"
-              >· Sampled frames</span
-            >
-          </summary>
-          <p>
-            {{ formatSize(i.size) }} · {{ i.width || "—" }} ×
-            {{ i.height || "—" }}
-          </p>
-          <label v-if="i.kind === 'attachment' && i.mediaKind === 'image'"
-            >Image quality
-            <select v-model="i.override" :disabled="busy">
-              <option value="">Message default</option>
-              <option value="optimized">Optimized for chat</option>
-              <option value="original">Original file</option>
-            </select></label
-          >
-          <p
-            v-if="
-              i.mediaKind === 'image' && (i.override || quality) === 'original'
-            "
-          >
-            Unchanged bytes may include embedded metadata. The provider may
-            resize or process this file.
-          </p>
-          <button
-            class="btn"
-            :disabled="busy || working"
-            @click="removeInput(n)"
-          >
-            Remove
-          </button>
-        </details>
-      </div>
       <p v-if="hasOriginal" class="chat-notice">
         Original file: larger upload and provider-dependent limits.
       </p>
@@ -194,6 +153,14 @@
         </p></template
       >
       <div class="chat-composer">
+        <div v-if="inputs.length" class="chat-attachments" aria-label="Message attachments">
+          <div v-for="(i, n) in inputs" :key="i.kind + i.id" class="chat-attachment-tile" :title="i.name">
+            <img v-if="i.previewUrl" :src="i.previewUrl" :alt="i.name" />
+            <div v-else class="chat-file-tile"><ChatIcon name="file" /><span>{{ i.name.split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
+            <span v-if="['gif', 'video'].includes(i.mediaKind)" class="chat-tile-badge">{{ i.mediaKind === 'gif' ? 'GIF' : 'Video' }}</span>
+            <button class="chat-remove-attachment" :disabled="busy || working" :aria-label="'Remove ' + i.name" title="Remove attachment" @click="removeInput(n)"><ChatIcon name="close" /></button>
+          </div>
+        </div>
         <textarea
           ref="composerElement"
           rows="2"
@@ -264,6 +231,10 @@
             <option value="original">Original file</option>
           </select></label
         >
+        <label v-for="i in inputs.filter(i => i.kind === 'attachment' && i.mediaKind === 'image')" :key="i.id" class="chat-attachment-quality">
+          <span :title="i.name">{{ i.name }}</span>
+          <select v-model="i.override" :disabled="busy"><option value="">Message default</option><option value="optimized">Optimized for chat</option><option value="original">Original file</option></select>
+        </label>
         <fieldset class="chat-metadata-options">
           <legend>Include saved metadata</legend>
           <label v-for="(label, key) in metadataLabels" :key="key">

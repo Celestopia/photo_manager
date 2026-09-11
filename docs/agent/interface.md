@@ -8,7 +8,7 @@ The viewer's right sidebar has Metadata and Assistant views. Switching between t
 
 - A header with New chat, History and Close.
 - A scrollable conversation.
-- A bottom composer with an input box, attachment chips, Attach, Options, Send and Stop.
+- A bottom composer with an input box, attachment tiles, Attach, Options, Send and Stop.
 
 Keep interface controls English. Replies follow the user's language, with Chinese as the default when the language is unspecified. Suggestions in an empty conversation fill the input box without sending anything.
 
@@ -16,7 +16,7 @@ New chat creates an independent conversation and adds the currently viewed media
 
 ## Add and Review Inputs
 
-Each attachment chip represents an input to the next message. It shows its name and offers details and removal. Users can paste supported images/files, use Attach to choose them, or choose + → Add current media to reference the photo or video currently displayed.
+Each attachment is a 40px square tile in a horizontal row inside the composer, above the text box. Images show a local thumbnail; text files show a file icon and extension. The filename is available on hover and through accessible labels. A top-right remove button replaces the expandable details view. Users can paste supported images/files, use Attach to choose them, or choose + → Add current media to reference the photo or video currently displayed.
 
 Navigating to another media item stops any active reply but keeps the session open. The new media is not attached automatically. This lets the user decide whether to continue discussing the earlier input or add the new one.
 
@@ -31,7 +31,7 @@ Options includes an Image quality choice for the message:
 | Optimized for chat | A smaller image, corrected for orientation and color, at most 1,024 pixels on its long edge. This is the default. |
 | Original file | The unchanged static-image file, without resizing, recompression or metadata removal. |
 
-The message choice applies to library static images. Imported static images initially follow it, but each imported-image chip can override the choice. Later changes to the message setting update only library images and imported images without an override.
+The message choice applies to library static images. Imported static images initially follow it, but each imported image can override the choice in Message options. Later changes to the message setting update only library images and imported images without an override.
 
 After a successful submission, the next message defaults to Optimized for chat. A failed unsent message keeps its choices. Retrying a submitted message keeps that message's recorded choices and creates another attempt.
 
@@ -39,11 +39,11 @@ When any input uses Original file, show this notice beside the composer before S
 
 > Original file: larger upload and provider-dependent limits.
 
-Attachment details show its source dimensions and file size, and explain that unchanged bytes can contain embedded metadata. They also explain that the provider may resize or process the upload. Do not silently change Original file to optimized mode if a limit is exceeded.
+Tiles do not show dimensions or file sizes. Processing provenance remains available in Message details after sending. Original files can contain embedded metadata and the provider may resize or process the upload. Do not silently change Original file to optimized mode if a limit is exceeded.
 
 ## Explain Video and GIF Processing Before Send
 
-Video and animated-GIF chips are labelled Sampled frames. They do not offer Original file mode.
+Video and animated-GIF tiles carry Video or GIF badges; sampling notices remain visible above the composer. They do not offer Original file mode.
 
 Show these notices beside the composer while the corresponding input is present:
 

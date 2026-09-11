@@ -606,3 +606,16 @@ test('provider form preserves secrets, validates before writing and supports exp
   await provider.saveConfig(file, { ...draft, clearKey: true });
   assert.equal((await provider.editableConfig(file)).hasKey, false);
 });
+
+test('attachment previews are bounded local images and text has no preview', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-preview-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, 'photo.png');
+  await sharp({ create: { width: 800, height: 600, channels: 3, background: 'red' } }).png().toFile(file);
+  const preview = await inputs.preview(file, { kind: 'image' }, tools);
+  assert.match(preview, /^data:image\/jpeg;base64,/);
+  const metadata = await sharp(Buffer.from(preview.split(',')[1], 'base64')).metadata();
+  assert.ok(metadata.width <= 160 && metadata.height <= 160);
+  assert.equal(await inputs.preview(file, { kind: 'text' }, tools), null);
+  assert.equal(await inputs.preview(path.join(root, 'missing.png'), { kind: 'image' }, tools), null);
+});

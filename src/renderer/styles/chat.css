@@ -343,3 +343,15 @@
 
 .chat-attachment-menu { position: absolute; bottom: 48px; left: 8px; z-index: 21; width: min(240px, calc(100% - 16px)); background: white; border: 1px solid #e4e7eb; border-radius: 12px; padding: 5px; box-shadow: 0 8px 30px #20252d18; }
 .chat-attachment-menu .btn { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px; background: transparent; text-align: left; }
+
+/* Compact local attachment previews inside the composer. */
+.chat-composer .chat-attachments { display: flex; flex-wrap: nowrap; gap: 10px; padding: 5px 4px 7px; margin: 0 0 7px; max-height: none; overflow-x: auto; }
+.chat-attachment-tile { position: relative; flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid #e0e4ea; border-radius: 12px; background: #fff; }
+.chat-attachment-tile > img { width: 100%; height: 100%; object-fit: cover; border-radius: 11px; display: block; }
+.chat-file-tile { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; color: #708297; }
+.chat-file-tile svg { width: 18px; height: 18px; }
+.chat-file-tile span { font-size: 9px; font-weight: 600; }
+.chat-remove-attachment { position: absolute; right: -4px; top: -4px; display: grid; place-items: center; width: 19px; height: 19px; padding: 2px; border-radius: 50%; border: 2px solid #f5f6f8; background: #59636f; color: #fff; cursor: pointer; }
+.chat-remove-attachment svg { width: 12px; height: 12px; }
+.chat-tile-badge { position: absolute; bottom: 3px; left: 4px; background: #202b3bba; color: white; border-radius: 3px; padding: 1px 3px; font-size: 8px; }
+.chat-options .chat-attachment-quality span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-size: 10px; }
