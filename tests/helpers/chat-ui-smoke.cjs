@@ -146,6 +146,16 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getAttribute('aria-expanded')`), 'true');
+  const searchTop = await win.webContents.executeJavaScript(`document.querySelector('.search-panel').getBoundingClientRect().top`);
+  await click('.gallery-controls-toggle');
+  await waitFor(`!document.querySelector('#gallery-filter-panel')`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.search-panel').getBoundingClientRect().top`), searchTop);
+  await click('.gallery-controls-toggle');
+  await waitFor(`Boolean(document.querySelector('#gallery-filter-panel'))`);
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getBoundingClientRect().top >= document.querySelector('#gallery-filter-panel').getBoundingClientRect().bottom - 1`), true);
+
   await click('.gallery-settings-trigger');
   await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('LLM Provider Settings')).click()`);
   await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);

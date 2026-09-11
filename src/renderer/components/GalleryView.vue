@@ -16,18 +16,8 @@
   <section class="gallery-content">
     <section class="gallery-controls-host">
       <div class="gallery-controls-drawer" :class="{ expanded: galleryControlsExpanded }">
-        <button
-          type="button"
-          class="gallery-controls-toggle"
-          :data-tip="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
-          :aria-label="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
-          :aria-expanded="galleryControlsExpanded"
-          @click="toggleGalleryControls"
-        >
-          <span v-if="galleryControlsModified" class="gallery-controls-status-dot" aria-hidden="true"></span>
-          <img class="gallery-controls-chevron" :class="galleryControlsExpanded ? 'point-right' : 'point-left'" :src="ICONS.chevronDown" alt="" />
-        </button>
-        <section v-if="galleryControlsExpanded" class="gallery-controls-panel">
+        <Transition name="gallery-filters">
+        <section v-if="galleryControlsExpanded" id="gallery-filter-panel" class="gallery-controls-panel">
           <div class="gallery-controls-primary">
             <div class="toolbar-group"><label>Album</label><RegistryFilterPicker kind="album" label="Album" /></div>
             <div class="toolbar-group"><label>Tags</label><RegistryFilterPicker kind="tag" label="Tags" /></div>
@@ -62,6 +52,19 @@
             />
           </div>
         </section>
+        </Transition>
+        <button
+          type="button"
+          class="gallery-controls-toggle"
+          :data-tip="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
+          :aria-label="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
+          :aria-expanded="galleryControlsExpanded"
+          aria-controls="gallery-filter-panel"
+          @click="onToggleControls"
+        >
+          <span v-if="galleryControlsModified" class="gallery-controls-status-dot" aria-hidden="true"></span>
+          <img class="gallery-controls-chevron" :class="galleryControlsExpanded ? 'point-up' : 'point-down'" :src="ICONS.chevronDown" alt="" />
+        </button>
       </div>
     </section>
     <section ref="galleryListRef" class="gallery-list">
@@ -153,6 +156,11 @@
 </template>
 
 <script setup>
+function onToggleControls() {
+  window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: "filter-panel-toggle" }));
+  toggleGalleryControls();
+}
+
 import { inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
