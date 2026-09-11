@@ -7,6 +7,7 @@ directories:
 
 files:
   - package.json
+  - build/icon.ico
   - dist/renderer/**/*
   - src/main/**/*
   - src/shared/**/*
@@ -28,7 +29,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: build/icon.svg
+  icon: build/icon.ico
   artifactName: PhotoManager-${version}-${arch}-Setup.${ext}
   requestedExecutionLevel: asInvoker
 

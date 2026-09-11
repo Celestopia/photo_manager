@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const path = require("node:path");
 
 async function createMainWindow(options, dependencies = {}) {
   const {
@@ -15,6 +16,7 @@ async function createMainWindow(options, dependencies = {}) {
   const dialog = electron.dialog;
   const rendererExists = dependencies.rendererExists || fs.existsSync;
   const window = new BrowserWindowClass({
+    icon: path.join(__dirname, "../../build/icon.ico"),
     width: 1600,
     height: 1000,
     minWidth: 1000,
