@@ -63,7 +63,7 @@ const selectedLocationName = computed(() => getLocationName(selectedLocationId.v
 const selectedRegionLabel = computed(() => getLocationRegionFilterLabel(selectedLocationRegion.value));
 const selectedFilterLabel = computed(() => (
   selectedLocationId.value === UNASSIGNED_FILTER
-    ? "Unassigned Location"
+    ? "Unassigned"
     : selectedLocationName.value || selectedRegionLabel.value
 ));
 const filterRows = computed(() => getLocationFilterRows(searchText.value));

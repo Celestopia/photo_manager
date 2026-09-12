@@ -23,7 +23,7 @@
         class="tag-option location-option location-tree-unassigned-option"
         :class="{ 'is-selected': unassignedSelected }"
         @mousedown.prevent="emit('select-unassigned')"
-      ><span>Unassigned Location</span></button>
+      ><span>Unassigned</span></button>
       <div
         v-if="showFixedOptionsDivider && hasHierarchyRows"
         class="registry-section-divider"

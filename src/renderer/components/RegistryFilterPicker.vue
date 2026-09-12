@@ -48,10 +48,10 @@ const dropdownOpen = ref(false);
 const pickerId = Symbol(props.kind);
 const searchText = ref("");
 const selectedValue = computed(() => query.filters[props.kind] || "");
-const unassignedLabel = computed(() => `Unassigned ${props.label}`);
+const unassignedLabel = "Unassigned";
 const fixedOptions = computed(() => [
   { value: "", label: "All" },
-  { value: UNASSIGNED_FILTER, label: unassignedLabel.value },
+  { value: UNASSIGNED_FILTER, label: unassignedLabel },
 ]);
 const optionIdKey = computed(() => {
   if (props.kind === "album") return "AlbumId";
@@ -65,7 +65,7 @@ const optionLabelKey = computed(() => {
 });
 const selectedLabel = computed(() => {
   if (!selectedValue.value) return "All";
-  if (selectedValue.value === UNASSIGNED_FILTER) return unassignedLabel.value;
+  if (selectedValue.value === UNASSIGNED_FILTER) return unassignedLabel;
   return optionLabel(options.value.find((option) => optionId(option) === selectedValue.value)) || "All";
 });
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
