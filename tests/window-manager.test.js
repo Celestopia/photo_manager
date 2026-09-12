@@ -12,6 +12,7 @@ test("main window is loaded before it is shown maximized", async () => {
       browserWindowOptions = options;
       this.maximized = false;
       this.listeners = new Map();
+      this.closeCalls = 0;
       this.webContents = {
         on: () => {},
         send: (channel, payload) => actions.push(["send", channel, payload]),
@@ -42,6 +43,10 @@ test("main window is loaded before it is shown maximized", async () => {
     isMaximized() {
       return this.maximized;
     }
+
+    close() {
+      this.closeCalls += 1;
+    }
   }
 
   await createMainWindow({
@@ -67,4 +72,42 @@ test("main window is loaded before it is shown maximized", async () => {
     "window:state-changed",
     { isMaximized: true },
   ]);
+});
+
+test("main window prepares its library session before closing", async () => {
+  let window;
+  let prepared = false;
+  class FakeBrowserWindow {
+    constructor() {
+      window = this;
+      this.listeners = new Map();
+      this.webContents = { on() {}, send() {} };
+      this.closeCalls = 0;
+    }
+    on(event, listener) { this.listeners.set(event, listener); }
+    async loadFile() {}
+    maximize() {}
+    show() {}
+    isDestroyed() { return false; }
+    isMaximized() { return true; }
+    close() { this.closeCalls += 1; }
+  }
+  await createMainWindow({
+    rendererIndexPath: "renderer.html",
+    preloadPath: "preload.js",
+    appendLog() {},
+    isMaintenanceRunning: () => false,
+    getInitializationWorker: () => null,
+    cancelInitializationAndClose() {},
+    prepareWindowClose: async () => { prepared = true; },
+  }, {
+    electron: { BrowserWindow: FakeBrowserWindow, dialog: { showMessageBoxSync() {} } },
+    rendererExists: () => true,
+  });
+  const event = { prevented: false, preventDefault() { this.prevented = true; } };
+  window.listeners.get("close")(event);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(event.prevented, true);
+  assert.equal(prepared, true);
+  assert.equal(window.closeCalls, 1);
 });

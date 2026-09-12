@@ -160,6 +160,10 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     busy.value = false;
   };
   const unsubscribe = api.onEvent((event) => {
+    if (event.type === "provider-configuration-changed") {
+      notice.value = event.text;
+      return;
+    }
     if (event.type === "notice") {
       notice.value = event.text;
       if (event.requestFailed) busy.value = false;

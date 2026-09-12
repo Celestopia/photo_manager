@@ -14,7 +14,7 @@ Only one provider request runs at a time, including the connection test. Request
 
 ## Main-Process Responsibilities
 
-`main.js` only wires the service to the active library, registered metadata, media-tool paths and window events.
+`main.js` wires one service instance per window session to that window's active library, registered metadata, media-tool paths and events. Main-process IPC routing derives the session from the trusted renderer sender; chat payloads cannot select another window or library.
 
 | Module under `src/main/chat/` | Responsibility |
 | --- | --- |

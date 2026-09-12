@@ -16,6 +16,14 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 - Persistence: JSONL for media/registries and JSON for chat sessions; export: UTF-8 BOM CSV.
 - The main process and renderer communicate through an explicit IPC allowlist. The renderer cannot access Node or the filesystem directly.
 
+### Process and Window Model
+
+PhotoManager keeps Electron's single-instance lock so Chromium profile data, renderer `localStorage`, global configuration, provider settings, and machine-local state have one process owner. A later operating-system launch does not focus or reuse an existing window: the `second-instance` event creates another library-entry window. There is deliberately no in-application New Window command.
+
+`window-session-router.js` maps trusted main-frame `webContents` senders to isolated sessions and preserves that ownership across asynchronous IPC work. Each session contains one `BrowserWindow`, one mutable application runtime, one chat service, one service set, and at most one active library. IPC payloads never choose a session or window identifier. Global normalized configuration, media-tool availability, the provider file, and the last successfully opened library path remain coordinator-owned.
+
+Launching more windows therefore does not create more Electron or Chromium profile owners. Different window sessions may hold different library locks concurrently. The coordinator additionally reserves `LibraryId` values so copied roots representing the same logical library cannot open in two windows even though their path-local lock files differ.
+
 Supported media extensions:
 
 - Images: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`, `.gif`.
@@ -55,7 +63,7 @@ Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation p
 
 ### `src/main/`
 
-`main.js` is the composition root. `application-runtime.js` creates isolated runtime state; `application-state.js` handles atomic local state. Simple registry catalog/service modules share tag/person/album logic; location domain/catalog/service modules own hierarchy-specific behavior. `gallery-query.js` is pure filtering/counting/grouping; `gallery-item-enricher.js` adds renderer paths and cached thumbnail status. `metadata-edit-service.js` owns validated edits and rollback. `ipc-handlers.js` registers the allowlist without owning state; `window-manager.js` owns BrowserWindow lifecycle; `preload.js` is the only renderer bridge.
+`main.js` is the composition root and application coordinator. `application-window-lifecycle.js` converts later operating-system launches into windows; `window-session-router.js` owns sender-to-session routing; `library-claim-registry.js` prevents duplicate logical-library ownership inside the coordinator; `application-runtime.js` creates isolated per-window runtime state; `application-state.js` handles atomic shared local state. Simple registry catalog/service modules share tag/person/album logic; location domain/catalog/service modules own hierarchy-specific behavior. `gallery-query.js` is pure filtering/counting/grouping; `gallery-item-enricher.js` adds renderer paths and cached thumbnail status. `metadata-edit-service.js` owns validated edits and rollback. `ipc-handlers.js` registers the allowlist without owning session state; `window-manager.js` owns BrowserWindow lifecycle and awaits safe session closure; `preload.js` is the only renderer bridge.
 
 Shared schema modules enforce exact keys, UUID v4 identity, customization patches, global uniqueness, references, location contexts, and parent chains. Dependency direction is `main.js` assembly → IPC → domain services through explicit runtime accessors → `scripts/library-*` persistence. Domain modules never import the IPC registrar or window.
 
@@ -63,7 +71,7 @@ Shared schema modules enforce exact keys, UUID v4 identity, customization patche
 
 The renderer is a declarative `App.vue` shell, application composition root, state-owning composables, pure domain functions, and presentation components. Components consume narrow contexts and never reverse-import the composition root. Pure functions import no Vue/DOM/Electron; composables import no page components and collaborate only through callbacks/refs wired at the root.
 
-State owners are: library session; gallery query and stale-request suppression; full-result selection; shared media-deletion confirmation; viewer navigation/shortcuts; editor drafts/locks; media transform listeners/observer; video element lifecycle/preferences; one composable per registry; library-scoped recent history; window controls; and UI feedback. Every owner of a global listener, timer, observer, element, or IPC subscription exposes idempotent cleanup called on unmount.
+Each renderer owns state for its window: library session; gallery query and stale-request suppression; full-result selection; shared media-deletion confirmation; viewer navigation/shortcuts; editor drafts/locks; media transform listeners/observer; video element lifecycle/preferences; one composable per registry; library-scoped recent history; window controls; and UI feedback. Every owner of a global listener, timer, observer, element, or IPC subscription exposes idempotent cleanup called on unmount.
 
 Contexts are split into library, gallery, gallery-filter, viewer, settings, four registries, and UI feedback. Components render and forward intent. Shared picker/menu components retain their single-value, multi-value, filter, and hierarchy semantics.
 

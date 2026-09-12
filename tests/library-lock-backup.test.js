@@ -38,6 +38,19 @@ test("library lock is exclusive and only its owning session releases it", async 
   assert.equal(await releaseLibraryLock(paths, lock.SessionId), true);
 });
 
+test("independent library sessions can hold different library locks concurrently", async (t) => {
+  const first = await createLibrary(t);
+  const second = await createLibrary(t);
+  const firstLock = await acquireLibraryLock(first.paths, first.manifest);
+  const secondLock = await acquireLibraryLock(second.paths, second.manifest);
+  assert.equal((await inspectLibraryLock(first.paths)).active, true);
+  assert.equal((await inspectLibraryLock(second.paths)).active, true);
+  assert.notEqual(firstLock.SessionId, secondLock.SessionId);
+  assert.equal(await releaseLibraryLock(first.paths, firstLock.SessionId), true);
+  assert.equal((await inspectLibraryLock(second.paths)).active, true);
+  assert.equal(await releaseLibraryLock(second.paths, secondLock.SessionId), true);
+});
+
 test("backup retention is counted by snapshot directory", async (t) => {
   const { paths } = await createLibrary(t);
   for (let index = 0; index < 4; index += 1) {

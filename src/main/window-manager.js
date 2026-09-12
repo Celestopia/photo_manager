@@ -10,6 +10,7 @@ async function createMainWindow(options, dependencies = {}) {
     isMaintenanceRunning,
     getInitializationWorker,
     cancelInitializationAndClose,
+    prepareWindowClose,
   } = options;
   const electron = dependencies.electron || require("electron");
   const BrowserWindowClass = electron.BrowserWindow;
@@ -61,29 +62,52 @@ async function createMainWindow(options, dependencies = {}) {
   window.on("unmaximize", emitWindowState);
   window.on("enter-full-screen", emitWindowState);
   window.on("leave-full-screen", emitWindowState);
+  let closePrepared = false;
+  let closePreparation = null;
   window.on("close", (event) => {
     if (isMaintenanceRunning()) {
       event.preventDefault();
       dialog.showMessageBoxSync(window, {
         type: "warning",
         title: "Maintenance Is Still Running",
-        message: "The current library maintenance task cannot be cancelled. Wait for it to finish before closing the application.",
+        message: "The current library maintenance task cannot be cancelled. Wait for it to finish before closing this window.",
         buttons: ["OK"],
       });
       return;
     }
     const worker = getInitializationWorker();
-    if (!worker) return;
+    if (worker) {
+      event.preventDefault();
+      const choice = dialog.showMessageBoxSync(window, {
+        type: "warning",
+        title: "Cancel Library Initialization",
+        message: "The library is still being initialized. Closing this window will cancel initialization and delete all incomplete data created during this attempt. Continue?",
+        buttons: ["Continue Initialization", "Cancel Initialization and Close"],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (choice === 1) cancelInitializationAndClose(worker);
+      return;
+    }
+    if (closePrepared || typeof prepareWindowClose !== "function") return;
     event.preventDefault();
-    const choice = dialog.showMessageBoxSync(window, {
-      type: "warning",
-      title: "Cancel Library Initialization",
-      message: "The library is still being initialized. Closing the application will cancel initialization and delete all incomplete data created during this attempt. Continue?",
-      buttons: ["Continue Initialization", "Cancel Initialization and Close"],
-      defaultId: 0,
-      cancelId: 0,
-    });
-    if (choice === 1) cancelInitializationAndClose(worker);
+    if (closePreparation) return;
+    closePreparation = Promise.resolve()
+      .then(prepareWindowClose)
+      .then(() => {
+        closePrepared = true;
+        window.close();
+      })
+      .catch((error) => {
+        appendLog(`window close preparation failed: ${error?.stack || error?.message || error}`);
+        dialog.showMessageBoxSync(window, {
+          type: "error",
+          title: "Could Not Close Window",
+          message: error?.message || "The library session could not be closed safely.",
+          buttons: ["OK"],
+        });
+      })
+      .finally(() => { closePreparation = null; });
   });
 
   if (rendererExists(rendererIndexPath)) {

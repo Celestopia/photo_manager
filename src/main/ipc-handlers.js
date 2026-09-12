@@ -1,5 +1,5 @@
 const { copyFileToClipboard, copyFilesToClipboard } = require("./file-clipboard");
-const { clipboard, dialog, ipcMain, shell } = require("electron");
+const { clipboard, dialog, ipcMain: electronIpcMain, shell } = require("electron");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -7,6 +7,11 @@ const { assertUuidArray } = require("../shared/identity-schema.js");
 const { assertExactObjectKeys } = require("../shared/object-schema.js");
 
 function registerIpcHandlers(options) {
+  const ipcMain = typeof options.runWithSession === "function" ? {
+    handle(channel, handler) {
+      electronIpcMain.handle(channel, (event, ...args) => options.runWithSession(event, () => handler(event, ...args)));
+    },
+  } : electronIpcMain;
   const {
     runtime,
     toSerializable,

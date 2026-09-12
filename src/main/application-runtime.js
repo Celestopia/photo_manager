@@ -8,11 +8,11 @@ function createApplicationRuntime() {
     personRegistryIndex: new Map(),
     locationRegistryIndex: new Map(),
     activeLibrary: null,
-    mediaToolsState: { available: false, error: "Media tools have not been checked", versions: null },
+    openingLibrary: false,
     maintenanceState: { running: false },
     activeWorker: null,
     activeWorkerOperation: "",
-    pendingAppClose: false,
+    pendingWindowClose: false,
     quickScanState: null,
   };
 }

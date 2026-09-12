@@ -44,10 +44,10 @@ Every entry point and CLI maintenance script follows the same boundaries:
 
 ### Application Startup
 
-1. Acquire Electron's single-instance lock; a second process activates the existing window.
+1. Acquire Electron's single-instance coordinator lock; a later launch asks that coordinator to create another independent entry window.
 2. Before Electron is ready, configure roaming/local global directories and read and normalize roaming `config.yml`.
 3. Validate `ffmpeg.exe` and `ffprobe.exe`.
-4. Create the window hidden, load the library-entry page, and show it maximized.
+4. Create the first window and its isolated session hidden, load the library-entry page, and show it maximized.
 5. If a last successful path exists, read the actual name from its manifest and prefill the name and full path without loading it.
 6. Validate and load only after the user enters or selects an existing library.
 7. Enter the gallery and update the last-library path only after the lock, manifest, five JSONL files, and all memory indexes load successfully.
@@ -86,7 +86,9 @@ Cancellation deletes the complete `.photo_manager` directory. Other failures ret
 
 Opening validates before acquiring the exclusive lock. Only its holder can write. If a crash left a media-deletion or cross-file data transaction, its journal is used to roll back or finish cleanup before strict loading. Media-deletion recovery runs first because it may restore media files or finalize a metadata commit. After main-process indexes load, the renderer requests all four registries in parallel and then performs its first gallery query.
 
-Returning to the entry page requires confirmation, is blocked by an unresolved viewer draft or running maintenance, clears renderer state and memory indexes, and releases the lock. The last-library path remains for a future manual entry. The application uses one instance, one window, and one active library.
+Returning to the entry page requires confirmation, is blocked by an unresolved viewer draft or running maintenance, clears that window's renderer state and memory indexes, and releases its lock. Closing a window first cancels its quick scan, stops its Assistant work, drains outstanding IPC operations, and safely closes only that session. Maintenance blocks only its owning window. The application exits after the last window closes.
+
+Launching PhotoManager again creates another entry window rather than activating an existing one. Every new window prefills the globally most recently opened library but still requires an explicit Open action. There is no in-application New Window command. Different windows may open different libraries concurrently; each retains one active library at a time.
 
 ## Locking and Concurrency
 
@@ -97,6 +99,8 @@ The lock is created with `wx`, allowing one holder per path. On Windows, PID and
 - A live lock can never be forcibly removed, including through low-level IPC.
 - A corrupt or dead-process lock may be forcibly removed only after displaying the risk and lock details and receiving confirmation.
 - The main process retains the lock while a maintenance worker runs and passes its random `SessionId`; the worker verifies that the parent still owns that lock.
+- The coordinator reserves each open `LibraryId` in memory as well as acquiring its path-local lock, preventing simultaneous access to copied roots with the same logical identity.
+- Different window sessions may concurrently hold locks for different libraries; closing one window never releases another window's lock.
 - Standalone CLI tools acquire the same lock and cannot maintain a library concurrently with the application.
 - Maintenance cannot be cancelled. While it runs, the library is read-only and cannot be switched or closed.
 

@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from "vue";
 
 /**
- * Owns the single active-library session, entry workflow, maintenance dialogs,
+ * Owns this window's active-library session, entry workflow, maintenance dialogs,
  * and all library-lifecycle IPC subscriptions.
  */
 export function useLibrarySession({

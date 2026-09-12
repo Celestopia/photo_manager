@@ -11,6 +11,7 @@ PhotoManager is a local Windows desktop media manager for user-selected, indepen
 Current capabilities include:
 
 - Managing images and videos on one timeline.
+- Opening multiple independent library windows by launching PhotoManager again, with one active library per window.
 - Viewing images, playing videos, and editing shared customization fields.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
@@ -69,4 +70,4 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 
 ## Architecture Summary
 
-PhotoManager combines application code and global settings with user-selected independent libraries whose management data are self-contained. The Electron main process owns the only active library session and all writes; maintenance tools share its boundary, lock, and persistence modules; Vue owns interaction and serializable UI state. A library can be moved or backed up together with `.photo_manager` and has no dependency on data paths inside the installation directory.
+PhotoManager combines application code and global settings with user-selected independent libraries whose management data are self-contained. One Electron coordinator process owns shared application state and any number of window-scoped library sessions. Every window owns at most one active library, its in-memory indexes, chat service, workers, and writes; sender-routed IPC prevents one renderer from reaching another window's session. A library can be moved or backed up together with `.photo_manager` and has no dependency on data paths inside the installation directory.

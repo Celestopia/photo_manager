@@ -3,9 +3,9 @@
  *
  * Responsibilities:
  * 1) Load and normalize runtime configuration.
- * 2) Load photo metadata index (JSONL -> in-memory Map).
- * 3) Serve IPC handlers for query/update/copy/window actions.
- * 4) Create and monitor the renderer window.
+ * 2) Coordinate isolated library sessions for renderer windows.
+ * 3) Route IPC handlers to the session that owns the trusted sender.
+ * 4) Create and monitor renderer windows.
  */
 const { app, BrowserWindow } = require("electron");
 const fs = require("node:fs");
@@ -38,6 +38,9 @@ const { createMediaDeletionService } = require("./media-deletion-service.js");
 const { registerIpcHandlers: registerMainIpcHandlers } = require("./ipc-handlers.js");
 const { createMainWindow } = require("./window-manager.js");
 const { createApplicationRuntime } = require("./application-runtime.js");
+const { createWindowSessionRouter } = require("./window-session-router.js");
+const { registerApplicationWindowLifecycle } = require("./application-window-lifecycle.js");
+const { createLibraryClaimRegistry } = require("./library-claim-registry.js");
 const { createChatService } = require("./chat/service.js");
 const { registerChatIpc } = require("./chat/ipc.js");
 const { metadataGroups } = require("./chat/metadata.js");
@@ -91,11 +94,16 @@ const APPLICATION_PATHS = resolveApplicationPaths();
 configureElectronStoragePaths(app, APPLICATION_PATHS);
 const RENDERER_INDEX_PATH = path.join(APP_CODE_ROOT, "dist", "renderer", "index.html");
 
-const state = createApplicationRuntime();
+const sessionRouter = createWindowSessionRouter();
+const state = sessionRouter.createProxy((session) => session.runtime, "window runtime");
+const chat = sessionRouter.createProxy((session) => session.chat, "window chat service");
 let config = null;
 let appState = { lastLibraryPath: "" };
 let lastLibraryName = "";
-let applicationStartedAt = new Date().toISOString();
+let appStateWriteQueue = Promise.resolve();
+let mediaToolsState = { available: false, error: "Media tools have not been checked", versions: null };
+const libraryClaims = createLibraryClaimRegistry();
+const applicationStartedAt = new Date().toISOString();
 const UNASSIGNED_FILTER = "__UNASSIGNED__";
 
 function createRuntimeEntityId() {
@@ -129,12 +137,22 @@ function resolveDataFile(fileName) {
   return path.join(resolveDataDir(), fileName);
 }
 
+function claimLibraryIdentity(manifest, root) {
+  const session = sessionRouter.current();
+  libraryClaims.claim(session, manifest, root);
+}
+
+function releaseLibraryIdentity(session = sessionRouter.current()) {
+  libraryClaims.release(session);
+}
+
 /**
  * Append one line into date-partitioned log file under configured log directory.
  */
 function appendLog(message) {
   try {
-    const logDir = state.activeLibrary?.paths?.logDir || APPLICATION_PATHS.logsDir;
+    const session = sessionRouter.current({ optional: true });
+    const logDir = session?.runtime?.activeLibrary?.paths?.logDir || APPLICATION_PATHS.logsDir;
     fs.mkdirSync(logDir, { recursive: true });
     const dayKey = new Date().toISOString().slice(0, 10);
     fs.appendFileSync(path.join(logDir, `${dayKey}.log`), `[${new Date().toISOString()}] ${message}\n`);
@@ -175,7 +193,10 @@ async function loadAppState() {
 }
 
 async function saveAppState() {
-  await saveApplicationState(APPLICATION_PATHS.stateFile, appState);
+  const snapshot = { ...appState };
+  const write = appStateWriteQueue.then(() => saveApplicationState(APPLICATION_PATHS.stateFile, snapshot));
+  appStateWriteQueue = write.catch(() => {});
+  await write;
 }
 
 function requireOpenLibrary({ writable = false } = {}) {
@@ -388,19 +409,33 @@ function resolveIndexedMediaPath(rawMediaId) {
   return { item, absolutePath };
 }
 
-const chat = createChatService({
-  getLibrary: requireOpenLibrary,
-  resolveMedia: resolveIndexedMediaPath,
-  getMetadata: (mediaId, groups) => metadataGroups(resolveIndexedMediaPath(mediaId).item, groups, {
-    tags: state.tagRegistryIndex, people: state.personRegistryIndex,
-    locations: state.locationRegistryIndex, locationPath: buildLocationPath,
-  }),
-  configFile: APPLICATION_PATHS.chatProviderFile,
-  getTools: () => resolveMediaToolPaths(PROGRAM_RESOURCE_ROOT, config.media),
-  emit: (payload) => {
-    if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send("chat:event", payload);
-  },
-});
+function createSessionChat(session) {
+  return createChatService({
+    getLibrary: requireOpenLibrary,
+    resolveMedia: resolveIndexedMediaPath,
+    getMetadata: (mediaId, groups) => metadataGroups(resolveIndexedMediaPath(mediaId).item, groups, {
+      tags: state.tagRegistryIndex, people: state.personRegistryIndex,
+      locations: state.locationRegistryIndex, locationPath: buildLocationPath,
+    }),
+    configFile: APPLICATION_PATHS.chatProviderFile,
+    getTools: () => resolveMediaToolPaths(PROGRAM_RESOURCE_ROOT, config.media),
+    emit: (payload) => {
+      const window = session.runtime.mainWindow;
+      if (window && !window.isDestroyed()) window.webContents.send("chat:event", payload);
+    },
+  });
+}
+
+function broadcastProviderConfigurationChange(sourceWindow) {
+  for (const session of sessionRouter.sessions()) {
+    const window = session.runtime.mainWindow;
+    if (!window || window === sourceWindow || window.isDestroyed()) continue;
+    window.webContents.send("chat:event", {
+      type: "provider-configuration-changed",
+      text: "Provider settings changed in another window. Reopen settings before editing them.",
+    });
+  }
+}
 
 /**
  * Persist full metadata Map back to JSONL using atomic replace:
@@ -461,7 +496,7 @@ function getLibraryState(extra = {}) {
     } : null,
     lastLibraryPath: appState.lastLibraryPath,
     lastLibraryName: state.activeLibrary?.manifest?.name || lastLibraryName,
-    mediaTools: state.mediaToolsState,
+    mediaTools: mediaToolsState,
     maintenance: state.maintenanceState,
     ...extra,
   };
@@ -470,15 +505,17 @@ function getLibraryState(extra = {}) {
 async function checkMediaTools() {
   try {
     const tools = await validateMediaTools(PROGRAM_RESOURCE_ROOT, config.media);
-    state.mediaToolsState = { available: true, error: "", versions: tools.versions };
+    mediaToolsState = { available: true, error: "", versions: tools.versions };
     appendLog(`media-tools ${tools.versions.ffmpeg}; ${tools.versions.ffprobe}`);
   } catch (error) {
     const reason = sanitizeMediaError(error, error?.path || "");
-    state.mediaToolsState = { available: false, error: reason, versions: null };
+    mediaToolsState = { available: false, error: reason, versions: null };
     appendLog(`media-tools validation failed: ${reason}`);
   }
-  emitLibraryState();
-  return state.mediaToolsState;
+  for (const session of sessionRouter.sessions()) {
+    sessionRouter.run(session, () => emitLibraryState());
+  }
+  return mediaToolsState;
 }
 
 async function loadAllLibraryIndexes() {
@@ -500,8 +537,8 @@ async function loadAllLibraryIndexes() {
 }
 
 async function openLibrary(rawRoot, options = {}) {
-  if (!state.mediaToolsState.available) {
-    const error = new Error(`FFmpeg media tools are unavailable: ${state.mediaToolsState.error}`);
+  if (!mediaToolsState.available) {
+    const error = new Error(`FFmpeg media tools are unavailable: ${mediaToolsState.error}`);
     error.code = "MEDIA_TOOLS_UNAVAILABLE";
     throw error;
   }
@@ -515,47 +552,63 @@ async function openLibrary(rawRoot, options = {}) {
     error.code = "MAINTENANCE_RUNNING";
     throw error;
   }
-  if (state.activeLibrary) await closeLibrary();
-  const paths = resolveLibraryPaths(rawRoot);
-  emitLibraryState({ state: "opening", openingPath: paths.root });
-  let lock = null;
+  if (state.openingLibrary) {
+    const error = new Error("A library is already being opened in this window");
+    error.code = "LIBRARY_OPEN_RUNNING";
+    throw error;
+  }
+  state.openingLibrary = true;
   try {
-    const marker = fs.existsSync(paths.initializationFile)
-      ? JSON.parse(await fsp.readFile(paths.initializationFile, "utf8"))
-      : null;
-    if (marker && marker.Status !== "committed") {
-      const error = new Error(marker.Error || "The previous library initialization did not complete");
-      error.code = "LIBRARY_INITIALIZATION_FAILED";
-      error.initialization = marker;
+    if (state.activeLibrary) await closeLibrary();
+    const paths = resolveLibraryPaths(rawRoot);
+    const session = sessionRouter.current();
+    emitLibraryState({ state: "opening", openingPath: paths.root });
+    let lock = null;
+    let identityClaimed = false;
+    try {
+      const marker = fs.existsSync(paths.initializationFile)
+        ? JSON.parse(await fsp.readFile(paths.initializationFile, "utf8"))
+        : null;
+      if (marker && marker.Status !== "committed") {
+        const error = new Error(marker.Error || "The previous library initialization did not complete");
+        error.code = "LIBRARY_INITIALIZATION_FAILED";
+        error.initialization = marker;
+        throw error;
+      }
+      const identityManifest = await readLibraryManifest(paths);
+      claimLibraryIdentity(identityManifest, paths.root);
+      identityClaimed = true;
+      const manifest = await validateExistingLibrary(paths, {
+        onProgress: (progress) => state.mainWindow?.webContents.send("library:progress", toSerializable(progress)),
+      });
+      lock = await acquireLibraryLock(paths, manifest, {
+        force: Boolean(options.force),
+        applicationStartedAt,
+      });
+      state.activeLibrary = { state: "opening", sessionId: lock.SessionId, paths, manifest, lock };
+      const deletionRecovery = await recoverMediaDeletionTransaction(paths);
+      if (deletionRecovery.recovered) appendLog(`media-deletion ${deletionRecovery.action} reason=${deletionRecovery.reason || "unknown"}`);
+      const recovery = await recoverPendingTransaction(paths);
+      if (recovery.recovered) appendLog(`library-transaction ${recovery.action} reason=${recovery.reason || "unknown"}`);
+      await loadAllLibraryIndexes();
+      if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
+      state.activeLibrary.state = "open";
+      await chat.open().catch(() => appendLog("Chat recovery could not finish; library browsing remains available."));
+      appState.lastLibraryPath = paths.root;
+      lastLibraryName = state.activeLibrary.manifest.name;
+      await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
+      emitLibraryState();
+      return getLibraryState();
+    } catch (error) {
+      if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
+      if (identityClaimed) releaseLibraryIdentity(session);
+      state.activeLibrary = null;
+      clearLibraryIndexes();
+      emitLibraryState({ error: error.message });
       throw error;
     }
-    const manifest = await validateExistingLibrary(paths, {
-      onProgress: (progress) => state.mainWindow?.webContents.send("library:progress", toSerializable(progress)),
-    });
-    lock = await acquireLibraryLock(paths, manifest, {
-      force: Boolean(options.force),
-      applicationStartedAt,
-    });
-    state.activeLibrary = { state: "opening", sessionId: lock.SessionId, paths, manifest, lock };
-    const deletionRecovery = await recoverMediaDeletionTransaction(paths);
-    if (deletionRecovery.recovered) appendLog(`media-deletion ${deletionRecovery.action} reason=${deletionRecovery.reason || "unknown"}`);
-    const recovery = await recoverPendingTransaction(paths);
-    if (recovery.recovered) appendLog(`library-transaction ${recovery.action} reason=${recovery.reason || "unknown"}`);
-    await loadAllLibraryIndexes();
-    if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
-    state.activeLibrary.state = "open";
-    await chat.open().catch(() => appendLog("Chat recovery could not finish; library browsing remains available."));
-    appState.lastLibraryPath = paths.root;
-    lastLibraryName = state.activeLibrary.manifest.name;
-    await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
-    emitLibraryState();
-    return getLibraryState();
-  } catch (error) {
-    if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
-    state.activeLibrary = null;
-    clearLibraryIndexes();
-    emitLibraryState({ error: error.message });
-    throw error;
+  } finally {
+    state.openingLibrary = false;
   }
 }
 
@@ -571,17 +624,17 @@ async function closeLibrary() {
   catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
   emitLibraryState();
   const closing = state.activeLibrary;
-  lastLibraryName = closing.manifest.name;
   state.activeLibrary = null;
   clearLibraryIndexes();
   await releaseLibraryLock(closing.paths, closing.sessionId).catch((error) => appendLog(`lock-release failed: ${error.message}`));
+  releaseLibraryIdentity();
   emitLibraryState();
   return getLibraryState();
 }
 
 async function inspectLibraryDirectory(rawRoot) {
-  if (!state.mediaToolsState.available) {
-    const error = new Error(`FFmpeg media tools are unavailable: ${state.mediaToolsState.error}`);
+  if (!mediaToolsState.available) {
+    const error = new Error(`FFmpeg media tools are unavailable: ${mediaToolsState.error}`);
     error.code = "MEDIA_TOOLS_UNAVAILABLE";
     throw error;
   }
@@ -637,6 +690,7 @@ async function inspectLibraryDirectory(rawRoot) {
 }
 
 function runOperationWorker(operation, root, options = {}) {
+  const session = sessionRouter.current();
   if (state.activeWorker) {
     const error = new Error("Another library operation is already running");
     error.code = "MAINTENANCE_RUNNING";
@@ -656,27 +710,27 @@ function runOperationWorker(operation, root, options = {}) {
   state.activeWorker = worker;
   state.activeWorkerOperation = operation;
   return new Promise((resolve, reject) => {
+    const inSession = (listener) => (...args) => sessionRouter.run(session, () => listener(...args));
     let result = null;
     let failure = null;
-    worker.stdout?.on("data", (chunk) => appendOperationLog(operation, root, `worker-${operation} ${String(chunk).trim()}`));
-    worker.stderr?.on("data", (chunk) => appendOperationLog(operation, root, `worker-${operation}-stderr ${String(chunk).trim()}`));
-    worker.on("message", (message) => {
+    worker.stdout?.on("data", inSession((chunk) => appendOperationLog(operation, root, `worker-${operation} ${String(chunk).trim()}`)));
+    worker.stderr?.on("data", inSession((chunk) => appendOperationLog(operation, root, `worker-${operation}-stderr ${String(chunk).trim()}`)));
+    worker.on("message", inSession((message) => {
       if (message?.type === "progress" || message?.type === "log") {
         if (message.message) appendOperationLog(operation, root, `worker-${operation} ${message.level || "info"}: ${message.message}`);
         state.mainWindow?.webContents.send(operation === "initialize" ? "library:progress" : "maintenance:progress", toSerializable(message));
       }
       if (message?.type === "result") result = message.result;
       if (message?.type === "failure") failure = message.error;
-    });
+    }));
     worker.on("error", reject);
-    worker.on("exit", (code) => {
+    worker.on("exit", inSession((code) => {
       state.activeWorker = null;
       state.activeWorkerOperation = "";
-      if (state.pendingAppClose) {
-        state.pendingAppClose = false;
+      if (state.pendingWindowClose) {
+        state.pendingWindowClose = false;
         setImmediate(() => {
-          state.mainWindow?.destroy();
-          app.quit();
+          session.runtime.mainWindow?.destroy();
         });
       }
       if (code === 0 && result) resolve(result);
@@ -685,7 +739,7 @@ function runOperationWorker(operation, root, options = {}) {
         error.code = failure?.code || "OPERATION_FAILED";
         reject(error);
       }
-    });
+    }));
   });
 }
 
@@ -880,19 +934,36 @@ function createDomainServices() {
  * Channels are intentionally explicit to keep the API surface narrow and auditable.
  */
 function registerIpcHandlers() {
-  registerChatIpc({ chat, getWindow: () => state.mainWindow, configFile: APPLICATION_PATHS.chatProviderFile });
-  const runtime = {
-    get config() { return config; },
-    set config(next) { config = next; },
-    get mainWindow() { return state.mainWindow; },
-    get quickScanState() { return state.quickScanState; },
-    get activeLibrary() { return state.activeLibrary; },
-    get activeWorker() { return state.activeWorker; },
-    get maintenanceState() { return state.maintenanceState; },
-    get metadataIndex() { return state.metadataIndex; },
-  };
+  const runWithSession = (event, operation) => sessionRouter.runForEvent(event, operation);
+  registerChatIpc({
+    chat,
+    getWindow: () => state.mainWindow,
+    configFile: APPLICATION_PATHS.chatProviderFile,
+    runWithSession,
+    onConfigurationSaved: broadcastProviderConfigurationChange,
+  });
+  const runtime = new Proxy({}, {
+    get(_target, property) {
+      if (property === "config") return config;
+      return state[property];
+    },
+    set(_target, property, value) {
+      if (property === "config") config = value;
+      else state[property] = value;
+      return true;
+    },
+  });
+  const services = Object.fromEntries([
+    "albumService",
+    "locationService",
+    "mediaDeletionService",
+    "metadataEditService",
+    "personService",
+    "tagService",
+  ].map((name) => [name, sessionRouter.createProxy((session) => session.services[name], name)]));
   registerMainIpcHandlers({
     runtime,
+    runWithSession,
     toSerializable,
     appendLog,
     getLibraryState,
@@ -911,81 +982,127 @@ function registerIpcHandlers() {
     runMaintenanceOperation,
     queryGallery,
     resolveIndexedMediaPath,
-    services: createDomainServices(),
+    services,
   });
 }
 
-/**
- * App bootstrap sequence:
- * 1) load app-level config and last-library state
- * 2) validate media tools without opening a library
- * 3) create BrowserWindow and bind diagnostics
- * 4) load the renderer entry; the user may then request the prefilled last library to open
- */
-async function bootstrap() {
+async function closeWindowSession(session) {
+  if (session.closePrepared) return;
+  if (session.closePromise) return session.closePromise;
+  session.closePromise = sessionRouter.run(session, async () => {
+    session.acceptingCommands = false;
+    if (state.quickScanState) state.quickScanState.cancelled = true;
+    await chat.stop().catch((error) => appendLog(`chat stop during window close failed: ${error.message}`));
+    await Promise.allSettled([...session.pendingOperations]);
+    if (state.activeLibrary) await closeLibrary();
+    else await chat.close();
+    session.closePrepared = true;
+  });
+  try {
+    await session.closePromise;
+  } finally {
+    if (!session.closePrepared) session.acceptingCommands = true;
+    session.closePromise = null;
+  }
+}
+
+/** Create one renderer window with a fully isolated library runtime. */
+async function createLibraryWindow() {
+  const session = {
+    runtime: createApplicationRuntime(),
+    chat: null,
+    services: null,
+    closePromise: null,
+    closePrepared: false,
+    claimedLibraryId: null,
+    acceptingCommands: true,
+    pendingOperations: new Set(),
+  };
+  session.chat = sessionRouter.run(session, () => createSessionChat(session));
+  session.services = sessionRouter.run(session, () => createDomainServices());
+
+  try {
+    await sessionRouter.run(session, async () => {
+      await createMainWindow({
+        rendererIndexPath: RENDERER_INDEX_PATH,
+        preloadPath: path.join(__dirname, "preload.js"),
+        appendLog: (message) => sessionRouter.run(session, () => appendLog(message)),
+        onCreated: (window) => {
+          session.runtime.mainWindow = window;
+          sessionRouter.register(session);
+          window.on("closed", () => {
+            sessionRouter.unregister(session);
+            session.runtime.mainWindow = null;
+          });
+        },
+        isMaintenanceRunning: () => session.runtime.maintenanceState.running,
+        getInitializationWorker: () => (
+          session.runtime.activeWorker && session.runtime.activeWorkerOperation === "initialize"
+            ? session.runtime.activeWorker
+            : null
+        ),
+        cancelInitializationAndClose: (worker) => {
+          session.runtime.pendingWindowClose = true;
+          worker.send({ type: "cancel" });
+        },
+        prepareWindowClose: () => closeWindowSession(session),
+      });
+    });
+    return session.runtime.mainWindow;
+  } catch (error) {
+    const window = session.runtime.mainWindow;
+    sessionRouter.unregister(session);
+    await closeWindowSession(session).catch(() => {});
+    window?.destroy();
+    session.runtime.mainWindow = null;
+    throw error;
+  }
+}
+
+/** Load shared application state once, then create the first entry window. */
+async function initializeApplication() {
   const configResult = loadConfig(APPLICATION_PATHS.configFile);
   config = configResult.config;
   if (configResult.warning) appendLog(configResult.warning);
   await loadAppState();
   await checkMediaTools();
+  registerIpcHandlers();
+  await createLibraryWindow();
+}
 
-  state.mainWindow = await createMainWindow({
-    rendererIndexPath: RENDERER_INDEX_PATH,
-    preloadPath: path.join(__dirname, "preload.js"),
+// Keep one Electron coordinator so Chromium profile data and global settings
+// remain single-owner; every later application launch creates another window.
+const singleInstanceLock = app.requestSingleInstanceLock();
+let applicationReady = null;
+if (!singleInstanceLock) {
+  app.quit();
+} else {
+  applicationReady = app.whenReady().then(initializeApplication);
+  registerApplicationWindowLifecycle({
+    app,
+    BrowserWindow,
+    applicationReady,
+    createWindow: createLibraryWindow,
     appendLog,
-    onCreated: (window) => { state.mainWindow = window; },
-    isMaintenanceRunning: () => state.maintenanceState.running,
-    getInitializationWorker: () => state.activeWorker && state.activeWorkerOperation === "initialize" ? state.activeWorker : null,
-    cancelInitializationAndClose: (worker) => {
-      state.pendingAppClose = true;
-      worker.send({ type: "cancel" });
-    },
   });
 }
 
-// Standard Electron lifecycle.
-const singleInstanceLock = app.requestSingleInstanceLock();
-if (!singleInstanceLock) {
-  app.quit();
-} else app.whenReady().then(async () => {
-  registerIpcHandlers();
-  await bootstrap();
-
-  app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      await bootstrap();
-    }
-  });
-});
-
-app.on("second-instance", () => {
-  if (!state.mainWindow || state.mainWindow.isDestroyed()) return;
-  if (state.mainWindow.isMinimized()) state.mainWindow.restore();
-  state.mainWindow.show();
-  state.mainWindow.focus();
-});
-
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
 
-let chatShutdownComplete = false;
+let quitPrepared = false;
+let quitPreparation = null;
 app.on("before-quit", (event) => {
-  if (!chatShutdownComplete) {
-    event.preventDefault();
-    chat.close().finally(() => { chatShutdownComplete = true; app.quit(); });
-    return;
-  }
-  if (state.activeLibrary) {
-    const closing = state.activeLibrary;
-    state.activeLibrary = null;
-    try {
-      const current = JSON.parse(fs.readFileSync(closing.paths.lockFile, "utf8"));
-      if (current?.SessionId === closing.sessionId) fs.rmSync(closing.paths.lockFile, { force: true });
-    } catch {
-      // Best-effort synchronous cleanup during application shutdown.
-    }
-  }
+  if (quitPrepared || sessionRouter.sessions().length === 0) return;
+  event.preventDefault();
+  if (quitPreparation) return;
+  quitPreparation = Promise.all(sessionRouter.sessions().map((session) => closeWindowSession(session)))
+    .then(() => {
+      quitPrepared = true;
+      for (const session of sessionRouter.sessions()) session.runtime.mainWindow?.close();
+      if (BrowserWindow.getAllWindows().length === 0) app.quit();
+    })
+    .catch((error) => appendLog(`application shutdown blocked: ${error.stack || error.message}`))
+    .finally(() => { quitPreparation = null; });
 });

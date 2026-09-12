@@ -1,9 +1,14 @@
-const { ipcMain, dialog, shell } = require("electron");
+const { ipcMain: electronIpcMain, dialog, shell } = require("electron");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { safePath } = require("./store");
 const { object, id } = require("./schema");
-function registerChatIpc({ chat, getWindow, configFile }) {
+function registerChatIpc({ chat, getWindow, configFile, runWithSession, onConfigurationSaved }) {
+  const ipcMain = typeof runWithSession === "function" ? {
+    handle(channel, handler) {
+      electronIpcMain.handle(channel, (event, ...args) => runWithSession(event, () => handler(event, ...args)));
+    },
+  } : electronIpcMain;
   const fields = {
     load: ["sessionId"], describe: ["sessionId", "input"], preview: ["sessionId", "input"],
     rename: ["sessionId", "title"], removeInput: ["sessionId", "attachmentId"],
@@ -22,7 +27,11 @@ function registerChatIpc({ chat, getWindow, configFile }) {
     rename: (p) => chat.rename(p.sessionId, p.title),
     removeInput: (p) => chat.removeInput(p.sessionId, p.attachmentId),
     configuration: () => chat.configuration(),
-    saveConfiguration: (p) => chat.saveConfiguration(p),
+    saveConfiguration: async (p) => {
+      const configuration = await chat.saveConfiguration(p);
+      onConfigurationSaved?.(getWindow());
+      return configuration;
+    },
     test: () => chat.test(),
     openConfiguration: async () => {
       await chat.configuration();

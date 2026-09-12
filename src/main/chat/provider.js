@@ -97,7 +97,9 @@ async function editableConfig(file) {
     thinking: c.enable_thinking === undefined ? "omit" : String(c.enable_thinking),
     hasKey: Boolean(c.apiKey), apiKey: "", clearKey: false };
 }
-async function saveConfig(file, draft) {
+let configSaveQueue = Promise.resolve();
+
+async function saveConfigNow(file, draft) {
   object(draft, ["baseUrl", "model", "apiKeyEnv", "thinking", "apiKey", "clearKey"], "Provider settings");
   if (["baseUrl", "model", "apiKeyEnv", "apiKey", "thinking"].some(k => typeof draft[k] !== "string" || draft[k].length > 4096) ||
       typeof draft.clearKey !== "boolean" || !["omit", "true", "false"].includes(draft.thinking))
@@ -109,6 +111,12 @@ async function saveConfig(file, draft) {
   validateConfig(c);
   await writeTextAtomic(file, yaml.dump(c));
   return editableConfig(file);
+}
+
+async function saveConfig(file, draft) {
+  const save = configSaveQueue.then(() => saveConfigNow(file, draft));
+  configSaveQueue = save.catch(() => {});
+  return save;
 }
 async function request(
   c,

@@ -42,6 +42,8 @@ Global data are split between roaming configuration and machine-specific state:
 
 `state.json` contains only the last successfully opened library path. Because that path is machine-specific, it is not stored under roaming data. Video volume and mute plus the recent tags, people, and locations namespaced by library UUID remain in renderer `localStorage`, whose physical storage follows Electron `sessionData` into Local AppData. Cache and crash dumps must not pollute roaming data.
 
+All windows share these paths because they live in one Electron coordinator process. The most recently completed library open wins `state.json`; writes are serialized and atomic. Provider-setting saves are also serialized, and other open windows receive a notice so a stale settings form can be reopened before editing. Window-scoped media, registry, chat-session, and maintenance state never enters these global files.
+
 Before Electron becomes ready, the main process must create these directories and explicitly set `userData`, `sessionData`, `crashDumps`, and the log path. `scripts/application-paths.js` is the only shared source of global path rules for Electron and standalone CLI tools. Other modules must not reconstruct AppData paths. The application does not permanently read the former installation-root `config.yml`; upgrading to v0.25.0 requires a one-time manual copy of customized configuration. Low-value recent-choice and playback preferences may reset.
 
 The application does not maintain a recent-library list. Startup always shows the library-entry page. If a last successful path exists, its real name is read from `library.yml` and displayed with the full path, but the library is not loaded until the user chooses to enter it.

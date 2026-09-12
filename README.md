@@ -13,6 +13,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.
 - Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.
+- Launch PhotoManager again to open another independent library window; the same library cannot be opened twice.
 
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
@@ -45,6 +46,8 @@ npm run dist:win
 Both commands build the renderer first; `dist:win` also runs the complete test suite. Packaging output is written under `release/`.
 
 On first use, select either an existing PhotoManager library or an ordinary directory to initialize. Initialization scans supported media, calculates hashes, extracts technical metadata, and creates the library management directory. It never modifies the original media files.
+
+Each application launch opens a new library-entry window in the existing PhotoManager process. Windows may manage different libraries concurrently. Every window owns one library session, and the library lock rejects attempts to open the same library in another window or maintenance process.
 
 ## Data Locations
 
