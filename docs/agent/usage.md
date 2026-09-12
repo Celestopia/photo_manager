@@ -63,4 +63,6 @@ Provider settings is also available from the gallery gear menu as **LLM Provider
 
 Pending attachments appear as square tiles above the text box, with local image previews or file icons. Use the corner × to remove an attachment; hover to see its filename. Previews are generated locally and do not upload anything.
 
+Click a static-image or GIF tile in the composer or a sent message to see a larger, complete-frame preview in the center of the application. GIF previews show the first frame. Click the dark backdrop or the preview's Close button to return to the conversation; video and text tiles do not open the image preview.
+
 Responses always stream; there is no streaming switch. To erase a stored credential, choose **Remove saved key** beneath the API-key field and **Save settings**. **Undo removal** cancels this before saving. This removes only the local copy. **Test connection** becomes available once changes are saved and sends only a generated test image.

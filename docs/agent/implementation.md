@@ -46,6 +46,8 @@ The application composition root creates `use-chat.js` and provides `CHAT_CONTEX
 
 `ViewerView.vue` keeps the metadata fields mounted while showing `ChatPanel.vue`, preserving draft edits. `ChatPanel.vue` renders the conversation and forwards actions to the composable. Settings and metadata choices sit behind Options beside the composer. Processing notices remain visible before Send. Invalid visual allocations and oversized original images disable Send with an explanation.
 
+`ChatImagePreviewDialog.vue` renders a body-teleported native dialog so clicked static-image and GIF tiles are centered over the full application rather than the Assistant sidebar. `use-chat.js` owns its transient loading state and rejects stale results after session or media changes. A dedicated validated preload/IPC operation resolves only the active session's library-media references or session-owned attachments and returns an ephemeral, complete-frame JPEG bounded to 1,280 pixels. Videos remain non-previewable in this dialog; GIFs use their first frame.
+
 `chat-markdown.mjs` uses Markdown-it with HTML disabled. Links render as inert underlined text, and image references render as text rather than automatically loading external assets. This release intentionally does not navigate links from model replies. `styles/chat.css` owns the panel's styles.
 
 ## Validation
@@ -70,7 +72,7 @@ Also run `node --check` on changed CommonJS files. Metadata verification always 
 
 For a development package without network downloads, electron-builder can use `--config.electronDist=node_modules/electron/dist --config.win.signAndEditExecutable=false`. That offline smoke-test build skips executable resource editing and signing; use the normal release command for distribution.
 
-Attachment descriptions include an ephemeral previewUrl for the composer. The main process prepares a bounded 160px JPEG locally from validated library or session-owned inputs; video uses a first-frame preview and GIF uses its first frame only for display. Preview failures fall back to a file icon. Previews are not persisted or included in model requests; video/GIF request sampling remains unchanged.
+Attachment descriptions include an ephemeral previewUrl for the composer. The main process prepares a bounded 160px, square-cropped JPEG locally from validated library or session-owned inputs; video uses a first-frame preview and GIF uses its first frame only for display. A clicked static image or GIF requests a separate complete-frame preview bounded to 1,280px. Preview failures fall back to a file icon or an error in the open preview. Previews are not persisted or included in model requests; video/GIF request sampling remains unchanged.
 
 Provider requests always stream. The stored `streaming` field remains fixed at `true`; an existing `false` value is normalized at runtime and replaced with `true` on the next settings save. Non-streaming JSON replies are rejected with an explanation.
 

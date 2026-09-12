@@ -135,6 +135,9 @@ test("GIF preparation returns composited frames across one timed cycle", async (
   const info = await inputs.inspect(file);
   assert.equal(info.kind, "gif");
   assert.deepEqual(info.delays, [100, 900, 200]);
+  const display = await inputs.displayPreview(file, info, tools);
+  const displayStats = await sharp(Buffer.from(display.split(",")[1], "base64")).stats();
+  assert.ok(displayStats.channels.every((channel) => channel.mean < 5));
   const frames = await inputs.prepare(file, info, "original", 3);
   assert.equal(frames.length, 3);
   assert.deepEqual(
@@ -608,17 +611,33 @@ test('provider form preserves secrets, validates before writing and supports exp
   assert.equal((await provider.editableConfig(file)).hasKey, false);
 });
 
-test('attachment previews are bounded local images and text has no preview', async (t) => {
+test('attachment thumbnails are cropped while display previews preserve the complete image', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-preview-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const file = path.join(root, 'photo.png');
-  await sharp({ create: { width: 800, height: 600, channels: 3, background: 'red' } }).png().toFile(file);
+  await sharp({ create: { width: 1600, height: 900, channels: 3, background: 'red' } }).png().toFile(file);
   const preview = await inputs.preview(file, { kind: 'image' }, tools);
   assert.match(preview, /^data:image\/jpeg;base64,/);
   const metadata = await sharp(Buffer.from(preview.split(',')[1], 'base64')).metadata();
-  assert.ok(metadata.width <= 160 && metadata.height <= 160);
+  assert.deepEqual([metadata.width, metadata.height], [160, 160]);
+  const display = await inputs.displayPreview(file, { kind: 'image' }, tools);
+  const displayMetadata = await sharp(Buffer.from(display.split(',')[1], 'base64')).metadata();
+  assert.deepEqual([displayMetadata.width, displayMetadata.height], [1280, 720]);
   assert.equal(await inputs.preview(file, { kind: 'text' }, tools), null);
   assert.equal(await inputs.preview(path.join(root, 'missing.png'), { kind: 'image' }, tools), null);
+});
+
+test('chat display previews resolve only validated image inputs', async (t) => {
+  const f = await serviceFixture(t);
+  const result = await f.chat.preview(f.session.sessionId, {
+    kind: 'media', id: f.mid, mode: 'optimized',
+  });
+  assert.equal(result.name, 'image.png');
+  assert.match(result.previewUrl, /^data:image\/jpeg;base64,/);
+  await assert.rejects(
+    f.chat.preview(f.session.sessionId, { kind: 'media', id: randomUUID(), mode: 'optimized' }),
+    /Missing media/,
+  );
 });
 
 test("abandon and recovery remove draft attachments but preserve submitted conversations", async t => {

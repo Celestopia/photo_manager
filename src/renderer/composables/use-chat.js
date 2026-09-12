@@ -19,6 +19,8 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     text = ref(""),
     inputs = ref([]),
     quality = ref("optimized");
+  const imagePreview = ref(null);
+  let previewRequest = 0;
   const error = ref(""),
     notice = ref(""),
     options = ref(false),
@@ -110,6 +112,28 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     if (!r.ok) throw new Error(r.error);
     return r.value;
   }
+  function closeImagePreview() {
+    previewRequest++;
+    imagePreview.value = null;
+  }
+  async function openImagePreview(input, name = input.name || 'Image') {
+    if (!session.value || !['image', 'gif'].includes(input.mediaKind)) return;
+    const request = ++previewRequest;
+    const sessionId = session.value.sessionId;
+    imagePreview.value = { loading: true, previewUrl: '', name, error: '' };
+    try {
+      const value = await unwrap(api.preview(sessionId, {
+        kind: input.kind,
+        id: input.id,
+        mode: input.mode,
+      }));
+      if (request !== previewRequest || session.value?.sessionId !== sessionId) return;
+      imagePreview.value = { loading: false, previewUrl: value.previewUrl, name: value.name, error: '' };
+    } catch (e) {
+      if (request !== previewRequest || session.value?.sessionId !== sessionId) return;
+      imagePreview.value = { loading: false, previewUrl: '', name, error: e.message };
+    }
+  }
   let generation = 0;
   let transition = Promise.resolve();
   const operations = new Set();
@@ -190,6 +214,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   // Drain in-flight imports/submissions before abandoning their session. Only the
   // latest navigation may publish a replacement, including late preview results.
   function replaceSession(sid = null, create = true) {
+    closeImagePreview();
     const epoch = ++generation;
     const pending = [...operations];
     working.value = true;
@@ -229,6 +254,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     if (!session.value) await newChat();
   }
   async function close() {
+    closeImagePreview();
     visible.value = false;
     await transition;
     await action(stop);
@@ -399,6 +425,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   );
   watch(view, (value) => {
     if (value !== "viewer") {
+      closeImagePreview();
       visible.value = false;
       if (busy.value) void action(stop);
     }
@@ -406,6 +433,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   watch(
     () => libraryState.value?.active?.libraryId,
     () => {
+      closeImagePreview();
       generation++;
       session.value = null;
       visible.value = false;
@@ -415,12 +443,16 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     },
   );
   onBeforeUnmount(() => {
+    closeImagePreview();
     generation++;
     clearTimeout(copyTimer);
     unsubscribe();
     void api.stop();
   });
   return {
+    imagePreview,
+    openImagePreview,
+    closeImagePreview,
     sentPreviews,
     copiedMessage,
     copyMessage,

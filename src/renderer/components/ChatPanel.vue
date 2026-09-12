@@ -92,8 +92,8 @@
         ></div>
         <p v-else class="chat-user-text">{{ m.text }}</p>
         <div v-if="m.inputs.length" class="chat-sent-tiles" aria-label="Message attachments">
-          <div v-for="i in m.inputs" :key="i.kind + i.id" class="chat-attachment-tile" :title="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'">
-            <img v-if="sentPreviews[i.kind + ':' + i.id]?.previewUrl" :src="sentPreviews[i.kind + ':' + i.id].previewUrl" :alt="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment'" />
+          <div v-for="i in m.inputs" :key="i.kind + i.id" class="chat-attachment-tile" :class="{ 'is-previewable': canPreview(sentPreviews[i.kind + ':' + i.id]) }" :title="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'">
+            <img v-if="sentPreviews[i.kind + ':' + i.id]?.previewUrl" :src="sentPreviews[i.kind + ':' + i.id].previewUrl" :alt="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment'" @click="openImagePreview(sentPreviews[i.kind + ':' + i.id], session.inputLabels?.[i.kind + ':' + i.id])" />
             <div v-else class="chat-file-tile" role="img" :aria-label="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'"><ChatIcon name="file" /><span>{{ (session.inputLabels?.[i.kind + ':' + i.id] || 'FILE').split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
           </div>
         </div>
@@ -153,8 +153,8 @@
       >
       <div class="chat-composer">
         <div v-if="inputs.length" class="chat-attachments" aria-label="Message attachments">
-          <div v-for="(i, n) in inputs" :key="i.kind + i.id" class="chat-attachment-tile" :title="i.name">
-            <img v-if="i.previewUrl" :src="i.previewUrl" :alt="i.name" />
+          <div v-for="(i, n) in inputs" :key="i.kind + i.id" class="chat-attachment-tile" :class="{ 'is-previewable': canPreview(i) }" :title="i.name">
+            <img v-if="i.previewUrl" :src="i.previewUrl" :alt="i.name" @click="openImagePreview(i, i.name)" />
             <div v-else class="chat-file-tile"><ChatIcon name="file" /><span>{{ i.name.split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
             <span v-if="['gif', 'video'].includes(i.mediaKind)" class="chat-tile-badge">{{ i.mediaKind === 'gif' ? 'GIF' : 'Video' }}</span>
             <button class="chat-remove-attachment" :disabled="busy || working" :aria-label="'Remove ' + i.name" title="Remove attachment" @click="removeInput(n)"><ChatIcon name="close" /></button>
@@ -245,11 +245,13 @@
       </div>
     </div>
 <ConversationActionDialog v-if="historyAction" :action="historyAction" @close="historyAction = null" />
+<ChatImagePreviewDialog v-if="imagePreview" />
 </section>
 </template>
 <script setup>
 import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ConversationActionDialog from "./ConversationActionDialog.vue";
+import ChatImagePreviewDialog from "./ChatImagePreviewDialog.vue";
 import TokenUsage from "./TokenUsage.vue";
 import { sessionUsage } from "../domain/chat-usage.mjs";
 import ChatIcon from "./ChatIcon.vue";
@@ -257,6 +259,8 @@ import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 const chat = inject(CHAT_CONTEXT);
 const {
+  imagePreview,
+  openImagePreview,
   sentPreviews,
   copiedMessage,
   copyMessage,
@@ -298,6 +302,7 @@ const {
   testConnection,
   keydown,
 } = chat;
+const canPreview = (input) => ['image', 'gif'].includes(input?.mediaKind);
 const metadataLabels = {
   basic: "Title, description and tags",
   location: "Location",

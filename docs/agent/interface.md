@@ -18,6 +18,8 @@ New chat prepares an independent draft with the current media attached. A conver
 
 Each attachment is a 40px square tile in a horizontal row inside the composer, above the text box. Images show a local thumbnail; text files show a file icon and extension. The filename is available on hover and through accessible labels. A top-right remove button replaces the expandable details view. Users can paste supported images/files, use Attach to choose them, or choose + → Add current media to reference the photo or video currently displayed.
 
+Clicking a static-image or animated-GIF tile in the composer or a sent user message opens a centered, medium-size still preview over a blurred application backdrop. The preview preserves the complete image instead of the tile's square crop; GIFs show their first frame. Video and text tiles do not open this preview. Click the backdrop or Close to dismiss it.
+
 Navigating to another media item stops and saves any active reply, discards unsent composer content and prepares a fresh draft with the new media attached. This also applies when Assistant is closed: reopening uses the newly viewed media. Resume a previous conversation explicitly through History; loading it does not attach the current media automatically.
 
 Reject unsupported files before completing their import. Explain that PDF, Office documents, archives, audio and external video attachments are not supported yet. Do not imply that the model has read a rejected file.
@@ -84,6 +86,8 @@ The configuration accepts a base URL, API key or environment-variable name, mode
 ## Visual Presentation
 
 The Assistant uses a compact segmented view switch, neutral colors, consistent SVG icon buttons and a rounded composer. The text box grows with the draft, up to a fixed height. Header and composer icons have accessible names and tooltips. User messages use light bubbles; assistant Markdown occupies the conversation directly. Sent attachments appear as the same 40px preview tiles used by the composer, without removal controls. Reopened conversations regenerate local previews; missing or unreadable sources show a file tile with the saved filename available on hover.
+
+Image previews use a whole-window modal with a blurred dark backdrop and a thick black image border. The preview fits within 70% of the window and never enlarges beyond the locally generated, 1,280-pixel bounded derivative. Preview generation stays local and does not contact the model provider.
 
 Each nonempty user or assistant message has a Copy button. It copies the original message text, preserving assistant Markdown, and briefly shows a checkmark. Upload processing records remain stored without a technical-details button. Raw media UUIDs do not appear in the transcript. Original-file and video/GIF sampling notices remain visible before sending. Options contains image quality and directly visible metadata checkboxes, with no earlier-input controls; provider configuration stays in its separate settings view.
 

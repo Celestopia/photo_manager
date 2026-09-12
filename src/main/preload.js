@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
     create: () => ipcRenderer.invoke("chat:create"),
     load: (sessionId) => ipcRenderer.invoke("chat:load", { sessionId }),
     describe: (sessionId, input) => ipcRenderer.invoke("chat:describe", { sessionId, input: toSerializable(input) }),
+    preview: (sessionId, input) => ipcRenderer.invoke("chat:preview", { sessionId, input: toSerializable(input) }),
     send: (payload) => ipcRenderer.invoke("chat:send", toSerializable(payload)),
     stop: () => ipcRenderer.invoke("chat:stop"),
     rename: (sessionId, title) => ipcRenderer.invoke("chat:rename", { sessionId, title }),

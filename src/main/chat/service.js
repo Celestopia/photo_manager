@@ -488,6 +488,23 @@ function createChatService({
         return describe(await store.load(sid), i);
       });
     },
+    async preview(sid, i) {
+      return serial(async () => {
+        schema.input(i);
+        await current();
+        const s = await store.load(sid);
+        const r = await resolve(s, i);
+        if (!["image", "gif"].includes(r.info.kind))
+          throw new Error("Only images and GIFs can be previewed here.");
+        const previewUrl = await media.displayPreview(r.file, r.info, getTools());
+        if (!previewUrl)
+          throw new Error("Unable to prepare this image preview.");
+        const name = i.kind === "media"
+          ? path.basename(resolveMedia(i.id).item.FilePath)
+          : s.attachments.find((a) => a.id === i.id)?.name || "Image";
+        return { previewUrl, name };
+      });
+    },
     async import(sid, name, bytes) {
       return serial(async () => {
         idle();

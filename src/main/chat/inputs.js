@@ -413,23 +413,37 @@ async function prepare(file, info, mode, count, { tools, signal } = {}) {
     );
   return results;
 }
-// Ephemeral local thumbnails; never persisted or included in model requests.
-async function preview(file, info, tools) {
+// Ephemeral local previews; never persisted or included in model requests.
+async function preview(
+  file,
+  info,
+  tools,
+  { size = 160, fit = "cover", quality = 70 } = {},
+) {
   if (info.kind === "text") return null;
   try {
     let source;
     if (info.kind === "video" || path.extname(file).toLowerCase() === ".bmp") {
-      source = (await run(tools.ffmpegPath, ["-v", "error", "-i", file, "-frames:v", "1", "-vf", "scale=160:160:force_original_aspect_ratio=decrease", "-f", "image2pipe", "-vcodec", "png", "pipe:1"])).stdout;
+      source = (await run(tools.ffmpegPath, ["-v", "error", "-i", file, "-frames:v", "1", "-vf", `scale=${size}:${size}:force_original_aspect_ratio=decrease`, "-f", "image2pipe", "-vcodec", "png", "pipe:1"])).stdout;
     } else source = await fs.readFile(file);
-    const bytes = await sharp(source, { page: 0, pages: 1 }).rotate().resize(160, 160, { fit: "cover", withoutEnlargement: true }).flatten({ background: "#ffffff" }).toColourspace("srgb").jpeg({ quality: 70 }).toBuffer();
+    const bytes = await sharp(source, { page: 0, pages: 1 })
+      .rotate()
+      .resize(size, size, { fit, withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .toColourspace("srgb")
+      .jpeg({ quality })
+      .toBuffer();
     return "data:image/jpeg;base64," + bytes.toString("base64");
   } catch {
     // A display preview failure must not prevent attaching an otherwise valid input.
     return null;
   }
 }
+const displayPreview = (file, info, tools) =>
+  preview(file, info, tools, { size: 1280, fit: "inside", quality: 85 });
 module.exports = {
   preview,
+  displayPreview,
   MiB,
   hash,
   fingerprint,

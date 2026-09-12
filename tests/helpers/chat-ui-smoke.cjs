@@ -176,6 +176,12 @@ async function run() {
   await click(".viewer-sidebar-tabs button:last-child");
   await waitFor(`Boolean(document.querySelector('.chat-composer .chat-attachment-tile'))`);
   await waitFor(`document.querySelector('.chat-composer .chat-attachment-tile img')?.naturalWidth > 0`);
+  await click('.chat-composer .chat-attachment-tile.is-previewable > img');
+  await waitFor(`document.querySelector('.chat-image-preview-dialog[open] img')?.naturalWidth > 160`);
+  assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.chat-image-preview-dialog img')).borderTopWidth`), '6px');
+  assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.chat-image-preview-dialog'), '::backdrop').backdropFilter.includes('blur')`), true);
+  await click('.chat-image-preview-dialog');
+  await waitFor(`!document.querySelector('.chat-image-preview-dialog')`);
 
   await click('[aria-label="Options"]');
   assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chat-options fieldset input[type=checkbox]').length`), 5);
@@ -209,6 +215,10 @@ async function run() {
   );
   await waitFor(`Boolean(document.querySelector('.chat-markdown strong'))`);
   await waitFor(`document.querySelector('.chat-sent-tiles img')?.naturalWidth > 0`);
+  await click('.chat-sent-tiles .chat-attachment-tile.is-previewable > img');
+  await waitFor(`document.querySelector('.chat-image-preview-dialog[open] img')?.naturalWidth > 160`);
+  await click('[aria-label="Close image preview"]');
+  await waitFor(`!document.querySelector('.chat-image-preview-dialog')`);
   await click('.assistant .chat-message-copy');
   await waitFor(`document.querySelector('.assistant .chat-message-copy')?.getAttribute('aria-label') === 'Copied'`);
   assert.ok(copiedText.includes('**'), 'Copy preserves raw Markdown');

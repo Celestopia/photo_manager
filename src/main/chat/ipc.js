@@ -5,7 +5,7 @@ const { safePath } = require("./store");
 const { object, id } = require("./schema");
 function registerChatIpc({ chat, getWindow, configFile }) {
   const fields = {
-    load: ["sessionId"], describe: ["sessionId", "input"],
+    load: ["sessionId"], describe: ["sessionId", "input"], preview: ["sessionId", "input"],
     rename: ["sessionId", "title"], removeInput: ["sessionId", "attachmentId"],
     abandon: ["sessionId"], delete: ["sessionId"], importBytes: ["sessionId", "name", "bytes"],
     importFile: ["sessionId", "path"], choose: ["sessionId"],
@@ -16,6 +16,7 @@ function registerChatIpc({ chat, getWindow, configFile }) {
     abandon: (p) => chat.abandon(p.sessionId),
     load: (p) => chat.load(p.sessionId),
     describe: (p) => chat.describe(p.sessionId, p.input),
+    preview: (p) => chat.preview(p.sessionId, p.input),
     send: (p) => chat.send(p),
     stop: () => chat.stop(),
     rename: (p) => chat.rename(p.sessionId, p.title),

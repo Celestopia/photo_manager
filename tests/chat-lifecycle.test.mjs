@@ -12,6 +12,7 @@ function fixture(t) {
     onEvent: () => () => {}, stop: () => ok(),
     create: () => { const s = { sessionId: String(++sequence), messages: [], attachments: [], title: '' }; sessions.set(s.sessionId, s); return ok(s); },
     describe: async (sid, input) => { if (delayDescribe) { const delay = delayDescribe; delayDescribe = null; await delay; } return ok({ ...input, name: input.id, mediaKind: 'image' }); },
+    preview: (sid, input) => ok({ previewUrl: 'data:image/jpeg;base64,preview', name: input.id }),
     abandon: sid => { abandoned.push(sid); if (!sessions.get(sid).messages.length) sessions.delete(sid); return ok({}); },
     load: sid => ok(sessions.get(sid)),
     open: () => ok({ sessions: [...sessions.values()].filter(s => s.messages.length) }),
@@ -49,4 +50,14 @@ test('late preview results cannot restore an abandoned media draft', async t => 
   release(); await opening; await settle(f);
   assert.deepEqual(f.chat.inputs.value.map(i => i.id), ['C']);
   assert.equal(f.sessions.size, 1);
+});
+
+test('image preview state opens and is cleared with its conversation', async t => {
+  const f = fixture(t), c = f.chat;
+  await c.open();
+  await c.openImagePreview(c.inputs.value[0]);
+  assert.equal(c.imagePreview.value.name, 'A');
+  f.selectedItem.value = { MediaId: 'B' };
+  await settle(f);
+  assert.equal(c.imagePreview.value, null);
 });
