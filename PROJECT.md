@@ -13,6 +13,7 @@ Current capabilities include:
 - Managing images and videos on one timeline.
 - Viewing images, playing videos, and editing shared customization fields.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
+- Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.
 - Batch-setting titles, ratings, privacy levels, albums, tags, people, and primary locations across mixed images and videos.
 - Managing tags, albums, people, and locations through registries, while preventing metadata from referencing unregistered values.

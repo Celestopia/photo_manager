@@ -8,7 +8,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 
 - Browse images and videos on one shooting-time timeline.
 - Edit titles, ratings, privacy levels, descriptions, albums, tags, people, and hierarchical locations.
-- Filter and batch-edit the complete matching media set.
+- Filter, batch-copy, and batch-edit the complete matching media set.
 - Permanently delete one media item from the viewer or a selected batch from the gallery, removing both files and metadata after confirmation.
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.

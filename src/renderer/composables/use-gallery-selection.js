@@ -1,6 +1,6 @@
 import { computed, reactive, ref, triggerRef } from "vue";
 
-/** Owns gallery selection and the batch-edit transaction built on the complete query result. */
+/** Owns gallery selection and batch operations built on the complete query result. */
 export function useGallerySelection({
   api,
   orderedItems,
@@ -15,6 +15,7 @@ export function useGallerySelection({
   const batchEdit = reactive({ title: "", rating: null, privacy: null, albumId: null, tagIds: [], personIds: [], locationId: null });
   const batchStatus = reactive({ visible: false, tone: "info", message: "" });
   const applyingBatchEdit = ref(false);
+  const copyingBatchFiles = ref(false);
 
   const selectedGalleryBytes = computed(() => orderedItems.value.reduce((sum, item) => {
     const bytes = item.FileSystem?.FileSize;
@@ -30,7 +31,8 @@ export function useGallerySelection({
     || batchEdit.personIds.length > 0
     || Boolean(batchEdit.locationId)
   ));
-  const canApplyBatchEdit = computed(() => !applyingBatchEdit.value && selectedGalleryCount.value > 0 && batchHasChanges.value);
+  const batchOperationBusy = computed(() => applyingBatchEdit.value || copyingBatchFiles.value);
+  const canApplyBatchEdit = computed(() => !batchOperationBusy.value && selectedGalleryCount.value > 0 && batchHasChanges.value);
 
   function enterSelectionMode() {
     isSelectionMode.value = true;
@@ -117,7 +119,7 @@ export function useGallerySelection({
   }
 
   async function applyBatchEdit() {
-    if (applyingBatchEdit.value) return;
+    if (batchOperationBusy.value) return;
     const mediaIds = [...gallerySelection.value];
     if (!mediaIds.length) {
       showToastMessage("Select at least one media item");
@@ -168,12 +170,36 @@ export function useGallerySelection({
     }
   }
 
+  async function copySelectedFiles() {
+    if (batchOperationBusy.value) return;
+    const mediaIds = orderedItems.value
+      .filter((item) => gallerySelection.value.has(item.MediaId))
+      .map((item) => item.MediaId);
+    if (!mediaIds.length) {
+      showToastMessage("Select at least one media item");
+      return;
+    }
+    copyingBatchFiles.value = true;
+    try {
+      const result = await api.copyFiles({ mediaIds });
+      if (!result?.ok) throw new Error(result?.error || "Unknown error");
+      const count = Number(result.copiedCount || mediaIds.length);
+      showToastMessage(`${count} file${count === 1 ? "" : "s"} copied to the clipboard`);
+    } catch (error) {
+      showToastMessage(`Could not copy selected files: ${error?.message || "Unknown error"}`);
+    } finally {
+      copyingBatchFiles.value = false;
+    }
+  }
+
   return {
     isSelectionMode,
     gallerySelection,
     batchEdit,
     batchStatus,
     applyingBatchEdit,
+    copyingBatchFiles,
+    batchOperationBusy,
     selectedGalleryCount,
     selectedGalleryBytes,
     batchHasChanges,
@@ -193,5 +219,6 @@ export function useGallerySelection({
     removeBatchTagAt,
     removeBatchPersonAt,
     applyBatchEdit,
+    copySelectedFiles,
   };
 }

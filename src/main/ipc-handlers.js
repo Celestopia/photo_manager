@@ -1,8 +1,10 @@
-const { copyFileToClipboard } = require("./file-clipboard");
+const { copyFileToClipboard, copyFilesToClipboard } = require("./file-clipboard");
 const { clipboard, dialog, ipcMain, shell } = require("electron");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const { assertUuidArray } = require("../shared/identity-schema.js");
+const { assertExactObjectKeys } = require("../shared/object-schema.js");
 
 function registerIpcHandlers(options) {
   const {
@@ -214,6 +216,18 @@ function registerIpcHandlers(options) {
       const { absolutePath } = resolveIndexedMediaPath(mediaId);
       await copyFileToClipboard(absolutePath);
       return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+  ipcMain.handle("photo:copy-files", async (_, payload) => {
+    try {
+      assertExactObjectKeys(payload, ["mediaIds"], "Batch file copy payload");
+      assertUuidArray(payload.mediaIds, "mediaIds");
+      if (!payload.mediaIds.length) throw new Error("Select at least one media item to copy");
+      const absolutePaths = payload.mediaIds.map((mediaId) => resolveIndexedMediaPath(mediaId).absolutePath);
+      await copyFilesToClipboard(absolutePaths);
+      return { ok: true, copiedCount: absolutePaths.length };
     } catch (error) {
       return { ok: false, error: error.message };
     }

@@ -109,8 +109,9 @@
       </template>
     </section>
   </section>
-  <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': applyingBatchEdit }" :inert="applyingBatchEdit ? '' : undefined" :aria-busy="applyingBatchEdit">
-    <div class="batch-panel-header"><h3>Batch Edit Metadata</h3><button class="btn batch-close" title="Close batch edit" aria-label="Close batch edit" @click="exitSelectionMode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
+  <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': batchOperationBusy }" :inert="batchOperationBusy ? '' : undefined" :aria-busy="batchOperationBusy">
+    <div class="batch-panel-scroll">
+    <div class="batch-panel-header"><h3>Batch Operation</h3><button class="btn batch-close" title="Close batch operations" aria-label="Close batch operations" @click="exitSelectionMode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
     <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected · {{ formatFileSize(selectedGalleryBytes) }}</div>
     <label>Set title</label><input class="input" v-model="batchEdit.title" placeholder="Replace titles of selected media" />
     <label>Set rating</label>
@@ -142,7 +143,11 @@
       <button class="btn btn-primary batch-apply-btn" title="Apply to selected media" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">Apply</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
-    <div class="batch-delete-action"><button class="btn icon-btn danger-icon-btn" data-tip="Permanently delete selected media" aria-label="Permanently delete selected media" :disabled="selectedGalleryCount === 0 || applyingBatchEdit" @click="requestBatchDeletion"><img class="icon" :src="ICONS.deleteMedia" alt="" /></button></div>
+    </div>
+    <div class="batch-operation-actions">
+      <button class="btn icon-btn batch-copy-btn" data-tip="Copy selected files" aria-label="Copy selected files" :disabled="selectedGalleryCount === 0 || batchOperationBusy" @click="copySelectedFiles"><img class="icon" :src="ICONS.copyFiles" alt="" /></button>
+      <button class="btn icon-btn danger-icon-btn" data-tip="Permanently delete selected media" aria-label="Permanently delete selected media" :disabled="selectedGalleryCount === 0 || batchOperationBusy" @click="requestBatchDeletion"><img class="icon" :src="ICONS.deleteMedia" alt="" /></button>
+    </div>
   </aside>
 </main>
 
@@ -194,7 +199,7 @@ const {
   selectedGalleryBytes,
   batchEdit,
   batchStatus,
-  applyingBatchEdit,
+  batchOperationBusy,
   total,
   galleryGroups,
   loading,
@@ -219,6 +224,7 @@ const {
   selectAllGalleryPhotos,
   clearBatchEditInputs,
   applyBatchEdit,
+  copySelectedFiles,
   requestBatchDeletion,
   buildImageUrl,
   doWindowAction,

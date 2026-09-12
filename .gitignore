@@ -19,6 +19,7 @@ pnpm-debug.log*
 dist/
 out/
 release/
+release-*/
 
 # IDE / editor
 .vscode/
