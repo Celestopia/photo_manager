@@ -55,3 +55,5 @@ Copy File is available for images and videos. It validates the indexed source pa
 The gallery filter and sorting panel expands downward beneath the always-visible search bar. It starts expanded and uses a bottom-center chevron to collapse upward; the collapsed tab retains the modified-filter indicator. Toggling closes transient dropdowns without clearing filters, sort order or selection. The gallery uses the freed vertical space. Transitions respect reduced-motion preferences.
 
 The batch-edit panel shows the selected item count and summed file size from the complete gallery selection. Its header uses an accessible X close button; compact bold Clear and Apply buttons retain their full action descriptions as tooltips.
+
+The gallery header places a three-line Settings button and Reset gallery icon at the left, followed by the application icon and PhotoManager name. Settings opens downward with a viewport-constrained scrollable menu. Gallery has no footer. Selected cards use a strong blue outline with a white inset and a blue circular check at the top right; video frame-rate badges move left in selection mode.

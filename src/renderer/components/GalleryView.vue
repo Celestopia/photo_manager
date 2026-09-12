@@ -1,6 +1,6 @@
 <template>
-<header class="topbar">
-  <div class="left-tools"><button class="btn icon-btn" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
+<header class="topbar gallery-topbar">
+  <div class="left-tools gallery-header-tools"><GallerySettingsMenu /><button class="btn icon-btn gallery-reset" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button><div class="gallery-brand"><img :src="appIcon" alt="" /><span>PhotoManager</span></div></div>
   <div class="search-panel">
     <select v-model="query.search.field" class="input"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option></select>
     <input class="input grow" v-model="query.search.value" placeholder="Enter search text" @keydown.enter="applySearch" />
@@ -81,7 +81,7 @@
             @click="onGalleryCardClick(item)"
             @contextmenu.prevent.stop="toggleGalleryDetailsMenu(item, $event)"
           >
-            <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.MediaId) }" @click.stop="toggleGallerySelection(item.MediaId)">✓</button>
+            <button v-if="isSelectionMode" type="button" class="card-select-toggle" :class="{ active: isGallerySelected(item.MediaId) }"  :aria-pressed="isGallerySelected(item.MediaId)" :aria-label="isGallerySelected(item.MediaId) ? 'Deselect media' : 'Select media'" @click.stop="toggleGallerySelection(item.MediaId)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg></button>
             <div class="card-media">
               <img
                 :src="resolveGalleryImageSrc(item)"
@@ -144,9 +144,7 @@
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>
 </main>
-<footer class="gallery-footer">
-  <GallerySettingsMenu />
-</footer>
+
 <GalleryMediaDetailsMenu
   v-if="galleryDetailsMenu.visible && galleryDetailsMenu.item"
   :item="galleryDetailsMenu.item"
@@ -164,6 +162,7 @@ function onToggleControls() {
 import { inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
 import { formatFileSize } from "../domain/media-formatters.mjs";
+import appIcon from "../../../build/icon.svg";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";

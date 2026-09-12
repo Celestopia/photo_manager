@@ -1,7 +1,7 @@
 <template>
-  <div v-if="!isSelectionMode" class="gallery-settings-anchor" @click.stop>
-    <button class="btn icon-btn gallery-settings-trigger" data-tip="Library settings" :aria-expanded="gallerySettingsOpen" @click="onToggleGallerySettings">
-      <img class="icon" :src="ICONS.settings" alt="Library settings" />
+  <div class="gallery-settings-anchor" @click.stop>
+    <button class="btn icon-btn gallery-settings-trigger" data-tip="Library settings" aria-label="Library settings" :aria-expanded="gallerySettingsOpen" @click="onToggleGallerySettings">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
     </button>
     <div v-if="gallerySettingsOpen" class="gallery-settings-menu">
       <button @click="openLibraryInfo"><span>ⓘ</span>Library Information</button>

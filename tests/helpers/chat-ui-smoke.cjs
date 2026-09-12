@@ -156,7 +156,12 @@ async function run() {
   await new Promise(resolve => setTimeout(resolve, 250));
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getBoundingClientRect().top >= document.querySelector('#gallery-filter-panel').getBoundingClientRect().bottom - 1`), true);
 
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-footer'))`), false);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-brand')?.textContent`), 'PhotoManager');
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-header-tools [aria-label="Reset gallery"]'))`), true);
   await click('.gallery-settings-trigger');
+  await waitFor(`Boolean(document.querySelector('.gallery-settings-menu'))`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-settings-menu').getBoundingClientRect().top > document.querySelector('.gallery-settings-trigger').getBoundingClientRect().bottom`), true);
   await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('LLM Provider Settings')).click()`);
   await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);
   assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-settings-menu'))`), false);
