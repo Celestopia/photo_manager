@@ -58,14 +58,10 @@
           ><span>{{ row.error || row.excerpt }}</span>
         </button>
         <div v-if="!row.error" class="chat-history-actions">
-          <button class="btn" title="Rename conversation" aria-label="Rename conversation" :disabled="working" @click="renameId = row.sessionId; renameTitle = row.title"><ChatIcon name="edit" /></button>
-          <button class="btn chat-danger" title="Delete conversation" aria-label="Delete conversation" :disabled="working" @click="removeSession(row.sessionId)"><ChatIcon name="trash" /></button>
+          <button class="btn" title="Rename conversation" aria-label="Rename conversation" :disabled="working" @click="historyAction = { kind: 'rename', row }"><ChatIcon name="edit" /></button>
+          <button class="btn chat-danger" title="Delete conversation" aria-label="Delete conversation" :disabled="working" @click="historyAction = { kind: 'delete', row }"><ChatIcon name="trash" /></button>
         </div>
-        <form v-if="renameId === row.sessionId" class="chat-rename" @submit.prevent="rename(row.sessionId); renameId = null">
-          <input class="input" v-model="renameTitle" aria-label="Conversation title" required maxlength="200" />
-          <button class="btn" :disabled="working || !renameTitle.trim()">Save</button>
-          <button class="btn" type="button" @click="renameId = null">Cancel</button>
-        </form>
+
       </article>
     </div>
     <div
@@ -245,10 +241,12 @@
         </fieldset>
       </div>
     </div>
+<ConversationActionDialog v-if="historyAction" :action="historyAction" @close="historyAction = null" />
 </section>
 </template>
 <script setup>
 import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
+import ConversationActionDialog from "./ConversationActionDialog.vue";
 import ChatIcon from "./ChatIcon.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
@@ -313,13 +311,13 @@ watch([historyOpen, busy, () => session.value?.sessionId], () => { attachmentsOp
 const conversationElement = ref(null);
 const composerElement = ref(null);
 
-const renameId = ref(null);
+const historyAction = ref(null);
 watch(text, async () => {
   await nextTick();
   const el = composerElement.value;
   if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
 });
-watch(() => session.value?.sessionId, () => { renameId.value = null; });
+watch(() => session.value?.sessionId, () => { historyAction.value = null; });
 watch(
   () => session.value?.messages.map((m) => m.text).join(""),
   async () => {

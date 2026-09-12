@@ -29,21 +29,8 @@ function registerChatIpc({ chat, getWindow, configFile }) {
       if (error)
         throw new Error("Unable to open configuration in the default editor.");
     },
-    delete: async (p) => {
-      const result = await dialog.showMessageBox(getWindow(), {
-        type: "warning",
-        buttons: ["Cancel", "Delete conversation"],
-        defaultId: 0,
-        cancelId: 0,
-        title: "Delete conversation?",
-        message: "Delete this conversation and its imported attachments?",
-        detail:
-          "Original library files are preserved. Chat history is not backed up.",
-      });
-      return result.response === 1
-        ? { deleted: true, ...(await chat.delete(p.sessionId)) }
-        : { deleted: false };
-    },
+    // Confirmation belongs to the renderer's modal before this command is sent.
+    delete: async (p) => ({ deleted: true, ...(await chat.delete(p.sessionId)) }),
     importBytes: (p) => {
       if (
         !p ||

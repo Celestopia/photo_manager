@@ -377,3 +377,5 @@
 .provider-banner, .provider-banner * { -webkit-app-region: no-drag; }
 
 .chat-panel .chat-history-open:hover:not(:disabled) { background: transparent; }
+.conversation-delete-description { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.provider-dialog .conversation-delete-confirm { background: #b83f3f; color: white; }

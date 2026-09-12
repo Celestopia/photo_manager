@@ -98,3 +98,5 @@ Provider feedback uses dismissible floating banners in the modal top layer, pres
 Completed provider banners dismiss manually or after 10 seconds; progress stays visible while an operation runs. New notifications restart the timeout, and closing the dialog clears it. Floating interactive banners explicitly disable Electron window dragging so title-bar overlap cannot swallow clicks.
 
 History cards expose a pencil Rename button and red bin Delete button directly at the right edge, with tooltips and keyboard focus indicators. Renaming acts on the selected card without switching the active conversation; deletion retains its confirmation.
+
+History rename and delete actions open centered modal dialogs with blurred backdrops. Rename focuses the title field; deletion focuses Cancel and requires explicit confirmation before IPC. Escape and Close cancel without changing data.
