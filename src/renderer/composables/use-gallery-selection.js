@@ -16,6 +16,10 @@ export function useGallerySelection({
   const batchStatus = reactive({ visible: false, tone: "info", message: "" });
   const applyingBatchEdit = ref(false);
 
+  const selectedGalleryBytes = computed(() => orderedItems.value.reduce((sum, item) => {
+    const bytes = item.FileSystem?.FileSize;
+    return sum + (gallerySelection.value.has(item.MediaId) && Number.isFinite(bytes) && bytes > 0 ? bytes : 0);
+  }, 0));
   const selectedGalleryCount = computed(() => gallerySelection.value.size);
   const batchHasChanges = computed(() => (
     Boolean(batchEdit.title.trim())
@@ -171,6 +175,7 @@ export function useGallerySelection({
     batchStatus,
     applyingBatchEdit,
     selectedGalleryCount,
+    selectedGalleryBytes,
     batchHasChanges,
     canApplyBatchEdit,
     enterSelectionMode,

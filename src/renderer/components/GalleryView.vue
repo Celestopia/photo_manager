@@ -110,8 +110,8 @@
     </section>
   </section>
   <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': applyingBatchEdit }" :inert="applyingBatchEdit ? '' : undefined" :aria-busy="applyingBatchEdit">
-    <div class="batch-panel-header"><h3>Batch Edit Metadata</h3><button class="btn" @click="exitSelectionMode">Close</button></div>
-    <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected</div>
+    <div class="batch-panel-header"><h3>Batch Edit Metadata</h3><button class="btn batch-close" title="Close batch edit" aria-label="Close batch edit" @click="exitSelectionMode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
+    <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected · {{ formatFileSize(selectedGalleryBytes) }}</div>
     <label>Set title</label><input class="input" v-model="batchEdit.title" placeholder="Replace titles of selected media" />
     <label>Set rating</label>
     <div class="rating-stars" role="radiogroup" aria-label="Set rating for selected media">
@@ -138,8 +138,8 @@
     <label>Set location</label>
     <LocationPicker target="batch" placeholder="Search locations" />
     <div class="batch-actions">
-      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges">Clear fields</button>
-      <button class="btn btn-primary batch-apply-btn" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">{{ applyingBatchEdit ? 'Applying...' : 'Apply to selected media' }}</button>
+      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges" title="Clear fields">Clear</button>
+      <button class="btn btn-primary batch-apply-btn" title="Apply to selected media" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">Apply</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
   </aside>
@@ -163,6 +163,7 @@ function onToggleControls() {
 
 import { inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { GALLERY_CONTEXT } from "../context/renderer-contexts.js";
+import { formatFileSize } from "../domain/media-formatters.mjs";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
 import LocationPicker from "./LocationPicker.vue";
@@ -190,6 +191,7 @@ const {
   galleryControlsModified,
   isSelectionMode,
   selectedGalleryCount,
+  selectedGalleryBytes,
   batchEdit,
   batchStatus,
   applyingBatchEdit,

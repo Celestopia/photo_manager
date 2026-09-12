@@ -171,7 +171,7 @@ export function useRendererApplication() {
       batchEdit,
       batchStatus,
       applyingBatchEdit,
-      selectedGalleryCount,
+      selectedGalleryCount, selectedGalleryBytes,
       batchHasChanges,
       canApplyBatchEdit,
       enterSelectionMode,
@@ -624,7 +624,7 @@ export function useRendererApplication() {
     };
     const galleryContext = {
       ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
-      isSelectionMode, selectedGalleryCount,
+      isSelectionMode, selectedGalleryCount, selectedGalleryBytes,
       batchEdit, batchStatus, applyingBatchEdit, total, galleryGroups, loading, batchHasChanges, canApplyBatchEdit,
       windowToggleTip, windowToggleIcon,
       resetAll, applySearch, applyFilterSort, setMediaTypeFilter, setAllGalleryLevels,
