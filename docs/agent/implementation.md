@@ -4,7 +4,7 @@ Viewer chat is implemented in v0.28.0. This page describes the code and its vali
 
 ## Provider Configuration and Requests
 
-`application-paths.js` resolves `%LOCALAPPDATA%/PhotoManager/app-data/chat-provider.yml`. Settings creates it on first access. The centered ProviderSettings dialog edits a sanitized configuration draft through preload; the main process validates and atomically saves it. Stored keys and environment values never return to the renderer. A blank replacement preserves the saved key, and removal is explicit. Save and open make no provider request; Test saved connection uses a synthetic image.
+`application-paths.js` resolves `%LOCALAPPDATA%/PhotoManager/app-data/chat-provider.yml`. Settings creates it on first access. The centered ProviderSettings dialog edits a sanitized configuration draft through preload; the main process validates and atomically saves it. Stored keys and environment values never return to the renderer. A blank replacement preserves the saved key, and removal is explicit. Save and open make no provider request; Test connection uses a synthetic image and reports explicit connection success or failure in a floating banner.
 
 `chat/provider.js` accepts strict `schemaVersion`, `baseUrl`, `apiKey`, `apiKeyEnv`, `model`, `streaming` and optional `enable_thinking` fields. An explicit key takes precedence over the named environment variable. The default model is `qwen3-vl-plus-2025-12-19`, verified against [Alibaba Cloud's official model listing](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-vl-plus). The base URL starts empty so the user must select the endpoint for their account and region. There is no automatic model fallback or model download.
 
@@ -71,3 +71,5 @@ Also run `node --check` on changed CommonJS files. Metadata verification always 
 For a development package without network downloads, electron-builder can use `--config.electronDist=node_modules/electron/dist --config.win.signAndEditExecutable=false`. That offline smoke-test build skips executable resource editing and signing; use the normal release command for distribution.
 
 Attachment descriptions include an ephemeral previewUrl for the composer. The main process prepares a bounded 160px JPEG locally from validated library or session-owned inputs; video uses a first-frame preview and GIF uses its first frame only for display. Preview failures fall back to a file icon. Previews are not persisted or included in model requests; video/GIF request sampling remains unchanged.
+
+Provider requests always stream. The stored `streaming` field remains fixed at `true`; an existing `false` value is normalized at runtime and replaced with `true` on the next settings save. Non-streaming JSON replies are rejected with an explanation.

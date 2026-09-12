@@ -274,9 +274,7 @@ test("service sends only selected inputs, persists provenance and leaves sources
     fetchImpl: async (url, options) => {
       captured = JSON.parse(options.body);
       return new Response(
-        JSON.stringify({
-          choices: [{ message: { content: "A red picture." } }],
-        }),
+        'data: {"choices":[{"delta":{"content":"A red picture."}}]}\n\ndata: [DONE]\n\n' ,
       );
     },
   });
@@ -352,7 +350,7 @@ async function serviceFixture(t, fetchImpl) {
       fetchImpl ||
       (async () =>
         new Response(
-          JSON.stringify({ choices: [{ message: { content: "Reply" } }] }),
+          'data: {"choices":[{"delta":{"content":"Reply"}}]}\n\ndata: [DONE]\n\n' ,
         )),
   });
   const session = await chat.create();
@@ -382,7 +380,7 @@ test("history sends at most twelve pairs and explicitly records omitted older tu
     async (url, options) => {
       sent = JSON.parse(options.body);
       return new Response(
-        JSON.stringify({ choices: [{ message: { content: "Reply" } }] }),
+        'data: {"choices":[{"delta":{"content":"Reply"}}]}\n\ndata: [DONE]\n\n' ,
       );
     },
   );
@@ -406,7 +404,7 @@ test("changed and missing sources require explicit choices; history remains immu
   const f = await serviceFixture(t, async () => {
     calls++;
     return new Response(
-      JSON.stringify({ choices: [{ message: { content: "Reply" } }] }),
+      'data: {"choices":[{"delta":{"content":"Reply"}}]}\n\ndata: [DONE]\n\n' ,
     );
   });
   const first = await f.send({
@@ -655,4 +653,22 @@ test("a rejected first submission stays a draft, while provider failure preserve
   assert.equal((await f.chat.open()).sessions.length, 1);
   await f.chat.abandon(s.sessionId);
   assert.equal((await f.chat.open()).sessions.length, 1);
+});
+
+test('provider always streams and normalizes the former disabled preference', async t => {
+  const { root } = await fixture(t);
+  const file = path.join(root, 'provider.yml');
+  await fs.writeFile(file, yaml.dump({ ...provider.DEFAULT, baseUrl: 'https://example.com/v1', streaming: false }));
+  const c = await provider.config(file);
+  assert.equal(c.streaming, true);
+  const { hasKey, ...draft } = await provider.editableConfig(file);
+  assert.equal('streaming' in draft, false);
+  await provider.saveConfig(file, draft);
+  assert.equal(yaml.load(await fs.readFile(file, 'utf8')).streaming, true);
+  await provider.request({ ...c, streaming: false }, [], { fetchImpl: async (_, options) => {
+    assert.equal(JSON.parse(options.body).stream, true);
+    return new Response('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\ndata: [DONE]\n\n');
+  } });
+  await assert.rejects(provider.request(c, [], { fetchImpl: async () =>
+    new Response('{}', { headers: { 'content-type': 'application/json' } }) }), /does not support streaming/);
 });

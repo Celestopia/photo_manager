@@ -81,6 +81,7 @@ function validateConfig(c, env = process.env) {
     );
   return {
     ...c,
+    streaming: true, // Normalize the former user preference to fixed streaming.
     baseUrl: c.baseUrl.replace(/\/+$/, ""),
     apiKey: c.apiKey || env[c.apiKeyEnv] || "",
   };
@@ -92,17 +93,17 @@ async function editableConfig(file) {
   const c = await readConfig(file);
   // Never send a stored credential or environment value to the renderer.
   return { baseUrl: c.baseUrl, model: c.model, apiKeyEnv: c.apiKeyEnv,
-    streaming: c.streaming, thinking: c.enable_thinking === undefined ? "omit" : String(c.enable_thinking),
+    thinking: c.enable_thinking === undefined ? "omit" : String(c.enable_thinking),
     hasKey: Boolean(c.apiKey), apiKey: "", clearKey: false };
 }
 async function saveConfig(file, draft) {
-  object(draft, ["baseUrl", "model", "apiKeyEnv", "streaming", "thinking", "apiKey", "clearKey"], "Provider settings");
+  object(draft, ["baseUrl", "model", "apiKeyEnv", "thinking", "apiKey", "clearKey"], "Provider settings");
   if (["baseUrl", "model", "apiKeyEnv", "apiKey", "thinking"].some(k => typeof draft[k] !== "string" || draft[k].length > 4096) ||
-      typeof draft.clearKey !== "boolean" || typeof draft.streaming !== "boolean" || !["omit", "true", "false"].includes(draft.thinking))
+      typeof draft.clearKey !== "boolean" || !["omit", "true", "false"].includes(draft.thinking))
     throw new Error("Invalid provider settings.");
   const previous = await readConfig(file);
   const c = { schemaVersion: 1, baseUrl: draft.baseUrl.trim(), model: draft.model.trim(),
-    apiKeyEnv: draft.apiKeyEnv.trim(), apiKey: draft.clearKey ? "" : (draft.apiKey || previous.apiKey), streaming: draft.streaming };
+    apiKeyEnv: draft.apiKeyEnv.trim(), apiKey: draft.clearKey ? "" : (draft.apiKey || previous.apiKey), streaming: true };
   if (draft.thinking !== "omit") c.enable_thinking = draft.thinking === "true";
   validateConfig(c);
   await writeTextAtomic(file, yaml.dump(c));
@@ -116,7 +117,7 @@ async function request(
   const body = {
     model: c.model,
     messages,
-    stream: c.streaming,
+    stream: true,
     max_tokens: 4096,
   };
   if ("enable_thinking" in c) body.enable_thinking = c.enable_thinking;
@@ -150,20 +151,10 @@ async function request(
       buffer = "",
       done = false;
     const decoder = new TextDecoder();
-    if (!c.streaming) {
-      const chunks = [];
-      for await (const chunk of response.body) {
-        total += chunk.length;
-        if (total > 2 * 1024 * 1024)
-          throw new Error("Provider response is too large.");
-        chunks.push(chunk);
-      }
-      const data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-      text = data.choices?.[0]?.message?.content;
-      if (typeof text !== "string" || !text.length || text.length > 200000)
-        throw new Error("Provider returned no supported text response.");
-      onText(text);
-      return text;
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      await response.body?.cancel();
+      throw new Error("Provider does not support streaming responses. Choose a streaming-compatible endpoint and model.");
     }
     function consume(event) {
       const data = event

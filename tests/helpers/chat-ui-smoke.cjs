@@ -160,6 +160,10 @@ async function run() {
   await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('LLM Provider Settings')).click()`);
   await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);
   assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-settings-menu'))`), false);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog').textContent.includes('Stream responses')`), false);
+  await setValue('.provider-fields input[type=url]', 'https://changed.example/v1');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog footer button').disabled`), true);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-footnote').textContent.includes('Save changes before testing')`), true);
   await click('[aria-label="Close provider settings"]');
   await click(".photo-card");
   await waitFor(`Boolean(document.querySelector('.viewer-sidebar-tabs'))`);
@@ -325,6 +329,21 @@ async function run() {
     ).length,
     0,
   );
+  await click('[aria-label="Provider settings"]');
+  await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);
+  const heightBeforeTest = await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog').getBoundingClientRect().height`);
+  await click('.provider-dialog footer button');
+  await waitFor(`document.querySelector('.provider-banner-success')?.textContent.includes('Connection successful')`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog').getBoundingClientRect().height`), heightBeforeTest);
+  const closePoint = await win.webContents.executeJavaScript(`(()=>{const r=document.querySelector('[aria-label="Dismiss notification"]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
+  win.webContents.sendInputEvent({type:'mouseDown', ...closePoint, button:'left', clickCount:1});
+  win.webContents.sendInputEvent({type:'mouseUp', ...closePoint, button:'left', clickCount:1});
+  await waitFor(`!document.querySelector('.provider-banner')`);
+  await click('.provider-dialog footer button');
+  await waitFor(`Boolean(document.querySelector('.provider-banner-success'))`);
+  await sleep(10300);
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.provider-banner'))`), false);
+
   console.log(
     "CHAT_UI_SMOKE_PASS: viewer, IME, Markdown, original bytes, Stop, History, paste, deletion and unchanged metadata.",
   );

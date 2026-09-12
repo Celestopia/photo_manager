@@ -339,7 +339,7 @@ function createChatService({
           model: c.model,
           messages: [{ role: "system", content: SYSTEM }, ...ms],
           max_tokens: 4096,
-          stream: c.streaming,
+          stream: true,
           enable_thinking: c.enable_thinking,
         }),
       ) <=

@@ -4,7 +4,7 @@ Open a photo or video, then choose **Assistant** in the right sidebar. The curre
 
 ## Configure Your Provider Once
 
-Choose the **Provider settings** gear in the Assistant header. Enter the Base URL, Model and API key in the centered dialog, then choose **Save settings**. Leave the API key blank to preserve a saved key. Advanced options contains explicit key removal, environment-variable fallback, streaming and model thinking. Closing without saving discards draft changes.
+Choose the **Provider settings** gear in the Assistant header. Enter the Base URL, Model and API key in the centered dialog, then choose **Save settings**. Leave the API key blank to preserve a saved key. Advanced options contains environment-variable fallback and model thinking. Closing without saving discards draft changes.
 
 PhotoManager stores these settings in the following file; manual editing is optional:
 
@@ -28,7 +28,7 @@ Replace the example URL with the endpoint for your provider account and region. 
 
 The Qwen default is listed in [Alibaba Cloud's model documentation](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-vl-plus). A local multimodal server can use a loopback URL such as `http://127.0.0.1:8000/v1` and its own model name. If your server does not accept `enable_thinking`, choose **Use provider default** under Model thinking. Turn off **Stream responses** if it only returns complete responses. PhotoManager does not download or start a local model.
 
-Choose **Save settings**, then **Test saved connection**. The test sends a generated blue square; it does not use your photos. Opening Settings and saving configuration do not contact the provider. A successful configuration check validates the fields, not the availability of the remote model; the explicit test checks the connection.
+Choose **Save settings**, then **Test connection**. The test sends a generated blue square; it does not use your photos. Opening Settings and saving configuration do not contact the provider. A successful configuration check validates the fields, not the availability of the remote model; the explicit test checks the connection.
 
 ## Choose What to Send
 
@@ -62,3 +62,5 @@ The composer’s + button opens upward with Add current media and Add text or im
 Provider settings is also available from the gallery gear menu as **LLM Provider Settings**. Both entry points open the same application-level dialog; opening it from the gallery does not create a conversation or submit media.
 
 Pending attachments appear as square tiles above the text box, with local image previews or file icons. Use the corner × to remove an attachment; hover to see its filename. Previews are generated locally and do not upload anything.
+
+Responses always stream; there is no streaming switch. To erase a stored credential, choose **Remove saved key** beneath the API-key field and **Save settings**. **Undo removal** cancels this before saving. This removes only the local copy. **Test connection** becomes available once changes are saved and sends only a generated test image.

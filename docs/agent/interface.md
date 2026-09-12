@@ -77,9 +77,9 @@ Deleting a session requires confirmation because its imported files are deleted 
 
 ## Configure the Model Separately
 
-The header gear opens a centered modal provider settings dialog over the application. Users edit Base URL, Model and API key directly, then choose Save settings. Advanced options contain environment-variable fallback, streaming, model thinking and explicit key removal. A blank key preserves the stored credential; stored keys never return to the renderer. Test saved connection uses the saved settings and a synthetic image. Opening or saving settings makes no network request. Escape or Close dismisses the dialog; keyboard focus stays inside while it is open.
+The header gear opens a centered modal provider settings dialog over the application. Users edit Base URL, Model and API key directly, then choose Save settings. Advanced options contain environment-variable fallback and model thinking. A blank key preserves the stored credential; stored keys never return to the renderer. Test connection uses the saved settings and a synthetic image. Opening or saving settings makes no network request. Escape or Close dismisses the dialog; keyboard focus stays inside while it is open.
 
-The configuration accepts a base URL, API key or environment-variable name, model, streaming capability and optional thinking setting. The [implementation page](implementation.md) defines its location and transport rules. The model has no file-reading, registry-search or metadata-editing tools in this release.
+The configuration accepts a base URL, API key or environment-variable name, model and optional thinking setting. The [implementation page](implementation.md) defines its location and transport rules. The model has no file-reading, registry-search or metadata-editing tools in this release.
 
 ## Visual Presentation
 
@@ -90,3 +90,9 @@ Each nonempty user or assistant message has a Copy button. It copies the origina
 The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.
 
 Provider settings is also available from the gallery gear menu as **LLM Provider Settings**. Both entry points open the same application-level dialog; opening it from the gallery does not create a conversation or submit media.
+
+Test connection is a secondary action, disabled while settings have unsaved changes. Progress, success and failure appear in a floating banner without shifting the form. Remove saved key appears beside the key field only when a key exists; it marks the local copy for removal on Save settings and offers Undo removal. It does not revoke the provider credential.
+
+Provider feedback uses dismissible floating banners in the modal top layer, preserving form layout. Connection tests show Testing, Connection successful or Connection failed rather than the model’s raw description. Key removal and Undo remain right-aligned beneath the key field.
+
+Completed provider banners dismiss manually or after 10 seconds; progress stays visible while an operation runs. New notifications restart the timeout, and closing the dialog clears it. Floating interactive banners explicitly disable Electron window dragging so title-bar overlap cannot swallow clicks.

@@ -361,3 +361,15 @@
 
 .chat-sent-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
 .chat-message.user .chat-sent-tiles { justify-content: flex-end; }
+
+.provider-dialog .provider-key-action button { padding: 0; background: transparent; color: #738092; font-size: 12px; }
+.provider-key-action { margin-top: -5px; text-align: right; }
+
+.provider-banner { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); width: max-content; max-width: min(560px, calc(100vw - 48px)); box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; color: #344354; box-shadow: 0 8px 30px #10192830; font-size: 13px; line-height: 1.5; z-index: 1; }
+.provider-banner-success { background: #edf8f1; border-color: #a8d5b7; color: #235b39; }
+.provider-banner-error { background: #fff1f0; border-color: #efb5af; color: #8f3028; }
+.provider-dialog .provider-banner button { background: transparent; color: inherit; padding: 2px; flex-shrink: 0; }
+.provider-banner button svg { width: 16px; height: 16px; }
+
+/* Floating controls can overlap the native title-bar drag region. */
+.provider-banner, .provider-banner * { -webkit-app-region: no-drag; }
