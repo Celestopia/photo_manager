@@ -266,7 +266,8 @@
 .chat-empty p { font-size: 12px; line-height: 1.6; margin: 0 0 22px; }
 .chat-empty .btn { background: white; border: 1px solid #e6e8ec; border-radius: 18px; padding: 8px 14px; }
 .chat-message { flex-shrink: 0; line-height: 1.75; margin-bottom: 25px; font-size: 14px; }
-.chat-message.user { align-self: flex-end; max-width: 90%; box-sizing: border-box; background: #f0f2f5; padding: 10px 14px; border-radius: 18px 18px 5px 18px; margin-left: 20px; }
+.chat-message.user { align-self: flex-end; max-width: 90%; box-sizing: border-box; background: transparent; padding: 0; border-radius: 0; margin-left: 20px; }
+.chat-message.user .chat-user-text { background: #f0f2f5; padding: 10px 14px; border-radius: 18px 18px 5px 18px; }
 .chat-sent-inputs { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .chat-sent-inputs span { display: flex; gap: 5px; align-items: center; color: #828995; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .chat-sent-inputs svg { width: 12px; height: 12px; }
@@ -363,7 +364,7 @@
 .chat-message.user { position: relative; }
 .chat-message.user .chat-message-copy { display: block; margin-left: auto; }
 
-.chat-sent-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.chat-sent-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 9px; }
 .chat-message.user .chat-sent-tiles { justify-content: flex-end; }
 
 .provider-dialog .provider-key-action button { padding: 0; background: transparent; color: #738092; font-size: 12px; }

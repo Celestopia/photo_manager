@@ -85,18 +85,18 @@
         :key="m.id"
         :class="['chat-message', m.role]"
       >
-        <div
-          v-if="m.role === 'assistant'"
-          class="chat-markdown"
-          v-html="renderChatMarkdown(m.text)"
-        ></div>
-        <p v-else class="chat-user-text">{{ m.text }}</p>
         <div v-if="m.inputs.length" class="chat-sent-tiles" aria-label="Message attachments">
           <div v-for="i in m.inputs" :key="i.kind + i.id" class="chat-attachment-tile" :class="{ 'is-previewable': canPreview(sentPreviews[i.kind + ':' + i.id]) }" :title="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'">
             <img v-if="sentPreviews[i.kind + ':' + i.id]?.previewUrl" :src="sentPreviews[i.kind + ':' + i.id].previewUrl" :alt="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment'" @click="openImagePreview(sentPreviews[i.kind + ':' + i.id], session.inputLabels?.[i.kind + ':' + i.id])" />
             <div v-else class="chat-file-tile" role="img" :aria-label="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'"><ChatIcon name="file" /><span>{{ (session.inputLabels?.[i.kind + ':' + i.id] || 'FILE').split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
           </div>
         </div>
+        <div
+          v-if="m.role === 'assistant'"
+          class="chat-markdown"
+          v-html="renderChatMarkdown(m.text)"
+        ></div>
+        <p v-else class="chat-user-text">{{ m.text }}</p>
         <small v-if="m.status !== 'complete'">{{
           m.status === "pending"
             ? "Preparing inputs…"
@@ -109,8 +109,8 @@
         </p>
         <p v-if="m.attempt?.error" class="chat-error">{{ m.attempt.error }}</p>
         <div class="chat-message-actions">
-        <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
-        <TokenUsage v-if="m.role === 'assistant'" :usage="m.attempt?.usage" />
+          <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
+          <TokenUsage v-if="m.role === 'assistant'" :usage="m.attempt?.usage" />
         </div>
         <button
           v-if="
