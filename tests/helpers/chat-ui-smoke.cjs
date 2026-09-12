@@ -303,14 +303,12 @@ async function run() {
   );
   await click('[aria-label="History"]');
   await waitFor(`Boolean(document.querySelector('.chat-history-item .btn'))`);
-  await win.webContents.executeJavaScript(`document.querySelector('.chat-history-menu summary').click()`);
   await win.webContents.executeJavaScript(`document.querySelector('.chat-history-actions .btn').click()`);
   await setValue('.chat-rename input', 'Renamed conversation');
   await click('.chat-rename button');
   await waitFor(`document.querySelector('.chat-history-open strong')?.textContent === 'Renamed conversation'`);
   await new Promise((resolve) => setTimeout(resolve, 200));
   await fsp.writeFile(path.resolve('release/chat-history.png'), (await win.webContents.capturePage()).toPNG());
-  await click(".chat-history-menu summary");
   await click(".chat-history-actions .chat-danger");
   await waitFor(
     `document.querySelector('.chat-history')?.textContent.includes('No saved conversations.')`,

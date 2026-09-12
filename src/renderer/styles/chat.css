@@ -249,7 +249,7 @@
 .viewer-sidebar-tabs [aria-pressed="true"] { background: #fff; color: #20252d; box-shadow: 0 1px 3px #00000012; }
 .chat-panel { color: #292d34; font-size: 14px; }
 .chat-panel .btn { border: 0; background: #f2f3f5; color: #424851; border-radius: 9px; padding: 7px 11px; font: inherit; font-size: 12px; cursor: pointer; box-shadow: none; }
-.chat-panel button:hover:not(:disabled), .chat-history-menu summary:hover { background: #e9ecf0; }
+.chat-panel button:hover:not(:disabled) { background: #e9ecf0; }
 .chat-panel button:disabled { opacity: .4; cursor: default; }
 .chat-panel button:focus-visible, .chat-panel summary:focus-visible { outline: 2px solid #7198c4; outline-offset: 2px; }
 .chat-icon { width: 19px; height: 19px; flex-shrink: 0; display: block; }
@@ -307,10 +307,12 @@
 .chat-history-open strong { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .chat-history-open small { color: #959ca6; font-size: 10px; }
 .chat-history-open span { font-size: 11px; color: #8c939e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
-.chat-history-menu summary { list-style: none; padding: 5px; border-radius: 6px; color: #818a97; cursor: pointer; }
-.chat-history-actions { position: absolute; right: 8px; top: 42px; z-index: 5; display: flex; flex-direction: column; padding: 5px; background: white; border: 1px solid #e8ebef; border-radius: 9px; box-shadow: 0 4px 18px #20252d15; }
-.chat-history-actions .btn { background: transparent; text-align: left; min-width: 95px; }
-.chat-history-actions .chat-danger { color: #a24c4c; }
+.chat-history-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.chat-history-actions .btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 6px; background: transparent; color: #738092; border-radius: 8px; }
+.chat-history-actions .chat-danger { color: #c34b4b; }
+.chat-history-actions .chat-danger:hover:not(:disabled) { background: #fcebea; color: #ab3030; }
+.chat-history-item:focus-within { background: #f5f6f8; }
+.chat-history-actions .btn:focus-visible { outline: 2px solid #839ab5; outline-offset: 2px; }
 .chat-rename { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; margin-top: 8px; }
 .chat-rename .input { width: 100%; min-width: 0; font-size: 12px; }
 .chat-input-detail { font-size: 12px; line-height: 1.7; padding: 12px 0; border-bottom: 1px solid #eceef1; }
@@ -373,3 +375,5 @@
 
 /* Floating controls can overlap the native title-bar drag region. */
 .provider-banner, .provider-banner * { -webkit-app-region: no-drag; }
+
+.chat-panel .chat-history-open:hover:not(:disabled) { background: transparent; }

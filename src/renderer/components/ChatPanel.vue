@@ -57,13 +57,10 @@
           }}</small
           ><span>{{ row.error || row.excerpt }}</span>
         </button>
-        <details v-if="!row.error" class="chat-history-menu">
-          <summary aria-label="Conversation actions" title="Conversation actions"><ChatIcon name="more" /></summary>
-          <div class="chat-history-actions">
-            <button class="btn" :disabled="working" @click="renameId = row.sessionId; renameTitle = row.title">Rename</button>
-            <button class="btn chat-danger" :disabled="working" @click="removeSession(row.sessionId)">Delete</button>
-          </div>
-        </details>
+        <div v-if="!row.error" class="chat-history-actions">
+          <button class="btn" title="Rename conversation" aria-label="Rename conversation" :disabled="working" @click="renameId = row.sessionId; renameTitle = row.title"><ChatIcon name="edit" /></button>
+          <button class="btn chat-danger" title="Delete conversation" aria-label="Delete conversation" :disabled="working" @click="removeSession(row.sessionId)"><ChatIcon name="trash" /></button>
+        </div>
         <form v-if="renameId === row.sessionId" class="chat-rename" @submit.prevent="rename(row.sessionId); renameId = null">
           <input class="input" v-model="renameTitle" aria-label="Conversation title" required maxlength="200" />
           <button class="btn" :disabled="working || !renameTitle.trim()">Save</button>

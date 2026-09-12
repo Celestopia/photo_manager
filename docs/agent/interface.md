@@ -96,3 +96,5 @@ Test connection is a secondary action, disabled while settings have unsaved chan
 Provider feedback uses dismissible floating banners in the modal top layer, preserving form layout. Connection tests show Testing, Connection successful or Connection failed rather than the model’s raw description. Key removal and Undo remain right-aligned beneath the key field.
 
 Completed provider banners dismiss manually or after 10 seconds; progress stays visible while an operation runs. New notifications restart the timeout, and closing the dialog clears it. Floating interactive banners explicitly disable Electron window dragging so title-bar overlap cannot swallow clicks.
+
+History cards expose a pencil Rename button and red bin Delete button directly at the right edge, with tooltips and keyboard focus indicators. Renaming acts on the selected card without switching the active conversation; deletion retains its confirmation.

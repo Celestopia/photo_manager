@@ -243,9 +243,8 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   async function load(sid) { return replaceSession(sid); }
   async function rename(sid = session.value?.sessionId) {
     return action(async () => {
-      session.value = await unwrap(
-        api.rename(session.value.sessionId, renameTitle.value),
-      );
+      const renamed = await unwrap(api.rename(sid, renameTitle.value));
+      if (session.value?.sessionId === sid) session.value = renamed;
       await showHistory();
     });
   }
