@@ -407,6 +407,7 @@ function createChatService({
         notice: built.notice,
         error: "",
         retryOf: payload.retryOf,
+        usage: null,
       };
       assistant.status = "streaming";
       await store.save(s);
@@ -414,6 +415,7 @@ function createChatService({
       const text = await provider.request(c, built.messages, {
         signal: job.controller.signal,
         fetchImpl,
+        onUsage: usage => { assistant.attempt.usage = usage; },
         onText: (text) => {
           assistant.text = text;
           assistant.updatedAt = new Date().toISOString();
@@ -445,6 +447,7 @@ function createChatService({
         notice: "",
         error: "",
         retryOf: payload.retryOf,
+        usage: null,
       };
       assistant.attempt.error = job.controller.signal.aborted
         ? "Reply stopped."

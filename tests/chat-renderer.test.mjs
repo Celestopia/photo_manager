@@ -12,3 +12,8 @@ test("assistant Markdown formats Chinese emphasis, lists, tables and code withou
   assert.ok(!html.includes("<img"));
   assert.ok(!html.includes("href="));
 });
+import { sessionUsage } from '../src/renderer/domain/chat-usage.mjs';
+test('session usage sums completion attempts once and marks missing reports', () => {
+  const messages = [{role:'user'}, {role:'assistant',attempt:{usage:{inputTotal:10,output:3,inputCacheHit:0,inputCacheMiss:10}}}, {role:'assistant',attempt:{retryOf:'prior',usage:{inputTotal:20,output:5,inputCacheHit:null,inputCacheMiss:null}}}];
+  assert.deepEqual(sessionUsage(messages), {usage:{inputCacheHit:0,inputCacheMiss:10,inputTotal:30,output:8},incomplete:true});
+});

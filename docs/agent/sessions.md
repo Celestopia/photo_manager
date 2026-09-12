@@ -101,3 +101,5 @@ For Original file uploads, transmitted bytes, dimensions and SHA256 must match t
 This record describes what PhotoManager sent. It cannot establish how the provider resized, processed or retained that content.
 
 Next: [Building and Testing the Feature](implementation.md).
+
+Completion attempt records require nullable `usage`, containing `inputCacheHit`, `inputCacheMiss`, `inputTotal` and `output` as nonnegative integers or null. Missing cache information remains null, never zero. No migration is provided: existing history was cleared before this schema change. Session totals are derived from attempts, including retries, without double counting user messages. Partial totals are labeled incomplete.

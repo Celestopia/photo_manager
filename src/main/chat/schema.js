@@ -164,9 +164,18 @@ function assertSession(s, libraryId) {
           "notice",
           "error",
           "retryOf",
+          "usage",
         ],
         "Request record",
       );
+      if (m.attempt.usage !== null) {
+        const fields = ["inputCacheHit", "inputCacheMiss", "inputTotal", "output"];
+        object(m.attempt.usage, fields, "Token usage");
+        for (const key of fields) {
+          const value = m.attempt.usage[key];
+          if (value !== null && (!Number.isSafeInteger(value) || value < 0)) throw new Error("Invalid token usage");
+        }
+      }
       string(m.attempt.model, 200);
       string(m.attempt.endpoint, 2000);
       string(m.attempt.notice);

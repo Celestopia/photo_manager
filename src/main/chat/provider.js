@@ -1,3 +1,4 @@
+const { normalizeUsage } = require("./usage");
 const fs = require("node:fs/promises");
 const yaml = require("js-yaml");
 const { object } = require("./schema");
@@ -112,12 +113,13 @@ async function saveConfig(file, draft) {
 async function request(
   c,
   messages,
-  { signal, onText = () => {}, fetchImpl = fetch } = {},
+  { signal, onText = () => {}, onUsage = () => {}, fetchImpl = fetch } = {},
 ) {
   const body = {
     model: c.model,
     messages,
     stream: true,
+    stream_options: { include_usage: true },
     max_tokens: 4096,
   };
   if ("enable_thinking" in c) body.enable_thinking = c.enable_thinking;
@@ -172,6 +174,7 @@ async function request(
         throw new Error(
           "Provider reported an error during the reply. Retry explicitly.",
         );
+      if (parsed.usage) onUsage(normalizeUsage(parsed.usage));
       const choice = parsed.choices?.[0];
       const delta = choice?.delta?.content;
       if (typeof delta === "string") {

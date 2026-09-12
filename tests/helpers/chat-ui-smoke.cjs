@@ -301,6 +301,17 @@ async function run() {
   await win.webContents.executeJavaScript(`(()=>{const host=document.querySelector('.chat-conversation');host.style.width='281.5px';host.style.height='240px';host.style.flex='none';document.querySelector('#overflow-probe').insertAdjacentHTML('beforeend','<p>'+ '（注：目前官方并未发布内容，此图极大概率是自制模组。）'.repeat(30) +'</p>');host.scrollTop=host.scrollHeight;})()`);
   assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.chat-conversation')).overflowX`), 'hidden', 'Fractional widths and CJK punctuation must not enable transcript horizontal scrolling');
   await win.webContents.executeJavaScript(`(()=>{const host=document.querySelector('.chat-conversation');host.style.width='';host.style.height='';host.style.flex='';document.querySelector('#overflow-probe').remove();})()`);
+  assert.equal(await win.webContents.executeJavaScript(`(()=>{const a=document.querySelector('.chat-message.assistant .chat-message-actions');const r=[...a.querySelectorAll('button')].map(b=>b.getBoundingClientRect());return Math.abs(r[0].top-r[1].top)<1 && r[0].height===r[1].height})()`), true);
+  assert.equal(await win.webContents.executeJavaScript(`(()=>{const a=document.querySelector('[aria-label="Session token usage"]').getBoundingClientRect();const b=document.querySelector('[aria-label="New chat"]').getBoundingClientRect();return a.height===b.height && Math.abs(a.top-b.top)<1})()`), true);
+  await click('[aria-label="Session token usage"]');
+  await waitFor(`Boolean(document.querySelector('.usage-menu'))`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.usage-menu').textContent.includes('Input (cache hit)')`), true);
+  await win.webContents.executeJavaScript(`window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))`);
+  await waitFor(`!document.querySelector('.usage-menu')`);
+  await click('[aria-label="Token usage"]');
+  await waitFor(`Boolean(document.querySelector('.usage-menu'))`);
+  await win.webContents.executeJavaScript(`document.body.click()`);
+  await waitFor(`!document.querySelector('.usage-menu')`);
   const pasted = Array.from(
     await sharp({
       create: { width: 20, height: 12, channels: 3, background: "red" },

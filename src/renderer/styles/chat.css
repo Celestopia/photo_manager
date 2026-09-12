@@ -389,3 +389,17 @@
 
 /* The transcript scrolls vertically only. Wide Markdown blocks own horizontal scrolling. */
 .chat-conversation { overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
+
+.usage-anchor { display: inline-flex; vertical-align: middle; }
+.usage-menu { position: fixed; z-index: 210; width: max-content; max-width: calc(100vw - 16px); padding: 14px; background: white; color: #343b45; border: 1px solid #e0e4ea; border-radius: 12px; box-shadow: 0 8px 28px #18243525; font-size: 12px; -webkit-app-region: no-drag; }
+.usage-menu dl { display: grid; grid-template-columns: max-content max-content; justify-content: start; column-gap: 16px; margin: 10px 0 0; }
+.usage-menu dl div { display: contents; }
+.usage-menu dt, .usage-menu dd { padding: 4px 0; }
+.usage-menu dd { text-align: right; margin: 0; font-variant-numeric: tabular-nums; }
+.usage-menu small { width: 0; min-width: 100%; display: block; margin-top: 8px; color: #738092; }
+
+.chat-message-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+.chat-message-actions .chat-message-copy { display: grid; place-items: center; width: 26px; height: 26px; padding: 5px; margin: 0; }
+.chat-message.user .chat-message-actions { justify-content: flex-end; }
+.chat-header .usage-anchor .chat-message-copy { display: grid; place-items: center; width: 32px; height: 32px; padding: 7px; margin: 0; color: #424851; border-radius: 9px; }
+.chat-header .usage-anchor svg { width: 19px; height: 19px; }

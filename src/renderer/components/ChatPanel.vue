@@ -1,9 +1,9 @@
 <template>
   <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="attachmentsOpen = false; options = false; settings = false">
     <header class="chat-header">
-      <span class="chat-heading">{{ historyOpen ? "Conversations" : "Assistant" }}</span>
+      <button class="btn" title="Provider settings" aria-label="Provider settings" @click="attachmentsOpen = false; showSettings()"><ChatIcon name="gear" /></button>
       <div>
-        <button class="btn" title="Provider settings" aria-label="Provider settings" @click="attachmentsOpen = false; showSettings()"><ChatIcon name="gear" /></button>
+        <TokenUsage label="Session token usage" :usage="sessionUsage(session?.messages || []).usage" :incomplete="sessionUsage(session?.messages || []).incomplete" />
         <button
           class="btn"
           title="New chat"
@@ -108,7 +108,10 @@
           {{ m.attempt.notice }}
         </p>
         <p v-if="m.attempt?.error" class="chat-error">{{ m.attempt.error }}</p>
+        <div class="chat-message-actions">
         <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
+        <TokenUsage v-if="m.role === 'assistant'" :usage="m.attempt?.usage" />
+        </div>
         <button
           v-if="
             m.role === 'assistant' &&
@@ -247,6 +250,8 @@
 <script setup>
 import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ConversationActionDialog from "./ConversationActionDialog.vue";
+import TokenUsage from "./TokenUsage.vue";
+import { sessionUsage } from "../domain/chat-usage.mjs";
 import ChatIcon from "./ChatIcon.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";

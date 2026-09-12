@@ -102,3 +102,5 @@ History cards expose a pencil Rename button and red bin Delete button directly a
 History rename and delete actions open centered modal dialogs with blurred backdrops. Rename focuses the title field; deletion focuses Cancel and requires explicit confirmation before IPC. Escape and Close cancel without changing data.
 
 The conversation transcript scrolls vertically only, with a stable scrollbar gutter. Messages fit the sidebar width; wide code blocks and tables provide their own horizontal scrolling.
+
+The Assistant header places provider settings at the left and session usage before New chat at the right. Only assistant replies have a usage icon next to Copy. Circled-exclamation buttons open compact dropdowns showing Input (cache hit), Input (cache miss), Input (total), and Output; unknown counts show Not reported. Per-reply usage covers only that completion, including its system prompt and context. Session totals include all attempts and retries. Outside click or Escape closes the dropdown. No billing information is calculated.

@@ -672,3 +672,20 @@ test('provider always streams and normalizes the former disabled preference', as
   await assert.rejects(provider.request(c, [], { fetchImpl: async () =>
     new Response('{}', { headers: { 'content-type': 'application/json' } }) }), /does not support streaming/);
 });
+
+const { normalizeUsage } = require('../src/main/chat/usage');
+test('usage distinguishes missing cache information from zero', () => {
+  assert.deepEqual(normalizeUsage({prompt_tokens:10, completion_tokens:3}), {inputTotal:10, output:3, inputCacheHit:null, inputCacheMiss:null});
+  assert.equal(normalizeUsage({prompt_tokens:10, prompt_tokens_details:{cached_tokens:0}}).inputCacheMiss, 10);
+  assert.equal(normalizeUsage({prompt_tokens:10, prompt_cache_hit_tokens:7}).inputCacheMiss, 3);
+});
+test('streamed usage-only events persist per completion', async t => {
+  const f = await serviceFixture(t, async (_, options) => {
+    assert.equal(JSON.parse(options.body).stream_options.include_usage, true);
+    return new Response('data: {"choices":[{"delta":{"content":"Reply"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":20,"prompt_tokens_details":{"cached_tokens":60}}}\n\ndata: [DONE]\n\n');
+  });
+  const s = await f.send();
+  assert.deepEqual(s.messages.at(-1).attempt.usage, {inputTotal:100,output:20,inputCacheHit:60,inputCacheMiss:40});
+  const loaded = await f.store.load(s.sessionId);
+  assert.deepEqual(loaded.messages.at(-1).attempt.usage, s.messages.at(-1).attempt.usage);
+});
