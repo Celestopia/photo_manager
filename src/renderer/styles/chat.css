@@ -379,3 +379,13 @@
 .chat-panel .chat-history-open:hover:not(:disabled) { background: transparent; }
 .conversation-delete-description { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .provider-dialog .conversation-delete-confirm { background: #b83f3f; color: white; }
+
+/* Keep intrinsic Markdown widths inside the sidebar; wide blocks scroll locally. */
+.chat-panel, .chat-conversation, .chat-message, .chat-markdown { min-width: 0; max-width: 100%; }
+.chat-message { box-sizing: border-box; }
+.chat-message.user { max-width: min(90%, calc(100% - 20px)); }
+.chat-markdown pre, .chat-markdown table { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.chat-markdown pre { white-space: pre; }
+
+/* The transcript scrolls vertically only. Wide Markdown blocks own horizontal scrolling. */
+.chat-conversation { overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }

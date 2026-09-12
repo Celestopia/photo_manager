@@ -289,6 +289,18 @@ async function run() {
   await waitFor(
     `document.querySelectorAll('.chat-markdown strong').length===3`,
   );
+  await win.webContents.executeJavaScript(`(()=>{
+    const host=document.querySelector('.chat-conversation');
+    const item=document.createElement('article'); item.className='chat-message'; item.id='overflow-probe';
+    item.innerHTML='<div class="chat-markdown"><p>'+ '长文本 LongText'.repeat(80) +'</p><pre><code>'+ 'wide-code-'.repeat(150) +'</code></pre><table><tbody><tr>'+ '<td>Column content</td>'.repeat(30) +'</tr></tbody></table></div>';
+    host.append(item);
+  })()`);
+  assert.equal(await win.webContents.executeJavaScript(`(()=>{const el=document.querySelector('.chat-conversation');return el.scrollWidth <= el.clientWidth+1})()`), true, 'Markdown must not widen the conversation');
+  assert.equal(await win.webContents.executeJavaScript(`(()=>{const el=document.querySelector('#overflow-probe pre');return el.scrollWidth > el.clientWidth})()`), true, 'Wide code remains locally scrollable');
+  assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.chat-conversation')).overflowX`), 'hidden');
+  await win.webContents.executeJavaScript(`(()=>{const host=document.querySelector('.chat-conversation');host.style.width='281.5px';host.style.height='240px';host.style.flex='none';document.querySelector('#overflow-probe').insertAdjacentHTML('beforeend','<p>'+ '（注：目前官方并未发布内容，此图极大概率是自制模组。）'.repeat(30) +'</p>');host.scrollTop=host.scrollHeight;})()`);
+  assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.chat-conversation')).overflowX`), 'hidden', 'Fractional widths and CJK punctuation must not enable transcript horizontal scrolling');
+  await win.webContents.executeJavaScript(`(()=>{const host=document.querySelector('.chat-conversation');host.style.width='';host.style.height='';host.style.flex='';document.querySelector('#overflow-probe').remove();})()`);
   const pasted = Array.from(
     await sharp({
       create: { width: 20, height: 12, channels: 3, background: "red" },

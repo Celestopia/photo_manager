@@ -100,3 +100,5 @@ Completed provider banners dismiss manually or after 10 seconds; progress stays 
 History cards expose a pencil Rename button and red bin Delete button directly at the right edge, with tooltips and keyboard focus indicators. Renaming acts on the selected card without switching the active conversation; deletion retains its confirmation.
 
 History rename and delete actions open centered modal dialogs with blurred backdrops. Rename focuses the title field; deletion focuses Cancel and requires explicit confirmation before IPC. Escape and Close cancel without changing data.
+
+The conversation transcript scrolls vertically only, with a stable scrollbar gutter. Messages fit the sidebar width; wide code blocks and tables provide their own horizontal scrolling.
