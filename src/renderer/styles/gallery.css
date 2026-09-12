@@ -113,7 +113,7 @@
 }
 .location-filter-picker {
   position: relative;
-  width: clamp(280px, 24vw, 360px);
+  width: clamp(260px, 21vw, 320px);
   min-width: 0;
 }
 .location-filter-input {
@@ -126,7 +126,6 @@
   right: auto;
   width: 100%;
 }
-.batch-count { color: var(--text-soft); font-size: 13px; min-width: 72px; }
 .gallery-media-type-filter,
 .gallery-level-filter { display: flex; align-items: center; gap: 8px; }
 .segmented-filter { display: inline-flex; align-items: stretch; gap: 0; }
@@ -213,7 +212,13 @@
 .batch-panel-scroll > label { font-weight: 700; }
 .batch-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .batch-panel-header h3 { margin: 0; }
-.batch-panel-summary { color: var(--text-soft); font-size: 13px; margin-bottom: 4px; }
+.batch-selection-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; }
+.batch-panel-summary { min-width: 0; color: var(--text-soft); font-size: 13px; }
+.batch-selection-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+.batch-selection-btn { width: 32px; height: 32px; flex: 0 0 32px; padding: 0; color: #2878c8; background: #f3f8ff; }
+.batch-selection-btn:hover:not(:disabled) { border-color: #2878c8; background: #e5f1ff; }
+.batch-selection-btn.active { border-color: #2878c8; background: #2878c8; color: #fff; }
+.batch-selection-btn.active:hover:not(:disabled) { background: #1f69b3; }
 .batch-operation-actions {
   flex: 0 0 auto; margin-top: auto; padding-top: 12px;
   display: flex; align-items: center; justify-content: space-between;

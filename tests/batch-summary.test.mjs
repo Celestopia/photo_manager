@@ -6,10 +6,16 @@ test('batch selection sums selected file sizes and clears the total', () => {
   const orderedItems = ref([{ MediaId: 'a', FileSystem: { FileSize: 1024 } }, { MediaId: 'b', FileSystem: { FileSize: 2048 } }]);
   const selection = useGallerySelection({ orderedItems, galleryGroups: ref([]), resetBatchPickers() {} });
   selection.enterSelectionMode();
-  selection.selectAllGalleryPhotos();
+  selection.toggleAllGallerySelection();
   assert.equal(selection.selectedGalleryBytes.value, 3072);
+  assert.equal(selection.allGalleryItemsSelected.value, true);
   selection.toggleGallerySelection('a');
   assert.equal(selection.selectedGalleryBytes.value, 2048);
+  assert.equal(selection.allGalleryItemsSelected.value, false);
+  selection.toggleAllGallerySelection();
+  assert.equal(selection.allGalleryItemsSelected.value, true);
+  selection.toggleAllGallerySelection();
+  assert.equal(selection.selectedGalleryBytes.value, 0);
   selection.clearGallerySelection();
   assert.equal(selection.selectedGalleryBytes.value, 0);
 });

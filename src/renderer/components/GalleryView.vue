@@ -24,7 +24,6 @@
             <div class="toolbar-group"><label>People</label><RegistryFilterPicker kind="person" label="People" /></div>
             <div class="toolbar-group location-filter-group"><label>Location</label><LocationFilterPicker /></div>
             <div class="toolbar-group selection-tools" v-if="!isSelectionMode"><button class="btn" @click="enterSelectionMode">Select</button></div>
-            <div class="toolbar-group selection-tools" v-else><button class="btn" @click="selectAllGalleryPhotos">Select all</button><button class="btn" @click="clearGallerySelection">Clear selection</button><button class="btn" @click="exitSelectionMode">Exit selection</button><span class="batch-count">{{ selectedGalleryCount }} selected</span></div>
             <div class="toolbar-group sort-tools"><label>Sort</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">Date taken</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
           </div>
           <div class="gallery-controls-secondary">
@@ -112,7 +111,14 @@
   <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': batchOperationBusy }" :inert="batchOperationBusy ? '' : undefined" :aria-busy="batchOperationBusy">
     <div class="batch-panel-scroll">
     <div class="batch-panel-header"><h3>Batch Operation</h3><button class="btn batch-close" title="Close batch operations" aria-label="Close batch operations" @click="exitSelectionMode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
-    <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected · {{ formatFileSize(selectedGalleryBytes) }}</div>
+    <div class="batch-selection-summary-row">
+      <div class="batch-panel-summary">{{ selectedGalleryCount }} media items selected · {{ formatFileSize(selectedGalleryBytes) }}</div>
+      <div class="batch-selection-actions">
+        <button class="btn icon-btn batch-selection-btn" :class="{ active: allGalleryItemsSelected }" :data-tip="allGalleryItemsSelected ? 'Clear selection' : 'Select all media'" :aria-label="allGalleryItemsSelected ? 'Clear selection' : 'Select all media'" :aria-pressed="allGalleryItemsSelected" :disabled="total === 0 || batchOperationBusy" @click="toggleAllGallerySelection">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><path d="m8 12 2.5 2.5L16 9"/></svg>
+        </button>
+      </div>
+    </div>
     <label>Set title</label><input class="input" v-model="batchEdit.title" placeholder="Replace titles of selected media" />
     <label>Set rating</label>
     <div class="rating-stars" role="radiogroup" aria-label="Set rating for selected media">
@@ -197,6 +203,7 @@ const {
   isSelectionMode,
   selectedGalleryCount,
   selectedGalleryBytes,
+  allGalleryItemsSelected,
   batchEdit,
   batchStatus,
   batchOperationBusy,
@@ -220,8 +227,7 @@ const {
   onGalleryCardClick,
   isGallerySelected,
   toggleGallerySelection,
-  clearGallerySelection,
-  selectAllGalleryPhotos,
+  toggleAllGallerySelection,
   clearBatchEditInputs,
   applyBatchEdit,
   copySelectedFiles,

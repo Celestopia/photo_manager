@@ -22,6 +22,9 @@ export function useGallerySelection({
     return sum + (gallerySelection.value.has(item.MediaId) && Number.isFinite(bytes) && bytes > 0 ? bytes : 0);
   }, 0));
   const selectedGalleryCount = computed(() => gallerySelection.value.size);
+  const allGalleryItemsSelected = computed(() => (
+    orderedItems.value.length > 0 && selectedGalleryCount.value === orderedItems.value.length
+  ));
   const batchHasChanges = computed(() => (
     Boolean(batchEdit.title.trim())
     || batchEdit.rating !== null
@@ -71,6 +74,11 @@ export function useGallerySelection({
     if (!isSelectionMode.value) return;
     const all = orderedItems.value.map((item) => item.MediaId).filter(Boolean);
     gallerySelection.value = new Set(all);
+  }
+
+  function toggleAllGallerySelection() {
+    if (allGalleryItemsSelected.value) clearGallerySelection();
+    else selectAllGalleryPhotos();
   }
 
   function syncGallerySelectionWithLoadedItems() {
@@ -202,6 +210,7 @@ export function useGallerySelection({
     batchOperationBusy,
     selectedGalleryCount,
     selectedGalleryBytes,
+    allGalleryItemsSelected,
     batchHasChanges,
     canApplyBatchEdit,
     enterSelectionMode,
@@ -211,6 +220,7 @@ export function useGallerySelection({
     toggleGallerySelection,
     clearGallerySelection,
     selectAllGalleryPhotos,
+    toggleAllGallerySelection,
     syncGallerySelectionWithLoadedItems,
     setBatchStatus,
     clearBatchEditInputs,

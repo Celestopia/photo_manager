@@ -173,7 +173,7 @@ export function useRendererApplication() {
       batchEdit,
       batchStatus,
       batchOperationBusy,
-      selectedGalleryCount, selectedGalleryBytes,
+      selectedGalleryCount, selectedGalleryBytes, allGalleryItemsSelected,
       batchHasChanges,
       canApplyBatchEdit,
       enterSelectionMode,
@@ -181,8 +181,7 @@ export function useRendererApplication() {
       onGalleryCardClick,
       isGallerySelected,
       toggleGallerySelection,
-      clearGallerySelection,
-      selectAllGalleryPhotos,
+      toggleAllGallerySelection,
       syncGallerySelectionWithLoadedItems,
       setBatchStatus,
       clearBatchEditInputs,
@@ -648,7 +647,7 @@ export function useRendererApplication() {
     };
     const galleryContext = {
       ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
-      isSelectionMode, selectedGalleryCount, selectedGalleryBytes,
+      isSelectionMode, selectedGalleryCount, selectedGalleryBytes, allGalleryItemsSelected,
       batchEdit, batchStatus, batchOperationBusy,
       total, galleryGroups, loading, batchHasChanges, canApplyBatchEdit,
       windowToggleTip, windowToggleIcon,
@@ -656,7 +655,7 @@ export function useRendererApplication() {
       toggleGalleryLevelFilter, toggleGalleryControls, enterSelectionMode,
       consumeGalleryReturnMediaId,
       exitSelectionMode, onGalleryCardClick, isGallerySelected, toggleGallerySelection,
-      clearGallerySelection, selectAllGalleryPhotos, clearBatchEditInputs, applyBatchEdit, copySelectedFiles,
+      toggleAllGallerySelection, clearBatchEditInputs, applyBatchEdit, copySelectedFiles,
       requestBatchDeletion: mediaDeletion.requestBatchDeletion,
       buildImageUrl, doWindowAction, toggleWindowMaximizeRestore,
     };
