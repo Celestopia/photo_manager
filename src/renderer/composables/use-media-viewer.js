@@ -95,6 +95,22 @@ export function useMediaViewer({
     resetVideoPlaybackState(selectedItem.value);
   }
 
+  function completeViewerDeletion(nextItem) {
+    clearVideoClickTimer();
+    showContextMenu.value = false;
+    if (!nextItem) {
+      selectedItem.value = null;
+      selectedGlobalIndex.value = -1;
+      view.value = "gallery";
+      return;
+    }
+    selectedItem.value = nextItem;
+    selectedGlobalIndex.value = orderedItems.value.findIndex((item) => item.MediaId === nextItem.MediaId);
+    setDraftFromItem(nextItem);
+    resetMediaTransform();
+    resetVideoPlaybackState(nextItem);
+  }
+
   function requestViewerTransition(type, direction = 0) {
     if (!editingDirty.value) {
       if (type === "close") performCloseViewer();
@@ -305,6 +321,7 @@ export function useMediaViewer({
     ratioStyle,
     viewerHeaderTime,
     openViewer,
+    completeViewerDeletion,
     closeViewer,
     switchPhoto,
     cancelViewerTransition,

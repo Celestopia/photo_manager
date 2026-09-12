@@ -17,6 +17,7 @@ export const ICONS = Object.freeze({
   windowClose: new URL("../assets/window_close.svg", import.meta.url).href,
   settings: new URL("../assets/settings.svg", import.meta.url).href,
   metadataInfo: new URL("../assets/metadata_info.svg", import.meta.url).href,
+  deleteMedia: new URL("../assets/delete_media.svg", import.meta.url).href,
   zoomIn: new URL("../assets/image_zoom_in.svg", import.meta.url).href,
   zoomOut: new URL("../assets/image_zoom_out.svg", import.meta.url).href,
   rotateClockwise: new URL("../assets/image_rotate_clockwise.svg", import.meta.url).href,

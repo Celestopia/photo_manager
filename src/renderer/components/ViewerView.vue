@@ -259,7 +259,10 @@
   </aside>
 </main>
 <footer class="viewer-footer">
-  <div class="meta-popup-wrapper"><button class="btn icon-btn" data-tip="Show or hide media information" @click="toggleLeftPanel"><img class="icon" :src="ICONS.metadataInfo" alt="Show or hide media information" /></button></div>
+  <div class="viewer-left-tools">
+    <button class="btn icon-btn danger-icon-btn" data-tip="Permanently delete media" aria-label="Permanently delete media" @click="requestViewerDeletion"><img class="icon" :src="ICONS.deleteMedia" alt="" /></button>
+    <div class="meta-popup-wrapper"><button class="btn icon-btn" data-tip="Show or hide media information" @click="toggleLeftPanel"><img class="icon" :src="ICONS.metadataInfo" alt="Show or hide media information" /></button></div>
+  </div>
   <div class="viewer-tools" :class="{ 'video-tools': isSelectedVideo }">
     <template v-if="canTransformSelectedMedia">
       <button class="btn icon-btn" data-tip="Zoom in" @click="zoomIn"><img class="icon" :src="ICONS.zoomIn" alt="Zoom in" /></button>
@@ -430,6 +433,7 @@ const {
   rotateCounterclockwise,
   toggleMirror,
   restoreMediaState,
+  requestViewerDeletion,
   toggleRightPanel,
 } = app;
 

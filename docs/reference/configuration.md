@@ -64,6 +64,7 @@ Standard layout:
     library.lock                  # exists only while open or while a script runs
     initialization.json          # exists only during/after failed initialization
     transaction.json             # exists only while a cross-file commit is incomplete
+    media-deletion.json          # exists only while media deletion needs recovery
     data/
       photo_metadata.jsonl
       tag_registry.jsonl
@@ -84,6 +85,7 @@ Standard layout:
       initialization-failed.log   # may exist after failed initialization
     temp/
       transactions/
+      media-deletions/
       temporary video-thumbnail files...
     chat/                    # conversations and imported attachments; excluded from automatic backups
 ```

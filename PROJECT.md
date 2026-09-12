@@ -13,6 +13,7 @@ Current capabilities include:
 - Managing images and videos on one timeline.
 - Viewing images, playing videos, and editing shared customization fields.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
+- Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.
 - Batch-setting titles, ratings, privacy levels, albums, tags, people, and primary locations across mixed images and videos.
 - Managing tags, albums, people, and locations through registries, while preventing metadata from referencing unregistered values.
 - Keeping metadata, registries, thumbnails, logs, and backups separate for every library.
@@ -49,7 +50,7 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 6. Derive children from `ParentId`; reject cycles.
 7. Maintenance never guesses a missing `--library` path.
 8. Never skip corrupt JSONL lines and continue opening.
-9. Global deletion must use a recoverable transaction; backup failure blocks writes.
+9. Registry and media deletion must use their recoverable transactions; backup failure blocks writes. Media deletion removes files and metadata but never prunes zero-use registry definitions.
 10. Probe failure does not remove customization access.
 11. Do not rehash/reprobe unchanged large videos.
 12. Media/library changes must clear old sound, menus, transforms, and library-scoped recents.

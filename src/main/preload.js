@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
   // Metadata mutation
   updateCustomization: (payload) => ipcRenderer.invoke("photo:update-customization", toSerializable(payload)),
   batchUpdateMetadata: (payload) => ipcRenderer.invoke("photo:batch-update", toSerializable(payload)),
+  deleteMedia: (payload) => ipcRenderer.invoke("photo:delete-media", toSerializable(payload)),
 
   // Tag registry
   listTags: () => ipcRenderer.invoke("tag:list"),

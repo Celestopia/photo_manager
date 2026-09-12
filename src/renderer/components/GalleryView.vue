@@ -142,6 +142,7 @@
       <button class="btn btn-primary batch-apply-btn" title="Apply to selected media" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">Apply</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
+    <div class="batch-delete-action"><button class="btn icon-btn danger-icon-btn" data-tip="Permanently delete selected media" aria-label="Permanently delete selected media" :disabled="selectedGalleryCount === 0 || applyingBatchEdit" @click="requestBatchDeletion"><img class="icon" :src="ICONS.deleteMedia" alt="" /></button></div>
   </aside>
 </main>
 
@@ -218,6 +219,7 @@ const {
   selectAllGalleryPhotos,
   clearBatchEditInputs,
   applyBatchEdit,
+  requestBatchDeletion,
   buildImageUrl,
   doWindowAction,
   toggleWindowMaximizeRestore,

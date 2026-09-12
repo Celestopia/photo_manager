@@ -10,3 +10,4 @@ export const ALBUM_CONTEXT = Symbol("album-context");
 export const PERSON_CONTEXT = Symbol("person-context");
 export const LOCATION_CONTEXT = Symbol("location-context");
 export const UI_FEEDBACK_CONTEXT = Symbol("ui-feedback-context");
+export const MEDIA_DELETION_CONTEXT = Symbol("media-deletion-context");

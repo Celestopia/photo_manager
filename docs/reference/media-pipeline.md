@@ -23,6 +23,8 @@ Duplicate hashes are valid and logged. Operations needing one source choose the 
 
 Thumbnails are `.photo_manager/thumb_cache/<SHA256Hash>.webp`, shared by equal content. `cache_manifest.json` stores size, quality, extreme-aspect threshold, and generator version; mismatches make the cache stale.
 
+Permanent media deletion removes a cached thumbnail only when no remaining metadata record uses its SHA-256 hash. It does not remove sidecars or empty source directories.
+
 Ordinary images are center-cropped square; extremely tall images crop from the top and extremely wide images from the left. Videos extract a PNG frame and pass it through Sharp. Target time is `min(max(DurationSeconds * 0.1, 1), 10, DurationSeconds / 2)`; failure retries frame zero, then uses the video placeholder. Failed images use the image placeholder. Video workers default to serial; image concurrency is configured.
 
 Only an explicit maintenance action or `build-thumbnails` generates thumbnails. Opening, initialization, and metadata updates do not. Missing/damaged cache entries use bundled placeholders, never original media. The main process indexes thumbnail filenames once per active cache state and supplies a shared URL version; closing/switching, updates, and thumbnail maintenance invalidate it. The renderer requeries after generation.

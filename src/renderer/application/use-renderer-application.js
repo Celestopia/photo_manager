@@ -15,6 +15,7 @@ import { useAlbumRegistry } from "../composables/use-album-registry.js";
 import { useLocationRegistry } from "../composables/use-location-registry.js";
 import { useMediaEditor } from "../composables/use-media-editor.js";
 import { useMediaViewer } from "../composables/use-media-viewer.js";
+import { useMediaDeletion } from "../composables/use-media-deletion.js";
 import { useChat } from "../composables/use-chat.js";
 import { CHAT_CONTEXT } from "../context/renderer-contexts.js";
 import {
@@ -23,6 +24,7 @@ import {
   GALLERY_FILTER_CONTEXT,
   LIBRARY_CONTEXT,
   LOCATION_CONTEXT,
+  MEDIA_DELETION_CONTEXT,
   PERSON_CONTEXT,
   SETTINGS_CONTEXT,
   TAG_CONTEXT,
@@ -509,6 +511,7 @@ export function useRendererApplication() {
     }
 
     const {
+      selectedGlobalIndex,
       showContextMenu,
       contextPosition,
       pendingViewerTransition,
@@ -517,6 +520,7 @@ export function useRendererApplication() {
       ratioStyle,
       viewerHeaderTime,
       openViewer,
+      completeViewerDeletion,
       closeViewer,
       switchPhoto,
       cancelViewerTransition,
@@ -562,6 +566,24 @@ export function useRendererApplication() {
       onReturnToGallery: requestGalleryReturn,
     });
 
+    const mediaDeletion = useMediaDeletion({
+      api: API,
+      view,
+      selectedItem,
+      orderedItems,
+      gallerySelection,
+      editingDirty,
+      selectedGlobalIndex,
+      releaseCurrentMedia,
+      resetVideoPlaybackState,
+      cancelEdit,
+      queryGallery,
+      loadAllRegistries,
+      exitSelectionMode,
+      completeViewerDeletion,
+      showToastMessage,
+    });
+
     // Application-level viewer defaults are loaded before a library can enter the gallery.
     async function loadConfig() {
       config.value = await API.getConfig();
@@ -579,6 +601,7 @@ export function useRendererApplication() {
       resetRecentValues();
       resetSelectionState();
       resetEditorState();
+      mediaDeletion.resetDeletionState();
       closeTransientPanels();
       gallerySettingsOpen.value = false;
     }
@@ -632,6 +655,7 @@ export function useRendererApplication() {
       consumeGalleryReturnMediaId,
       exitSelectionMode, onGalleryCardClick, isGallerySelected, toggleGallerySelection,
       clearGallerySelection, selectAllGalleryPhotos, clearBatchEditInputs, applyBatchEdit,
+      requestBatchDeletion: mediaDeletion.requestBatchDeletion,
       buildImageUrl, doWindowAction, toggleWindowMaximizeRestore,
     };
     const galleryFilterContext = {
@@ -707,6 +731,7 @@ export function useRendererApplication() {
       stepVideoFrame, onFieldTextareaInput,
       confirmEdit, cancelEdit, setRating, setPrivacy, requestEdit, toggleLeftPanel, zoomIn, zoomOut,
       rotateClockwise, rotateCounterclockwise, toggleMirror, restoreMediaState, toggleRightPanel,
+      requestViewerDeletion: mediaDeletion.requestViewerDeletion,
     };
     const uiFeedbackContext = { toast, dynamicTooltip, dynamicTooltipRef };
 
@@ -720,6 +745,7 @@ export function useRendererApplication() {
     provide(SETTINGS_CONTEXT, settingsContext);
     provide(VIEWER_CONTEXT, viewerContext);
     provide(UI_FEEDBACK_CONTEXT, uiFeedbackContext);
+    provide(MEDIA_DELETION_CONTEXT, mediaDeletion);
 
     return { view, providerSettingsOpen: chat.settings };
 }

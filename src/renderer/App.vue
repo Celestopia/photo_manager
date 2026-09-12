@@ -9,6 +9,7 @@
     <PersonManagerDialog />
     <LocationManagerDialog />
     <UiFeedbackOverlay />
+    <MediaDeletionDialog />
     <ProviderSettings v-if="providerSettingsOpen" />
   </div>
 </template>
@@ -24,6 +25,7 @@ import AlbumManagerDialog from "./components/dialogs/AlbumManagerDialog.vue";
 import PersonManagerDialog from "./components/dialogs/PersonManagerDialog.vue";
 import LocationManagerDialog from "./components/dialogs/LocationManagerDialog.vue";
 import UiFeedbackOverlay from "./components/dialogs/UiFeedbackOverlay.vue";
+import MediaDeletionDialog from "./components/dialogs/MediaDeletionDialog.vue";
 import { useRendererApplication } from "./application/use-renderer-application.js";
 
 export default {
@@ -39,6 +41,7 @@ export default {
     PersonManagerDialog,
     LocationManagerDialog,
     UiFeedbackOverlay,
+    MediaDeletionDialog,
   },
   setup: useRendererApplication,
 };

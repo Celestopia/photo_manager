@@ -84,7 +84,7 @@ Cancellation deletes the complete `.photo_manager` directory. Other failures ret
 
 ### Opening and Closing
 
-Opening validates before acquiring the exclusive lock. Only its holder can write. If a crash left a cross-file transaction, the journal is used to roll it back or finish cleanup before strict loading. After main-process indexes load, the renderer requests all four registries in parallel and then performs its first gallery query.
+Opening validates before acquiring the exclusive lock. Only its holder can write. If a crash left a media-deletion or cross-file data transaction, its journal is used to roll back or finish cleanup before strict loading. Media-deletion recovery runs first because it may restore media files or finalize a metadata commit. After main-process indexes load, the renderer requests all four registries in parallel and then performs its first gallery query.
 
 Returning to the entry page requires confirmation, is blocked by an unresolved viewer draft or running maintenance, clears renderer state and memory indexes, and releases the lock. The last-library path remains for a future manual entry. The application uses one instance, one window, and one active library.
 
@@ -126,7 +126,7 @@ Partial loading could cause a later write to overwrite unloaded data, so explici
 A backup must precede every user-data write:
 
 - Ordinary edits and registry creation/update create the first daily snapshot of that day.
-- Global deletion and library-name changes create an immediate snapshot every time.
+- Registry deletion, media deletion, and library-name changes create an immediate snapshot every time.
 - Incremental metadata update creates an update snapshot every time.
 
 A snapshot includes `library.yml` and all five JSONL files, but not original media, thumbnails, CSV, logs, or temporary files. `backup.retentionCount` counts snapshot directories; the oldest are removed beyond the limit. Backup failure blocks the real write. The current UI has no restore operation; backups support manual diagnosis and future recovery tooling.
@@ -143,3 +143,9 @@ Global tag, person, album, or location deletion normally changes both a registry
 6. On the next open after a crash, roll back an incomplete commit or clean an entirely applied commit according to the journal.
 
 An unparseable journal or missing rollback file rejects opening rather than guessing. Main-process global deletion keeps old in-memory objects only for media whose references actually change and transacts with copied replacements; unaffected media preserve object and Map identity. Do not deep-clone the entire active metadata set merely to simplify rollback.
+
+## Permanent Media Deletion
+
+Single-viewer and gallery-batch deletion share one all-or-nothing operation. After explicit confirmation, active media handles and chat generation are stopped, an immediate metadata backup is created, and every target path is revalidated as a regular file inside the active library. Files are renamed into `.photo_manager/temp/media-deletions/<uuid>/`, then `photo_metadata.jsonl` is atomically replaced without the target `MediaId` records. Only after that commit are staged files permanently removed.
+
+`.photo_manager/media-deletion.json` records the complete deletion set. Recovery restores staged files when all target records still exist, or finishes staged-file cleanup when all are absent; a partial metadata set or ambiguous source/stage pair rejects opening. Empty source directories, sidecars, CSV exports, chat history, and registry definitions are not removed. A hash thumbnail is removed only when no remaining record shares it.

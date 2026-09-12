@@ -41,6 +41,8 @@ function resolveLibraryPaths(rawRoot) {
     initializationFile: path.join(managerDir, "initialization.json"),
     transactionFile: path.join(managerDir, "transaction.json"),
     transactionDir: path.join(managerDir, "temp", "transactions"),
+    mediaDeletionFile: path.join(managerDir, "media-deletion.json"),
+    mediaDeletionDir: path.join(managerDir, "temp", "media-deletions"),
     dataDir,
     metadataFile: path.join(dataDir, DATA_FILE_NAMES.metadata),
     thumbnailDir: path.join(managerDir, "thumb_cache"),
@@ -131,7 +133,7 @@ async function writeLibraryManifest(paths, manifest) {
 }
 
 async function ensureLibraryDirectories(paths) {
-  for (const directory of [paths.managerDir, paths.dataDir, paths.thumbnailDir, paths.backupDir, paths.logDir, paths.tempDir, paths.transactionDir]) {
+  for (const directory of [paths.managerDir, paths.dataDir, paths.thumbnailDir, paths.backupDir, paths.logDir, paths.tempDir, paths.transactionDir, paths.mediaDeletionDir]) {
     await fsp.mkdir(directory, { recursive: true });
   }
 }

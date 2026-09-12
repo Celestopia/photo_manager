@@ -34,6 +34,7 @@ const { createSimpleRegistryCatalog } = require("./simple-registry-catalog.js");
 const { createLocationCatalog } = require("./location-catalog.js");
 const { createLocationRegistryService } = require("./location-registry-service.js");
 const { createMetadataEditService } = require("./metadata-edit-service.js");
+const { createMediaDeletionService } = require("./media-deletion-service.js");
 const { registerIpcHandlers: registerMainIpcHandlers } = require("./ipc-handlers.js");
 const { createMainWindow } = require("./window-manager.js");
 const { createApplicationRuntime } = require("./application-runtime.js");
@@ -74,6 +75,10 @@ const {
   recoverPendingTransaction,
   commitJsonlTransaction,
 } = require(path.join(__dirname, "..", "..", "scripts", "library-transaction.js"));
+const {
+  recoverMediaDeletionTransaction,
+  commitMediaDeletion,
+} = require(path.join(__dirname, "..", "..", "scripts", "media-deletion-transaction.js"));
 const {
   walkFiles,
   extensionType,
@@ -532,6 +537,8 @@ async function openLibrary(rawRoot, options = {}) {
       applicationStartedAt,
     });
     state.activeLibrary = { state: "opening", sessionId: lock.SessionId, paths, manifest, lock };
+    const deletionRecovery = await recoverMediaDeletionTransaction(paths);
+    if (deletionRecovery.recovered) appendLog(`media-deletion ${deletionRecovery.action} reason=${deletionRecovery.reason || "unknown"}`);
     const recovery = await recoverPendingTransaction(paths);
     if (recovery.recovered) appendLog(`library-transaction ${recovery.action} reason=${recovery.reason || "unknown"}`);
     await loadAllLibraryIndexes();
@@ -851,7 +858,21 @@ function createDomainServices() {
     enrichItem,
     appendLog,
   });
-  return { albumService, locationService, metadataEditService, personService, tagService };
+  const mediaDeletionService = createMediaDeletionService({
+    getMetadata: () => state.metadataIndex,
+    getMediaPathIndex: () => state.mediaPathIndex,
+    requireOpenLibrary,
+    resolveIndexedMediaPath,
+    prepareLibraryWrite,
+    commitDeletion: commitMediaDeletion,
+    thumbnailAbsolutePath,
+    clearThumbnailStatusCache,
+    touchLibraryManifest,
+    emitLibraryState,
+    stopChat: () => chat.stop(),
+    appendLog,
+  });
+  return { albumService, locationService, mediaDeletionService, metadataEditService, personService, tagService };
 }
 
 /**

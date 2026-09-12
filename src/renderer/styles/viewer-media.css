@@ -107,6 +107,9 @@
   padding: 8px 12px; background: rgba(242, 249, 255, 0.86);
 }
 .meta-popup-wrapper { position: relative; display: inline-flex; }
+.viewer-left-tools { display: flex; align-items: center; gap: 8px; }
+.danger-icon-btn { border-color: rgba(201, 47, 63, 0.42); background: #fff6f7; }
+.danger-icon-btn:hover:not(:disabled) { border-color: #c92f3f; background: #ffe9ec; }
 .camera-table-wrapper { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #f8fbff; }
 .camera-table-wrapper h4 { margin: 0 0 8px; font-size: 13px; color: var(--text-soft); }
 .camera-table { width: 100%; border-collapse: collapse; font-size: 12px; }

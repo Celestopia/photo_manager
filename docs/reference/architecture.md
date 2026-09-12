@@ -35,7 +35,7 @@ The installed runtime distinguishes the code root from the program-resource root
 
 Assistant adds the `chat:*` request allowlist and `chat:event` updates through `photoManagerApi.chat`. Its main-process services, renderer composable, provider boundary and cancellation lifecycle are documented in [Viewer Chat Implementation](../agent/implementation.md).
 
-Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directories, and info; `maintenance:start/show-output`; `gallery:query`; `photo:update-customization/batch-update`; list/create/update/delete-global for four registries; clipboard/system media actions; `photo:report-playback`; and `window:action/get-state`. Events are `library:state-changed`, `library:progress`, `maintenance:progress`, and `window:state-changed`.
+Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directories, and info; `maintenance:start/show-output`; `gallery:query`; `photo:update-customization/batch-update/delete-media`; list/create/update/delete-global for four registries; clipboard/system media actions; `photo:report-playback`; and `window:action/get-state`. Events are `library:state-changed`, `library:progress`, `maintenance:progress`, and `window:state-changed`.
 
 Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation payloads camelCase, and each channel rejects unknown fields and obsolete PascalCase aliases. `FilePath` is never an action target: the main process resolves `MediaId` through its current index and verifies the resulting path remains inside the active library before any filesystem operation.
 
@@ -46,7 +46,7 @@ Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation p
 - `application-paths.js`: roaming/local paths and pre-ready Electron storage setup.
 - `program-paths.js`: development/packaged program-resource root resolution and worker propagation contract.
 - `application-config.js`: complete defaults and shared strict configuration loading.
-- `library-core.js`, `library-access.js`, `library-lock.js`, `library-backup.js`, `library-transaction.js`: boundaries, authorization, locking, snapshots, atomic writes, transactions, and recovery.
+- `library-core.js`, `library-access.js`, `library-lock.js`, `library-backup.js`, `library-transaction.js`, `media-deletion-transaction.js`: boundaries, authorization, locking, snapshots, atomic writes, registry transactions, media-file staging, and recovery.
 - `operation-progress.js`, `maintenance-worker.js`: structured operation reporting and child-process dispatch.
 - `common.js`, `library-data.js`: scanning, hashing, record creation, registry loading, and reference validation.
 - `media-tools.js`, `media-time.js`, `thumbnail-cache.js`: FFmpeg execution/normalization, reference-time-zone logic, and thumbnail queues.
@@ -63,7 +63,7 @@ Shared schema modules enforce exact keys, UUID v4 identity, customization patche
 
 The renderer is a declarative `App.vue` shell, application composition root, state-owning composables, pure domain functions, and presentation components. Components consume narrow contexts and never reverse-import the composition root. Pure functions import no Vue/DOM/Electron; composables import no page components and collaborate only through callbacks/refs wired at the root.
 
-State owners are: library session; gallery query and stale-request suppression; full-result selection; viewer navigation/shortcuts; editor drafts/locks; media transform listeners/observer; video element lifecycle/preferences; one composable per registry; library-scoped recent history; window controls; and UI feedback. Every owner of a global listener, timer, observer, element, or IPC subscription exposes idempotent cleanup called on unmount.
+State owners are: library session; gallery query and stale-request suppression; full-result selection; shared media-deletion confirmation; viewer navigation/shortcuts; editor drafts/locks; media transform listeners/observer; video element lifecycle/preferences; one composable per registry; library-scoped recent history; window controls; and UI feedback. Every owner of a global listener, timer, observer, element, or IPC subscription exposes idempotent cleanup called on unmount.
 
 Contexts are split into library, gallery, gallery-filter, viewer, settings, four registries, and UI feedback. Components render and forward intent. Shared picker/menu components retain their single-value, multi-value, filter, and hierarchy semantics.
 

@@ -27,7 +27,7 @@ function registerIpcHandlers(options) {
     resolveIndexedMediaPath,
     services,
   } = options;
-  const { albumService, locationService, metadataEditService, personService, tagService } = services;
+  const { albumService, locationService, mediaDeletionService, metadataEditService, personService, tagService } = services;
 
   ipcMain.handle("app:get-config", async () => toSerializable(runtime.config));
 
@@ -185,6 +185,7 @@ function registerIpcHandlers(options) {
   ipcMain.handle("album:delete-global", async (_, payload) => toSerializable(await albumService.deleteGlobal(payload)));
   ipcMain.handle("photo:update-customization", async (_, payload) => toSerializable(await metadataEditService.updateCustomization(payload)));
   ipcMain.handle("photo:batch-update", async (_, payload) => toSerializable(await metadataEditService.batchUpdate(payload)));
+  ipcMain.handle("photo:delete-media", async (_, payload) => toSerializable(await mediaDeletionService.deleteMedia(payload)));
 
   ipcMain.handle("photo:copy-path", async (_, mediaId) => {
     try {
