@@ -261,7 +261,7 @@
 .gallery-media-details-list { margin: 0; padding: 5px 0; }
 .gallery-media-details-row {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 8em) minmax(0, 1fr);
   align-items: start;
   gap: 8px;
   padding: 5px 10px;
@@ -271,7 +271,8 @@
 .gallery-media-details-row dt {
   color: var(--text-soft);
   font-weight: 700;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .gallery-media-details-row dd {
   min-width: 0;
