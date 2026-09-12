@@ -212,19 +212,16 @@
 .batch-panel-scroll > label { font-weight: 700; }
 .batch-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .batch-panel-header h3 { margin: 0; }
-.batch-selection-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; }
 .batch-panel-summary { min-width: 0; color: var(--text-soft); font-size: 13px; }
-.batch-selection-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
-.batch-selection-btn { width: 32px; height: 32px; flex: 0 0 32px; padding: 0; color: #2878c8; background: #f3f8ff; }
-.batch-selection-btn:hover:not(:disabled) { border-color: #2878c8; background: #e5f1ff; }
+.batch-selection-actions { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-start; gap: 6px; min-height: 34px; }
+.batch-panel-action-btn { width: 36px; height: 36px; flex: 0 0 36px; padding: 0; color: #2878c8; border-color: rgba(40, 120, 200, 0.42); background: #f3f8ff; }
+.batch-panel-action-btn:hover:not(:disabled) { border-color: #2878c8; background: #e5f1ff; }
 .batch-selection-btn.active { border-color: #2878c8; background: #2878c8; color: #fff; }
 .batch-selection-btn.active:hover:not(:disabled) { background: #1f69b3; }
 .batch-operation-actions {
   flex: 0 0 auto; margin-top: auto; padding-top: 12px;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-end;
 }
-.batch-copy-btn { border-color: rgba(40, 120, 200, 0.42); background: #f3f8ff; }
-.batch-copy-btn:hover:not(:disabled) { border-color: #2878c8; background: #e5f1ff; }
 .batch-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 12px; margin-top: 8px; }
 .batch-actions .btn {
   margin-top: 0;
@@ -319,6 +316,8 @@
 .gallery-settings-separator { height: 1px; margin: 5px 0; background: var(--line); }
 
 .gallery-topbar { position: relative; z-index: 90; }
+.gallery-right-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; -webkit-app-region: no-drag; }
+.batch-selection-trigger { min-width: 132px; height: 38px; padding: 0 18px; border-radius: 6px; font-weight: 600; white-space: nowrap; }
 .gallery-header-tools { align-items: center; gap: 10px; min-width: 0; }
 .gallery-brand { margin-left: 8px; display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 18px; font-weight: 700; letter-spacing: -.4px; }
 .gallery-brand img { width: 30px; height: 30px; }
