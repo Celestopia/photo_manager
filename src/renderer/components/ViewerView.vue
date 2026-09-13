@@ -8,7 +8,15 @@
     <button class="btn ghost danger icon-btn" data-tip="Close" @click="doWindowAction(WINDOW_ACTIONS.close)"><img class="icon" :src="ICONS.windowClose" alt="Close" /></button>
   </div>
 </header>
-<main class="viewer-main" :style="ratioStyle">
+<main ref="viewerLayoutRef" class="viewer-main" :class="{ 'is-panel-resizing': panelResizeSide }" :style="ratioStyle">
+  <button
+    v-if="!showLeftPanel"
+    type="button"
+    class="viewer-panel-restore left"
+    data-tip="Restore media information panel"
+    aria-label="Restore media information panel"
+    @click="restoreViewerPanel('left')"
+  ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
   <aside class="side-panel left-panel" :class="{ collapsed: !showLeftPanel }">
     <h3>{{ isSelectedVideo ? 'Video Information' : 'Image Information' }}</h3>
     <dl>
@@ -50,6 +58,15 @@
       </table>
     </div>
   </aside>
+  <div
+    v-if="showLeftPanel"
+    class="viewer-panel-resizer left"
+    :class="{ active: panelResizeSide === 'left' }"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Resize media information panel"
+    @pointerdown="beginPanelResize('left', $event)"
+  ></div>
   <section class="image-stage" ref="mediaStageRef" @wheel="(!isSelectedVideo || videoPlaybackMode === 'video') && onMediaWheel($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
     <button class="nav-btn left" @click="switchPhoto(-1)">◀</button>
     <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerMediaStyle" /></div>
@@ -145,6 +162,15 @@
       <button @click="contextCopyFile">Copy File</button><button @click="contextCopyPath">Copy File Path</button><button @click="contextCopyJson">Copy Media Metadata JSON</button><button @click="openCurrentWithSystem">Open with Default App</button><button @click="showCurrentInFolder">Show in File Explorer</button>
     </div>
   </section>
+  <div
+    v-if="showRightPanel"
+    class="viewer-panel-resizer right"
+    :class="{ active: panelResizeSide === 'right' }"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Resize customization panel"
+    @pointerdown="beginPanelResize('right', $event)"
+  ></div>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
     <div class="viewer-sidebar-tabs" role="group" aria-label="Viewer sidebar">
       <button class="btn" :aria-pressed="!chat.visible.value" @click="chat.close">Metadata</button>
@@ -257,11 +283,18 @@
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'HiddenDescription'">{{ saveNotice.message }}</div>
     </div>
   </aside>
+  <button
+    v-if="!showRightPanel"
+    type="button"
+    class="viewer-panel-restore right"
+    data-tip="Restore customization panel"
+    aria-label="Restore customization panel"
+    @click="restoreViewerPanel('right')"
+  ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg></button>
 </main>
 <footer class="viewer-footer">
   <div class="viewer-left-tools">
     <button class="btn icon-btn danger-icon-btn" data-tip="Permanently delete media" aria-label="Permanently delete media" @click="requestViewerDeletion"><img class="icon" :src="ICONS.deleteMedia" alt="" /></button>
-    <div class="meta-popup-wrapper"><button class="btn icon-btn" data-tip="Show or hide media information" @click="toggleLeftPanel"><img class="icon" :src="ICONS.metadataInfo" alt="Show or hide media information" /></button></div>
   </div>
   <div class="viewer-tools" :class="{ 'video-tools': isSelectedVideo }">
     <template v-if="canTransformSelectedMedia">
@@ -280,9 +313,7 @@
     <button class="btn icon-btn" :data-tip="isSelectedVideo ? 'Full-screen media' : 'Full-screen image'" @click="toggleFullscreen"><img class="icon" :src="ICONS.fullscreen" :alt="isSelectedVideo ? 'Full-screen media' : 'Full-screen image'" /></button>
     <button v-if="isSelectedVideo" class="btn icon-btn" data-tip="Open in system player" aria-label="Open in system player" @click="openCurrentWithSystem"><img class="icon" :src="ICONS.openSystem" alt="" /></button>
   </div>
-  <div class="right-tools">
-    <button class="btn icon-btn" data-tip="Show or hide customization" @click="toggleRightPanel"><img class="icon" :src="ICONS.customization" alt="Show or hide customization" /></button>
-  </div>
+  <div class="viewer-footer-spacer" aria-hidden="true"></div>
 </footer>
 <div class="tag-modal-backdrop" v-if="pendingViewerTransition.visible" @click="cancelViewerTransition">
   <section class="library-confirm-modal viewer-unsaved-modal" role="dialog" aria-modal="true" aria-labelledby="viewer-unsaved-title" @click.stop>
@@ -300,7 +331,7 @@
 </template>
 
 <script setup>
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, ref } from "vue";
 import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";
 import PeoplePicker from "./PeoplePicker.vue";
@@ -342,8 +373,12 @@ const {
   windowToggleTip,
   windowToggleIcon,
   ratioStyle,
+  viewerLayoutRef,
   showLeftPanel,
   showRightPanel,
+  panelResizeSide,
+  beginPanelResize,
+  restoreViewerPanel,
   mediaStageRef,
   videoElementRef,
   audioElementRef,
@@ -426,7 +461,6 @@ const {
   setRating,
   setPrivacy,
   requestEdit,
-  toggleLeftPanel,
   zoomIn,
   zoomOut,
   rotateClockwise,
@@ -434,13 +468,11 @@ const {
   toggleMirror,
   restoreMediaState,
   requestViewerDeletion,
-  toggleRightPanel,
 } = app;
 
 const canTransformSelectedMedia = computed(() => (
   !isSelectedVideo.value || videoPlaybackMode.value === "video"
 ));
-watch(showRightPanel, (shown) => { if (!shown && chat.visible.value) void chat.close(); });
 
 const showVideoCenterPlay = computed(() => (
   videoPlaybackMode.value === "video"

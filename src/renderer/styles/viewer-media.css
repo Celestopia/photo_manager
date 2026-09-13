@@ -1,7 +1,7 @@
 /* Image and video stages, viewer navigation, context menu, and footer tools. */
 
 .image-stage {
-  position: relative; border: 1px solid var(--line); border-radius: var(--radius);
+  position: relative; grid-column: 3; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius);
   background: linear-gradient(180deg, #fafdff 0%, #eff6ff 100%); overflow: hidden;
 }
 .image-container {
@@ -103,11 +103,11 @@
 .context-menu button:hover { background: #eff6ff; }
 .viewer-footer {
   height: 62px; border-top: 1px solid var(--line); display: grid;
-  grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
   padding: 8px 12px; background: rgba(242, 249, 255, 0.86);
 }
-.meta-popup-wrapper { position: relative; display: inline-flex; }
 .viewer-left-tools { display: flex; align-items: center; gap: 8px; }
+.viewer-footer-spacer { min-width: 0; }
 .danger-icon-btn { border-color: rgba(201, 47, 63, 0.42); background: #fff6f7; }
 .danger-icon-btn:hover:not(:disabled) { border-color: #c92f3f; background: #ffe9ec; }
 .camera-table-wrapper { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #f8fbff; }

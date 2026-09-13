@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import { resolveHorizontalArrowAction } from "../video-playback.mjs";
 import { allowsViewerGlobalShortcut } from "../domain/viewer-keyboard.mjs";
+import { useViewerPanelLayout } from "./use-viewer-panel-layout.js";
 
 /** Owns one viewer navigation session, shell panels, context actions, and global shortcuts. */
 export function useMediaViewer({
@@ -33,16 +34,8 @@ export function useMediaViewer({
   const showContextMenu = ref(false);
   const contextPosition = reactive({ x: 0, y: 0 });
   const pendingViewerTransition = reactive({ visible: false, type: "", direction: 0 });
-  const showLeftPanel = ref(true);
-  const showRightPanel = ref(true);
   let videoClickTimer = null;
-
-  const ratioStyle = computed(() => {
-    const ratio = config.value?.ui?.viewer?.panelRatio || { left: 1, center: 2, right: 1 };
-    const left = showLeftPanel.value ? ratio.left : 0;
-    const right = showRightPanel.value ? ratio.right : 0;
-    return { gridTemplateColumns: `${left}fr ${ratio.center}fr ${right}fr` };
-  });
+  const panelLayout = useViewerPanelLayout({ config, onResizeStart: closeTransientPanels });
 
   const viewerHeaderTime = computed(() => {
     const raw = selectedItem.value?.FileSystem?.ShootingTimeString || "";
@@ -60,6 +53,7 @@ export function useMediaViewer({
   function openViewer(item) {
     clearVideoClickTimer();
     releaseCurrentMedia();
+    panelLayout.resetViewerPanelLayout();
     selectedItem.value = item;
     selectedGlobalIndex.value = orderedItems.value.findIndex((candidate) => candidate.MediaId === item.MediaId);
     setDraftFromItem(item);
@@ -74,6 +68,7 @@ export function useMediaViewer({
     onReturnToGallery?.(selectedItem.value?.MediaId);
     view.value = "gallery";
     showContextMenu.value = false;
+    panelLayout.resetViewerPanelLayout();
   }
 
   function performSwitchPhoto(direction) {
@@ -102,6 +97,7 @@ export function useMediaViewer({
       selectedItem.value = null;
       selectedGlobalIndex.value = -1;
       view.value = "gallery";
+      panelLayout.resetViewerPanelLayout();
       return;
     }
     selectedItem.value = nextItem;
@@ -173,9 +169,6 @@ export function useMediaViewer({
     gallerySettingsOpen.value = false;
     closeRegistryDropdowns?.();
   }
-
-  function toggleLeftPanel() { showLeftPanel.value = !showLeftPanel.value; }
-  function toggleRightPanel() { showRightPanel.value = !showRightPanel.value; }
 
   async function contextCopyFile() {
     if (!selectedItem.value) return;
@@ -298,6 +291,7 @@ export function useMediaViewer({
 
   function dispose() {
     clearVideoClickTimer();
+    panelLayout.disposeViewerPanelLayout();
     window.removeEventListener("keydown", onGlobalKeydown);
     document.removeEventListener("click", closeTransientPanels);
   }
@@ -309,6 +303,7 @@ export function useMediaViewer({
     selectedGlobalIndex.value = -1;
     showContextMenu.value = false;
     cancelViewerTransition();
+    panelLayout.resetViewerPanelLayout();
   }
 
   return {
@@ -316,9 +311,7 @@ export function useMediaViewer({
     showContextMenu,
     contextPosition,
     pendingViewerTransition,
-    showLeftPanel,
-    showRightPanel,
-    ratioStyle,
+    ...panelLayout,
     viewerHeaderTime,
     openViewer,
     completeViewerDeletion,
@@ -329,8 +322,6 @@ export function useMediaViewer({
     discardAndContinueViewerTransition,
     openContextMenu,
     closeTransientPanels,
-    toggleLeftPanel,
-    toggleRightPanel,
     contextCopyFile,
     contextCopyPath,
     contextCopyJson,

@@ -33,6 +33,11 @@ import {
 } from "../src/renderer/domain/media-transform.mjs";
 import { allowsViewerGlobalShortcut } from "../src/renderer/domain/viewer-keyboard.mjs";
 import {
+  reconcileViewerPanelWidths,
+  resolveViewerPanelDrag,
+  VIEWER_PANEL_LIMITS,
+} from "../src/renderer/domain/viewer-panel-layout.mjs";
+import {
   applyLocationSelectionFilter,
   createDefaultGalleryFilters,
   hasNonDefaultGalleryControls,
@@ -188,6 +193,51 @@ test("viewer global shortcuts do not override focused controls", () => {
     assert.equal(allowsViewerGlobalShortcut({ tagName, isContentEditable: false }), false);
   }
   assert.equal(allowsViewerGlobalShortcut({ tagName: "DIV", isContentEditable: true }), false);
+});
+
+test("viewer panel defaults follow configured ratios and preserve the center minimum", () => {
+  const defaults = reconcileViewerPanelWidths({
+    availableWidth: 1600,
+    showLeft: true,
+    showRight: true,
+    panelRatio: { left: 1, center: 3, right: 1 },
+  });
+  assert.deepEqual(defaults, { left: 316, right: 316 });
+
+  const constrained = reconcileViewerPanelWidths({
+    availableWidth: 1000,
+    leftWidth: 600,
+    rightWidth: 600,
+    showLeft: true,
+    showRight: true,
+    panelRatio: { left: 1, center: 3, right: 1 },
+  });
+  const handles = VIEWER_PANEL_LIMITS.handleWidth * 2;
+  assert.ok(constrained.left >= VIEWER_PANEL_LIMITS.leftMin);
+  assert.ok(constrained.right >= VIEWER_PANEL_LIMITS.rightMin);
+  assert.ok(1000 - handles - constrained.left - constrained.right >= VIEWER_PANEL_LIMITS.centerMin - 1e-9);
+});
+
+test("viewer panel dragging collapses immediately below the edge threshold and clamps ordinary resizing", () => {
+  const common = {
+    side: "left",
+    availableWidth: 1000,
+    leftWidth: 220,
+    rightWidth: 300,
+    showLeft: true,
+    showRight: true,
+    panelRatio: { left: 1, center: 3, right: 1 },
+  };
+  assert.deepEqual(resolveViewerPanelDrag({ ...common, rawWidth: 95 }), { collapsed: true, width: 0 });
+  assert.deepEqual(resolveViewerPanelDrag({ ...common, rawWidth: 96 }), { collapsed: false, width: 220 });
+  assert.deepEqual(resolveViewerPanelDrag({ ...common, rawWidth: 500 }), { collapsed: false, width: 260 });
+
+  assert.deepEqual(reconcileViewerPanelWidths({
+    availableWidth: 1000,
+    showLeft: false,
+    showRight: true,
+    panelRatio: { left: 1, center: 3, right: 1 },
+  }), { left: 0, right: 300 });
 });
 
 test("media dragging starts only after the pointer crosses its movement threshold", () => {

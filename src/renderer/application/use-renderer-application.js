@@ -515,8 +515,10 @@ export function useRendererApplication() {
       showContextMenu,
       contextPosition,
       pendingViewerTransition,
+      viewerLayoutRef,
       showLeftPanel,
       showRightPanel,
+      panelResizeSide,
       ratioStyle,
       viewerHeaderTime,
       openViewer,
@@ -528,8 +530,8 @@ export function useRendererApplication() {
       discardAndContinueViewerTransition,
       openContextMenu,
       closeTransientPanels,
-      toggleLeftPanel,
-      toggleRightPanel,
+      beginPanelResize,
+      restoreViewerPanel,
       contextCopyFile,
       contextCopyPath,
       contextCopyJson,
@@ -712,7 +714,8 @@ export function useRendererApplication() {
     };
     const viewerContext = {
       ICONS, WINDOW_ACTIONS, selectedItem, viewerHeaderTime, windowToggleTip, windowToggleIcon,
-      ratioStyle, showLeftPanel, showRightPanel, mediaStageRef, videoElementRef, audioElementRef,
+      ratioStyle, viewerLayoutRef, showLeftPanel, showRightPanel, panelResizeSide,
+      beginPanelResize, restoreViewerPanel, mediaStageRef, videoElementRef, audioElementRef,
       videoPlaybackMode, videoPlaybackMessage, videoFrameStepping, videoDisplayedTime, videoDuration,
       videoPlaying, videoWaiting, videoReady, videoSeeking, videoBufferedPercent, videoVolume, videoMuted,
       canStepVideoBackward, canStepVideoForward,
@@ -730,8 +733,8 @@ export function useRendererApplication() {
       toggleVideoPlayback, beginVideoSeek, previewVideoSeek, commitVideoSeek,
       toggleVideoMuted, setVideoVolume, onVideoSurfaceClick, onVideoSurfaceDoubleClick,
       stepVideoFrame, onFieldTextareaInput,
-      confirmEdit, cancelEdit, setRating, setPrivacy, requestEdit, toggleLeftPanel, zoomIn, zoomOut,
-      rotateClockwise, rotateCounterclockwise, toggleMirror, restoreMediaState, toggleRightPanel,
+      confirmEdit, cancelEdit, setRating, setPrivacy, requestEdit, zoomIn, zoomOut,
+      rotateClockwise, rotateCounterclockwise, toggleMirror, restoreMediaState,
       requestViewerDeletion: mediaDeletion.requestViewerDeletion,
     };
     const uiFeedbackContext = { toast, dynamicTooltip, dynamicTooltipRef };

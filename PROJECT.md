@@ -12,7 +12,7 @@ Current capabilities include:
 
 - Managing images and videos on one timeline.
 - Opening multiple independent library windows by launching PhotoManager again, with one active library per window.
-- Viewing images, playing videos, and editing shared customization fields.
+- Viewing images, playing videos, resizing or collapsing viewer-session side panels, and editing shared customization fields.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.
