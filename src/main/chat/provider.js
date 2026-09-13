@@ -32,7 +32,9 @@ async function readConfig(file) {
 }
 function validateConfig(c, env = process.env) {
   if (!c || typeof c !== "object" || Array.isArray(c)) {
-    throw new Error("Provider configuration must contain the documented YAML fields.");
+    throw new Error(
+      "Provider configuration must contain the documented YAML fields.",
+    );
   }
   const fields = [
     "schemaVersion",
@@ -93,20 +95,42 @@ async function config(file, env = process.env) {
 async function editableConfig(file) {
   const c = await readConfig(file);
   // Never send a stored credential or environment value to the renderer.
-  return { baseUrl: c.baseUrl, model: c.model, apiKeyEnv: c.apiKeyEnv,
-    thinking: c.enable_thinking === undefined ? "omit" : String(c.enable_thinking),
-    hasKey: Boolean(c.apiKey), apiKey: "", clearKey: false };
+  return {
+    baseUrl: c.baseUrl,
+    model: c.model,
+    apiKeyEnv: c.apiKeyEnv,
+    thinking:
+      c.enable_thinking === undefined ? "omit" : String(c.enable_thinking),
+    hasKey: Boolean(c.apiKey),
+    apiKey: "",
+    clearKey: false,
+  };
 }
 let configSaveQueue = Promise.resolve();
 
 async function saveConfigNow(file, draft) {
-  object(draft, ["baseUrl", "model", "apiKeyEnv", "thinking", "apiKey", "clearKey"], "Provider settings");
-  if (["baseUrl", "model", "apiKeyEnv", "apiKey", "thinking"].some(k => typeof draft[k] !== "string" || draft[k].length > 4096) ||
-      typeof draft.clearKey !== "boolean" || !["omit", "true", "false"].includes(draft.thinking))
+  object(
+    draft,
+    ["baseUrl", "model", "apiKeyEnv", "thinking", "apiKey", "clearKey"],
+    "Provider settings",
+  );
+  if (
+    ["baseUrl", "model", "apiKeyEnv", "apiKey", "thinking"].some(
+      (k) => typeof draft[k] !== "string" || draft[k].length > 4096,
+    ) ||
+    typeof draft.clearKey !== "boolean" ||
+    !["omit", "true", "false"].includes(draft.thinking)
+  )
     throw new Error("Invalid provider settings.");
   const previous = await readConfig(file);
-  const c = { schemaVersion: 1, baseUrl: draft.baseUrl.trim(), model: draft.model.trim(),
-    apiKeyEnv: draft.apiKeyEnv.trim(), apiKey: draft.clearKey ? "" : (draft.apiKey || previous.apiKey), streaming: true };
+  const c = {
+    schemaVersion: 1,
+    baseUrl: draft.baseUrl.trim(),
+    model: draft.model.trim(),
+    apiKeyEnv: draft.apiKeyEnv.trim(),
+    apiKey: draft.clearKey ? "" : draft.apiKey || previous.apiKey,
+    streaming: true,
+  };
   if (draft.thinking !== "omit") c.enable_thinking = draft.thinking === "true";
   validateConfig(c);
   await writeTextAtomic(file, yaml.dump(c));
@@ -121,11 +145,30 @@ async function saveConfig(file, draft) {
 async function request(
   c,
   messages,
-  { signal, onText = () => {}, onUsage = () => {}, fetchImpl = fetch } = {},
+  {
+    signal,
+    onText = () => {},
+    onUsage = () => {},
+    tools = [],
+    fetchImpl = fetch,
+  } = {},
 ) {
   const body = {
     model: c.model,
-    messages,
+    messages: wireMessages(messages),
+    ...(tools.length
+      ? {
+          tools: tools.map((t) => ({
+            type: "function",
+            function: {
+              name: t.name,
+              description: t.description,
+              parameters: t.parameters,
+            },
+          })),
+          tool_choice: "auto",
+        }
+      : {}),
     stream: true,
     stream_options: { include_usage: true },
     max_tokens: 4096,
@@ -156,6 +199,11 @@ async function request(
         `Provider returned HTTP ${response.status}. Check credentials, model availability and input limits; retry explicitly.`,
       );
     }
+    const calls = new Map();
+    let usage = null,
+      finish = null,
+      reasoning = "",
+      refusal = "";
     let total = 0,
       text = "",
       buffer = "",
@@ -164,7 +212,9 @@ async function request(
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       await response.body?.cancel();
-      throw new Error("Provider does not support streaming responses. Choose a streaming-compatible endpoint and model.");
+      throw new Error(
+        "Provider does not support streaming responses. Choose a streaming-compatible endpoint and model.",
+      );
     }
     function consume(event) {
       const data = event
@@ -182,8 +232,37 @@ async function request(
         throw new Error(
           "Provider reported an error during the reply. Retry explicitly.",
         );
-      if (parsed.usage) onUsage(normalizeUsage(parsed.usage));
+      if (parsed.usage) {
+        usage = normalizeUsage(parsed.usage);
+        onUsage(usage);
+      }
       const choice = parsed.choices?.[0];
+      if (choice?.delta?.reasoning_content)
+        reasoning += choice.delta.reasoning_content;
+      if (choice?.delta?.refusal) refusal += choice.delta.refusal;
+      if (reasoning.length > 200000 || refusal.length > 20000)
+        throw new Error("Provider response is too large.");
+      for (const part of choice?.delta?.tool_calls || []) {
+        if (!Number.isInteger(part.index) || part.index < 0 || part.index >= 32)
+          throw new Error("Provider returned invalid tool indices.");
+        const call = calls.get(part.index) || {
+          providerId: "",
+          name: "",
+          arguments: "",
+        };
+        if (part.type && part.type !== "function")
+          throw new Error("Provider returned an unsupported tool type.");
+        if (part.id) call.providerId += part.id;
+        if (part.function?.name) call.name += part.function.name;
+        if (part.function?.arguments) call.arguments += part.function.arguments;
+        if (
+          call.providerId.length > 200 ||
+          call.name.length > 100 ||
+          call.arguments.length > 100000
+        )
+          throw new Error("Provider tool call is too large.");
+        calls.set(part.index, call);
+      }
       const delta = choice?.delta?.content;
       if (typeof delta === "string") {
         text += delta;
@@ -191,7 +270,10 @@ async function request(
           throw new Error("Provider response is too large.");
         onText(text);
       }
-      if (choice?.finish_reason) done = true;
+      if (choice?.finish_reason) {
+        finish = choice.finish_reason;
+        done = true;
+      }
     }
     for await (const chunk of response.body) {
       total += chunk.length;
@@ -210,8 +292,45 @@ async function request(
       throw new Error(
         "The connection ended before the reply completed. Retry explicitly.",
       );
-    if (!text) throw new Error("Provider returned no text response.");
-    return text;
+    if (
+      finish &&
+      !["stop", "tool_calls", "length", "content_filter"].includes(finish)
+    )
+      throw new Error("Provider returned an unsupported completion reason.");
+    if (finish === "length")
+      throw new Error(
+        "Provider output limit reached. Retry with a smaller request.",
+      );
+    const toolCalls = [...calls.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, v]) => v);
+    if (
+      toolCalls.length &&
+      (finish !== "tool_calls" ||
+        toolCalls.some((v) => !v.providerId || !v.name) ||
+        new Set(toolCalls.map((v) => v.providerId)).size !== toolCalls.length)
+    )
+      throw new Error("Provider returned incomplete tool calls.");
+    if (finish === "tool_calls" && !toolCalls.length)
+      throw new Error("Provider returned no tool calls.");
+    if (!text && refusal) text = refusal;
+    if (!text && finish === "content_filter")
+      text = "The provider declined this request.";
+    if (!text && !toolCalls.length)
+      throw new Error("Provider returned no text response.");
+    return {
+      text,
+      calls: toolCalls,
+      finish: toolCalls.length
+        ? "calls"
+        : refusal || finish === "content_filter"
+          ? "refusal"
+          : "stop",
+      usage,
+      continuation: reasoning
+        ? { adapter: "chat-completions", reasoning }
+        : null,
+    };
   } catch (e) {
     if (signal?.aborted) throw new Error("Request stopped.");
     if (timeout.aborted)
@@ -225,4 +344,36 @@ async function request(
     );
   }
 }
-module.exports = { DEFAULT, ensureConfig, config, request, editableConfig, saveConfig };
+function wireMessages(messages) {
+  return messages.map((m) => {
+    if (m.role === "assistant" && m.calls)
+      return {
+        role: "assistant",
+        content: m.content || null,
+        ...(m.calls.length
+          ? {
+              tool_calls: m.calls.map((c) => ({
+                id: c.providerId,
+                type: "function",
+                function: { name: c.name, arguments: c.arguments },
+              })),
+            }
+          : {}),
+        ...(m.continuation
+          ? { reasoning_content: m.continuation.reasoning }
+          : {}),
+      };
+    if (m.role === "tool")
+      return { role: "tool", tool_call_id: m.providerId, content: m.content };
+    return m;
+  });
+}
+module.exports = {
+  wireMessages,
+  DEFAULT,
+  ensureConfig,
+  config,
+  request,
+  editableConfig,
+  saveConfig,
+};

@@ -26,7 +26,7 @@ enable_thinking: false
 
 Replace the example URL with the endpoint for your provider account and region. Put your key in `apiKey`, or leave it empty and set the environment variable named by `apiKeyEnv` before starting PhotoManager. A nonempty `apiKey` takes precedence. Keys entered in this file are stored as local plaintext; using an environment variable avoids putting the key in the file. Neither method puts credentials in conversation history.
 
-The Qwen default is listed in [Alibaba Cloud's model documentation](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-vl-plus). A local multimodal server can use a loopback URL such as `http://127.0.0.1:8000/v1` and its own model name. If your server does not accept `enable_thinking`, choose **Use provider default** under Model thinking. Turn off **Stream responses** if it only returns complete responses. PhotoManager does not download or start a local model.
+The Qwen default is listed in [Alibaba Cloud's model documentation](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-vl-plus). A local multimodal server can use a loopback URL such as `http://127.0.0.1:8000/v1` and its own model name. If your server does not accept `enable_thinking`, choose **Use provider default** under Model thinking. The server must support streaming Chat Completions and function calling for tools. PhotoManager does not download or start a local model.
 
 Choose **Save settings**, then **Test connection**. The test sends a generated blue square; it does not use your photos. Opening Settings and saving configuration do not contact the provider. A successful configuration check validates the fields, not the availability of the remote model; the explicit test checks the connection.
 
@@ -50,11 +50,11 @@ Earlier inputs remain part of the conversation automatically. If a referenced so
 
 ## Consequences and Limits
 
-Remote requests upload the selected content and can incur API charges. There is no library-wide upload, retrieval, metadata editing, vector index or model download.
+Remote requests upload the selected content and can incur API charges. There is no library-wide media upload, web search, vector index or model download. Tool suggestions apply only to supplied library media and never save automatically.
 
 Each message accepts up to eight attachments. A model request accepts up to eight images in total, so each video/GIF consumes several of those slots. Older whole turns can be omitted to stay within the request limits; the reply records a notice when that happens. See [input processing](inputs.md) for exact limits.
 
-Conversations and imported attachments are saved under `<library>/.photo_manager/chat/`. They are excluded from automatic library backups. Deleting a conversation deletes its imported attachments after confirmation, but preserves original library media. If a locked file delays cleanup, the app reports it and retries on the next library open.
+Conversations and imported attachments are saved under `<library>/.photo_manager/chat/v2/`. They are excluded from automatic library backups. Deleting a conversation deletes its imported attachments after confirmation, but preserves original library media. If a locked file delays cleanup, the app reports it and retries on the next library open.
 
 
 The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.
@@ -66,3 +66,13 @@ Pending attachments appear as square tiles above the text box, with local image 
 Click a static-image or GIF tile in the composer or a sent message to see a larger, complete-frame preview in the center of the application. GIF previews show the first frame. When that draft or message contains multiple previewable images, use the floating Previous and Next buttons or Left Arrow and Right Arrow to switch between them; navigation stops at the first and last image, and the counter shows the current position. Click the dark backdrop or the preview's Close button to return to the conversation. Video and text tiles are excluded.
 
 Responses always stream; there is no streaming switch. To erase a stored credential, choose **Remove saved key** beneath the API-key field and **Save settings**. **Undo removal** cancels this before saving. This removes only the local copy. **Test connection** becomes available once changes are saved and sends only a generated test image.
+
+## Ask for Metadata Suggestions
+
+Ask naturally for a title, description or tags. The four starter buttons include **Introduce this photo**, **Suggest a title**, **Suggest a description** and **Suggest tags**; they fill and focus the composer without sending. Video prompts use video wording.
+
+The agent can look up existing library tags and make several tool calls in one reply. Basic metadata sharing also permits this bounded tag lookup, including tag names and descriptions. Disabling it disables tag lookup and tag suggestions; title and description suggestions remain available. Imported files cannot be edited through these tools.
+
+Each preview shows the target file, saved value, suggested value and status. **Accept** saves that field; **Decline** leaves metadata unchanged. Review buttons become available after the reply ends. Save or discard unsaved Metadata edits on the selected item before accepting. If the saved field, source file or referenced tag changed, the preview needs refresh; refreshing creates a new preview requiring another Accept. Changed source bytes require a new suggestion. Tag suggestions never create registry entries.
+
+Accepted changes are recorded together with the metadata write. They can be discussed in later messages without rewriting earlier input snapshots. Manual changes to previously supplied metadata still require a new conversation. Deleting a conversation does not undo accepted changes.

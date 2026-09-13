@@ -44,7 +44,7 @@ Global data are split between roaming configuration and machine-specific state:
 
 All windows share these paths because they live in one Electron coordinator process. The most recently completed library open wins `state.json`; writes are serialized and atomic. Provider-setting saves are also serialized, and other open windows receive a notice so a stale settings form can be reopened before editing. Window-scoped media, registry, chat-session, and maintenance state never enters these global files.
 
-Before Electron becomes ready, the main process must create these directories and explicitly set `userData`, `sessionData`, `crashDumps`, and the log path. `scripts/application-paths.js` is the only shared source of global path rules for Electron and standalone CLI tools. Other modules must not reconstruct AppData paths. The application does not permanently read the former installation-root `config.yml`; upgrading to v0.25.0 requires a one-time manual copy of customized configuration. Low-value recent-choice and playback preferences may reset.
+Before Electron becomes ready, the main process must create these directories and explicitly set `userData`, `sessionData`, `crashDumps`, and the log path. `scripts/application-paths.js` is the only shared source of global path rules for Electron and standalone CLI tools. Other modules must not reconstruct AppData paths.
 
 The application does not maintain a recent-library list. Startup always shows the library-entry page. If a last successful path exists, its real name is read from `library.yml` and displayed with the full path, but the library is not loaded until the user chooses to enter it.
 
@@ -94,4 +94,4 @@ Standard layout:
 
 `.photo_manager` is not given the Windows hidden attribute. The scanner excludes only this reserved directory at the library root; other ordinary hidden directories are still scanned.
 
-Assistant configuration and its strict conversation/attachment records are documented in the [chat implementation](../agent/implementation.md) and [session storage](../agent/sessions.md) references. Chat uses the active library lock but does not modify metadata or registries.
+Assistant configuration and its strict conversation/attachment records are documented in the [chat implementation](../agent/implementation.md) and [session storage](../agent/sessions.md) references. Chat uses the active library lock. Sessions live under `chat/v2/`. Reviewed metadata changes share the existing recoverable transaction system with their session decision; tools never create registry entries.

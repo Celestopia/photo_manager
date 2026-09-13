@@ -4,12 +4,12 @@ import { createRenderer, ref, nextTick } from 'vue';
 import { useChat } from '../src/renderer/composables/use-chat.js';
 
 function fixture(t) {
-  let chat, sequence = 0, delayDescribe = null;
+  let chat, sequence = 0, delayDescribe = null, receive;
   const sessions = new Map(), abandoned = [], previewCalls = [], failedPreviews = new Set(), previewDelays = new Map();
   const selectedItem = ref({ MediaId: 'A' });
   const ok = value => Promise.resolve({ ok: true, value });
   const api = {
-    onEvent: () => () => {}, stop: () => ok(),
+    onEvent: fn => { receive=fn; return () => {}; }, stop: () => ok(),
     create: () => { const s = { sessionId: String(++sequence), messages: [], attachments: [], title: '' }; sessions.set(s.sessionId, s); return ok(s); },
     describe: async (sid, input) => { if (delayDescribe) { const delay = delayDescribe; delayDescribe = null; await delay; } return ok({ ...input, name: input.id, mediaKind: 'image' }); },
     preview: async (sid, input) => {
@@ -28,7 +28,7 @@ function fixture(t) {
   const app = renderer.createApp({ setup() { chat = useChat({ api, copyText() {}, selectedItem, libraryState: ref(null), view: ref('viewer') }); return () => null; } });
   app.mount({}); t.after(() => app.unmount());
   return {
-    chat, sessions, abandoned, selectedItem, previewCalls,
+    chat, sessions, abandoned, selectedItem, previewCalls, event: e=>receive(e),
     delay: p => { delayDescribe = p; },
     failPreview: id => failedPreviews.add(id),
     delayPreview: (id, promise) => previewDelays.set(id, promise),
@@ -120,4 +120,22 @@ test('late image preview results do not replace a newer navigation target', asyn
   await secondPending;
   assert.equal(c.imagePreview.value.index, 2);
   assert.equal(c.imagePreview.value.name, 'C');
+});
+
+
+test('older session revisions and late run events cannot replace finalized review state',async t=>{
+  const f=fixture(t);await f.chat.open();
+  const sessionId=f.chat.session.value.sessionId;
+  const live={sessionId,revision:2,messages:[{id:'run',role:'assistant',status:'generating',text:'Initial',inputs:[]}],proposals:[]};
+  f.event({type:'session',session:structuredClone(live)});
+  f.event({type:'reply',sessionId,runId:'run',sequence:2,message:{...live.messages[0],text:'Latest'}});
+  f.event({type:'reply',sessionId,runId:'run',sequence:1,message:{...live.messages[0],text:'Older'}});
+  assert.equal(f.chat.session.value.messages[0].text,'Latest');
+  const final={...live,revision:3,messages:[{...live.messages[0],text:'Final',status:'complete'}],proposals:[{id:'proposal',status:'accepted'}]};
+  f.event({type:'session',session:structuredClone(final)});
+  f.event({type:'session',session:structuredClone(live)});
+  f.event({type:'reply',sessionId,runId:'run',sequence:3,message:live.messages[0]});
+  assert.equal(f.chat.session.value.messages[0].text,'Final');
+  assert.equal(f.chat.session.value.proposals[0].status,'accepted');
+  assert.equal(f.chat.busy.value,false);
 });

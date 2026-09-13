@@ -1,6 +1,6 @@
 # Viewer Chat Implementation
 
-Viewer chat is implemented in v0.28.0. This page describes the code and its validation. The [interface](interface.md), [input processing](inputs.md) and [session storage](sessions.md) pages own the corresponding behavior contracts. See [Using Assistant](usage.md) for configuration instructions.
+This page describes Assistant tool calling, module boundaries and validation. The [interface](interface.md), [input processing](inputs.md) and [session storage](sessions.md) pages own the corresponding behavior contracts. See [Using Assistant](usage.md) for configuration instructions.
 
 ## Provider Configuration and Requests
 
@@ -10,7 +10,7 @@ Viewer chat is implemented in v0.28.0. This page describes the code and its vali
 
 Use HTTPS for public APIs; HTTP is allowed for loopback and private IPv4 servers. URLs cannot contain credentials, query parameters or fragments. Requests append `/chat/completions` to the configured base URL and do not follow redirects. Compatible user-operated local VLM servers use the same contract.
 
-Only one provider request runs at a time, including the connection test. Requests have a 60-second timeout and a 4,096-token output limit. The transport handles complete JSON responses and streamed SSE, bounds response size and UI updates, and rejects incomplete streams. HTTP errors report their status and next steps without exposing raw response bodies, transport details or credentials. Retries require an explicit user action.
+Only one provider request runs at a time, including the connection test. Requests have a 60-second timeout and a 4,096-token output limit. The transport handles streamed SSE, bounds response size and UI updates, and rejects incomplete streams. HTTP errors report their status and next steps without exposing raw response bodies, transport details or credentials. Retries require an explicit user action.
 
 ## Main-Process Responsibilities
 
@@ -23,7 +23,7 @@ Only one provider request runs at a time, including the connection test. Request
 | `inputs.js` | File inspection, fingerprints, optimized images, unchanged originals, timed GIF/video samples and visual-slot allocation. |
 | `metadata.js` | Resolve enabled saved metadata and assigned registry names; never expose unsaved drafts or mutate records. |
 | `provider.js` | Validate machine-local configuration and send bounded multimodal requests. |
-| `service.js` | Serialize mutations, assemble bounded conversation context, check source changes, record uploads and coordinate cancellation. |
+| `service.js` | Compose the run, context, tool and review services; own session serialization, events, preparation and cancellation. |
 | `ipc.js` | Validate the main-window sender, expose chat actions and own native file/confirmation dialogs. |
 
 Media inputs use the existing indexed `MediaId` resolver. External files enter only through the native picker or pasted File objects; preload resolves native File paths. Clipboard blobs are bounded byte arrays. The renderer never receives provider keys or arbitrary filesystem access.
@@ -54,7 +54,7 @@ The application composition root creates `use-chat.js` and provides `CHAT_CONTEX
 
 `tests/chat.test.js` covers strict persistence, corrupt sessions, link/path rejection, original-byte equality, optimized orientation/size, input validation, GIF timing/composition, video sampling, provider errors, bounded history, changed/missing sources, independent attachment ownership, stopped streams and explicit retries. Synthetic video tests include a 30-minute file and use bundled CPU media tools. `tests/chat-renderer.test.mjs` checks Markdown formatting and inactive HTML/links/images.
 
-`tests/helpers/chat-ui-smoke.cjs` runs a hidden, offscreen Electron window against an isolated temporary library and a loopback fake provider. It exercises the actual renderer/preload/main bridge: open Assistant without network traffic, IME-safe Enter, Send, Markdown, original upload, Stop, History, pasted images and deletion. It verifies that library metadata stays unchanged. It writes a screenshot under ignored `release/` and prints its isolated temporary-data directory for cleanup after Electron exits.
+`tests/helpers/chat-ui-smoke.cjs` runs a hidden, offscreen Electron window against an isolated temporary library and a loopback fake provider. It exercises the actual renderer/preload/main bridge: open Assistant without network traffic, IME-safe Enter, Send, Markdown, original upload, Stop, History, pasted images and deletion. It verifies that ordinary chat and proposals leave metadata unchanged and that only an accepted review changes it. It writes a screenshot under ignored `release/` and prints its isolated temporary-data directory for cleanup after Electron exits.
 
 Run the checks with:
 
@@ -76,4 +76,33 @@ Attachment descriptions include an ephemeral previewUrl for the composer. The ma
 
 Provider requests always stream. The stored `streaming` field remains fixed at `true`; an existing `false` value is normalized at runtime and replaced with `true` on the next settings save. Non-streaming JSON replies are rejected with an explanation.
 
-Streaming requests ask for `stream_options.include_usage`. Usage-only events are accepted and saved on the completion attempt, including on failure or stop if already received. Cache counts use [the OpenAI-compatible cached_tokens field](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/context-cache) or [DeepSeek cache-hit fields](https://api-docs.deepseek.com/guides/kv_cache/). No token estimation or automatic request retries are introduced.
+Streaming requests ask for `stream_options.include_usage`. Usage-only events are accepted and saved on the individual completion step, including on failure or stop if already received. Cache counts use [the OpenAI-compatible cached_tokens field](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/context-cache) or [DeepSeek cache-hit fields](https://api-docs.deepseek.com/guides/kv_cache/). No token estimation or automatic request retries are introduced.
+
+## Module Boundaries
+
+| Module | Owns |
+| --- | --- |
+| `context-builder.js` | Bounded history, input preparation/provenance, immutable historical snapshots and review-decision context. |
+| `runtime.js` | Canonical completion contracts, transitions, budgets, typed errors and transcript projection. |
+| `agent-loop.js` | Serial complete → execute → persist loop, stop/deadline handling and finalization. No tool-name branches or metadata writes. |
+| `provider.js` | Chat Completions wire messages, streaming call-fragment assembly, usage and adapter continuation data. No tool dispatch. |
+| `tools/registry.js` | Unique tool definitions, availability, strict argument/result checks, authority and execution limits. |
+| `tools/metadata.js` | Version 1 find_library_tags, propose_title, propose_description and propose_tags contracts and handlers. |
+| `proposals.js` | Typed preview snapshots, no-op/deduplication and current-resource validation. |
+| `review-service.js` | Accept, Decline, stale detection and explicit refresh. The agent cannot invoke these decisions. |
+| `metadata-commit.js` | Existing customization validation, immediate backup, metadata/session transaction and post-commit index update. |
+| `../mutation-coordinator.js` | Per-window ordering shared by manual metadata, registry, library and acceptance mutations. |
+
+Tool definitions declare a version, description, JSON parameter schema, availability, effect/replay classification, validators and handler. Provider normalization produces text, calls, finish, usage and nullable continuation; local call IDs are assigned by the runner. Tool handlers return structured success, no_change, proposal_created or error outcomes. A staged proposal becomes durable together with its tool result; no handler has permission to approve it. A new read/proposal tool registers its contract and handler without changing the loop. A new provider adapter supplies the normalized contract and its explicitly validated continuation format.
+
+Every run captures a MediaId scope independently of context trimming and executes calls sequentially, even when a completion emits multiple calls. Each result is persisted before dispatching another tool. Complete tool groups are replayed as assistant calls followed by matching results. Partial call groups are retained locally but excluded from later requests. Interrupted calls are never automatically executed again. Provider refusal is a completed outcome; transport, context and persistence failures remain distinct from recoverable tool errors.
+
+Default limits are eight completions, twelve dispatched calls, six new proposals, 16 KiB per result, 64 KiB result output per turn and five minutes per turn. Provider calls retain the 60-second timeout and 4,096-token output cap; local handlers have a 30-second cooperative cancellation deadline. The final allowed completion advertises no tools. Exhaustion terminates the bounded loop; tools cannot obtain extra authority or a fresh budget by returning another name. Future non-cooperative handlers need an isolated worker or abortable I/O; the registry alone cannot preempt arbitrary JavaScript.
+
+`find_library_tags` returns bounded, cursor-paginated existing UUIDs/names/descriptions, with registry-sensitive cursors. Tag changes use explicit add/remove/replace operations, deduplicate IDs, and reject unknown tags. Title/description can be cleared with an empty string. Basic sharing gates tag tools; title and description tools require an authorized library target. There is no arbitrary library search or filesystem tool.
+
+Runs use pending → preparing → generating → executing → generating, then finalizing → complete/failed/stopped; recovery marks unfinished runs interrupted. Proposal states are independent. Revisioned session snapshots and sequenced live run updates drive the renderer; checkpoints drain before final snapshots. Persistence failure stops dispatch and blocks new chat work until recovery. Accept checks saved field, relevant tag names/IDs and source hash again while holding library then session queues. Duplicate decisions are idempotent. Backup or transaction failure cannot record a successful acceptance without its metadata. A remaining transaction journal blocks new library mutations until reopen/recovery, including manual edits.
+
+`ChatRunContent.vue` renders steps and review cards. `use-chat.js` owns review commands and rejects stale events. Application-injected callbacks enforce dirty-draft rules and refresh editor/gallery state, preserving composable boundaries. `domain/chat-tools.mjs` owns pure display projections. No raw provider continuation payload is rendered.
+
+`tests/chat-tools.test.js` covers streamed tool-only fragments, sequential lookup/proposals, scope and sharing gates, budgets, no-op/error outcomes, idempotent acceptance, stale refresh, backup failure, immutable history, storage isolation, and a fake adapter/tool proving the generic loop seam. Web search is not available.

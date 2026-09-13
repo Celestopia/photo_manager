@@ -85,7 +85,7 @@ Application-wide data stay outside the installation directory:
   crash-dumps\
 ```
 
-The generated `config.yml` controls shared thumbnail, FFmpeg, backup-retention, and UI defaults. Relative FFmpeg paths are resolved from the installation directory. When updating from a release before v0.25.0, copy any customized root `config.yml` to the roaming path before first launch; per-library data are unaffected.
+The generated `config.yml` controls shared thumbnail, FFmpeg, backup-retention, and UI defaults. Relative FFmpeg paths are resolved from the installation directory.
 
 PhotoManager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See [PROJECT.md](PROJECT.md) for the exact persisted schemas and safety rules.
 

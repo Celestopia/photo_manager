@@ -1,5 +1,5 @@
 import { ref, computed, watch, onBeforeUnmount } from "vue";
-export function useChat({ api, copyText, selectedItem, libraryState, view }) {
+export function useChat({ api, copyText, selectedItem, libraryState, view, reviewBlocked = () => false, beforeReview = () => {}, afterReview = async () => {} }) {
   const copiedMessage = ref(null);
   let copyTimer;
   async function copyMessage(message) {
@@ -199,6 +199,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     if (!imagePreview.value || imagePreview.value.index >= imagePreview.value.items.length - 1) return false;
     return selectImagePreview(imagePreview.value.index + 1);
   }
+  const replySequences = new Map();
   let generation = 0;
   let transition = Promise.resolve();
   const operations = new Set();
@@ -238,9 +239,10 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
       event.type === "session" &&
       event.session.sessionId === session.value?.sessionId
     ) {
+      if ((event.session.revision ?? 0) < (session.value?.revision ?? 0)) return;
       session.value = event.session;
       busy.value = event.session.messages.some((m) =>
-        ["pending", "streaming"].includes(m.status),
+        ["pending", "preparing", "generating", "executing", "finalizing"].includes(m.status),
       );
     }
     if (
@@ -250,7 +252,13 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
       const index = session.value.messages.findIndex(
         (m) => m.id === event.message.id,
       );
-      if (index >= 0) session.value.messages[index] = event.message;
+      if (index >= 0) {
+        if (!['pending','preparing','generating','executing','finalizing'].includes(session.value.messages[index].status)) return;
+        const key = event.runId || event.message.id;
+        if ((event.sequence || 0) <= (replySequences.get(key) || -1)) return;
+        replySequences.set(key,event.sequence || 0);
+        session.value.messages[index] = event.message;
+      }
     }
   });
   function clearComposer() {
@@ -331,7 +339,8 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   async function showHistory() {
     return action(async () => {
       await stop();
-      history.value = (await unwrap(api.open())).sessions;
+      const result = await unwrap(api.open());
+      history.value = result.sessions;
       historyOpen.value = true;
     });
   }
@@ -406,6 +415,19 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
       if (i.kind === "attachment")
         await unwrap(api.removeInput(session.value.sessionId, i.id));
       inputs.value.splice(index, 1);
+    });
+  }
+  async function decideProposal(proposal, decision) {
+    if (busy.value || working.value) return;
+    return action(async () => {
+      if(decision === 'accept' && reviewBlocked(proposal)) throw new Error('Save or discard your Metadata edits before accepting.');
+      beforeReview();
+      let item = null;
+      try {
+        const result = await unwrap(api.decide(session.value.sessionId, proposal.id, decision));
+        session.value = result.session;
+        item = result.item;
+      } finally { await afterReview(item); }
     });
   }
   async function send(retryOf = null, retryUser = null) {
@@ -503,6 +525,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     () => libraryState.value?.active?.libraryId,
     () => {
       closeImagePreview();
+      replySequences.clear();
       generation++;
       session.value = null;
       visible.value = false;
@@ -519,6 +542,8 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     void api.stop();
   });
   return {
+    decideProposal,
+    reviewBlocked,
     imagePreview,
     openImagePreview,
     previousImagePreview,

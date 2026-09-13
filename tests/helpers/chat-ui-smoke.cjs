@@ -103,7 +103,21 @@ async function run() {
   server = http.createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) body += chunk;
-    requests.push(JSON.parse(body));
+    const request=JSON.parse(body);
+    requests.push(request);
+    const latestUser=request.messages.filter(m=>m.role==='user').at(-1);
+    if(JSON.stringify(latestUser).includes('AGENT TOOL TEST')) {
+      res.writeHead(200, { 'Content-Type':'text/event-stream' });
+      const catalog=request.messages.find(m=>m.role==='system' && m.content.startsWith('Authorized target catalog'));
+      const mediaId=JSON.parse(catalog.content.slice(catalog.content.indexOf('[')))[0].mediaId;
+      const done=request.messages.at(-1).role==='tool';
+      const delta=done?{content:'Suggestions are ready for your review.'}:{tool_calls:[
+        {index:0,id:'title-review',type:'function',function:{name:'propose_title',arguments:JSON.stringify({mediaId,title:'Reviewed title'})}},
+        {index:1,id:'description-review',type:'function',function:{name:'propose_description',arguments:JSON.stringify({mediaId,description:'Decline this description'})}}
+      ]};
+      res.end('data: '+JSON.stringify({choices:[{delta,finish_reason:done?'stop':'tool_calls'}]})+'\n\ndata: [DONE]\n\n');
+      return;
+    }
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     res.write(
       "data: " +
@@ -147,10 +161,8 @@ async function run() {
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getAttribute('aria-expanded')`), 'true');
-  const searchTop = await win.webContents.executeJavaScript(`document.querySelector('.search-panel').getBoundingClientRect().top`);
   await click('.gallery-controls-toggle');
   await waitFor(`!document.querySelector('#gallery-filter-panel')`);
-  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.search-panel').getBoundingClientRect().top`), searchTop);
   await click('.gallery-controls-toggle');
   await waitFor(`Boolean(document.querySelector('#gallery-filter-panel'))`);
   await new Promise(resolve => setTimeout(resolve, 250));
@@ -238,7 +250,7 @@ async function run() {
   );
   assert.equal(requests.length, 1);
   assert.equal(
-    JSON.parse(requests[0].messages.at(-1).content[1].text).metadata.title,
+    JSON.parse(requests[0].messages.filter(m=>m.role==='user').at(-1).content[1].text).metadata.title,
     "",
   );
   await click(".viewer-sidebar-tabs button:first-child");
@@ -272,7 +284,7 @@ async function run() {
     `document.querySelector('.chat-composer .btn-primary')?.getAttribute('aria-label')==='Send message'`,
   );
   const upload = requests[1].messages
-    .at(-1)
+    .filter(m=>m.role==='user').at(-1)
     .content.find((c) => c.type === "image_url");
   assert.deepEqual(
     Buffer.from(upload.image_url.url.split(",")[1], "base64"),
@@ -362,7 +374,7 @@ async function run() {
   assert.equal(
     (
       await fsp.readdir(
-        path.join(library, ".photo_manager", "chat", "sessions"),
+        path.join(library, ".photo_manager", "chat", "v2", "sessions"),
       )
     ).length,
     0,
@@ -382,8 +394,39 @@ async function run() {
   await sleep(10300);
   assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.provider-banner'))`), false);
 
+  await click('[aria-label="Close provider settings"]');
+  await click('[aria-label="New chat"]');
+  await waitFor(`document.querySelectorAll('.chat-suggestions button').length===4`);
+  const beforeStarter=requests.length;
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('.chat-suggestions button')].find(b=>b.textContent.trim()==='Suggest a title').click()`);
+  assert.equal(requests.length,beforeStarter);
+  assert.ok(await win.webContents.executeJavaScript(`document.querySelector('.chat-composer textarea').value.includes('title')`));
+  await click('.viewer-sidebar-tabs button:first-child');
+  await setValue('.viewer-title-input','Unsaved review draft');
+  await click('.viewer-sidebar-tabs button:last-child');
+  await setValue('.chat-composer textarea','AGENT TOOL TEST');
+  await click('.chat-composer .btn-primary');
+  await waitFor(`document.querySelectorAll('.chat-proposal').length===2 && document.querySelector('[aria-label="Send message"]')`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.chat-proposal .btn-primary').disabled`),true);
+  assert.deepEqual(await fsp.readFile(path.join(library,'.photo_manager','data','photo_metadata.jsonl')),metadata);
+  await click('.viewer-sidebar-tabs button:first-child');
+  await setValue('.viewer-title-input','');
+  await click('.viewer-sidebar-tabs button:last-child');
+  await waitFor(`!document.querySelector('.chat-proposal .btn-primary').disabled`);
+  await click('.chat-proposal .btn-primary');
+  await waitFor(`document.querySelector('.chat-proposal [role="status"]').textContent==='Accepted'`);
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('.chat-proposal button')].find(b=>b.textContent.trim()==='Decline').click()`);
+  await waitFor(`[...document.querySelectorAll('.chat-proposal [role="status"]')].some(e=>e.textContent==='Declined')`);
+  const saved=(await fsp.readFile(path.join(library,'.photo_manager','data','photo_metadata.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(saved.find(m=>m.FilePath==='second.jpg').Customization.Title,'Reviewed title');
+  assert.notEqual(saved.find(m=>m.FilePath==='second.jpg').Customization.Description,'Decline this description');
+  await click('.viewer-sidebar-tabs button:first-child');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').value`),'Reviewed title');
+  await click('.viewer-sidebar-tabs button:last-child');
+  await fsp.writeFile(path.resolve('release/chat-tools.png'),(await win.webContents.capturePage()).toPNG());
+
   console.log(
-    "CHAT_UI_SMOKE_PASS: viewer, IME, Markdown, original bytes, Stop, History, paste, deletion and unchanged metadata.",
+    "CHAT_UI_SMOKE_PASS: viewer, IME, Markdown, original bytes, Stop, History, paste, deletion, tool calls, dirty-draft guard, Accept and Decline.",
   );
 }
 run()

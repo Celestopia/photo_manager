@@ -2,6 +2,9 @@ const { randomUUID } = require("node:crypto");
 const { assertExactObjectKeys } = require("../../shared/object-schema");
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const runtime = require("./runtime");
+const { metadataTools, definitions } = require("./tools/metadata");
+const { assertProposal } = require("./proposals");
 const MODES = ["optimized", "original", "sampled"];
 function id(value) {
   if (!UUID.test(value)) throw new Error("Invalid chat ID");
@@ -46,11 +49,19 @@ function assertSession(s, libraryId) {
       "updatedAt",
       "messages",
       "attachments",
+      "revision",
+      "proposals",
     ],
     "Conversation",
   );
-  if (s.schemaVersion !== 1 || s.libraryId !== libraryId)
+  if (s.schemaVersion !== 2 || s.libraryId !== libraryId)
     throw new Error("Conversation schema or library mismatch");
+  if (
+    !Number.isSafeInteger(s.revision) ||
+    s.revision < 0 ||
+    !Array.isArray(s.proposals)
+  )
+    throw new Error("Invalid conversation revision/proposals");
   id(s.sessionId);
   id(s.libraryId);
   string(s.title, 200);
@@ -117,7 +128,7 @@ function assertSession(s, libraryId) {
       [
         "id",
         "role",
-        "text",
+        ...(m.role === "user" ? ["text"] : []),
         "createdAt",
         "updatedAt",
         "status",
@@ -128,13 +139,16 @@ function assertSession(s, libraryId) {
       "Message",
     );
     unique(m.id);
-    string(m.text);
+    if (m.role === "user") string(m.text);
     if (
       !["user", "assistant"].includes(m.role) ||
       ![
         "draft",
         "pending",
-        "streaming",
+        "preparing",
+        "generating",
+        "executing",
+        "finalizing",
         "complete",
         "stopped",
         "failed",
@@ -164,16 +178,68 @@ function assertSession(s, libraryId) {
           "notice",
           "error",
           "retryOf",
-          "usage",
+          "steps",
+          "scope",
+          "tools",
+          "reason",
         ],
         "Request record",
       );
-      if (m.attempt.usage !== null) {
-        const fields = ["inputCacheHit", "inputCacheMiss", "inputTotal", "output"];
-        object(m.attempt.usage, fields, "Token usage");
-        for (const key of fields) {
-          const value = m.attempt.usage[key];
-          if (value !== null && (!Number.isSafeInteger(value) || value < 0)) throw new Error("Invalid token usage");
+      const run = m.attempt;
+      if (m.role !== "assistant")
+        throw new Error("User messages cannot own runs");
+      object(run.scope, ["mediaIds", "groups"], "Run scope");
+      groups(run.scope.groups);
+      if (
+        !Array.isArray(run.scope.mediaIds) ||
+        new Set(run.scope.mediaIds).size !== run.scope.mediaIds.length
+      )
+        throw new Error("Invalid resource scope");
+      run.scope.mediaIds.forEach(id);
+      if (!Array.isArray(run.tools) || !Array.isArray(run.steps))
+        throw new Error("Invalid run records");
+      const enabled = new Set();
+      for (const t of run.tools) {
+        object(t, ["name", "contractVersion"], "Tool contract");
+        if (
+          t.contractVersion !== 1 ||
+          !definitions.some((d) => d.name === t.name) ||
+          enabled.has(t.name)
+        )
+          throw new Error("Unsupported tool contract");
+        enabled.add(t.name);
+      }
+      string(run.reason, 100);
+      const calls = new Map(),
+        results = new Set();
+      for (const step of run.steps) {
+        if (step.kind === "completion") {
+          if (calls.size !== results.size)
+            throw new Error("Completion before tool results");
+          runtime.completion(step, true);
+          unique(step.id);
+          for (const c of step.calls) {
+            unique(c.id);
+            calls.set(c.id, c);
+          }
+        } else {
+          object(step, ["kind", "callId", "outcome"], "Tool result");
+          if (
+            step.kind !== "tool" ||
+            !calls.has(step.callId) ||
+            results.has(step.callId)
+          )
+            throw new Error("Invalid tool result reference");
+          results.add(step.callId);
+          metadataTools.validateOutcome(
+            calls.get(step.callId).name,
+            step.outcome,
+          );
+          if (
+            step.outcome.status === "proposal_created" &&
+            !s.proposals.some((p) => p.id === step.outcome.proposalId)
+          )
+            throw new Error("Missing proposal");
         }
       }
       string(m.attempt.model, 200);
@@ -216,7 +282,10 @@ function assertSession(s, libraryId) {
           throw new Error("Invalid source record");
         string(p.text);
         for (const dimension of [p.width, p.height]) {
-          if (dimension !== null && (!Number.isInteger(dimension) || dimension < 1)) {
+          if (
+            dimension !== null &&
+            (!Number.isInteger(dimension) || dimension < 1)
+          ) {
             throw new Error("Invalid source dimensions");
           }
         }
@@ -284,6 +353,70 @@ function assertSession(s, libraryId) {
       if (m.attempt.inputs.some((v) => !messageIds.has(v.messageId)))
         throw new Error("Invalid upload message reference");
     }
+  const calls = new Map(
+    s.messages
+      .flatMap((m) => m.attempt?.steps || [])
+      .filter((v) => v.kind === "completion")
+      .flatMap((v) => v.calls)
+      .map((c) => [c.id, c]),
+  );
+  const mediaIds = new Set(
+    s.messages
+      .filter((m) => m.role === "user")
+      .flatMap((m) => m.inputs)
+      .filter((i) => i.kind === "media")
+      .map((i) => i.id),
+  );
+  const submitted = new Set();
+  for (const m of s.messages) {
+    if (m.role === "user")
+      m.inputs
+        .filter((i) => i.kind === "media")
+        .forEach((i) => submitted.add(i.id));
+    if (m.attempt?.scope.mediaIds.some((v) => !submitted.has(v)))
+      throw new Error("Unauthorized stored scope");
+  }
+  for (const p of s.proposals) {
+    unique(p.id);
+    assertProposal(p);
+    const call = calls.get(p.callId);
+    if (
+      !call ||
+      !mediaIds.has(p.mediaId) ||
+      call.name !==
+        {
+          Title: "propose_title",
+          Description: "propose_description",
+          TagIds: "propose_tags",
+        }[p.field]
+    )
+      throw new Error("Invalid proposal origin");
+    const owner = s.messages.find((m) =>
+      m.attempt?.steps.some(
+        (step) =>
+          step.kind === "completion" &&
+          step.calls.some((c) => c.id === p.callId),
+      ),
+    );
+    if (
+      JSON.parse(call.arguments).mediaId !== p.mediaId ||
+      !owner.attempt.scope.mediaIds.includes(p.mediaId)
+    )
+      throw new Error("Invalid proposal authority");
+    if (
+      p.refreshOf !== null &&
+      !s.proposals
+        .slice(0, s.proposals.indexOf(p))
+        .some(
+          (v) =>
+            v.id === p.refreshOf &&
+            v.callId === p.callId &&
+            v.mediaId === p.mediaId &&
+            v.field === p.field,
+        )
+    )
+      throw new Error("Invalid refresh reference");
+  }
   return s;
 }
 const defaultGroups = () => ({
@@ -298,7 +431,7 @@ function message(role, text, inputs = [], choices = defaultGroups()) {
   return {
     id: randomUUID(),
     role,
-    text,
+    ...(role === "user" ? { text } : {}),
     createdAt: now,
     updatedAt: now,
     status: role === "user" ? "complete" : "pending",

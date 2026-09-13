@@ -19,7 +19,7 @@ Library inputs use `MediaId`, so renaming or moving a file within the library do
 Use this layout:
 
 ```text
-<library>/.photo_manager/chat/
+<library>/.photo_manager/chat/v2/
   sessions/
     <session-id>/
       session.json
@@ -31,7 +31,7 @@ Use this layout:
 
 Imported files retain their original display filename, detected MIME type, byte size and hash in the attachment inventory. Reusing an attachment in several messages does not create more source-file copies. Do not share or deduplicate files between sessions: each session must be able to delete its own attachments independently.
 
-All writes use the existing exclusive library lock, validated paths and atomic persistence helpers. Chat does not change media metadata, registries or original library files.
+All writes use the existing exclusive library lock, validated paths and atomic persistence helpers. Proposal tools do not write metadata. Accept writes the selected customization field and the accepted proposal state in one recoverable transaction; it never edits original media or creates tags.
 
 ## Save During Composition and Generation
 
@@ -45,7 +45,7 @@ When the user sends a message:
 2. Save streamed response text at most once per second, with writes performed sequentially for that session.
 3. Save the final text and status immediately when the request completes, fails or stops.
 
-The stored states distinguish draft, pending, streaming, complete, stopped, failed and interrupted, as appropriate to the message role. Stop preserves the partial response. An explicit retry creates a new attempt and retains the previous attempt's result; it does not overwrite history or automatically resend after a failure.
+The stored states distinguish draft, pending, preparing, generating, executing, finalizing, complete, stopped, failed and interrupted, as appropriate to the message role. Stop preserves the partial response. An explicit retry creates a new attempt and retains the previous attempt's result; it does not overwrite history or automatically resend after a failure.
 
 ## Reopen and Recover a Conversation
 
@@ -53,7 +53,7 @@ On application startup or library open, mark unfinished responses as Interrupted
 
 Keep the full conversation text until the user deletes it. The smaller history window sent to the model is governed separately by the [request limits](inputs.md#5-add-recent-conversation-history).
 
-If a library update removes a referenced media record, preserve the conversation and show **Media unavailable**. Never substitute a similar filename or matching hash automatically. If the source or saved metadata has changed, explain that continuation will use the current version. Earlier records stay unchanged. A missing input needed for continuation must be restored or explicitly removed from the next request.
+If a library update removes a referenced media record, preserve the conversation and show **Media unavailable**. Never substitute a similar filename or matching hash automatically. If source bytes or manually edited supplied metadata changed, require a new conversation. Accepted in-session proposal changes are represented as review decisions while earlier input snapshots stay unchanged. A missing input needed for continuation must be restored or explicitly removed from the next request.
 
 ## Delete a Conversation and Its Attachments Together
 
@@ -62,7 +62,7 @@ Deletion requires confirmation because it removes the conversation and its impor
 Perform deletion in this order:
 
 1. Stop any active request for the session and wait for preparation and writes to finish.
-2. Atomically move the entire session directory into `chat/trash` on the same filesystem.
+2. Atomically move the entire session directory into `chat/v2/trash` on the same filesystem.
 3. Remove the session from visible History.
 4. Recursively delete that session's validated trash directory.
 
@@ -72,15 +72,15 @@ Chat storage is excluded from automatic library backups. Copying or moving the e
 
 ## Define the Stored Records
 
-Use `schemaVersion: 1`, strict field validation and validated references. Do not introduce implicit migrations or partially load invalid records.
+Use `schemaVersion: 2`, strict field validation and validated references. Do not introduce implicit migrations or partially load invalid records.
 
 | Record | Required information |
 | --- | --- |
-| Session | `sessionId`, `libraryId`, title, creation/update timestamps, messages and attachment inventory. There is no required session-level `MediaId`. |
-| Message | UUID, role, text, creation/update timestamps, status and ordered input references. |
+| Session | `sessionId`, `libraryId`, title, creation/update timestamps, monotonically increasing revision, messages, attachment inventory and proposals. There is no required session-level `MediaId`. |
+| Message | UUID, role, creation/update timestamps, status, metadata groups and ordered input references. Only user messages persist text; assistant text is derived from completion steps. |
 | Library input | The library's `MediaId`. |
 | Imported input | An attachment ID belonging to this session. |
-| Request attempt | Provider/model identity, outcome and the record of what was sent, described below. Never credentials. |
+| Request attempt | Provider/model identity, included message IDs, input provenance, explicit media/group scope, tool contract versions, ordered completion/result steps, retry reference, reason, notice and error. Never credentials. |
 
 Message IDs and attachment IDs must be unique within the session. An attachment reference cannot point into another session's directory.
 
@@ -102,4 +102,10 @@ This record describes what PhotoManager sent. It cannot establish how the provid
 
 Next: [Building and Testing the Feature](implementation.md).
 
-Completion attempt records require nullable `usage`, containing `inputCacheHit`, `inputCacheMiss`, `inputTotal` and `output` as nonnegative integers or null. Missing cache information remains null, never zero. No migration is provided: existing history was cleared before this schema change. Session totals are derived from attempts, including retries, without double counting user messages. Partial totals are labeled incomplete.
+Each completion step stores its local UUID, text, ordered tool calls, finish reason, nullable usage and adapter continuation data. A call stores a stable local UUID separately from its provider call ID, tool name and raw argument JSON. Tool-result steps reference the local call UUID and contain a strictly validated outcome. Only complete assistant-call/result groups enter later provider context; interrupted incomplete groups remain visible locally and are never replayed automatically.
+
+Usage belongs to each completion step: `inputCacheHit`, `inputCacheMiss`, `inputTotal` and `output` are nonnegative integers or null. Reply and session totals are derived, including retries; unreported values stay unknown and partial totals are labeled incomplete. No duplicate assistant text or total usage is persisted.
+
+Proposals store origin call, MediaId, field, before/after values, relevant tag UUID/name snapshots, filename, source hash, creation time, review status, decision time and an optional prior-preview reference. States are pending_review, accepted, declined and stale, independent of run state. Refresh appends a new preview instead of rewriting an earlier proposal. Validation rejects unknown fields/contracts, duplicate identities, broken references and invalid origins.
+
+The normal library transaction journal also covers accepted metadata/session updates, allowing recovery to restore a consistent pair before chat recovery runs.

@@ -41,6 +41,8 @@ const { createApplicationRuntime } = require("./application-runtime.js");
 const { createWindowSessionRouter } = require("./window-session-router.js");
 const { registerApplicationWindowLifecycle } = require("./application-window-lifecycle.js");
 const { createLibraryClaimRegistry } = require("./library-claim-registry.js");
+const { createMutationCoordinator, assertMutationReady } = require("./mutation-coordinator");
+const { createMetadataCommit } = require("./chat/metadata-commit");
 const { createChatService } = require("./chat/service.js");
 const { registerChatIpc } = require("./chat/ipc.js");
 const { metadataGroups } = require("./chat/metadata.js");
@@ -210,6 +212,7 @@ function requireOpenLibrary({ writable = false } = {}) {
     error.code = "MAINTENANCE_RUNNING";
     throw error;
   }
+  if (writable) assertMutationReady(state.activeLibrary);
   return state.activeLibrary;
 }
 
@@ -259,6 +262,7 @@ async function prepareLibraryWrite(reason, { immediate = false } = {}) {
   const library = state.activeLibrary;
   if (!library || !["opening", "open"].includes(library.state)) throw new Error("No writable library session is active");
   if (state.maintenanceState.running) throw new Error("The library is read-only while maintenance is running");
+  assertMutationReady(library);
   await createLibraryBackup(library.paths, {
     kind: immediate ? "immediate" : "daily",
     reason,
@@ -417,8 +421,12 @@ function createSessionChat(session) {
       tags: state.tagRegistryIndex, people: state.personRegistryIndex,
       locations: state.locationRegistryIndex, locationPath: buildLocationPath,
     }),
+    tags: () => [...state.tagRegistryIndex.values()],
+    mutate: session.mutate,
+    commitMetadata: createMetadataCommit({getLibrary:requireOpenLibrary,getIndex:()=>state.metadataIndex,getTags:()=>state.tagRegistryIndex,
+      prepareWrite:prepareLibraryWrite,metadataFile:()=>resolveDataFile(DATA_FILE_NAMES.metadata),enrich:enrichItem,touchManifest:touchLibraryManifest}),
     configFile: APPLICATION_PATHS.chatProviderFile,
-    getTools: () => resolveMediaToolPaths(PROGRAM_RESOURCE_ROOT, config.media),
+    getMediaToolPaths: () => resolveMediaToolPaths(PROGRAM_RESOURCE_ROOT, config.media),
     emit: (payload) => {
       const window = session.runtime.mainWindow;
       if (window && !window.isDestroyed()) window.webContents.send("chat:event", payload);
@@ -963,6 +971,7 @@ function registerIpcHandlers() {
   ].map((name) => [name, sessionRouter.createProxy((session) => session.services[name], name)]));
   registerMainIpcHandlers({
     runtime,
+    mutate: operation => sessionRouter.current().mutate(operation),
     runWithSession,
     toSerializable,
     appendLog,
@@ -1017,6 +1026,7 @@ async function createLibraryWindow() {
     claimedLibraryId: null,
     acceptingCommands: true,
     pendingOperations: new Set(),
+    mutate: createMutationCoordinator(),
   };
   session.chat = sessionRouter.run(session, () => createSessionChat(session));
   session.services = sessionRouter.run(session, () => createDomainServices());

@@ -9,7 +9,10 @@ const { assertExactObjectKeys } = require("../shared/object-schema.js");
 function registerIpcHandlers(options) {
   const ipcMain = typeof options.runWithSession === "function" ? {
     handle(channel, handler) {
-      electronIpcMain.handle(channel, (event, ...args) => options.runWithSession(event, () => handler(event, ...args)));
+      electronIpcMain.handle(channel, (event, ...args) => options.runWithSession(event, () => {
+        const write = /^(tag|person|location|album):(create|update|delete-global)$|^photo:(update-customization|batch-update|delete)|^library:(open|close|initialize|cleanup-failed-initialization|update-info)$|^maintenance:start$/.test(channel);
+        return write && options.mutate ? options.mutate(() => handler(event,...args)) : handler(event,...args);
+      }));
     },
   } : electronIpcMain;
   const {

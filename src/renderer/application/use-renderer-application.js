@@ -135,7 +135,19 @@ export function useRendererApplication() {
     } = useRecentRegistryHistory({ libraryState });
 
     const selectedItem = ref(null);
-    const chat = useChat({ api: API.chat, copyText: API.copyText, selectedItem, libraryState, view });
+    const chat = useChat({ api: API.chat, copyText: API.copyText, selectedItem, libraryState, view,
+      reviewBlocked: p => saving.value || (selectedItem.value?.MediaId === p.mediaId && editingDirty.value),
+      beforeReview: () => { saving.value = true; },
+      afterReview: async item => {
+        try {
+          if (item) {
+            if (selectedItem.value?.MediaId === item.MediaId) { selectedItem.value = item; setDraftFromItem(item); }
+            syncUpdatedItemsIntoGallery([item]);
+            await queryGallery();
+          }
+        } finally { saving.value = false; }
+      },
+    });
     provide(CHAT_CONTEXT, chat);
     const {
       query,

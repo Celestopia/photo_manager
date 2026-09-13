@@ -1,6 +1,6 @@
 # Preparing Inputs for the Model
 
-This page explains what happens between choosing an input and sending a message. It continues [Using the Chat Panel](interface.md). These rules are implemented by `src/main/chat/inputs.js` and `service.js`.
+This page explains what happens between choosing an input and sending a message. It continues [Using the Chat Panel](interface.md). These rules are implemented by `src/main/chat/inputs.js` and `context-builder.js`.
 
 ## 1. Check Whether the Input Is Supported
 
@@ -98,8 +98,10 @@ This size limit does not permit silently dropping an unavailable source. If an i
 
 When the user presses Send, capture the message text, input references, effective quality choices, enabled metadata groups and provider configuration together. Check each source's identity and fingerprint before preparation and again before dispatch. If it changes during preparation, stop and explain the change instead of sending a mixture of versions.
 
-A later message may use a newer version of a library file or its saved metadata, after notifying the user. It must not rewrite the record of what earlier messages sent.
+A later message may incorporate accepted in-session proposal changes through explicit review-decision context, preserving historical input snapshots. Changed source bytes or other changes to supplied metadata require a new conversation.
 
 Save a record of the actual input sizes, transformations, sampled frames, supplied metadata and included history. The fields are defined in [Saving Conversations and Attachments](sessions.md#record-what-was-sent). Do not store base64 payloads or duplicate the uploaded derivatives in the conversation. Remove temporary derivatives after the request finishes or is cancelled; imported source files remain owned by the session.
 
 Next: [Saving Conversations and Attachments](sessions.md).
+
+Tool authority is captured from explicitly submitted library MediaIds, minus explicitly excluded inputs, independently of the recent-history window. A bounded catalog of up to 200 authorized targets survives context trimming. The executor checks both authorization and representation; model arguments cannot expand either. Proposal preparation also checks the source against recorded input provenance. Imported attachments never grant metadata-write authority. Metadata, attachments, tag descriptions and tool outputs are data, not permission or application instructions.

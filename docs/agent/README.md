@@ -1,8 +1,8 @@
 # Viewer Chat
 
-Viewer chat is implemented in v0.28.0. Start with [Using Assistant](usage.md) for provider setup and everyday use. These pages document its behavior and implementation as part of [PROJECT.md](../../PROJECT.md).
+Viewer chat supports tool calling and reviewed metadata suggestions. Start with [Using Assistant](usage.md) for provider setup and everyday use. These pages document its behavior and implementation as part of [PROJECT.md](../../PROJECT.md).
 
-Assistant sits beside the photo or video in the viewer. Users can ask questions, attach images or text files, and return to saved conversations later. It does not search the media library or change metadata. Gallery agent panels, embeddings, model tools, audio transcription and cross-library access remain out of scope.
+Assistant sits beside the photo or video in the viewer. Users can ask questions, attach images or text files, and return to saved conversations later. The agent can look up existing tags and propose titles, descriptions and tag assignments for explicitly supplied library media. Each change requires Accept in its conversation preview. Web search, gallery agent panels, embeddings, audio transcription and cross-library access remain out of scope.
 
 ## A Conversation from Start to Finish
 
@@ -34,7 +34,7 @@ By default, a library-media input includes its saved title, description and assi
 
 Messages are saved automatically in the active library. History lists that library's conversations and can filter them by references to the current media.
 
-Moving to another photo stops an active reply but keeps the conversation open. It does not add that photo automatically. Reopening an old conversation also leaves its inputs unchanged until the user chooses to add something.
+Moving to another photo stops an active reply and prepares a fresh draft with that photo attached. The submitted conversation remains in History. Reopening an old conversation also leaves its inputs unchanged until the user chooses to add something.
 
 ### 6. Delete it when it is no longer needed
 
@@ -55,4 +55,4 @@ Remote chat can upload the selected content and incur API charges. Original imag
 
 Frame sampling can miss brief events. Imported attachments take disk space until removed or their conversation is deleted. This feature requires no local model downloads or vector database.
 
-These files are permanent project documentation. Keep credentials, conversations and actual attachments out of docs. This implementation was built incrementally on main, without merging the agent-probe prototype.
+These files are permanent project documentation. Keep credentials, conversations and actual attachments out of docs. See the implementation reference for module boundaries and validation.

@@ -107,4 +107,12 @@ History rename and delete actions open centered modal dialogs with blurred backd
 
 The conversation transcript scrolls vertically only, with a stable scrollbar gutter. Messages fit the sidebar width; wide code blocks and tables provide their own horizontal scrolling.
 
-The Assistant header places provider settings at the left and session usage before New chat at the right. Only assistant replies have a usage icon next to Copy. Circled-exclamation buttons open compact dropdowns showing Input (cache hit), Input (cache miss), Input (total), and Output; unknown counts show Not reported. Per-reply usage covers only that completion, including its system prompt and context. Session totals include all attempts and retries. Outside click or Escape closes the dropdown. No billing information is calculated.
+The Assistant header places provider settings at the left and session usage before New chat at the right. Only assistant replies have a usage icon next to Copy. Circled-exclamation buttons open compact dropdowns showing Input (cache hit), Input (cache miss), Input (total), and Output; unknown counts show Not reported. Per-reply usage sums every completion in that turn, including each request’s system prompt and context. Session totals include all attempts and retries. Outside click or Escape closes the dropdown. No billing information is calculated.
+
+## Tool Activity and Metadata Review
+
+The empty composer offers Introduce this photo, Suggest a title, Suggest a description and Suggest tags. Each fills and focuses the input without sending. Suggestions wrap in the compact sidebar; there is no separate metadata-agent entry point.
+
+Completion prose and collapsible tool results appear in execution order. Each metadata proposal shows the target, saved and proposed values, tag additions/removals where relevant, and review status. Pending cards offer Accept/Decline once generation ends. Stale cards offer Refresh preview/Decline; refreshing does not approve. Accepted and declined cards remain in history. Failures, no matching tags and no-change outcomes are explicit.
+
+An unsaved Metadata draft for the selected target blocks Accept with an explanation. Acceptance temporarily locks editing, then refreshes the selected item, editor draft and gallery through application-composition callbacks. The chat composable does not import the metadata composable. Web search is not available.

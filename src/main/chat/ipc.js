@@ -3,17 +3,35 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { safePath } = require("./store");
 const { object, id } = require("./schema");
-function registerChatIpc({ chat, getWindow, configFile, runWithSession, onConfigurationSaved }) {
-  const ipcMain = typeof runWithSession === "function" ? {
-    handle(channel, handler) {
-      electronIpcMain.handle(channel, (event, ...args) => runWithSession(event, () => handler(event, ...args)));
-    },
-  } : electronIpcMain;
+function registerChatIpc({
+  chat,
+  getWindow,
+  configFile,
+  runWithSession,
+  onConfigurationSaved,
+}) {
+  const ipcMain =
+    typeof runWithSession === "function"
+      ? {
+          handle(channel, handler) {
+            electronIpcMain.handle(channel, (event, ...args) =>
+              runWithSession(event, () => handler(event, ...args)),
+            );
+          },
+        }
+      : electronIpcMain;
   const fields = {
-    load: ["sessionId"], describe: ["sessionId", "input"], preview: ["sessionId", "input"],
-    rename: ["sessionId", "title"], removeInput: ["sessionId", "attachmentId"],
-    abandon: ["sessionId"], delete: ["sessionId"], importBytes: ["sessionId", "name", "bytes"],
-    importFile: ["sessionId", "path"], choose: ["sessionId"],
+    decide: ["sessionId", "proposalId", "decision"],
+    load: ["sessionId"],
+    describe: ["sessionId", "input"],
+    preview: ["sessionId", "input"],
+    rename: ["sessionId", "title"],
+    removeInput: ["sessionId", "attachmentId"],
+    abandon: ["sessionId"],
+    delete: ["sessionId"],
+    importBytes: ["sessionId", "name", "bytes"],
+    importFile: ["sessionId", "path"],
+    choose: ["sessionId"],
   };
   const handlers = {
     open: () => chat.open(),
@@ -22,6 +40,10 @@ function registerChatIpc({ chat, getWindow, configFile, runWithSession, onConfig
     load: (p) => chat.load(p.sessionId),
     describe: (p) => chat.describe(p.sessionId, p.input),
     preview: (p) => chat.preview(p.sessionId, p.input),
+    decide: (p) => {
+      id(p.proposalId);
+      return chat.decide(p.sessionId, p.proposalId, p.decision);
+    },
     send: (p) => chat.send(p),
     stop: () => chat.stop(),
     rename: (p) => chat.rename(p.sessionId, p.title),
@@ -40,7 +62,10 @@ function registerChatIpc({ chat, getWindow, configFile, runWithSession, onConfig
         throw new Error("Unable to open configuration in the default editor.");
     },
     // Confirmation belongs to the renderer's modal before this command is sent.
-    delete: async (p) => ({ deleted: true, ...(await chat.delete(p.sessionId)) }),
+    delete: async (p) => ({
+      deleted: true,
+      ...(await chat.delete(p.sessionId)),
+    }),
     importBytes: (p) => {
       if (
         !p ||
@@ -101,7 +126,11 @@ function registerChatIpc({ chat, getWindow, configFile, runWithSession, onConfig
         if (fields[name]) {
           object(p, fields[name], "Chat command");
           id(p.sessionId);
-        } else if (name !== "send" && name !== "saveConfiguration" && p !== undefined) {
+        } else if (
+          name !== "send" &&
+          name !== "saveConfiguration" &&
+          p !== undefined
+        ) {
           throw new Error("This chat command accepts no arguments.");
         }
         return { ok: true, value: await fn(p) };

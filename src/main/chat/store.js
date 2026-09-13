@@ -42,17 +42,22 @@ async function safeRemove(root, target) {
   await fs.rm(target, { recursive: true, force: true });
 }
 function createStore(library) {
-  const root = path.join(library.paths.managerDir, "chat");
+  const root = path.join(library.paths.managerDir, "chat", "v2");
   const libraryId = library.manifest.libraryId;
   const file = async (sid) =>
     safePath(root, "sessions", id(sid), "session.json");
-  async function save(s) {
+  async function stage(s) {
     assertSession(s, libraryId);
     s.updatedAt = new Date().toISOString();
-    await writeTextAtomic(
-      await file(s.sessionId),
-      JSON.stringify(s, null, 2) + "\n",
-    );
+    s.revision++;
+    return {
+      filePath: await file(s.sessionId),
+      text: JSON.stringify(s, null, 2) + "\n",
+    };
+  }
+  async function save(s) {
+    const change = await stage(s);
+    await writeTextAtomic(change.filePath, change.text);
     return s;
   }
   async function load(sid) {
@@ -64,7 +69,9 @@ function createStore(library) {
   async function create() {
     const now = new Date().toISOString();
     return save({
-      schemaVersion: 1,
+      schemaVersion: 2,
+      revision: 0,
+      proposals: [],
       sessionId: randomUUID(),
       libraryId,
       title: "New conversation",
@@ -87,7 +94,8 @@ function createStore(library) {
       if (!entry.isDirectory()) continue;
       try {
         const s = await load(entry.name);
-        if (!includeDrafts && !s.messages.some(m => m.role === "user")) continue;
+        if (!includeDrafts && !s.messages.some((m) => m.role === "user"))
+          continue;
         result.push({
           sessionId: s.sessionId,
           title: s.title,
@@ -159,7 +167,7 @@ function createStore(library) {
       const s = await load(row.sessionId);
       let changed = false;
       for (const m of s.messages)
-        if (["pending", "streaming"].includes(m.status)) {
+        if (require("./runtime").ACTIVE.includes(m.status)) {
           m.status = "interrupted";
           changed = true;
         }
@@ -182,7 +190,7 @@ function createStore(library) {
         }
       }
     }
-    pending.push(...await cleanEmpty());
+    pending.push(...(await cleanEmpty()));
     return pending;
   }
   async function cleanEmpty() {
@@ -199,6 +207,8 @@ function createStore(library) {
   }
   return {
     root,
+    file,
+    stage,
     libraryId,
     save,
     load,

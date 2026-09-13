@@ -36,7 +36,7 @@ test("chat stores independent sessions, recovers interruptions and deletes only 
   b.messages.push(message("user", "Hello"));
   await store.save(b);
   a.messages.push(message("user", "Question"));
-  a.messages[0].status = "streaming";
+  a.messages[0].status = "generating";
   await store.save(a);
   await store.recover();
   assert.equal(
@@ -193,7 +193,7 @@ test("provider streams split SSE, rejects incomplete streams and redacts HTTP bo
   const result = await provider.request(c, [], {
     fetchImpl: async () => new Response(body),
   });
-  assert.equal(result, "你好 **world**");
+  assert.equal(result.text, "你好 **world**");
   await assert.rejects(
     () =>
       provider.request(c, [], {
@@ -266,7 +266,7 @@ test("service sends only selected inputs, persists provenance and leaves sources
     },
     getMetadata: () => ({ title: "Sample" }),
     configFile,
-    getTools: () => tools,
+    getMediaToolPaths: () => tools,
     emit: (e) => {
       if (
         e.type === "session" &&
@@ -295,7 +295,7 @@ test("service sends only selected inputs, persists provenance and leaves sources
   const saved = await finished;
   await chat.stop();
   const uploaded = captured.messages
-    .at(-1)
+    .filter(m => m.role === "user").at(-1)
     .content.find((c) => c.type === "image_url").image_url.url;
   assert.deepEqual(
     Buffer.from(uploaded.split(",")[1], "base64"),
@@ -306,6 +306,7 @@ test("service sends only selected inputs, persists provenance and leaves sources
     path.join(
       library.paths.managerDir,
       "chat",
+      "v2",
       "sessions",
       session.sessionId,
       "session.json",
@@ -347,7 +348,7 @@ async function serviceFixture(t, fetchImpl) {
     },
     getMetadata: () => ({ title: "Test" }),
     configFile,
-    getTools: () => tools,
+    getMediaToolPaths: () => tools,
     emit: () => {},
     fetchImpl:
       fetchImpl ||
@@ -391,13 +392,14 @@ test("history sends at most twelve pairs and explicitly records omitted older tu
     const u = message("user", "Question " + n),
       a = message("assistant", "Answer " + n);
     a.status = "complete";
+    a.attempt={model:'test',endpoint:'https://example.com/v1',includedMessageIds:[],inputs:[],notice:'',error:'',retryOf:null,scope:{mediaIds:[],groups:defaultGroups()},tools:[],reason:'stop',steps:[{kind:'completion',id:randomUUID(),text:'Answer '+n,calls:[],finish:'stop',usage:null,continuation:null}]};
     session.messages.push(u, a);
   }
   // UI-only labels are not a persisted field.
   delete session.inputLabels;
   await store.save(session);
   const saved = await send();
-  assert.equal(sent.messages.length, 26);
+  assert.equal(sent.messages.length, 27);
   assert.equal(sent.messages[1].content[0].text, "Question 2");
   assert.match(saved.messages.at(-1).attempt.notice, /Earlier turns/);
   assert.equal(saved.messages.length, 30);
@@ -423,14 +425,14 @@ test("changed and missing sources require explicit choices; history remains immu
   assert.equal(calls, 1);
   assert.match(next.messages.at(-1).attempt.error, /changed/);
   next = await f.send({ acceptChanges: true });
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
   assert.equal(next.messages[1].attempt.inputs[0].sha256, originalHash);
   await fs.unlink(f.file);
   next = await f.send();
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
   assert.match(next.messages.at(-1).attempt.error, /unavailable/);
   next = await f.send({ excludeInputs: ["media:" + f.mid] });
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
   assert.match(next.messages.at(-1).attempt.notice, /excluded/);
 });
 test("imported attachments survive reopening and are owned by their session only", async (t) => {
@@ -704,7 +706,7 @@ test('streamed usage-only events persist per completion', async t => {
     return new Response('data: {"choices":[{"delta":{"content":"Reply"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":20,"prompt_tokens_details":{"cached_tokens":60}}}\n\ndata: [DONE]\n\n');
   });
   const s = await f.send();
-  assert.deepEqual(s.messages.at(-1).attempt.usage, {inputTotal:100,output:20,inputCacheHit:60,inputCacheMiss:40});
+  assert.deepEqual(s.messages.at(-1).attempt.steps[0].usage, {inputTotal:100,output:20,inputCacheHit:60,inputCacheMiss:40});
   const loaded = await f.store.load(s.sessionId);
-  assert.deepEqual(loaded.messages.at(-1).attempt.usage, s.messages.at(-1).attempt.usage);
+  assert.deepEqual(loaded.messages.at(-1).attempt.steps[0].usage, s.messages.at(-1).attempt.steps[0].usage);
 });

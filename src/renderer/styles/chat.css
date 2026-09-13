@@ -505,3 +505,17 @@
   color: #343b45;
   box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
 }
+
+.chat-suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.chat-tool-activity { margin: 8px 0; font-size: 12px; overflow-wrap: anywhere; }
+.chat-tool-activity summary { cursor: pointer; color: var(--text-muted, #64748b); }
+.chat-result-tag { display: inline-block; margin: 3px; }
+.chat-proposal { margin: 10px 0; padding: 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; background: var(--surface, #fff); overflow-wrap: anywhere; }
+.chat-proposal header { display: flex; align-items: center; gap: 8px; }
+.chat-proposal header img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
+.chat-proposal header small { display: block; margin-top: 3px; }
+.chat-proposal dl { margin: 10px 0; }
+.chat-proposal dt { font-size: 11px; color: var(--text-muted, #64748b); margin-top: 8px; }
+.chat-proposal dd { margin: 3px 0; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+.chat-proposal-actions { display: flex; gap: 8px; margin-top: 8px; }
+.chat-tag-diff { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; font-size: 12px; }

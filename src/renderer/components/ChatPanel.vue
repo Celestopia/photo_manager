@@ -73,12 +73,9 @@
     >
       <div v-if="!session?.messages.length" class="chat-empty">
         <div class="chat-empty-icon"><ChatIcon name="chat" /></div><h2>A closer look.</h2><p>Ask a question about your photo or video.</p>
-        <button
-          class="btn"
-          @click="text = 'Please introduce this photo for me.'"
-        >
-          Introduce this photo
-        </button>
+        <div v-if="!text.trim()" class="chat-suggestions">
+          <button v-for="example in examples" :key="example.label" class="btn" @click="fillExample(example.prompt)">{{ example.label }}</button>
+        </div>
       </div>
       <article
         v-for="m in session?.messages || []"
@@ -91,16 +88,12 @@
             <div v-else class="chat-file-tile" role="img" :aria-label="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'"><ChatIcon name="file" /><span>{{ (session.inputLabels?.[i.kind + ':' + i.id] || 'FILE').split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
           </div>
         </div>
-        <div
-          v-if="m.role === 'assistant'"
-          class="chat-markdown"
-          v-html="renderChatMarkdown(m.text)"
-        ></div>
+        <ChatRunContent v-if="m.role === 'assistant'" :message="m" :proposals="session.proposals || []" :previews="sentPreviews" />
         <p v-else class="chat-user-text">{{ m.text }}</p>
         <small v-if="m.status !== 'complete'">{{
           m.status === "pending"
             ? "Preparing inputs…"
-            : m.status === "streaming"
+            : m.status === "generating"
               ? "Replying…"
               : m.status
         }}</small>
@@ -110,7 +103,7 @@
         <p v-if="m.attempt?.error" class="chat-error">{{ m.attempt.error }}</p>
         <div class="chat-message-actions">
           <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
-          <TokenUsage v-if="m.role === 'assistant'" :usage="m.attempt?.usage" />
+          <TokenUsage v-if="m.role === 'assistant'" :usage="messageUsage(m).usage" :incomplete="messageUsage(m).incomplete" />
         </div>
         <button
           v-if="
@@ -240,7 +233,7 @@
             <input type="checkbox" v-model="groups[key]" :disabled="busy" />
             <span>{{ label }}</span>
           </label>
-          <small>Saved values only. Original files may also contain embedded metadata.</small>
+          <small>Saved values only. Tag tools can look up existing tag names and descriptions when basic metadata is included. Original files may also contain embedded metadata.</small>
         </fieldset>
       </div>
     </div>
@@ -252,8 +245,9 @@
 import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ConversationActionDialog from "./ConversationActionDialog.vue";
 import ChatImagePreviewDialog from "./ChatImagePreviewDialog.vue";
+import ChatRunContent from "./ChatRunContent.vue";
 import TokenUsage from "./TokenUsage.vue";
-import { sessionUsage } from "../domain/chat-usage.mjs";
+import { sessionUsage, messageUsage } from "../domain/chat-usage.mjs";
 import ChatIcon from "./ChatIcon.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
@@ -349,6 +343,16 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', dismissAttachm
 watch([historyOpen, busy, () => session.value?.sessionId], () => { attachmentsOpen.value = false; });
 const conversationElement = ref(null);
 const composerElement = ref(null);
+const examples = [
+  {label:'Introduce this photo',prompt:'Please introduce this photo for me.'},
+  {label:'Suggest a title',prompt:'Please suggest a concise title for this photo and prepare it for review.'},
+  {label:'Suggest a description',prompt:'Please suggest a description for this photo and prepare it for review.'},
+  {label:'Suggest tags',prompt:'Please suggest suitable existing library tags for this photo and prepare them for review. If none fit, explain why.'},
+];
+async function fillExample(prompt) {
+  text.value = inputs.value.some(i => i.mediaKind === 'video') ? prompt.replace('photo','video') : prompt;
+  await nextTick(); composerElement.value?.focus();
+}
 
 const historyAction = ref(null);
 watch(text, async () => {
