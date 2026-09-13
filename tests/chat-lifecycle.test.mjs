@@ -5,14 +5,20 @@ import { useChat } from '../src/renderer/composables/use-chat.js';
 
 function fixture(t) {
   let chat, sequence = 0, delayDescribe = null;
-  const sessions = new Map(), abandoned = [];
+  const sessions = new Map(), abandoned = [], previewCalls = [], failedPreviews = new Set(), previewDelays = new Map();
   const selectedItem = ref({ MediaId: 'A' });
   const ok = value => Promise.resolve({ ok: true, value });
   const api = {
     onEvent: () => () => {}, stop: () => ok(),
     create: () => { const s = { sessionId: String(++sequence), messages: [], attachments: [], title: '' }; sessions.set(s.sessionId, s); return ok(s); },
     describe: async (sid, input) => { if (delayDescribe) { const delay = delayDescribe; delayDescribe = null; await delay; } return ok({ ...input, name: input.id, mediaKind: 'image' }); },
-    preview: (sid, input) => ok({ previewUrl: 'data:image/jpeg;base64,preview', name: input.id }),
+    preview: async (sid, input) => {
+      previewCalls.push(input.id);
+      if (previewDelays.has(input.id)) await previewDelays.get(input.id);
+      return failedPreviews.has(input.id)
+        ? { ok: false, error: `Could not preview ${input.id}` }
+        : { ok: true, value: { previewUrl: `data:image/jpeg;base64,${input.id}`, name: input.id } };
+    },
     abandon: sid => { abandoned.push(sid); if (!sessions.get(sid).messages.length) sessions.delete(sid); return ok({}); },
     load: sid => ok(sessions.get(sid)),
     open: () => ok({ sessions: [...sessions.values()].filter(s => s.messages.length) }),
@@ -21,7 +27,12 @@ function fixture(t) {
   const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode() {}, nextSibling() {} });
   const app = renderer.createApp({ setup() { chat = useChat({ api, copyText() {}, selectedItem, libraryState: ref(null), view: ref('viewer') }); return () => null; } });
   app.mount({}); t.after(() => app.unmount());
-  return { chat, sessions, abandoned, selectedItem, delay: p => { delayDescribe = p; } };
+  return {
+    chat, sessions, abandoned, selectedItem, previewCalls,
+    delay: p => { delayDescribe = p; },
+    failPreview: id => failedPreviews.add(id),
+    delayPreview: (id, promise) => previewDelays.set(id, promise),
+  };
 }
 async function settle(f) { await nextTick(); await f.chat.open(); }
 
@@ -60,4 +71,53 @@ test('image preview state opens and is cleared with its conversation', async t =
   f.selectedItem.value = { MediaId: 'B' };
   await settle(f);
   assert.equal(c.imagePreview.value, null);
+});
+
+test('image preview navigates one attachment group without wrapping and caches results', async t => {
+  const f = fixture(t), c = f.chat;
+  await c.open();
+  const first = c.inputs.value[0];
+  const second = { ...first, id: 'B', name: 'B' };
+  const third = { ...first, id: 'C', name: 'C' };
+  const group = [first, second, third].map(input => ({ input, name: input.name || input.id }));
+  f.failPreview('B');
+
+  await c.openImagePreview(first, 'A', group);
+  assert.equal(c.imagePreview.value.index, 0);
+  assert.equal(c.imagePreview.value.items.length, 3);
+  assert.equal(await c.previousImagePreview(), false);
+
+  await c.nextImagePreview();
+  assert.equal(c.imagePreview.value.index, 1);
+  assert.equal(c.imagePreview.value.error, 'Could not preview B');
+  await c.nextImagePreview();
+  assert.equal(c.imagePreview.value.index, 2);
+  assert.equal(c.imagePreview.value.name, 'C');
+  assert.equal(await c.nextImagePreview(), false);
+
+  await c.previousImagePreview();
+  await c.previousImagePreview();
+  assert.equal(c.imagePreview.value.index, 0);
+  assert.deepEqual(f.previewCalls, ['A', 'B', 'C']);
+});
+
+test('late image preview results do not replace a newer navigation target', async t => {
+  const f = fixture(t), c = f.chat;
+  await c.open();
+  const first = c.inputs.value[0];
+  const second = { ...first, id: 'B', name: 'B' };
+  const third = { ...first, id: 'C', name: 'C' };
+  let releaseSecond;
+  f.delayPreview('B', new Promise(resolve => { releaseSecond = resolve; }));
+
+  await c.openImagePreview(first, 'A', [first, second, third]);
+  const secondPending = c.nextImagePreview();
+  const thirdPending = c.nextImagePreview();
+  await thirdPending;
+  assert.equal(c.imagePreview.value.index, 2);
+  assert.equal(c.imagePreview.value.name, 'C');
+  releaseSecond();
+  await secondPending;
+  assert.equal(c.imagePreview.value.index, 2);
+  assert.equal(c.imagePreview.value.name, 'C');
 });

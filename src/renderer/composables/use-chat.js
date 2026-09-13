@@ -116,23 +116,88 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
     previewRequest++;
     imagePreview.value = null;
   }
-  async function openImagePreview(input, name = input.name || 'Image') {
-    if (!session.value || !['image', 'gif'].includes(input.mediaKind)) return;
+  function normalizeImagePreviewGroup(input, name, candidates) {
+    const selectedKey = `${input.kind}:${input.id}`;
+    const source = Array.isArray(candidates) && candidates.length
+      ? candidates
+      : [{ input, name }];
+    const unique = new Map();
+    for (const candidate of source) {
+      const candidateInput = candidate?.input || candidate;
+      if (!['image', 'gif'].includes(candidateInput?.mediaKind)) continue;
+      const key = `${candidateInput.kind}:${candidateInput.id}`;
+      if (!unique.has(key)) unique.set(key, {
+        key,
+        input: candidateInput,
+        name: candidate?.name || candidateInput.name || 'Image',
+        resolved: false,
+        previewUrl: '',
+        error: '',
+      });
+    }
+    if (!unique.has(selectedKey)) unique.set(selectedKey, {
+      key: selectedKey,
+      input,
+      name,
+      resolved: false,
+      previewUrl: '',
+      error: '',
+    });
+    return [...unique.values()];
+  }
+  async function selectImagePreview(index) {
+    const preview = imagePreview.value;
+    if (!preview || index < 0 || index >= preview.items.length) return false;
+    const item = preview.items[index];
+    preview.index = index;
+    preview.name = item.name;
+    preview.loading = !item.resolved;
+    preview.previewUrl = item.previewUrl;
+    preview.error = item.error;
+    if (item.resolved) return true;
     const request = ++previewRequest;
-    const sessionId = session.value.sessionId;
-    imagePreview.value = { loading: true, previewUrl: '', name, error: '' };
+    const sessionId = session.value?.sessionId;
+    if (!sessionId) return false;
     try {
       const value = await unwrap(api.preview(sessionId, {
-        kind: input.kind,
-        id: input.id,
-        mode: input.mode,
+        kind: item.input.kind,
+        id: item.input.id,
+        mode: item.input.mode,
       }));
-      if (request !== previewRequest || session.value?.sessionId !== sessionId) return;
-      imagePreview.value = { loading: false, previewUrl: value.previewUrl, name: value.name, error: '' };
+      if (imagePreview.value !== preview || session.value?.sessionId !== sessionId) return false;
+      item.resolved = true;
+      item.previewUrl = value.previewUrl;
+      item.name = value.name || item.name;
+      item.error = '';
     } catch (e) {
-      if (request !== previewRequest || session.value?.sessionId !== sessionId) return;
-      imagePreview.value = { loading: false, previewUrl: '', name, error: e.message };
+      if (imagePreview.value !== preview || session.value?.sessionId !== sessionId) return false;
+      item.resolved = true;
+      item.previewUrl = '';
+      item.error = e.message;
     }
+    if (request === previewRequest && preview.index === index) {
+      preview.loading = false;
+      preview.previewUrl = item.previewUrl;
+      preview.name = item.name;
+      preview.error = item.error;
+    }
+    return true;
+  }
+  async function openImagePreview(input, name = input.name || 'Image', candidates = null) {
+    if (!session.value || !['image', 'gif'].includes(input.mediaKind)) return false;
+    const items = normalizeImagePreviewGroup(input, name, candidates);
+    const selectedKey = `${input.kind}:${input.id}`;
+    const index = Math.max(0, items.findIndex((item) => item.key === selectedKey));
+    imagePreview.value = { items, index, loading: true, previewUrl: '', name, error: '' };
+    return selectImagePreview(index);
+  }
+  async function previousImagePreview() {
+    if (!imagePreview.value || imagePreview.value.index === 0) return false;
+    return selectImagePreview(imagePreview.value.index - 1);
+  }
+  async function nextImagePreview() {
+    if (!imagePreview.value || imagePreview.value.index >= imagePreview.value.items.length - 1) return false;
+    return selectImagePreview(imagePreview.value.index + 1);
   }
   let generation = 0;
   let transition = Promise.resolve();
@@ -456,6 +521,8 @@ export function useChat({ api, copyText, selectedItem, libraryState, view }) {
   return {
     imagePreview,
     openImagePreview,
+    previousImagePreview,
+    nextImagePreview,
     closeImagePreview,
     sentPreviews,
     copiedMessage,

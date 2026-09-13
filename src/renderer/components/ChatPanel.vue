@@ -87,7 +87,7 @@
       >
         <div v-if="m.inputs.length" class="chat-sent-tiles" aria-label="Message attachments">
           <div v-for="i in m.inputs" :key="i.kind + i.id" class="chat-attachment-tile" :class="{ 'is-previewable': canPreview(sentPreviews[i.kind + ':' + i.id]) }" :title="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'">
-            <img v-if="sentPreviews[i.kind + ':' + i.id]?.previewUrl" :src="sentPreviews[i.kind + ':' + i.id].previewUrl" :alt="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment'" @click="openImagePreview(sentPreviews[i.kind + ':' + i.id], session.inputLabels?.[i.kind + ':' + i.id])" />
+            <img v-if="sentPreviews[i.kind + ':' + i.id]?.previewUrl" :src="sentPreviews[i.kind + ':' + i.id].previewUrl" :alt="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment'" @click="openSentImagePreview(m, i)" />
             <div v-else class="chat-file-tile" role="img" :aria-label="session.inputLabels?.[i.kind + ':' + i.id] || 'Attachment unavailable'"><ChatIcon name="file" /><span>{{ (session.inputLabels?.[i.kind + ':' + i.id] || 'FILE').split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
           </div>
         </div>
@@ -154,7 +154,7 @@
       <div class="chat-composer">
         <div v-if="inputs.length" class="chat-attachments" aria-label="Message attachments">
           <div v-for="(i, n) in inputs" :key="i.kind + i.id" class="chat-attachment-tile" :class="{ 'is-previewable': canPreview(i) }" :title="i.name">
-            <img v-if="i.previewUrl" :src="i.previewUrl" :alt="i.name" @click="openImagePreview(i, i.name)" />
+            <img v-if="i.previewUrl" :src="i.previewUrl" :alt="i.name" @click="openComposerImagePreview(i)" />
             <div v-else class="chat-file-tile"><ChatIcon name="file" /><span>{{ i.name.split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
             <span v-if="['gif', 'video'].includes(i.mediaKind)" class="chat-tile-badge">{{ i.mediaKind === 'gif' ? 'GIF' : 'Video' }}</span>
             <button class="chat-remove-attachment" :disabled="busy || working" :aria-label="'Remove ' + i.name" title="Remove attachment" @click="removeInput(n)"><ChatIcon name="close" /></button>
@@ -303,6 +303,35 @@ const {
   keydown,
 } = chat;
 const canPreview = (input) => ['image', 'gif'].includes(input?.mediaKind);
+const previewKey = (input) => `${input.kind}:${input.id}`;
+const staticImageExtensions = new Set(['jpg', 'jpeg', 'png', 'bmp', 'webp']);
+function sentPreviewCandidate(input) {
+  const key = previewKey(input);
+  const described = sentPreviews.value[key];
+  const name = session.value?.inputLabels?.[key] || described?.name || 'Attachment unavailable';
+  if (canPreview(described)) return { input: described, name };
+  const extension = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  const mediaKind = extension === 'gif' ? 'gif' : staticImageExtensions.has(extension) ? 'image' : '';
+  return mediaKind ? { input: { ...input, mediaKind }, name } : null;
+}
+function openComposerImagePreview(input) {
+  const candidates = inputs.value
+    .filter(canPreview)
+    .map((candidate) => ({ input: candidate, name: candidate.name }));
+  void openImagePreview(input, input.name, candidates);
+}
+function openSentImagePreview(message, input) {
+  const selected = sentPreviewCandidate(input);
+  if (!selected) return;
+  const candidates = message.inputs
+    .map(sentPreviewCandidate)
+    .filter(Boolean);
+  void openImagePreview(
+    selected.input,
+    selected.name,
+    candidates,
+  );
+}
 const metadataLabels = {
   basic: "Title, description and tags",
   location: "Location",
