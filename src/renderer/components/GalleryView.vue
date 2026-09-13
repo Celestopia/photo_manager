@@ -1,11 +1,7 @@
 <template>
 <header class="topbar gallery-topbar">
-  <div class="left-tools gallery-header-tools"><GallerySettingsMenu /><button class="btn icon-btn gallery-reset" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button><div class="gallery-brand"><img :src="appIcon" alt="" /><span>PhotoManager</span></div></div>
-  <div class="search-panel">
-    <select v-model="query.search.field" class="input"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option></select>
-    <input class="input grow" v-model="query.search.value" placeholder="Enter search text" @keydown.enter="applySearch" />
-    <button class="btn btn-primary" @click="applySearch">Search</button>
-  </div>
+  <div class="left-tools gallery-header-tools"><GallerySettingsMenu /><button class="btn icon-btn gallery-reset" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
+  <div class="gallery-brand"><img :src="appIcon" alt="" /><span>PhotoManager</span></div>
   <div class="gallery-right-tools">
     <button v-if="!isSelectionMode" class="btn batch-selection-trigger" @click="enterSelectionMode">Batch operation</button>
     <div class="window-controls">
@@ -21,6 +17,13 @@
       <div class="gallery-controls-drawer" :class="{ expanded: galleryControlsExpanded }">
         <Transition name="gallery-filters">
         <section v-if="galleryControlsExpanded" id="gallery-filter-panel" class="gallery-controls-panel">
+          <div class="gallery-controls-search">
+            <div class="search-panel">
+              <select v-model="query.search.field" class="input" aria-label="Search field"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option></select>
+              <input class="input grow" v-model="query.search.value" placeholder="Enter search text" aria-label="Search text" @keydown.enter="applySearch" />
+              <button class="btn btn-primary" @click="applySearch">Search</button>
+            </div>
+          </div>
           <div class="gallery-controls-primary">
             <div class="toolbar-group"><label>Album</label><RegistryFilterPicker kind="album" label="Album" /></div>
             <div class="toolbar-group"><label>Tags</label><RegistryFilterPicker kind="tag" label="Tags" /></div>
@@ -57,8 +60,8 @@
         <button
           type="button"
           class="gallery-controls-toggle"
-          :data-tip="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
-          :aria-label="galleryControlsExpanded ? 'Collapse filters and sorting' : 'Expand filters and sorting'"
+          :data-tip="galleryControlsExpanded ? 'Collapse search, filters, and sorting' : 'Expand search, filters, and sorting'"
+          :aria-label="galleryControlsExpanded ? 'Collapse search, filters, and sorting' : 'Expand search, filters, and sorting'"
           :aria-expanded="galleryControlsExpanded"
           aria-controls="gallery-filter-panel"
           @click="onToggleControls"

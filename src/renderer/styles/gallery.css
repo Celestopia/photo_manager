@@ -51,6 +51,11 @@
 }
 .gallery-controls-primary,
 .gallery-controls-secondary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gallery-controls-search { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.gallery-controls-search .search-panel { width: min(100%, 620px); flex-wrap: wrap; }
+.gallery-controls-search .search-panel > select { flex: 0 0 110px; }
+.gallery-controls-search .search-panel > .grow { flex: 1 1 280px; min-width: 180px; }
+.gallery-controls-primary,
 .gallery-controls-secondary { padding-top: 10px; border-top: 1px solid var(--line); }
 .toolbar-group { display: flex; align-items: center; gap: 8px; }
 .toolbar-group > label,
@@ -315,11 +320,11 @@
 .gallery-settings-menu button span { text-align: center; font-family: "Segoe UI Symbol", "Segoe UI", sans-serif; }
 .gallery-settings-separator { height: 1px; margin: 5px 0; background: var(--line); }
 
-.gallery-topbar { position: relative; z-index: 90; }
+.gallery-topbar { position: relative; z-index: 90; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 .gallery-right-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; -webkit-app-region: no-drag; }
 .batch-selection-trigger { min-width: 132px; height: 38px; padding: 0 18px; border-radius: 6px; font-weight: 600; white-space: nowrap; }
 .gallery-header-tools { align-items: center; gap: 10px; min-width: 0; }
-.gallery-brand { margin-left: 8px; display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 18px; font-weight: 700; letter-spacing: -.4px; }
+.gallery-brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 18px; font-weight: 700; letter-spacing: -.4px; }
 .gallery-brand img { width: 30px; height: 30px; }
 .gallery-topbar .icon-btn { width: 36px; height: 36px; flex: 0 0 36px; padding: 0; background: var(--bg-card); }
 .gallery-settings-anchor, .gallery-settings-anchor * { -webkit-app-region: no-drag; }

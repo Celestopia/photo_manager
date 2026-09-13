@@ -57,7 +57,9 @@ test("gallery control defaults use all ratings and privacy level one", () => {
   const filters = createDefaultGalleryFilters();
   assert.deepEqual(filters.ratingLevels, []);
   assert.deepEqual(filters.privacyLevels, [1]);
-  assert.equal(hasNonDefaultGalleryControls({ filters, sortBy: "shootingTime", sortOrder: "desc" }), false);
+  assert.equal(hasNonDefaultGalleryControls({ filters, search: { field: "title", value: "" }, sortBy: "shootingTime", sortOrder: "desc" }), false);
+  assert.equal(hasNonDefaultGalleryControls({ filters, search: { field: "title", value: "  bridge  " }, sortBy: "shootingTime", sortOrder: "desc" }), true);
+  assert.equal(hasNonDefaultGalleryControls({ filters, search: { field: "filename", value: "   " }, sortBy: "shootingTime", sortOrder: "desc" }), false);
   assert.equal(hasNonDefaultGalleryControls({ filters: { ...filters, privacyLevels: [] }, sortBy: "shootingTime", sortOrder: "desc" }), true);
   assert.equal(hasNonDefaultGalleryControls({ filters, sortBy: "shootingTime", sortOrder: "asc" }), true);
 });

@@ -50,6 +50,7 @@ export function hasNonDefaultGalleryControls(query) {
     || normalizeGalleryLevels(filters.ratingLevels).length
     || privacyLevels.length !== 1
     || privacyLevels[0] !== 1
+    || String(query?.search?.value || "").trim()
     || query?.sortBy !== "shootingTime"
     || query?.sortOrder !== "desc"
   );
