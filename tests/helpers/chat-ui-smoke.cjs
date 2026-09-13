@@ -115,7 +115,8 @@ async function run() {
         {index:0,id:'title-review',type:'function',function:{name:'propose_title',arguments:JSON.stringify({mediaId,title:'Reviewed title'})}},
         {index:1,id:'description-review',type:'function',function:{name:'propose_description',arguments:JSON.stringify({mediaId,description:'Decline this description'})}}
       ]};
-      res.end('data: '+JSON.stringify({choices:[{delta,finish_reason:done?'stop':'tool_calls'}]})+'\n\ndata: [DONE]\n\n');
+      const finish = () => res.end('data: '+JSON.stringify({choices:[{delta,finish_reason:done?'stop':'tool_calls'}]})+'\n\ndata: [DONE]\n\n');
+      if (done) setTimeout(finish, 1200); else finish();
       return;
     }
     res.writeHead(200, { "Content-Type": "text/event-stream" });
@@ -406,7 +407,13 @@ async function run() {
   await click('.viewer-sidebar-tabs button:last-child');
   await setValue('.chat-composer textarea','AGENT TOOL TEST');
   await click('.chat-composer .btn-primary');
+  await waitFor(`document.querySelectorAll('.chat-proposal').length===2`);
+  await click('.viewer-sidebar-tabs button:first-child');
+  await sleep(1600);
+  await click('.viewer-sidebar-tabs button:last-child');
   await waitFor(`document.querySelectorAll('.chat-proposal').length===2 && document.querySelector('[aria-label="Send message"]')`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.chat-conversation').textContent.includes('Reply stopped.')`),false);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.chat-conversation').textContent.includes('Suggestions are ready for your review.')`),true);
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.chat-proposal .btn-primary').disabled`),true);
   assert.deepEqual(await fsp.readFile(path.join(library,'.photo_manager','data','photo_metadata.jsonl')),metadata);
   await click('.viewer-sidebar-tabs button:first-child');

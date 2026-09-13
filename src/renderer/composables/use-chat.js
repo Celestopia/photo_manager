@@ -330,11 +330,10 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
     await transition;
     if (!session.value) await newChat();
   }
-  async function close() {
+  function close() {
+    // Panel visibility does not own the lifetime of the active run.
     closeImagePreview();
     visible.value = false;
-    await transition;
-    await action(stop);
   }
   async function showHistory() {
     return action(async () => {
