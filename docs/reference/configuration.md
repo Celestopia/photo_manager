@@ -35,6 +35,7 @@ Global data are split between roaming configuration and machine-specific state:
   app-data\
     state.json
     chat-provider.yml        # optional Assistant provider; created from its Settings menu
+    search-provider.yml      # independent optional Tavily key and environment fallback
   logs\                     # startup diagnostics produced before a library opens
   session-data\             # localStorage, Chromium cache, and session state
   crash-dumps\
@@ -95,3 +96,5 @@ Standard layout:
 `.photo_manager` is not given the Windows hidden attribute. The scanner excludes only this reserved directory at the library root; other ordinary hidden directories are still scanned.
 
 Assistant configuration and its strict conversation/attachment records are documented in the [chat implementation](../agent/implementation.md) and [session storage](../agent/sessions.md) references. Chat uses the active library lock. Sessions live under `chat/v2/`. Reviewed metadata changes share the existing recoverable transaction system with their session decision; tools never create registry entries.
+
+Search settings use the exact YAML fields `schemaVersion: 1`, `provider: tavily`, `apiKey: ''`, and `apiKeyEnv: TAVILY_API_KEY`. They are machine-local and independent of the Assistant key. Web-off chat does not require this file. Settings opening can create defaults; saving and testing are explicit, serialized operations. Stored/environment keys never return to the renderer. A blank key preserves the saved value; explicit removal preserves the separate environment fallback. In-flight turns use a configuration snapshot; other windows are notified after saves. Globe permission is transient and is not global configuration.

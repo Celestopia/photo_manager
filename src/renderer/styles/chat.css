@@ -519,3 +519,13 @@
 .chat-proposal dd { margin: 3px 0; white-space: pre-wrap; max-height: 220px; overflow: auto; }
 .chat-proposal-actions { display: flex; gap: 8px; margin-top: 8px; }
 .chat-tag-diff { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; font-size: 12px; }
+.chat-web-toggle.active { background: #dcecff; color: #155da8; border-color: #80b3ef; }
+.provider-tabs { display: flex; gap: 8px; margin: 12px 0; }
+.provider-tabs button { padding: 7px 12px; border: 1px solid var(--border, #cfe0f3); border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.provider-tabs button[aria-selected="true"] { background: #dcecff; color: #155da8; }
+.chat-web-source { display: grid; gap: 4px; margin: 8px 0; overflow-wrap: anywhere; }
+.chat-web-source button, .chat-source-citation { color: #1765ad; border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; padding: 0; overflow-wrap: anywhere; }
+.chat-source-citation { margin: 0 2px; font-size: .85em; }
+.chat-web-source button:hover, .chat-source-citation:hover { text-decoration: underline; }
+.chat-web-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; }
+.chat-web-usage { display: block; margin: 5px 0; color: #657e96; }

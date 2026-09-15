@@ -1,5 +1,7 @@
 # Preparing Inputs for the Model
 
+Web-enabled turns additionally send minimal generated text queries to Tavily and selected public source URLs for extraction. Images and the conversation are not automatically sent to Tavily. Source excerpts and extracted text return as untrusted tool evidence to the Assistant model. Search keeps at most five results, excerpts at most 1 KiB UTF-8 each, and page text at most 10 KiB, further reduced to fit shared result budgets. Historical web results use a 32 KiB allowance while preserving whole-turn boundaries; omitted history is reported. Web-off turns may reuse retained evidence without new search traffic. See the implementation and session references for contracts and provenance.
+
 This page explains what happens between choosing an input and sending a message. It continues [Using the Chat Panel](interface.md). These rules are implemented by `src/main/chat/inputs.js` and `context-builder.js`.
 
 ## 1. Check Whether the Input Is Supported

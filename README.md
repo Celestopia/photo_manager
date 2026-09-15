@@ -12,12 +12,15 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Permanently delete one media item from the viewer or a selected batch from the gallery, removing both files and metadata after confirmation.
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.
+- Enable optional Tavily web research, inspect cited sources, and review researched metadata suggestions before saving.
 - Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.
 - Launch PhotoManager again to open another independent library window; the same library cannot be opened twice.
 
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
-Assistant is available in the viewer's right sidebar. Open Options beside its message box to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).
+Assistant is available in the viewer's right sidebar. Open the Provider settings gear in the Assistant header to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).
+
+Configure Tavily separately in **Provider settings → Web search**, then use the composer globe to enable search for the current conversation. Search is off by default. Its connection test uses a generic public query and page; it sends no library content.
 
 ## Install
 

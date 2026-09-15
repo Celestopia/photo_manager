@@ -23,6 +23,7 @@ function resolveApplicationPaths(environment = process.env) {
     localAppDataDir: path.join(localRoot, "app-data"),
     stateFile: path.join(localRoot, "app-data", "state.json"),
     chatProviderFile: path.join(localRoot, "app-data", "chat-provider.yml"),
+    searchProviderFile: path.join(localRoot, "app-data", "search-provider.yml"),
     logsDir: path.join(localRoot, "logs"),
     sessionDataDir: path.join(localRoot, "session-data"),
     crashDumpsDir: path.join(localRoot, "crash-dumps"),

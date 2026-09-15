@@ -6,8 +6,10 @@
     <div
       v-if="step.kind === 'completion' && step.text"
       class="chat-markdown"
-      v-html="renderChatMarkdown(step.text)"
+      @click="citationClick($event, step.id)"
+      v-html="renderChatMarkdown(step.text, sourcesBefore(session, message, step.id))"
     ></div>
+    <p v-if="step.kind === 'completion' && message.status === 'executing' && pendingWebCall(step)" class="chat-notice" role="status">{{ pendingWebCall(step).name === 'web_search' ? 'Searching the web…' : 'Reading a source…' }}</p>
     <template v-if="step.kind === 'tool'">
       <details class="chat-tool-activity">
         <summary>
@@ -28,9 +30,22 @@
         <p v-else-if="step.outcome.status === 'no_change'">
           The suggested value is already saved.
         </p>
-        <p v-else>
+        <template v-else-if="step.outcome.provider === 'tavily'">
+          <p v-if="callQuery(step.callId)">{{ callQuery(step.callId) }}</p>
+          <p v-if="step.outcome.sources && !step.outcome.sources.length">No usable public sources found.</p>
+          <div v-for="source in step.outcome.sources || []" :key="source.sourceId" class="chat-web-source">
+            <button type="button" @click="openSource(source.sourceId)">{{ source.title || source.url }}</button>
+            <small>{{ sourceHost(source.url) }}</small><p>{{ source.excerpt }}</p>
+          </div>
+          <p v-if="step.outcome.text" class="chat-web-text">{{ step.outcome.text }}</p>
+          <small v-if="step.outcome.truncated">Content shortened to fit the request limits.</small>
+          <small v-if="step.outcome.discardedCount">{{ step.outcome.discardedCount }} sources omitted.</small>
+          <small>Reported web credits: {{ step.outcome.credits ?? 'unknown' }}</small>
+        </template>
+        <p v-else-if="step.outcome.status === 'proposal_created'">
           Prepared for review. No metadata has been saved by the tool.
         </p>
+        <p v-else>Tool completed.</p>
       </details>
       <article
         v-for="p in proposals.filter((p) => p.callId === step.callId)"
@@ -105,16 +120,35 @@
       </article>
     </template>
   </template>
+  <details v-if="ownSources.length" class="chat-tool-activity chat-source-list"><summary>Sources · {{ ownSources.length }}</summary>
+    <div v-for="source in ownSources" :key="source.sourceId" class="chat-web-source"><button type="button" @click="openSource(source.sourceId)">{{ source.title || source.url }}</button><small>{{ sourceHost(source.url) }}</small></div>
+  </details>
+  <small v-if="webUsage(message)" class="chat-web-usage">{{ webUsage(message) }}</small>
 </template>
 <script setup>
-import { inject } from "vue";
+import { inject, computed } from "vue";
 import { fieldLabel, tagName, value, statusLabel, outcomeLabel, toolLabel } from "../domain/chat-tools.mjs";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
-defineProps({
+import { sourcesBefore, webUsage } from '../domain/chat-sources.mjs';
+const props = defineProps({
   message: Object,
   proposals: Array,
   previews: Object,
 });
-const { busy, working, decideProposal, reviewBlocked } = inject(CHAT_CONTEXT);
+const { busy, working, decideProposal, reviewBlocked, session, openSource } = inject(CHAT_CONTEXT);
+const ownSources = computed(() => (props.message.attempt?.steps || []).flatMap(s => s.kind === 'tool' ? s.outcome.sources || [] : []));
+const sourceHost = url => { try { return new URL(url).hostname; } catch { return ''; } };
+function citationClick(event, stepId) {
+  const button = event.target.closest('button[data-source-id]');
+  if (button && event.currentTarget.contains(button) && sourcesBefore(session.value, props.message, stepId).some(s => s.sourceId === button.dataset.sourceId)) void openSource(button.dataset.sourceId);
+}
+function callQuery(id) {
+  const call = (props.message.attempt?.steps || []).flatMap(s => s.calls || []).find(c => c.id === id && c.name === 'web_search');
+  try { return call ? JSON.parse(call.arguments).query : ''; } catch { return ''; }
+}
+function pendingWebCall(step) {
+  const call = step.calls.find(c => !props.message.attempt.steps.some(s => s.kind === 'tool' && s.callId === c.id));
+  return ['web_search', 'read_web_page'].includes(call?.name) ? call : null;
+}
 </script>

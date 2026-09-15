@@ -55,7 +55,7 @@ function reply(text = "Done", calls = []) {
       "data: [DONE]\n\n",
   );
 }
-async function fixture(t, respond) {
+async function fixture(t, respond, searchFetchImpl) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "photo-manager-agent-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const paths = resolveLibraryPaths(root),
@@ -124,6 +124,8 @@ async function fixture(t, respond) {
       ),
   });
   const requests = [];
+  const searchConfigFile = path.join(root, 'search.yml');
+  if (searchFetchImpl) await fs.writeFile(searchConfigFile, yaml.dump({ schemaVersion: 1, provider: 'tavily', apiKey: 'test-only', apiKeyEnv: '' }));
   const ctx = { id, tagId, otherTag, index, tags, requests };
   const chat = createChatService({
     getLibrary: () => library,
@@ -143,6 +145,8 @@ async function fixture(t, respond) {
           }
         : {},
     configFile,
+    searchConfigFile,
+    searchFetchImpl,
     getMediaToolPaths: () => ({}),
     tags: () => [...tags.values()],
     commitMetadata: commit,
@@ -160,6 +164,7 @@ async function fixture(t, respond) {
     text = "Suggest metadata",
     inputs = [{ kind: "media", id, mode: "optimized" }],
     groups = defaultGroups(),
+    webEnabled = false,
   ) {
     await chat.send({
       sessionId: session.sessionId,
@@ -167,7 +172,7 @@ async function fixture(t, respond) {
       inputs,
       groups,
       excludeInputs: [],
-      acceptChanges: false,
+      acceptChanges: false, webEnabled,
       retryOf: null,
     });
     for (let n = 0; chat.isBusy() && n < 500; n++)
@@ -194,6 +199,32 @@ async function fixture(t, respond) {
     backups: () => backups,
   };
 }
+
+test('web research can produce an existing-tag lookup and a reviewed metadata change in one serial turn', async t => {
+  let active = 0, maxActive = 0, webCalls = 0;
+  const f = await fixture(t, (body, ctx) => {
+    const outcomes = body.messages.filter(m => m.role === 'tool').map(m => JSON.parse(m.content));
+    if (!outcomes.length) return reply('', [{ name: 'web_search', args: { query: 'Eiffel Tower' } }]);
+    const source = outcomes[0].sources[0];
+    if (outcomes.length === 1) return reply('', [{ name: 'read_web_page', args: { sourceId: source.sourceId } }]);
+    if (outcomes.length === 2) return reply('', [{ name: 'find_library_tags', args: { query: 'Architecture', cursor: null } }]);
+    if (outcomes.length === 3) return reply('', [{ name: 'propose_title', args: { mediaId: ctx.id, title: 'Eiffel Tower in Paris' } }]);
+    return reply(`Research supports this title [source:${source.sourceId}].`);
+  }, async url => {
+    active++; maxActive = Math.max(maxActive, active); webCalls++;
+    await new Promise(r => setTimeout(r, 5)); active--;
+    return new Response(JSON.stringify({ results: [url.endsWith('/search')
+      ? { title: 'Tower', url: 'https://www.toureiffel.paris/en', content: 'Paris landmark' }
+      : { url: 'https://www.toureiffel.paris/en', raw_content: 'The Eiffel Tower is in Paris.' }], usage: { credits: 1 } }));
+  });
+  const session = await f.send('Research and suggest a title', undefined, undefined, true);
+  assert.equal(maxActive, 1); assert.equal(webCalls, 2); assert.equal(session.messages[1].status, 'complete');
+  assert.equal(f.index.get(f.id).Customization.Title, 'Original');
+  assert.equal(session.proposals.length, 1);
+  await f.chat.decide(session.sessionId, session.proposals[0].id, 'accept');
+  assert.equal(f.index.get(f.id).Customization.Title, 'Eiffel Tower in Paris');
+  assert.equal((await f.store.load(session.sessionId)).proposals[0].status, 'accepted');
+});
 
 test("tool-only streaming assembles interleaved fragments and retains trailing usage", async () => {
   const data =

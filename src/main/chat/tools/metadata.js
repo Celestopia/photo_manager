@@ -154,7 +154,10 @@ const definitions = [
         )
           throw new Error("Invalid tag operation");
         a.tagIds.forEach(uuid);
-      } else str(a[name], max);
+      } else {
+        str(a[name], max);
+        if (/\[source:/i.test(a[name])) throw new Error('Keep source citations in the explanation, not metadata values');
+      }
     },
     validateResult: validateProposalResult,
     execute: (a, ctx, call) => ctx.propose(field, a, call),

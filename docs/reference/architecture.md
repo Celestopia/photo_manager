@@ -43,6 +43,8 @@ The installed runtime distinguishes the code root from the program-resource root
 
 Assistant adds the `chat:*` request allowlist and `chat:event` updates through `photoManagerApi.chat`. Its main-process services, renderer composable, provider boundary and cancellation lifecycle are documented in [Viewer Chat Implementation](../agent/implementation.md).
 
+Web search adds `chat:searchConfiguration`, `chat:saveSearchConfiguration`, `chat:testSearch`, and `chat:openSource`. The last accepts only `sessionId/sourceId`; the owning main service resolves and validates the stored URL for the system browser. Send includes an explicit Boolean `webEnabled`, while stored attempts record availability through their tool contracts. All commands retain sender/frame isolation.
+
 Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directories, and info; `maintenance:start/show-output`; `gallery:query`; `photo:update-customization/batch-update/delete-media`; list/create/update/delete-global for four registries; single and batch clipboard/system media actions including `photo:copy-file/copy-files`; `photo:report-playback`; and `window:action/get-state`. Events are `library:state-changed`, `library:progress`, `maintenance:progress`, and `window:state-changed`.
 
 Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation payloads camelCase, and each channel rejects unknown fields and obsolete PascalCase aliases. `FilePath` is never an action target: the main process resolves `MediaId` through its current index and verifies the resulting path remains inside the active library before any filesystem operation.

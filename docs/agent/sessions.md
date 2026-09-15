@@ -1,5 +1,13 @@
 # Saving Conversations and Attachments
 
+## Web Evidence in v2 Sessions
+
+Web results extend the existing versioned tool contracts without changing the session envelope or migrating Stage 1 records. Search success contains exactly `status`, `provider`, `retrievedAt`, `sources`, `discardedCount`, `truncated`, and `credits`. Each source contains `sourceId`, `title`, `url`, `excerpt`, `publishedAt`, and `truncated`. Read success contains `status`, `provider`, `retrievedAt`, `sourceId`, `text`, `truncated`, and `credits`. Errors retain the existing `status/code/message` shape. Provider is `tavily`; timestamps are canonical ISO; unavailable publication dates/credits are null, and reported credits may be fractional.
+
+Source UUIDs share session identity validation. Read results must resolve an earlier search in the same attempt and match their call argument. Titles are bounded to 300 UTF-16 code units, URLs to 2,048, excerpts to 1 KiB UTF-8, and extracted text to 10 KiB, subject to smaller serialized budgets. Invalid and duplicate URLs are counted as discarded. Repeated retrievals have new IDs, preserving earlier evidence. Catalogs, display numbering and usage totals are derived rather than persisted twice.
+
+Enabled tool contracts record historical permission; loading a conversation never restores the globe setting or performs network work. Sources remain available without credentials and follow normal conversation deletion and backup exclusions. Whole pages, remote assets, credentials and duplicate caches are not saved. Older application builds may reject new web contracts; downgrade compatibility is not provided.
+
 This page explains how conversations survive closing the viewer or restarting the application. It follows [Preparing Inputs for the Model](inputs.md). Session persistence is implemented by `src/main/chat/store.js`, with strict records validated by `schema.js`.
 
 ## Give Each Conversation Its Own Identity

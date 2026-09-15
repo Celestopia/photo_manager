@@ -3,7 +3,7 @@ const { assertExactObjectKeys } = require("../../shared/object-schema");
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const runtime = require("./runtime");
-const { metadataTools, definitions } = require("./tools/metadata");
+const { tools, definitions } = require("./tools");
 const { assertProposal } = require("./proposals");
 const MODES = ["optimized", "original", "sampled"];
 function id(value) {
@@ -210,6 +210,7 @@ function assertSession(s, libraryId) {
         enabled.add(t.name);
       }
       string(run.reason, 100);
+      const webSources = new Set();
       const calls = new Map(),
         results = new Set();
       for (const step of run.steps) {
@@ -231,10 +232,18 @@ function assertSession(s, libraryId) {
           )
             throw new Error("Invalid tool result reference");
           results.add(step.callId);
-          metadataTools.validateOutcome(
+          tools.validateOutcome(
             calls.get(step.callId).name,
             step.outcome,
           );
+          const call = calls.get(step.callId);
+          if (step.outcome.provider === 'tavily' && Buffer.byteLength(JSON.stringify(step.outcome)) > 16384) throw new Error('Web result exceeds limit');
+          if (step.outcome.status !== 'error' && !enabled.has(call.name)) throw new Error('Unauthorized stored tool result');
+          if (call.name === 'web_search' && step.outcome.status === 'success') {
+            for (const source of step.outcome.sources) { unique(source.sourceId); webSources.add(source.sourceId); }
+          }
+          if (call.name === 'read_web_page' && step.outcome.status === 'success'
+            && (!webSources.has(step.outcome.sourceId) || JSON.parse(call.arguments).sourceId !== step.outcome.sourceId)) throw new Error('Invalid source provenance');
           if (
             step.outcome.status === "proposal_created" &&
             !s.proposals.some((p) => p.id === step.outcome.proposalId)

@@ -21,6 +21,7 @@ function registerChatIpc({
         }
       : electronIpcMain;
   const fields = {
+    openSource: ['sessionId', 'sourceId'],
     decide: ["sessionId", "proposalId", "decision"],
     load: ["sessionId"],
     describe: ["sessionId", "input"],
@@ -49,6 +50,10 @@ function registerChatIpc({
     rename: (p) => chat.rename(p.sessionId, p.title),
     removeInput: (p) => chat.removeInput(p.sessionId, p.attachmentId),
     configuration: () => chat.configuration(),
+    searchConfiguration: () => chat.searchConfiguration(),
+    saveSearchConfiguration: async p => { const result = await chat.saveSearchConfiguration(p); onConfigurationSaved?.(getWindow()); return result; },
+    testSearch: () => chat.testSearch(),
+    openSource: async p => { id(p.sourceId); await shell.openExternal(await chat.sourceUrl(p.sessionId, p.sourceId)); return true; },
     saveConfiguration: async (p) => {
       const configuration = await chat.saveConfiguration(p);
       onConfigurationSaved?.(getWindow());
@@ -128,7 +133,7 @@ function registerChatIpc({
           id(p.sessionId);
         } else if (
           name !== "send" &&
-          name !== "saveConfiguration" &&
+          name !== "saveConfiguration" && name !== 'saveSearchConfiguration' &&
           p !== undefined
         ) {
           throw new Error("This chat command accepts no arguments.");

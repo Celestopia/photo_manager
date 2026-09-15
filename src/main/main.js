@@ -427,6 +427,7 @@ function createSessionChat(session) {
       prepareWrite:prepareLibraryWrite,metadataFile:()=>resolveDataFile(DATA_FILE_NAMES.metadata),enrich:enrichItem,touchManifest:touchLibraryManifest}),
     configFile: APPLICATION_PATHS.chatProviderFile,
     getMediaToolPaths: () => resolveMediaToolPaths(PROGRAM_RESOURCE_ROOT, config.media),
+    searchConfigFile: APPLICATION_PATHS.searchProviderFile,
     emit: (payload) => {
       const window = session.runtime.mainWindow;
       if (window && !window.isDestroyed()) window.webContents.send("chat:event", payload);

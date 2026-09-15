@@ -1,6 +1,8 @@
 /* Run with Electron: node_modules/.bin/electron tests/helpers/chat-ui-smoke.cjs.
    All library/configuration data and the fake provider are isolated to this test. */
-const { app, BrowserWindow, dialog, clipboard } = require("electron");
+const { app, BrowserWindow, dialog, clipboard, shell } = require("electron");
+const openedSources = [];
+shell.openExternal = async url => { openedSources.push(url); };
 app.disableHardwareAcceleration();
 let copiedText = null;
 clipboard.writeText = (value) => { copiedText = value; };
@@ -106,6 +108,16 @@ async function run() {
     const request=JSON.parse(body);
     requests.push(request);
     const latestUser=request.messages.filter(m=>m.role==='user').at(-1);
+    if (JSON.stringify(latestUser).includes('WEB TOOL TEST')) {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      const outcomes = request.messages.filter(m => m.role === 'tool').map(m => JSON.parse(m.content));
+      const source = outcomes.find(o => o.sources)?.sources[0];
+      const name = source ? 'read_web_page' : 'web_search';
+      const done = outcomes.some(o => o.text);
+      const delta = done ? { content: `The Eiffel Tower is in Paris [source:${source.sourceId}].` } : { tool_calls: [{ index: 0, id: name, type: 'function', function: { name, arguments: JSON.stringify(source ? { sourceId: source.sourceId } : { query: 'Eiffel Tower' }) } }] };
+      res.end('data: ' + JSON.stringify({ choices: [{ delta, finish_reason: done ? 'stop' : 'tool_calls' }] }) + '\n\ndata: [DONE]\n\n');
+      return;
+    }
     if(JSON.stringify(latestUser).includes('AGENT TOOL TEST')) {
       res.writeHead(200, { 'Content-Type':'text/event-stream' });
       const catalog=request.messages.find(m=>m.role==='system' && m.content.startsWith('Authorized target catalog'));
@@ -149,6 +161,11 @@ async function run() {
       apiKey: "test-only",
     }),
   );
+  const searchProvider = require('../../src/main/chat/search-provider');
+  const originalAdapter = searchProvider.adapter;
+  searchProvider.adapter = c => originalAdapter(c, async url => new Response(JSON.stringify({ results: [url.endsWith('/search')
+    ? { title: 'The Eiffel Tower — official visitor information', url: 'https://www.toureiffel.paris/en', content: 'The Eiffel Tower is a landmark in Paris.' }
+    : { url: 'https://www.toureiffel.paris/en', raw_content: 'The Eiffel Tower is in Paris, France.' }], usage: { credits: 0.2 } })));
   require("../../src/main/main");
   for (let n = 0; n < 100 && !win; n++) {
     win = BrowserWindow.getAllWindows()[0];
@@ -432,8 +449,33 @@ async function run() {
   await click('.viewer-sidebar-tabs button:last-child');
   await fsp.writeFile(path.resolve('release/chat-tools.png'),(await win.webContents.capturePage()).toPNG());
 
+  await click('[aria-label="New chat"]');
+  await waitFor(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed') === 'false' && !document.querySelector('[aria-label="Web search"]').disabled`);
+  await click('[aria-label="Web search"]');
+  await waitFor(`document.querySelector('.provider-tabs [aria-selected="true"]')?.textContent === 'Web search'`);
+  await setValue('.provider-dialog input[type=password]', 'test-search-only');
+  await click('.provider-save');
+  await waitFor(`Boolean(document.querySelector('.provider-banner-success'))`);
+  await click('.provider-dialog footer button');
+  await waitFor(`document.querySelector('.provider-banner-success')?.textContent.includes('extraction succeeded')`);
+  await fsp.writeFile(path.resolve('release/web-settings.png'), (await win.webContents.capturePage()).toPNG());
+  await click('[aria-label="Close provider settings"]');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed')`), 'false');
+  await click('[aria-label="Web search"]');
+  await waitFor(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed') === 'true'`);
+  await setValue('.chat-composer textarea', 'WEB TOOL TEST');
+  await click('[aria-label="Send message"]');
+  await waitFor(`Boolean(document.querySelector('.chat-source-citation')) && Boolean(document.querySelector('[aria-label="Send message"]'))`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed')`), 'true');
+  await click('.chat-source-citation');
+  for (let i = 0; !openedSources.length && i < 100; i++) await sleep(20);
+  assert.deepEqual(openedSources, ['https://www.toureiffel.paris/en']);
+  await fsp.writeFile(path.resolve('release/web-search.png'), (await win.webContents.capturePage()).toPNG());
+  await click('[aria-label="New chat"]');
+  await waitFor(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed') === 'false'`);
+
   console.log(
-    "CHAT_UI_SMOKE_PASS: viewer, IME, Markdown, original bytes, Stop, History, paste, deletion, tool calls, dirty-draft guard, Accept and Decline.",
+    "CHAT_UI_SMOKE_PASS: viewer, IME, Markdown, original bytes, Stop, History, paste, deletion, review tools, web settings, search/read, citations, external opening and permission reset.",
   );
 }
 run()

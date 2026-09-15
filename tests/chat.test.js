@@ -289,7 +289,7 @@ test("service sends only selected inputs, persists provenance and leaves sources
     inputs: [{ kind: "media", id: mid, mode: "original" }],
     groups: defaultGroups(),
     excludeInputs: [],
-    acceptChanges: false,
+    acceptChanges: false, webEnabled: false,
     retryOf: null,
   });
   const saved = await finished;
@@ -365,7 +365,7 @@ async function serviceFixture(t, fetchImpl) {
       inputs: [],
       groups: defaultGroups(),
       excludeInputs: [],
-      acceptChanges: false,
+      acceptChanges: false, webEnabled: false,
       retryOf: null,
       ...overrides,
     });
@@ -497,7 +497,7 @@ test("stopping a stream saves its partial reply and an explicit retry creates an
     inputs: [],
     groups: defaultGroups(),
     excludeInputs: [],
-    acceptChanges: false,
+    acceptChanges: false, webEnabled: false,
     retryOf: null,
   });
   await receiving;

@@ -183,6 +183,7 @@
             >
               <ChatIcon name="options" />
             </button>
+            <button class="btn chat-web-toggle" :class="{ active: webEnabled }" :aria-pressed="webEnabled" :title="webEnabled ? 'Web search on' : 'Web search off'" aria-label="Web search" :disabled="busy || working" @click="toggleWeb"><ChatIcon name="globe" /></button>
           </div>
           <button v-if="busy" class="btn btn-primary" title="Stop response" aria-label="Stop response" @click="stop"><ChatIcon name="stop" /></button
           ><button
@@ -253,6 +254,7 @@ import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 const chat = inject(CHAT_CONTEXT);
 const {
+  webEnabled, toggleWeb,
   imagePreview,
   openImagePreview,
   sentPreviews,

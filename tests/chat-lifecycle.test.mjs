@@ -5,10 +5,12 @@ import { useChat } from '../src/renderer/composables/use-chat.js';
 
 function fixture(t) {
   let chat, sequence = 0, delayDescribe = null, receive, stops = 0;
-  const sessions = new Map(), abandoned = [], previewCalls = [], failedPreviews = new Set(), previewDelays = new Map();
+  const sessions = new Map(), abandoned = [], previewCalls = [], failedPreviews = new Set(), previewDelays = new Map(), payloads = [];
+  let configured = true;
   const selectedItem = ref({ MediaId: 'A' });
   const ok = value => Promise.resolve({ ok: true, value });
   const api = {
+    searchConfiguration: () => ok({ provider: 'tavily', apiKey: '', apiKeyEnv: '', clearKey: false, hasKey: configured, configured }),
     onEvent: fn => { receive=fn; return () => {}; }, stop: () => { stops++; return ok(); },
     create: () => { const s = { sessionId: String(++sequence), messages: [], attachments: [], title: '' }; sessions.set(s.sessionId, s); return ok(s); },
     describe: async (sid, input) => { if (delayDescribe) { const delay = delayDescribe; delayDescribe = null; await delay; } return ok({ ...input, name: input.id, mediaKind: 'image' }); },
@@ -22,19 +24,31 @@ function fixture(t) {
     abandon: sid => { abandoned.push(sid); if (!sessions.get(sid).messages.length) sessions.delete(sid); return ok({}); },
     load: sid => ok(sessions.get(sid)),
     open: () => ok({ sessions: [...sessions.values()].filter(s => s.messages.length) }),
-    send: payload => { const s = sessions.get(payload.sessionId); s.messages.push({ id: 'u', role: 'user', text: payload.text, inputs: payload.inputs, status: 'complete' }); return ok(s); },
+    send: payload => { payloads.push(payload); const s = sessions.get(payload.sessionId); s.messages.push({ id: 'u', role: 'user', text: payload.text, inputs: payload.inputs, status: 'complete' }); return ok(s); },
   };
   const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode() {}, nextSibling() {} });
   const app = renderer.createApp({ setup() { chat = useChat({ api, copyText() {}, selectedItem, libraryState: ref(null), view: ref('viewer') }); return () => null; } });
   app.mount({}); t.after(() => app.unmount());
   return {
     chat, sessions, abandoned, selectedItem, previewCalls, event: e=>receive(e), stops: () => stops,
+    payloads, unconfigure: () => { configured = false; },
     delay: p => { delayDescribe = p; },
     failPreview: id => failedPreviews.add(id),
     delayPreview: (id, promise) => previewDelays.set(id, promise),
   };
 }
 async function settle(f) { await nextTick(); await f.chat.open(); }
+
+test('web permission survives sending and hiding, resets on navigation, and Retry uses the visible choice', async t => {
+  const f = fixture(t), c = f.chat; await c.open();
+  assert.equal(c.webEnabled.value, false); await c.toggleWeb(); assert.equal(c.webEnabled.value, true);
+  c.text.value = 'Research'; await c.send(); await c.stop(); assert.equal(f.payloads[0].webEnabled, true); assert.equal(c.webEnabled.value, true);
+  c.close(); await c.open(); assert.equal(c.webEnabled.value, true);
+  const m = { id: 'reply', role: 'assistant', inputs: [], status: 'failed' }; c.session.value.messages.push(m);
+  await c.toggleWeb(); await c.retry(m); await c.stop(); assert.equal(f.payloads[1].webEnabled, false);
+  await c.toggleWeb(); f.selectedItem.value = { MediaId: 'B' }; await settle(f); assert.equal(c.webEnabled.value, false);
+  f.unconfigure(); await c.toggleWeb(); assert.equal(c.webEnabled.value, false); assert.equal(c.settings.value, true); assert.equal(c.settingsTab.value, 'web');
+});
 
 test('chat navigation replaces drafts, keeps same-media reopen, and resumes submitted history explicitly', async t => {
   const f = fixture(t), c = f.chat;

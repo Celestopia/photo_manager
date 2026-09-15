@@ -41,8 +41,15 @@ async function run() {
       tools,
     });
     assert.deepEqual(original.bytes, frames[0].bytes);
+    assert.equal(require(path.join(code, 'package.json')).version, '0.35.0');
+    const { tools: agentTools } = require(path.join(code, 'src/main/chat/tools'));
+    const scope = { mediaIds: [], groups: { basic: false }, webEnabled: true };
+    assert.deepEqual(agentTools.available(scope).map(t => t.name), ['web_search', 'read_web_page']);
+    const search = require(path.join(code, 'src/main/chat/search-provider'));
+    const found = await search.adapter({ apiKey: 'fixture' }, async () => new Response(JSON.stringify({ results: [{ title: 'Tower', url: 'https://www.toureiffel.paris/en', content: 'Paris' }] }))).search({ query: 'Tower' });
+    assert.equal(found.sources.length, 1);
     console.log(
-      "CHAT_PACKAGE_SMOKE_PASS: packaged ASAR modules, Sharp, bundled FFmpeg and original bytes.",
+      "CHAT_PACKAGE_SMOKE_PASS: v0.35.0 ASAR, web tools/adapter, Sharp, bundled FFmpeg and original bytes.",
     );
   } finally {
     await fs.rm(root, { recursive: true, force: true });

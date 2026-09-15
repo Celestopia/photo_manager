@@ -1,6 +1,10 @@
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 export function useChat({ api, copyText, selectedItem, libraryState, view, reviewBlocked = () => false, beforeReview = () => {}, afterReview = async () => {} }) {
   const copiedMessage = ref(null);
+  const webEnabled = ref(false);
+  const settingsTab = ref('assistant');
+  const searchConfiguration = ref(null);
+  const configurationStale = ref(false);
   let copyTimer;
   async function copyMessage(message) {
     try {
@@ -227,6 +231,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
   };
   const unsubscribe = api.onEvent((event) => {
     if (event.type === "provider-configuration-changed") {
+      configurationStale.value = true;
       notice.value = event.text;
       return;
     }
@@ -291,6 +296,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
   // Drain in-flight imports/submissions before abandoning their session. Only the
   // latest navigation may publish a replacement, including late preview results.
   function replaceSession(sid = null, create = true) {
+    if (!sid || sid !== session.value?.sessionId) webEnabled.value = false;
     closeImagePreview();
     const epoch = ++generation;
     const pending = [...operations];
@@ -356,6 +362,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
       const result = await unwrap(api.delete(sid));
       if (result.deleted) {
         if (session.value?.sessionId === sid) {
+          webEnabled.value = false;
           session.value = null;
           clearComposer();
         }
@@ -453,6 +460,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
           excludeInputs: [],
           acceptChanges: false,
           retryOf,
+          webEnabled: webEnabled.value,
         };
         session.value = await unwrap(
           api.send(JSON.parse(JSON.stringify(payload))),
@@ -470,7 +478,10 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
     const user = session.value.messages[index - 1];
     if (user?.role === "user") await send(m.id, user);
   }
-  async function showSettings() {
+  async function showSettings(tab = 'assistant') {
+    configuration.value = null;
+    searchConfiguration.value = null;
+    settingsTab.value = typeof tab === 'string' ? tab : 'assistant';
     options.value = false;
     notice.value = "";
     settings.value = true;
@@ -478,13 +489,25 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
   }
   async function reloadConfiguration() {
     return action(async () => {
-      configuration.value = await unwrap(api.configuration());
+      if (configurationStale.value) {
+        configuration.value = null;
+        searchConfiguration.value = null;
+      }
+      if (settingsTab.value === 'web') searchConfiguration.value = await unwrap(api.searchConfiguration());
+      else configuration.value = await unwrap(api.configuration());
+      configurationStale.value = false;
     });
   }
   async function saveConfiguration() {
     return action(async () => {
-      const { hasKey, ...draft } = configuration.value;
-      configuration.value = await unwrap(api.saveConfiguration(JSON.parse(JSON.stringify(draft))));
+      if (configurationStale.value) throw new Error('Provider settings changed in another window. Reload settings before saving.');
+      if (settingsTab.value === 'web') {
+        const { provider, apiKey, apiKeyEnv, clearKey } = searchConfiguration.value;
+        searchConfiguration.value = await unwrap(api.saveSearchConfiguration({ provider, apiKey, apiKeyEnv, clearKey }));
+      } else {
+        const { hasKey, ...draft } = configuration.value;
+        configuration.value = await unwrap(api.saveConfiguration(JSON.parse(JSON.stringify(draft))));
+      }
       notice.value = "Settings saved.";
     });
   }
@@ -493,8 +516,26 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
   }
   async function testConnection() {
     return action(async () => {
-      notice.value = await unwrap(api.test());
+      if (configurationStale.value) throw new Error('Reload settings before testing.');
+      notice.value = await unwrap(settingsTab.value === 'web' ? api.testSearch() : api.test());
     });
+  }
+  async function toggleWeb() {
+    if (busy.value || working.value) return;
+    if (webEnabled.value) { webEnabled.value = false; return; }
+    const epoch = generation;
+    return action(async () => {
+      const c = await unwrap(api.searchConfiguration());
+      if (epoch !== generation) return;
+      searchConfiguration.value = c;
+      if (c.configured) webEnabled.value = true;
+      else { settingsTab.value = 'web'; settings.value = true; }
+    });
+  }
+  async function openSource(sourceId) {
+    if (!session.value) return;
+    try { await unwrap(api.openSource(session.value.sessionId, sourceId)); }
+    catch (e) { error.value = e.message; }
   }
   function keydown(event) {
     if (
@@ -515,6 +556,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
   );
   watch(view, (value) => {
     if (value !== "viewer") {
+      webEnabled.value = false;
       closeImagePreview();
       visible.value = false;
       if (busy.value) void action(stop);
@@ -523,6 +565,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
   watch(
     () => libraryState.value?.active?.libraryId,
     () => {
+      webEnabled.value = false;
       closeImagePreview();
       replySequences.clear();
       generation++;
@@ -541,6 +584,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
     void api.stop();
   });
   return {
+    webEnabled, toggleWeb, openSource, settingsTab, searchConfiguration, configurationStale,
     decideProposal,
     reviewBlocked,
     imagePreview,

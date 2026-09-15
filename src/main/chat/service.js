@@ -7,7 +7,9 @@ const media = require("./inputs");
 const provider = require("./provider");
 const { assemble } = require("./context-builder");
 const { runAgent } = require("./agent-loop");
-const { metadataTools } = require("./tools/metadata");
+const { tools } = require("./tools");
+const searchProvider = require('./search-provider');
+const { publicUrl, sourcesOf } = require('./web-sources');
 const { prepareProposal } = require("./proposals");
 const { createReviewService } = require("./review-service");
 const { transition, AgentError, createBudget } = require("./runtime");
@@ -16,6 +18,8 @@ function createChatService({
   resolveMedia,
   getMetadata,
   configFile,
+  searchConfigFile,
+  searchFetchImpl,
   getMediaToolPaths,
   emit,
   fetchImpl,
@@ -227,7 +231,9 @@ function createChatService({
       lastSave = 0,
       lastEmit = 0;
     let pendingSave = Promise.resolve();
-    const available = metadataTools.available(assistant.attempt.scope);
+    const available = job.available;
+    const scope = { ...assistant.attempt.scope, webEnabled: payload.webEnabled };
+    const webSources = new Map();
     async function save() {
       try {
         await pendingSave;
@@ -314,13 +320,15 @@ function createChatService({
         complete: (messages, options) =>
           provider.request(c, messages, { ...options, fetchImpl }),
         definitions: available,
-        executor: metadataTools.execute,
+        executor: tools.execute,
         signal: job.controller.signal,
         budget,
         save,
         progress,
         context: {
-          scope: assistant.attempt.scope,
+          scope,
+          web: job.web,
+          webSources,
           represented,
           tags,
           checkLibrary: () => getLibrary({ writable: true }),
@@ -354,6 +362,8 @@ function createChatService({
             return value.outcome;
           },
           afterTool(call, outcome) {
+            if (call.name === 'web_search' && outcome.status === 'success')
+              for (const source of outcome.sources) webSources.set(source.sourceId, source);
             if (outcome.status === "proposal_created" && staged.has(call.id))
               s.proposals.push(staged.get(call.id));
             staged.delete(call.id);
@@ -524,6 +534,7 @@ function createChatService({
             "excludeInputs",
             "acceptChanges",
             "retryOf",
+            "webEnabled",
           ],
           "Send request",
         );
@@ -544,7 +555,7 @@ function createChatService({
           payload.excludeInputs.some(
             (k) => !/^((media)|(attachment)):[0-9a-f-]{36}$/.test(k),
           ) ||
-          typeof payload.acceptChanges !== "boolean"
+          typeof payload.acceptChanges !== "boolean" || typeof payload.webEnabled !== 'boolean'
         )
           throw new Error("Invalid request options");
         const s = await store.load(payload.sessionId);
@@ -556,6 +567,7 @@ function createChatService({
         )
           throw new Error("Invalid retry attempt");
         const c = await provider.config(configFile);
+        const web = payload.webEnabled ? searchProvider.adapter(await searchProvider.config(searchConfigFile), searchFetchImpl) : null;
         const user = schema.message(
           "user",
           payload.text,
@@ -585,6 +597,7 @@ function createChatService({
           ),
         ];
         const scope = { mediaIds, groups: structuredClone(payload.groups) };
+        const available = tools.available({ ...scope, webEnabled: payload.webEnabled });
         assistant.attempt = {
           model: c.model,
           endpoint: c.baseUrl,
@@ -595,14 +608,12 @@ function createChatService({
           retryOf: payload.retryOf,
           steps: [],
           scope,
-          tools: metadataTools
-            .available(scope)
-            .map((d) => ({ name: d.name, contractVersion: d.contractVersion })),
+          tools: available.map((d) => ({ name: d.name, contractVersion: d.contractVersion })),
           reason: "",
         };
         s.messages.push(user, assistant);
         await store.save(s);
-        const job = { controller: new AbortController(), promise: null };
+        const job = { controller: new AbortController(), promise: null, available, web };
         active = job;
         job.promise = execute(s, user, assistant, payload, c, job).catch(() => {
           blocked = true;
@@ -634,6 +645,35 @@ function createChatService({
     },
     isBusy() {
       return Boolean(active);
+    },
+    async sourceUrl(sessionId, sourceId) {
+      return serial(async () => {
+        await current(); schema.id(sessionId); schema.id(sourceId);
+        const source = sourcesOf(await store.load(sessionId)).find(s => s.sourceId === sourceId);
+        if (!source) throw new Error('Source not found in this conversation.');
+        return publicUrl(source.url);
+      });
+    },
+    async searchConfiguration() { return searchProvider.editableConfig(searchConfigFile); },
+    async saveSearchConfiguration(draft) {
+      return serial(async () => { idle(); return searchProvider.saveConfig(searchConfigFile, draft); });
+    },
+    async testSearch() {
+      const job = await serial(async () => {
+        idle();
+        const web = searchProvider.adapter(await searchProvider.config(searchConfigFile), searchFetchImpl);
+        const controller = new AbortController();
+        const job = { controller, promise: null };
+        active = job;
+        job.promise = (async () => {
+          const result = await web.search({ query: 'What is the Eiffel Tower?', signal: controller.signal });
+          if (!result.sources.length) throw new Error('Search returned no usable public sources; extraction was not tested.');
+          await web.extract({ url: result.sources[0].url, signal: controller.signal });
+          return 'Search and page extraction succeeded using a generic query.';
+        })().finally(() => { if (active === job) active = null; });
+        return job;
+      });
+      return job.promise;
     },
     async configuration() {
       return provider.editableConfig(configFile);

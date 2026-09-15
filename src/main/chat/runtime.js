@@ -99,6 +99,8 @@ function createBudget(limits = {}) {
     completions: 8,
     calls: 12,
     proposals: 6,
+    searches: 3,
+    pageReads: 5,
     outputBytes: 65536,
     resultBytes: 16384,
     durationMs: 300000,
@@ -109,7 +111,12 @@ function createBudget(limits = {}) {
   return {
     policy,
     deadline,
+    remaining(key) {
+      if (!Object.hasOwn(policy, key)) throw new Error('Unknown budget key');
+      return Math.max(0, policy[key] - (used[key] || 0));
+    },
     reserve(key, count = 1) {
+      if (!Object.hasOwn(policy, key) || !Number.isFinite(count) || count < 0) throw new Error('Invalid budget reservation');
       if (Date.now() >= deadline || (used[key] || 0) + count > policy[key])
         throw new AgentError(
           "budget_exceeded",

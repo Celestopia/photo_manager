@@ -115,6 +115,12 @@ The empty composer offers Introduce this photo, Suggest a title, Suggest a descr
 
 Completion prose and collapsible tool results appear in execution order. Each metadata proposal shows the target, saved and proposed values, tag additions/removals where relevant, and review status. Pending cards offer Accept/Decline once generation ends. Stale cards offer Refresh preview/Decline; refreshing does not approve. Accepted and declined cards remain in history. Failures, no matching tags and no-change outcomes are explicit.
 
-An unsaved Metadata draft for the selected target blocks Accept with an explanation. Acceptance temporarily locks editing, then refreshes the selected item, editor draft and gallery through application-composition callbacks. The chat composable does not import the metadata composable. Web search is not available.
+An unsaved Metadata draft for the selected target blocks Accept with an explanation. Acceptance temporarily locks editing, then refreshes the selected item, editor draft and gallery through application-composition callbacks. The chat composable does not import the metadata composable.
+
+## Web Controls and Sources
+
+The globe follows Options in the composer and uses `aria-pressed` with Web search on/off tooltips. It is disabled during a run. Unconfigured activation opens the Web search settings tab and leaves access off. Permission survives Send and same-conversation hiding; conversation/media changes, viewer exit, library changes and restart reset it. Retry uses the current switch, never saved permission. Composer clearing does not own that reset.
+
+Provider Settings has Assistant and Web search tabs with independent drafts and Save/Test controls. Other-window changes require reloading before saving. Search activity expands into its query, source excerpts or page text, errors, truncation notices and reported credits. Numbered citations and the Sources list open validated stored URLs in the system browser. Arbitrary Markdown links and remote images remain inactive. Pending calls use the existing executing phase. Sources and usage are derived from results, and all content fits the viewer's narrow sidebar.
 
 Switching to Metadata or hiding Assistant with its Close button keeps the current reply and tool calls running. Reopening shows the ongoing or completed response. Use Stop to cancel explicitly. Changing media or conversations, leaving the viewer, closing the library/window, or starting maintenance still stops active work. Background suggestions remain pending until accepted; unsaved-draft and stale-preview checks still apply.

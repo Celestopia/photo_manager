@@ -17,6 +17,10 @@ function toSerializable(value) {
 
 contextBridge.exposeInMainWorld("photoManagerApi", {
   chat: {
+    openSource: (sessionId, sourceId) => ipcRenderer.invoke('chat:openSource', { sessionId, sourceId }),
+    searchConfiguration: () => ipcRenderer.invoke('chat:searchConfiguration'),
+    saveSearchConfiguration: draft => ipcRenderer.invoke('chat:saveSearchConfiguration', toSerializable(draft)),
+    testSearch: () => ipcRenderer.invoke('chat:testSearch'),
     open: () => ipcRenderer.invoke("chat:open"),
     create: () => ipcRenderer.invoke("chat:create"),
     load: (sessionId) => ipcRenderer.invoke("chat:load", { sessionId }),

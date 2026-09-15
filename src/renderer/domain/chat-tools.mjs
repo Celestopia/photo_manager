@@ -28,6 +28,8 @@ export function toolLabel(message, id) {
   return (
     {
       find_library_tags: "Find library tags",
+      web_search: 'Search the web',
+      read_web_page: 'Read a source',
       propose_title: "Suggest title",
       propose_description: "Suggest description",
       propose_tags: "Suggest tags",

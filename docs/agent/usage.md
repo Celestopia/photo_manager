@@ -50,7 +50,17 @@ Earlier inputs remain part of the conversation automatically. If a referenced so
 
 ## Consequences and Limits
 
-Remote requests upload the selected content and can incur API charges. There is no library-wide media upload, web search, vector index or model download. Tool suggestions apply only to supplied library media and never save automatically.
+Remote requests upload the selected content and can incur API charges. There is no library-wide media upload, vector index or model download. Tool suggestions apply only to supplied library media and never save automatically.
+
+## Research with Web Search
+
+Open **Provider settings → Web search**, enter your separate Tavily key (or use the configured environment variable), and save. **Test connection** searches a generic topic and extracts one public result without sending library content. A saved Assistant key is never reused for Tavily. Removing a saved Tavily key leaves any environment fallback applicable.
+
+The globe beside Options enables web tools for the current conversation. It starts off and stays on through successive messages and panel hide/reopen. New chat, media navigation, another history conversation, leaving the viewer, library changes, or restart reset it. Retry uses the currently visible setting. Saving settings does not turn it on.
+
+Ask, for example, “Research this landmark and suggest a description.” Assistant may search, read a returned page, explain its findings with clickable numbered citations, and prepare the usual review cards. Search is optional even when enabled. Sources open in your system browser. You can inspect saved sources with web access off; previously saved evidence is not automatically refreshed.
+
+Generated queries go to Tavily, and retrieved text goes to the Assistant model. Queries may contain details you supplied. Images, paths, complete metadata, and the transcript are not automatically attached to Tavily requests. Search credits are shown separately from model tokens; unknown or partial usage stays labeled. Source text can be incomplete or inaccurate, and failed extraction is reported explicitly. Stop cancels current web work. Search never approves a metadata change.
 
 Each message accepts up to eight attachments. A model request accepts up to eight images in total, so each video/GIF consumes several of those slots. Older whole turns can be omitted to stay within the request limits; the reply records a notice when that happens. See [input processing](inputs.md) for exact limits.
 

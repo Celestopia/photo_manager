@@ -4,6 +4,7 @@
 <script setup>
 defineProps({ name: { type: String, default: 'chat' } });
 const paths = {
+  globe: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M3 12h18M12 3c-5 5-5 13 0 18M12 3c5 5 5 13 0 18',
   edit: 'm15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z',
   trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
   copy: 'M9 8h11v13H9zM15 4V2H3v14h2',
