@@ -140,14 +140,14 @@ html.viewer-panel-resizing * { cursor: col-resize !important; user-select: none 
 .hidden-description-input { margin-top: 6px; }
 
 /* Shared photo/video presentation, scoped to the viewer. */
-.viewer-main { background: #f3f6fa; --line: #dce3eb; --text-soft: #687990; }
+.viewer-main { background: transparent; }
 .viewer-main .side-panel { background: #fff; border-radius: 12px; padding: 16px; }
 .viewer-main .side-panel h3 { font-size: 17px; font-weight: 600; margin: 0 0 18px; }
 .viewer-information dt { margin-top: 13px; font-weight: 500; }
 .viewer-information dd { margin-top: 4px; font-size: 14px; overflow-wrap: anywhere; word-break: normal; }
-.viewer-main .viewer-sidebar-tabs { width: 100%; flex-shrink: 0; border-radius: 20px; padding: 3px; margin-bottom: 22px; background: #f0f3f7; }
+.viewer-main .viewer-sidebar-tabs { width: 100%; flex-shrink: 0; border-radius: 20px; padding: 3px; margin-bottom: 22px; background: var(--bg); }
 .viewer-main .viewer-sidebar-tabs .btn { flex: 1; min-width: 0; border-radius: 17px; padding: 7px 8px; font-size: 13px; }
-.viewer-main .viewer-sidebar-tabs [aria-pressed="true"] { color: #216ec1; background: #eaf3ff; box-shadow: inset 0 0 0 1px #c9dff8; }
+.viewer-main .viewer-sidebar-tabs [aria-pressed="true"] { color: var(--accent); background: #dcecff; box-shadow: inset 0 0 0 1px var(--line); }
 .viewer-main .viewer-field-heading, .viewer-metadata-fields > label { margin-top: 14px; margin-bottom: 5px; }
 .viewer-main .viewer-field-heading label { margin: 0; }
 .viewer-main .viewer-metadata-fields label { font-weight: 600; }
@@ -156,22 +156,22 @@ html.viewer-panel-resizing * { cursor: col-resize !important; user-select: none 
   padding: 6px 10px; line-height: 20px; resize: none; white-space: pre; overflow: hidden;
 }
 .viewer-main .location-detail-input { width: calc(100% - 18px); }
-.viewer-main .input, .viewer-main .tag-editor { border-color: #d8e1ec; border-radius: 8px; }
+.viewer-main .input, .viewer-main .tag-editor { border-color: var(--line); border-radius: 8px; }
 .viewer-main .album-input.registry-trigger { min-height: 34px; padding-left: 34px; }
 .viewer-main .controlled-tag-editor { position: relative; min-height: 34px; padding-left: 34px; }
-.registry-field-icon { position: absolute; left: 10px; top: 8px; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: #61758d; pointer-events: none; }
-.viewer-main .star-btn { border-color: transparent; background: transparent; color: #c0cad7; font-size: 25px; width: 32px; height: 32px; }
+.registry-field-icon { position: absolute; left: 10px; top: 8px; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--text-soft); pointer-events: none; }
+.viewer-main .star-btn { border-color: transparent; background: transparent; color: #a8c4e3; font-size: 25px; width: 32px; height: 32px; }
 .viewer-main .star-btn.active { color: #e9a416; border-color: transparent; background: transparent; }
 .viewer-main .star-btn:hover { background: #fff7e5; }
-.viewer-main .privacy-level-btn { width: 32px; height: 32px; padding: 5px; border-color: transparent; background: transparent; color: #c0cad7; }
-.viewer-main .privacy-level-btn.active { border-color: transparent; background: transparent; color: #6489b2; }
+.viewer-main .privacy-level-btn { width: 32px; height: 32px; padding: 5px; border-color: transparent; background: transparent; color: #a8c4e3; }
+.viewer-main .privacy-level-btn.active { border-color: transparent; background: transparent; color: var(--accent); }
 .viewer-main .privacy-level-icon { opacity: 1; }
-.viewer-main .privacy-level-btn:hover { background: #edf3fa; }
+.viewer-main .privacy-level-btn:hover { background: var(--bg); }
 .parameters-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: left; }
-.parameters-toggle span { color: #687990; font-size: 18px; }
-.viewer-main button:focus-visible { outline: 2px solid #448acf; outline-offset: 2px; }
-.viewer-main .viewer-panel-resizer::before { background: #ced8e4; width: 1px; }
-.viewer-main .viewer-panel-resizer:hover::before, .viewer-main .viewer-panel-resizer.active::before { background: #448acf; width: 3px; }
+.parameters-toggle span { color: var(--text-soft); font-size: 18px; }
+.viewer-main button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.viewer-main .viewer-panel-resizer::before { background: var(--line); width: 1px; }
+.viewer-main .viewer-panel-resizer:hover::before, .viewer-main .viewer-panel-resizer.active::before { background: var(--accent); width: 3px; }
 .location-field { position: relative; }
 .location-label-row {
   margin-top: 8px;
