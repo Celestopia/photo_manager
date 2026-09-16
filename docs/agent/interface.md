@@ -4,7 +4,7 @@ This page describes the implemented viewer chat interface. Start with the [featu
 
 ## Open the Panel
 
-The viewer's right sidebar has Metadata and Assistant views. Switching between them preserves the metadata draft. Assistant has three areas:
+The viewer's left sidebar has Information and Assistant views. The right sidebar always shows Customization. Switching left-side views preserves the metadata draft and conversation. Assistant has three areas:
 
 - A header with New chat, History and Close.
 - A scrollable conversation.
@@ -123,4 +123,4 @@ The globe follows Options in the composer and uses `aria-pressed` with Web searc
 
 Provider Settings has Assistant and Web search tabs with independent drafts and Save/Test controls. Other-window changes require reloading before saving. Search activity expands into its query, source excerpts or page text, errors, truncation notices and reported credits. Numbered citations and the Sources list open validated stored URLs in the system browser. Arbitrary Markdown links and remote images remain inactive. Pending calls use the existing executing phase. Sources and usage are derived from results, and all content fits the viewer's narrow sidebar.
 
-Switching to Metadata or hiding Assistant with its Close button keeps the current reply and tool calls running. Reopening shows the ongoing or completed response. Use Stop to cancel explicitly. Changing media or conversations, leaving the viewer, closing the library/window, or starting maintenance still stops active work. Background suggestions remain pending until accepted; unsaved-draft and stale-preview checks still apply.
+Switching to Information or hiding Assistant with its Close button keeps the current reply and tool calls running. Reopening shows the ongoing or completed response. Use Stop to cancel explicitly. Changing media or conversations, leaving the viewer, closing the library/window, or starting maintenance still stops active work. Background suggestions remain pending until accepted; unsaved-draft and stale-preview checks still apply.

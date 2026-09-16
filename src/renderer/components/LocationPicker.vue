@@ -2,6 +2,7 @@
   <div class="album-picker location-picker" @click.stop>
     <div class="album-control">
       <div class="album-input-wrap">
+        <RegistryFieldIcon v-if="target === 'viewer'" kind="location" />
         <button
           type="button"
           class="input album-input registry-trigger"
@@ -64,6 +65,7 @@
 </template>
 
 <script setup>
+import RegistryFieldIcon from "./RegistryFieldIcon.vue";
 import { computed, inject } from "vue";
 import { LOCATION_CONTEXT } from "../context/renderer-contexts.js";
 import LocationParentPicker from "./LocationParentPicker.vue";

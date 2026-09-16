@@ -1,6 +1,6 @@
 # Using Assistant
 
-Open a photo or video, then choose **Assistant** in the right sidebar. The current media appears as a removable input. Type your question and press Enter or Send. Shift+Enter inserts a newline; Stop keeps the partial reply.
+Open a photo or video, then choose **Assistant** in the left sidebar. Customization remains on the right. The current media appears as a removable input. Type your question and press Enter or Send. Shift+Enter inserts a newline; Stop keeps the partial reply.
 
 ## Configure Your Provider Once
 
@@ -87,4 +87,4 @@ Each preview shows the target file, saved value, suggested value and status. **A
 
 Accepted changes are recorded together with the metadata write. They can be discussed in later messages without rewriting earlier input snapshots. Manual changes to previously supplied metadata still require a new conversation. Deleting a conversation does not undo accepted changes.
 
-Switching to Metadata or hiding Assistant with its Close button keeps the current reply and tool calls running. Reopening shows the ongoing or completed response. Use Stop to cancel explicitly. Changing media or conversations, leaving the viewer, closing the library/window, or starting maintenance still stops active work. Background suggestions remain pending until accepted; unsaved-draft and stale-preview checks still apply.
+Switching to Information or hiding Assistant with its Close button keeps the current reply and tool calls running. Reopening shows the ongoing or completed response. Use Stop to cancel explicitly. Changing media or conversations, leaving the viewer, closing the library/window, or starting maintenance still stops active work. Background suggestions remain pending until accepted; unsaved-draft and stale-preview checks still apply.

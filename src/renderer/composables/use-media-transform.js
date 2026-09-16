@@ -35,12 +35,13 @@ export function useMediaTransform({ config, selectedItem }) {
         stageHeight: stageSize.height,
         mediaWidth: sourceSize.value.width,
         mediaHeight: sourceSize.value.height,
+        maxFraction: 0.88,
       })
     : { width: 0, height: 0 });
   const rotationFitScale = computed(() => isVideo.value
     ? calculateRotationFitScale({
-        stageWidth: stageSize.width,
-        stageHeight: stageSize.height,
+        stageWidth: stageSize.width * 0.88,
+        stageHeight: stageSize.height * 0.88,
         fittedWidth: fittedSize.value.width,
         fittedHeight: fittedSize.value.height,
         rotationDegrees: rotateDeg.value,

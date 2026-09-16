@@ -8,7 +8,7 @@ Assistant sits beside the photo or video in the viewer. Users can ask questions,
 
 ### 1. Open Assistant and start a conversation
 
-The viewer's right sidebar switches between Metadata and Assistant. Switching panels preserves any unsaved metadata draft.
+The viewer's left sidebar switches between Information and Assistant. Customization stays visible on the right; switching left-side views preserves any unsaved metadata draft.
 
 A new conversation includes the currently viewed photo or video as a removable attachment. The conversation has its own identity: it does not belong permanently to that file. For example, a user can start by discussing one photo, move to another photo, and explicitly add the second one to the same conversation.
 

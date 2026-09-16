@@ -8,7 +8,7 @@
   background: var(--bg-soft, #edf3f8);
   font-weight: 600;
 }
-.right-panel:has(.chat-panel) {
+.left-panel:has(.chat-panel) {
   display: flex;
   flex-direction: column;
   overflow: hidden;

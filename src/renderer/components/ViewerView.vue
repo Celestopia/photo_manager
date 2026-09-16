@@ -18,6 +18,12 @@
     @click="restoreViewerPanel('left')"
   ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
   <aside class="side-panel left-panel" :class="{ collapsed: !showLeftPanel }">
+    <div class="viewer-sidebar-tabs" role="group" aria-label="Information and Assistant">
+      <button class="btn" :aria-pressed="!chat.visible.value" @click="chat.close">Information</button>
+      <button class="btn" :aria-pressed="chat.visible.value" @click="chat.open">Assistant</button>
+    </div>
+    <ChatPanel v-if="chat.visible.value" />
+    <div v-show="!chat.visible.value" class="viewer-information">
     <h3>{{ isSelectedVideo ? 'Video Information' : 'Image Information' }}</h3>
     <dl>
       <dt>File name</dt><dd>{{ selectedItem?.FilePath?.split('/').pop() }}</dd>
@@ -32,8 +38,8 @@
     </dl>
     <div v-if="!isSelectedVideo && selectedItem?.Picture?.ProbeStatus === 'failed'" class="video-probe-error">{{ selectedItem?.Picture?.ProbeError || 'Could not analyze image' }}</div>
     <div class="camera-table-wrapper" v-if="isSelectedVideo">
-      <h4>Video Parameters</h4>
-      <table class="camera-table">
+      <h4><button class="parameters-toggle" :aria-expanded="parametersExpanded" aria-controls="video-parameters" @click="parametersExpanded = !parametersExpanded">Video Parameters<span aria-hidden="true">{{ parametersExpanded ? '−' : '+' }}</span></button></h4>
+      <table v-show="parametersExpanded" id="video-parameters" class="camera-table">
         <tr><th>Video codec</th><td>{{ selectedItem?.Video?.VideoCodec || '-' }}<template v-if="selectedItem?.Video?.VideoProfile"> / {{ selectedItem.Video.VideoProfile }}</template></td></tr>
         <tr><th>Video bit rate</th><td>{{ formatBitRate(selectedItem?.Video?.BitRate) }}</td></tr>
         <tr><th>Pixel format</th><td>{{ selectedItem?.Video?.PixelFormat || '-' }}<template v-if="selectedItem?.Video?.BitDepth"> / {{ selectedItem.Video.BitDepth }} bit</template></td></tr>
@@ -46,8 +52,8 @@
       <div v-if="selectedItem?.Video?.ProbeStatus === 'failed'" class="video-probe-error">{{ selectedItem?.Video?.ProbeError || 'Could not analyze video' }}</div>
     </div>
     <div v-if="!isSelectedVideo" class="camera-table-wrapper">
-      <h4>Camera Parameters</h4>
-      <table class="camera-table">
+      <h4><button class="parameters-toggle" :aria-expanded="parametersExpanded" aria-controls="camera-parameters" @click="parametersExpanded = !parametersExpanded">Camera Parameters<span aria-hidden="true">{{ parametersExpanded ? '−' : '+' }}</span></button></h4>
+      <table v-show="parametersExpanded" id="camera-parameters" class="camera-table">
         <tr><th>Make</th><td>{{ selectedItem?.Camera?.Make || '-' }}</td></tr>
         <tr><th>Model</th><td>{{ selectedItem?.Camera?.Model || '-' }}</td></tr>
         <tr><th>Focal length</th><td>{{ formatCameraValue(selectedItem?.Camera?.FocalLength) }}</td></tr>
@@ -56,6 +62,7 @@
         <tr><th>Shutter speed</th><td>{{ formatCameraValue(selectedItem?.Camera?.ExposureTime) }}</td></tr>
         <tr><th>Flash</th><td>{{ formatFlashUsed(selectedItem?.Camera?.FlashUsed) }}</td></tr>
       </table>
+    </div>
     </div>
   </aside>
   <div
@@ -68,7 +75,7 @@
     @pointerdown="beginPanelResize('left', $event)"
   ></div>
   <section class="image-stage" ref="mediaStageRef" @wheel="(!isSelectedVideo || videoPlaybackMode === 'video') && onMediaWheel($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
-    <button class="nav-btn left" @click="switchPhoto(-1)">◀</button>
+    <button class="nav-btn left" aria-label="Previous media" data-tip="Previous media" @click="switchPhoto(-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg></button>
     <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerMediaStyle" /></div>
     <div v-else class="video-container">
       <template v-if="videoPlaybackMode === 'video'">
@@ -157,7 +164,7 @@
         <div class="video-fallback-actions"><button class="btn btn-primary" @click.stop="openCurrentWithSystem">Open in System Player</button><button class="btn" @click.stop="showCurrentInFolder">Show in File Explorer</button></div>
       </div>
     </div>
-    <button class="nav-btn right" @click="switchPhoto(1)">▶</button>
+    <button class="nav-btn right" aria-label="Next media" data-tip="Next media" @click="switchPhoto(1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5 7 7-7 7" /></svg></button>
     <div v-if="showContextMenu" class="context-menu" :style="{ left: contextPosition.x + 'px', top: contextPosition.y + 'px' }" @click.stop>
       <button @click="contextCopyFile">Copy File</button><button @click="contextCopyPath">Copy File Path</button><button @click="contextCopyJson">Copy Media Metadata JSON</button><button @click="openCurrentWithSystem">Open with Default App</button><button @click="showCurrentInFolder">Show in File Explorer</button>
     </div>
@@ -172,14 +179,9 @@
     @pointerdown="beginPanelResize('right', $event)"
   ></div>
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
-    <div class="viewer-sidebar-tabs" role="group" aria-label="Viewer sidebar">
-      <button class="btn" :aria-pressed="!chat.visible.value" @click="chat.close">Metadata</button>
-      <button class="btn" :aria-pressed="chat.visible.value" @click="chat.open">Assistant</button>
-    </div>
-    <ChatPanel v-if="chat.visible.value" />
-    <div v-show="!chat.visible.value" class="viewer-metadata-fields">
+    <div class="viewer-metadata-fields">
     <h3>Customization</h3>
-    <label>Title</label><textarea class="input field-textarea viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1"></textarea>
+    <label for="viewer-title-input">Title</label><textarea id="viewer-title-input" class="input viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1" wrap="off"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Title'">{{ saveNotice.message }}</div>
     <div class="viewer-field-heading">
@@ -351,6 +353,8 @@ if (!app) {
 const locationDetailExpanded = ref(false);
 const hiddenDescriptionExpanded = ref(false);
 const privacyExpanded = ref(false);
+// Shared by photo/video parameters for this mounted viewer session.
+const parametersExpanded = ref(false);
 
 function formatCameraValue(value) {
   if (value == null || value === "") return "-";

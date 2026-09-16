@@ -88,6 +88,12 @@ async function run() {
     .toFile(path.join(library, "second.jpg"));
   const oldDate = new Date("2025-01-01T00:00:00Z");
   await fsp.utimes(path.join(library, "second.jpg"), oldDate, oldDate);
+  if (process.env.VIEWER_VISUAL_SMOKE) {
+    const { resolveMediaToolPaths, runMediaTool } = require('../../scripts/media-tools');
+    const tools = resolveMediaToolPaths(path.resolve('.'), {});
+    await runMediaTool(tools.ffmpegPath, ['-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-t', '2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(library, 'viewer-video.mp4')]);
+    await fsp.utimes(path.join(library, 'viewer-video.mp4'), oldDate, oldDate);
+  }
   const { DEFAULT_CONFIG } = require("../../scripts/application-config");
   const { resolveLibraryPaths } = require("../../scripts/library-core");
   await require("../../scripts/init-metadata").run({
@@ -202,9 +208,60 @@ async function run() {
   await click('[aria-label="Close provider settings"]');
   await click(".photo-card");
   await waitFor(`Boolean(document.querySelector('.viewer-sidebar-tabs'))`);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'false');
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.left-panel .viewer-sidebar-tabs')) && !document.querySelector('.right-panel .viewer-sidebar-tabs')`), true);
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.right-panel .registry-field-icon').length`), 4);
+  const titleHeight = await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').getBoundingClientRect().height`);
+  await setValue('.viewer-title-input', 'Unicode title 首钢园\nSecond line');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').getBoundingClientRect().height`), titleHeight, 'Title must not grow for multiline stored text');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').value.includes('\\n')`), true, 'One-line presentation must not destroy stored line breaks');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-left-tools button').textContent.trim()`), '', 'Delete stays icon-only');
+  await fsp.mkdir(path.resolve('release'), { recursive: true });
+  await sleep(400);
+  await fsp.writeFile(path.resolve('release/viewer-photo-v036.png'), (await win.webContents.capturePage()).toPNG());
+  if (process.env.VIEWER_VISUAL_SMOKE) {
+    await click('.inline-feedback .btn:not(.btn-primary)');
+    await click('.parameters-toggle');
+    await click('.nav-btn.right');
+    await sleep(300);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'true', 'Parameter expansion survives media navigation');
+    await click('.nav-btn.left');
+    await sleep(300);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'true');
+    const panelsFit = () => win.webContents.executeJavaScript(`['.left-panel','.right-panel'].every(s=>{const e=document.querySelector(s);return e.scrollWidth<=e.clientWidth+1})`);
+    for (const [width,height] of [[1280,720],[1920,1080]]) {
+      win.setSize(width,height); await sleep(500);
+      assert.equal(await panelsFit(), true, 'Side panels must not overflow horizontally');
+      assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').getBoundingClientRect().height`), titleHeight);
+    }
+    await fsp.writeFile(path.resolve('release/viewer-photo-v036.png'), (await win.webContents.capturePage()).toPNG());
+    await click('.topbar .left-tools button');
+    await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+    await win.webContents.executeJavaScript(`[...document.querySelectorAll('.photo-card')].find(e=>e.textContent.includes('viewer-video')).click()`);
+    await waitFor(`Boolean(document.querySelector('video')) && document.querySelector('video').readyState >= 1`);
+    await sleep(500);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'false', 'Reopening the viewer resets parameter expansion');
+    assert.equal(await win.webContents.executeJavaScript(`(()=>{const stage=document.querySelector('.image-stage').getBoundingClientRect();const video=document.querySelector('video').getBoundingClientRect();return video.width<=stage.width*.89 && video.height<=stage.height*.89})()`), true, 'Video fits inside the padded stage');
+    assert.equal(await panelsFit(), true);
+    assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.viewer-tools [data-tip="Open in system player"]'))`), true);
+    await fsp.writeFile(path.resolve('release/viewer-video-v036.png'), (await win.webContents.capturePage()).toPNG());
+    await click('.video-center-play-button');
+    await waitFor(`!document.querySelector('video').paused`);
+    await win.webContents.executeJavaScript(`document.querySelector('video').pause()`);
+    await click('[aria-label="Expand privacy level"]');
+    await waitFor(`document.querySelectorAll('.privacy-level-btn svg').length === 5`);
+    await sleep(150);
+    await fsp.writeFile(path.resolve('release/viewer-video-v036.png'), (await win.webContents.capturePage()).toPNG());
+    await click('.viewer-sidebar-tabs button:last-child');
+    await waitFor(`Boolean(document.querySelector('.left-panel .chat-panel'))`);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.right-panel .viewer-title-input').getBoundingClientRect().height > 0`), true);
+    console.log('VIEWER_VISUAL_SMOKE_PASS: photo/video, two window sizes, title, fields, footer and Assistant.');
+    return;
+  }
   await setValue(".viewer-title-input", "Unsaved draft title");
   await click(".viewer-sidebar-tabs button:last-child");
   await waitFor(`Boolean(document.querySelector('.chat-composer .chat-attachment-tile'))`);
+  assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.left-panel .chat-panel')) && document.querySelector('.right-panel .viewer-title-input').getBoundingClientRect().height > 0`), true, 'Assistant and Customization remain visible together');
   await waitFor(`document.querySelector('.chat-composer .chat-attachment-tile img')?.naturalWidth > 0`);
   await click('.chat-composer .chat-attachment-tile.is-previewable > img');
   await waitFor(`document.querySelector('.chat-image-preview-dialog[open] img')?.naturalWidth > 160`);

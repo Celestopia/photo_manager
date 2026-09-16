@@ -2,6 +2,7 @@
   <div class="tag-picker" @click.stop>
     <div class="controlled-tag-control">
       <div class="tag-editor controlled-tag-editor">
+        <RegistryFieldIcon v-if="target === 'viewer'" kind="tags" />
       <span
         class="tag-chip"
         v-for="(tagId, index) in selectedTagIds"
@@ -55,6 +56,7 @@
 </template>
 
 <script setup>
+import RegistryFieldIcon from "./RegistryFieldIcon.vue";
 import { computed, inject } from "vue";
 import { TAG_CONTEXT } from "../context/renderer-contexts.js";
 import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";

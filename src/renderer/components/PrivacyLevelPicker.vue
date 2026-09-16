@@ -12,13 +12,13 @@
       :data-tip="'Privacy level ' + level"
       @click="$emit('update:modelValue', level)"
     >
-      <img class="privacy-level-icon" :src="ICONS.privacyPattern" alt="" />
+      <svg class="privacy-level-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="4" y="9" width="16" height="13" rx="3" fill="currentColor" /><path d="M12 14v3" stroke="white" stroke-width="1.8" stroke-linecap="round" /></svg>
     </button>
   </div>
 </template>
 
 <script setup>
-import { ICONS, PRIVACY_LEVELS } from "../constants/ui-constants.mjs";
+import { PRIVACY_LEVELS } from "../constants/ui-constants.mjs";
 
 defineProps({
   modelValue: { type: Number, default: null },

@@ -87,7 +87,7 @@ export function useMediaEditor({
   }
 
   function onFieldTextareaInput(event, field) {
-    autoGrowFieldTextarea(event.target);
+    if (field !== "Title") autoGrowFieldTextarea(event.target);
     requestEdit(field);
   }
 
