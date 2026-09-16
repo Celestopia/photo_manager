@@ -6,6 +6,14 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 ## Application Configuration and Library Data
 
+### First Launch Without Installation
+
+The unpacked release initializes its own user-data storage; no installer action or source-code environment is required. At process startup, `src/main/main.js` resolves the current account's `APPDATA` and `LOCALAPPDATA` paths and calls `configureElectronStoragePaths()` from `scripts/application-paths.js`. Before Electron becomes ready, that function recursively creates missing configuration, Electron user-data, local application-state, log, session-cache, and crash-dump directories under the respective `PhotoManager` roots, then assigns Electron's storage paths. Existing directories and data are retained.
+
+During initialization, `loadConfig()` writes default `config.yml` when absent. Missing application state loads as an empty last-library selection; state and optional provider files are written when their owning operations require them, rather than all being pre-created. A new account can launch the complete unpacked folder and select or initialize a library directly. The account needs write access to AppData and the selected library. Unavailable environment paths or denied filesystem access prevent initialization rather than redirecting writes into the program folder.
+
+The release is install-free, not a self-contained portable user profile. Moving the program folder on the same account retains access to that account's AppData; copying it to another device does not transfer settings or libraries. Deleting or replacing program files does not delete AppData or library-owned data.
+
 ### Application Configuration
 
 `%APPDATA%\PhotoManager\app-data\config.yml` contains only application settings shared by every library and suitable for roaming with the user:
@@ -15,7 +23,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 - `backup.retentionCount`: maximum retained backup snapshots per library, with a minimum of 1.
 - `ui`: gallery card width, viewer panel ratios and default visibility, and zoom range.
 
-`config.yml` does not contain library paths or data, thumbnail, or log directories. Individual libraries cannot override thumbnail or UI settings. The installation directory contains only programs, dependencies, and program resources such as FFmpeg; it contains no live configuration or runtime state.
+`config.yml` does not contain library paths or data, thumbnail, or log directories. Individual libraries cannot override thumbnail or UI settings. The application directory contains only programs, dependencies, and program resources such as FFmpeg; it contains no live configuration or runtime state.
 
 The application and standalone maintenance scripts use the same configuration module. When the file is absent, the caller creates its parent directory, writes the complete defaults, and continues. Invalid YAML is left untouched and defaults are used for that run. There is no runtime configuration UI; the renderer can only read normalized configuration.
 

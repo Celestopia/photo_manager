@@ -1,7 +1,7 @@
 {
   "name": "photo-manager",
   "productName": "PhotoManager",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "description": "Local image and video manager built with Electron and Vue",
   "author": "PhotoManager",
   "engines": {
@@ -12,7 +12,7 @@
     "start": "npm run build:renderer && node scripts/start-electron.js",
     "build:renderer": "vite build --config vite.config.mjs",
     "pack:win": "npm run build:renderer && electron-builder --dir --win --x64",
-    "dist:win": "npm test && npm run build:renderer && electron-builder --win nsis --x64",
+    "dist:win": "npm test && npm run pack:win",
     "build-thumbnails": "node scripts/build-thumbnails.js",
     "init-metadata": "node scripts/init-metadata.js",
     "update-metadata": "node scripts/update-metadata.js",
