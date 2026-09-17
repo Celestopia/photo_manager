@@ -2,7 +2,6 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomBytes } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
-const { assertPathInsideLibrary } = require("../../scripts/library-core");
 const { assertCacheDirectory, checkCoverSource, coverName } = require("../../scripts/video-cover-cache");
 
 const owners = new Map();
@@ -46,7 +45,7 @@ function createViewerImageResources({ getLibrary, getItem, fetchFile }) {
     const url = new URL(request.url);
     const item = getItem(decodeURIComponent(url.pathname.slice(1)));
     if (!item || urlFor(item) !== request.url) return new Response(null, { status: 404 });
-    const source = assertPathInsideLibrary(library.paths, path.resolve(library.paths.root, item.FilePath));
+    const source = path.resolve(library.paths.root, item.FilePath);
     await checkCoverSource(library.paths, item, source);
     let file = source;
     if (item.FileSystem.FileType === "video") {

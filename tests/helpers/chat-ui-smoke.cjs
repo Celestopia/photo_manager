@@ -268,8 +268,8 @@ async function run() {
     await waitFor(`Boolean(document.querySelector('.photo-card'))`);
     await win.webContents.executeJavaScript(`[...document.querySelectorAll('.photo-card')].find(e=>e.textContent.includes('viewer-video')).click()`);
     await waitFor(`Boolean(document.querySelector('video')) && document.querySelector('video').readyState >= 1`);
-    await waitFor(`document.querySelector('.video-transform-viewport .viewer-image')?.naturalWidth === 1280`);
-    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.video-transform-viewport .viewer-image').src.startsWith('viewer-image://')`), true);
+    await waitFor(`document.querySelector('.viewer-image-surface .viewer-image')?.naturalWidth === 1280`);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-image-surface .viewer-image').src.startsWith('viewer-image://')`), true);
     assert.equal(await win.webContents.executeJavaScript(`document.querySelector('video').hasAttribute('poster')`), false);
     const coverFiles = await fsp.readdir(path.join(library, '.photo_manager', 'video_covers'));
     const coverFile = path.join(library, '.photo_manager', 'video_covers', coverFiles.find(name => name.endsWith('.webp')));
@@ -299,9 +299,46 @@ async function run() {
     assert.notEqual(await mediaSource(), playingSource, 'Before playback arrows navigate');
     await arrow('Right');
     await click('[aria-label="Expand privacy level"]');
-    await waitFor(`document.querySelector('.video-transform-viewport .viewer-image')?.naturalWidth === 1280`);
+    await waitFor(`document.querySelector('.viewer-image-surface .viewer-image')?.naturalWidth === 1280`);
     assert.equal((await fsp.stat(coverFile)).mtimeMs, coverModified, 'Returning to a video reuses its cover without extraction');
-    const timings = [];
+    // Slow decode exposes blank-frame regressions even with a warm filesystem cache.
+      await win.webContents.executeJavaScript(`window.originalViewerDecode = HTMLImageElement.prototype.decode;
+        HTMLImageElement.prototype.decode = async function() { await window.originalViewerDecode.call(this); await new Promise(r => setTimeout(r, 300)); }; void 0;`);
+      for (const direction of ['left', 'right']) {
+        const continuity = await win.webContents.executeJavaScript(`new Promise(resolve => {
+          let blank = 0, samples = 0; const start = performance.now();
+          document.querySelector('.nav-btn.${direction}').click();
+          function sample() {
+            const visible = [...document.querySelectorAll('.viewer-image')].some(img => img.naturalWidth && getComputedStyle(img).visibility === 'visible');
+            if (!visible) blank++; samples++;
+            if (performance.now() - start < 450) requestAnimationFrame(sample); else resolve({ blank, samples });
+          } requestAnimationFrame(sample);
+        })`);
+        assert.equal(continuity.blank, 0, 'Keep the displayed image during delayed decode');
+        assert.ok(continuity.samples > 2);
+      }
+      await click('.video-center-play-button');
+      await waitFor(`document.querySelector('video') && !document.querySelector('video').classList.contains('video-awaiting-frame')`);
+      await win.webContents.executeJavaScript(`window.outgoingVideo = document.querySelector('video'); document.querySelector('.nav-btn.left').click();`);
+      await waitFor(`document.querySelector('.viewer-held-frame')?.width > 0`);
+      assert.equal(await win.webContents.executeJavaScript(`window.outgoingVideo.paused && !window.outgoingVideo.hasAttribute('src')`), true, 'Release the decoder while retaining a display-sized frame');
+      await waitFor(`document.querySelector('.viewer-held-frame')?.width === 0 && document.querySelector('.viewer-image-surface').getAttribute('aria-busy') === 'false'`);
+      await win.webContents.executeJavaScript(`document.querySelector('.nav-btn.right').click(); setTimeout(() => document.querySelector('.nav-btn.left').click(), 30);`);
+      await sleep(450);
+      assert.equal(await win.webContents.executeJavaScript(`[...document.querySelectorAll('.viewer-image')].filter(img => getComputedStyle(img).visibility === 'visible').length`), 1, 'Rapid switching keeps only the latest decoded image');
+      assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('video'))`), false);
+      await win.webContents.executeJavaScript(`HTMLImageElement.prototype.decode = window.originalViewerDecode; delete window.originalViewerDecode; delete window.outgoingVideo;`);
+      await click('.nav-btn.right');
+      await waitFor(`document.querySelector('.viewer-image-surface').getAttribute('aria-busy') === 'false'`);
+      await win.webContents.executeJavaScript(`window.originalViewerDecode = HTMLImageElement.prototype.decode;
+        HTMLImageElement.prototype.decode = function() { return this.classList.contains('viewer-image') ? Promise.reject(new Error('Test decode failure')) : window.originalViewerDecode.call(this); }; void 0;`);
+      await click('.nav-btn.left');
+      await waitFor(`document.querySelector('.viewer-image-status')?.textContent === 'Image unavailable'`);
+      assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.viewer-image').length`), 0, 'A failed replacement must not leave misleading old pixels');
+      await win.webContents.executeJavaScript(`HTMLImageElement.prototype.decode = window.originalViewerDecode; delete window.originalViewerDecode;`);
+      await click('.nav-btn.right');
+      await waitFor(`document.querySelector('.viewer-image-surface').getAttribute('aria-busy') === 'false'`);
+      const timings = [];
     for (let sample = 0; sample < 3; sample++) {
       for (const direction of ['left', 'right']) {
         timings.push(await win.webContents.executeJavaScript(`new Promise((resolve,reject)=>{

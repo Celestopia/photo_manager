@@ -5,6 +5,7 @@
   background: #22262b; overflow: hidden;
 }
 .image-container {
+  position: absolute; inset: 0;
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
   cursor: grab; user-select: none;
 }
@@ -13,8 +14,8 @@
 .viewer-video { flex: 0 0 auto; transform-origin: center center; will-change: transform; }
 .viewer-image { max-width: 88%; max-height: 88%; }
 .video-container {
-  position: relative; width: 100%; height: 100%;
-  background: #22262b; overflow: hidden;
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  background: transparent; overflow: hidden; pointer-events: none;
 }
 .video-transform-viewport {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -161,3 +162,13 @@
   }
   .video-volume-slider { display: none; }
 }
+
+/* Decode the incoming layer before replacing the displayed layer. */
+.viewer-image-surface { position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; }
+.viewer-image-surface > .viewer-image, .viewer-held-frame { grid-area: 1 / 1; }
+.viewer-held-frame { z-index: 1; transform-origin: center; }
+.viewer-image-status { position: absolute; bottom: 76px; z-index: 7; padding: 6px 10px; border-radius: 6px; background: #142331; color: white; }
+.viewer-surface-inactive { pointer-events: none; }
+.video-transform-viewport { pointer-events: none; }
+.viewer-video:not(.video-awaiting-frame), .video-center-play-button, .video-playback-controls, .video-fallback-actions, .video-fallback-panel audio { pointer-events: auto; }
+.video-fallback-panel { justify-content: flex-end; }

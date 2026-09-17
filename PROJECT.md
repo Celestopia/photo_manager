@@ -17,7 +17,7 @@ Current capabilities include:
 - Generating separate first-frame video viewer covers on demand, with aspect-preserving scaling and library-scoped cancellation (see Media Processing and Playback).
 - Batch-generating video covers through gallery maintenance or the explicit-library CLI, with cache reuse and optional forced regeneration.
 - Using shared first-frame extraction for video thumbnails and covers, with explicit thumbnail maintenance rebuilding outdated cache recipes.
-- Displaying photos and video covers through one image surface with stable library-scoped resource URLs, bounded adjacent preloading, and a decoded-frame handoff to video playback.
+- Displaying photos and video covers through one persistent image surface with stable library-scoped resource URLs, bounded adjacent preloading, and a decoded-frame handoff to video playback. Navigation retains the outgoing visual until the latest replacement decodes; see Shared Viewer Image Loading for transition and cleanup rules.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.

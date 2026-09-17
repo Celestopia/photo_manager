@@ -295,6 +295,7 @@ export function useRendererApplication() {
       showToastMessage,
       onExternalAction: () => closeTransientPanels(),
     });
+    const viewerImageRef = ref(null);
     const { imageUrl, imageFailed, imageLoaded } = useViewerImage({ api: API.videoCover,
       selectedItem, libraryState, view, orderedItems });
     const {
@@ -572,7 +573,10 @@ export function useRendererApplication() {
       cancelEdit,
       closeRegistryDropdowns: () => closeAllRegistryDropdowns(),
       resetMediaTransform,
-      releaseCurrentMedia,
+      releaseCurrentMedia: (retainVisual = false) => {
+        if (retainVisual && videoFrameVisible.value) viewerImageRef.value?.retainVideo(videoElementRef.value);
+        releaseCurrentMedia();
+      },
       resetVideoPlaybackState,
       mediaStageRef,
       consumeCompletedDrag,
@@ -729,7 +733,7 @@ export function useRendererApplication() {
       openTagManager, returnToLibraryEntry,
     };
     const viewerContext = {
-      imageUrl, imageFailed, imageLoaded,
+      viewerImageRef, imageUrl, imageFailed, imageLoaded,
       ICONS, WINDOW_ACTIONS, selectedItem, viewerHeaderTime, windowToggleTip, windowToggleIcon,
       ratioStyle, viewerLayoutRef, showLeftPanel, showRightPanel, panelResizeSide,
       beginPanelResize, restoreViewerPanel, mediaStageRef, videoElementRef, audioElementRef,

@@ -3,6 +3,24 @@ import assert from 'node:assert/strict';
 import { effectScope, ref, nextTick } from 'vue';
 import { useViewerImage } from '../src/renderer/composables/use-viewer-image.js';
 
+test('navigation retains destination preloads until the visible handoff', () => {
+  const created = [];
+  const items = ['a', 'b', 'c'].map(MediaId => ({ MediaId, __viewerImageUrl: `viewer-image://library/${MediaId}`, FileSystem: { FileType: 'image' }, Picture: { Width: 2000, Height: 2000 } }));
+  const selectedItem = ref(items[0]), view = ref('viewer');
+  const scope = effectScope();
+  const image = scope.run(() => useViewerImage({ api: {}, selectedItem, view, orderedItems: ref(items), libraryState: ref({}),
+    createImage: () => { const image = { decode: async () => {} }; created.push(image); return image; } }));
+  image.imageLoaded(image.imageUrl.value);
+  const destination = created[0];
+  selectedItem.value = items[1];
+  assert.equal(destination.src, items[1].__viewerImageUrl);
+  image.imageLoaded(image.imageUrl.value);
+  assert.equal(destination.src, '', 'Release only after visible handoff');
+  view.value = 'gallery';
+  assert.ok(created.every(image => image.src === ''));
+  scope.stop();
+});
+
 test('photos and covers have immediate URLs; only selected failures repair and stale replies are ignored', async () => {
   const pending = [], cancelled = [];
   const api = { request: request => new Promise(resolve => pending.push({ request, resolve })), cancel: async id => cancelled.push(id) };

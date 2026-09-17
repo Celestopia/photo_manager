@@ -82,7 +82,7 @@ export function useMediaViewer({
       return;
     }
     clearVideoClickTimer();
-    releaseCurrentMedia();
+    releaseCurrentMedia(true);
     selectedGlobalIndex.value = next;
     selectedItem.value = orderedItems.value[next];
     setDraftFromItem(selectedItem.value);

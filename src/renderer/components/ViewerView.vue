@@ -74,10 +74,15 @@
     aria-label="Resize media information panel"
     @pointerdown="beginPanelResize('left', $event)"
   ></div>
-  <section class="image-stage" ref="mediaStageRef" @wheel="(!isSelectedVideo || videoPlaybackMode === 'video') && onMediaWheel($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
+  <section class="image-stage" ref="mediaStageRef" @wheel="(!imagePending || videoFrameVisible) && (!isSelectedVideo || videoPlaybackMode === 'video') && onMediaWheel($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
     <button class="nav-btn left" aria-label="Previous media" data-tip="Previous media" @click="switchPhoto(-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg></button>
-    <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><ViewerImage :src="imageUrl" :media-style="viewerMediaStyle" @loaded="imageLoaded" @failed="imageFailed" /></div>
-    <div v-else class="video-container">
+    <div v-show="!videoFrameVisible" class="image-container" :class="{ 'viewer-surface-inactive': imagePending }"
+      @mousedown="!imagePending && startDrag($event)" @click="!imagePending && isSelectedVideo && onVideoSurfaceClick($event)"
+      @dblclick.stop.prevent="!imagePending && (isSelectedVideo ? onVideoSurfaceDoubleClick() : toggleFullscreen())">
+      <ViewerImage ref="viewerImageRef" :src="imageUrl" :media-style="viewerMediaStyle" :repair="imageFailed"
+        @loaded="imageLoaded" @pending="imagePending = $event" />
+    </div>
+    <div v-if="isSelectedVideo" class="video-container">
       <template v-if="videoPlaybackMode === 'video'">
         <div
           class="video-transform-viewport"
@@ -85,7 +90,6 @@
           @click="onVideoSurfaceClick"
           @dblclick.stop.prevent="onVideoSurfaceDoubleClick"
         >
-          <ViewerImage v-if="!videoFrameVisible" :src="imageUrl" :media-style="viewerMediaStyle" alt="Video cover" @loaded="imageLoaded" @failed="imageFailed" />
           <video
             :key="selectedItem?.MediaId"
             ref="videoElementRef"
@@ -140,7 +144,6 @@
         />
       </template>
       <div v-else-if="videoPlaybackMode === 'audio'" class="video-fallback-panel">
-        <ViewerImage :src="imageUrl" alt="Video cover" @loaded="imageLoaded" @failed="imageFailed" />
         <p>{{ videoPlaybackMessage || 'Playing audio only' }}</p>
         <audio
           :key="selectedItem?.MediaId + '_audio'"
@@ -160,7 +163,6 @@
         ></audio>
       </div>
       <div v-else class="video-fallback-panel video-unsupported-panel">
-        <ViewerImage :src="imageUrl" alt="Video cover" @loaded="imageLoaded" @failed="imageFailed" />
         <p>{{ videoPlaybackMessage || selectedItem?.Video?.ProbeError || 'This player cannot play the media' }}</p>
         <div class="video-fallback-actions"><button class="btn btn-primary" @click.stop="openCurrentWithSystem">Open in System Player</button><button class="btn" @click.stop="showCurrentInFolder">Show in File Explorer</button></div>
       </div>
@@ -357,6 +359,7 @@ const hiddenDescriptionExpanded = ref(false);
 const privacyExpanded = ref(false);
 // Shared by photo/video parameters for this mounted viewer session.
 const parametersExpanded = ref(false);
+const imagePending = ref(true);
 
 function formatCameraValue(value) {
   if (value == null || value === "") return "-";
@@ -372,7 +375,7 @@ function formatFlashUsed(value) {
 }
 
 const {
-  imageUrl, imageFailed, imageLoaded, videoFrameVisible,
+  viewerImageRef, imageUrl, imageFailed, imageLoaded, videoFrameVisible,
   ICONS,
   WINDOW_ACTIONS,
   selectedItem,
