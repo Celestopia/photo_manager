@@ -93,7 +93,7 @@
             playsinline
             :style="viewerMediaStyle"
             :data-media-id="selectedItem?.MediaId"
-            :poster="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder"
+            :poster="videoPosterUrl || ICONS.videoPlaceholder"
             :src="buildImageUrl(selectedItem?.__absolutePath)"
             @loadedmetadata="onVideoLoadedMetadata"
             @canplay="onVideoCanPlay"
@@ -139,7 +139,7 @@
         />
       </template>
       <div v-else-if="videoPlaybackMode === 'audio'" class="video-fallback-panel">
-        <img :src="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder" alt="Video thumbnail" />
+        <img :src="videoCoverUrl || ICONS.videoPlaceholder" alt="Video cover" />
         <p>{{ videoPlaybackMessage || 'Playing audio only' }}</p>
         <audio
           :key="selectedItem?.MediaId + '_audio'"
@@ -159,7 +159,7 @@
         ></audio>
       </div>
       <div v-else class="video-fallback-panel video-unsupported-panel">
-        <img :src="selectedItem?.__thumbnailAvailable ? buildImageUrl(selectedItem.__thumbnailPath) : ICONS.videoPlaceholder" alt="Video thumbnail" />
+        <img :src="videoCoverUrl || ICONS.videoPlaceholder" alt="Video cover" />
         <p>{{ videoPlaybackMessage || selectedItem?.Video?.ProbeError || 'This player cannot play the media' }}</p>
         <div class="video-fallback-actions"><button class="btn btn-primary" @click.stop="openCurrentWithSystem">Open in System Player</button><button class="btn" @click.stop="showCurrentInFolder">Show in File Explorer</button></div>
       </div>
@@ -370,6 +370,7 @@ function formatFlashUsed(value) {
 }
 
 const {
+  videoCoverUrl, videoPosterUrl,
   ICONS,
   WINDOW_ACTIONS,
   selectedItem,

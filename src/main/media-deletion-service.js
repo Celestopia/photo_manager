@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const { assertUuidArray } = require("../shared/identity-schema.js");
 const { assertExactObjectKeys } = require("../shared/object-schema.js");
+const { pruneVideoCovers } = require("../../scripts/video-cover-cache.js");
 
 function createMediaDeletionService(options) {
   const {
@@ -57,6 +58,8 @@ function createMediaDeletionService(options) {
           .catch((error) => appendLog(`thumbnail cleanup failed hash=${hash}: ${error.message}`));
       }
       clearThumbnailStatusCache();
+      if (library.paths.videoCoverDir) await pruneVideoCovers(library.paths, remainingEntries)
+        .catch(() => appendLog("video cover cleanup failed"));
       emitLibraryState();
       appendLog(`media-delete committed count=${targets.length} cleanupPending=${transaction.cleanupPending}`);
       return {
@@ -71,7 +74,8 @@ function createMediaDeletionService(options) {
     }
   }
 
-  return { deleteMedia };
+  return { deleteMedia: payload => options.withCoverMutation
+    ? options.withCoverMutation(() => deleteMedia(payload)) : deleteMedia(payload) };
 }
 
 module.exports = { createMediaDeletionService };

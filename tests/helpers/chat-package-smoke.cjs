@@ -31,6 +31,12 @@ async function run() {
       video,
     ]);
     const info = await inputs.inspect(video, { video: true, tools });
+    const paths = require(path.join(code, 'scripts/library-core.js')).resolveLibraryPaths(root);
+    await fs.mkdir(paths.managerDir);
+    const cover = await require(path.join(code, 'scripts/video-cover-cache.js')).generateCover({
+      paths, source: video, hash: 'a'.repeat(64), appRoot: resources, config: {}, beforePublish: async () => {},
+    });
+    assert.ok(cover.length > 0);
     const frames = await inputs.prepare(video, info, "sampled", 3, { tools });
     assert.equal(frames.length, 3);
     assert.ok(frames.every((f) => f.mime === "image/jpeg" && f.width === 32));

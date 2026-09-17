@@ -46,6 +46,7 @@ function resolveLibraryPaths(rawRoot) {
     dataDir,
     metadataFile: path.join(dataDir, DATA_FILE_NAMES.metadata),
     thumbnailDir: path.join(managerDir, "thumb_cache"),
+    videoCoverDir: path.join(managerDir, "video_covers"),
     thumbnailManifestFile: path.join(managerDir, "thumb_cache", "cache_manifest.json"),
     backupDir: path.join(managerDir, "backups"),
     logDir: path.join(managerDir, "logs"),

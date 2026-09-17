@@ -242,6 +242,8 @@ async function run(options = {}) {
     const nextEntries = [...result.next.values()];
     emit({ phase: "commit", processed: nextEntries.length, total: nextEntries.length, message: "Writing metadata atomically" });
     await writeAll(paths.metadataFile, nextEntries);
+    await require("./video-cover-cache.js").pruneVideoCovers(paths, nextEntries)
+      .catch(() => logger.warn("Failed to prune video covers"));
     const retainedHashes = new Set(nextEntries.map((item) => item?.SHA256Hash).filter(Boolean));
     const staleHashes = new Set(
       [...existing.values()]

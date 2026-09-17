@@ -239,6 +239,8 @@ async function run() {
     await waitFor(`Boolean(document.querySelector('.photo-card'))`);
     await win.webContents.executeJavaScript(`[...document.querySelectorAll('.photo-card')].find(e=>e.textContent.includes('viewer-video')).click()`);
     await waitFor(`Boolean(document.querySelector('video')) && document.querySelector('video').readyState >= 1`);
+    await waitFor(`document.querySelector('video').poster.startsWith('data:image/webp;base64,')`);
+    assert.deepEqual(await win.webContents.executeJavaScript(`new Promise(resolve => { const image=new Image(); image.onload=()=>resolve([image.naturalWidth,image.naturalHeight]); image.src=document.querySelector('video').poster; })`), [1280, 720]);
     await sleep(500);
     assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'false', 'Reopening the viewer resets parameter expansion');
     assert.equal(await win.webContents.executeJavaScript(`(()=>{const stage=document.querySelector('.image-stage').getBoundingClientRect();const video=document.querySelector('video').getBoundingClientRect();return video.width<=stage.width*.89 && video.height<=stage.height*.89})()`), true, 'Video fits inside the padded stage');

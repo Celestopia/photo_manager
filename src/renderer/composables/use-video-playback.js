@@ -270,6 +270,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     const element = videoElementRef.value || audioElementRef.value;
     if (!element) return;
     if (element.paused) {
+      hasVideoPlaybackStarted.value = true;
       videoWaiting.value = element.tagName === "VIDEO";
       try {
         await element.play();
@@ -285,6 +286,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   function seekVideo(seconds) {
     const element = videoElementRef.value || audioElementRef.value;
     if (!element || !Number.isFinite(element.duration)) return;
+    hasVideoPlaybackStarted.value = true;
     element.currentTime = clampVideoTime(element.currentTime + seconds, element.duration);
     if (element.tagName === "VIDEO") syncVideoTimeline(element, { forceCurrentTime: true });
   }
@@ -292,6 +294,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   function beginVideoSeek() {
     const element = videoElementRef.value;
     if (!element || !Number.isFinite(element.duration) || element.duration <= 0) return;
+    hasVideoPlaybackStarted.value = true;
     if (!videoSeeking.value) {
       resumeAfterSeek = !element.paused && !element.ended;
       if (resumeAfterSeek) element.pause();

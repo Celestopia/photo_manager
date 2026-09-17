@@ -86,6 +86,8 @@ Standard layout:
     thumb_cache/
       cache_manifest.json
       <SHA256Hash>.webp
+    video_covers/                 # Lazy, disposable first-frame viewer covers.
+      <SHA256Hash>.v1-2560-q90.webp
     backups/
       <timestamp>-<kind>-<suffix>/
         library.yml

@@ -5,6 +5,7 @@ import { useUiFeedback } from "../composables/use-ui-feedback.js";
 import { useWindowControls } from "../composables/use-window-controls.js";
 import { useMediaTransform } from "../composables/use-media-transform.js";
 import { useVideoPlayback } from "../composables/use-video-playback.js";
+import { useVideoCover } from "../composables/use-video-cover.js";
 import { useLibrarySession } from "../composables/use-library-session.js";
 import { useGalleryQuery } from "../composables/use-gallery-query.js";
 import { useGallerySelection } from "../composables/use-gallery-selection.js";
@@ -293,6 +294,8 @@ export function useRendererApplication() {
       showToastMessage,
       onExternalAction: () => closeTransientPanels(),
     });
+    const { videoCoverUrl, videoPosterUrl } = useVideoCover({ api: API.videoCover,
+      selectedItem, libraryState, view, hasVideoPlaybackStarted });
     const {
       editDraft,
       editingDirty,
@@ -725,6 +728,7 @@ export function useRendererApplication() {
       openTagManager, returnToLibraryEntry,
     };
     const viewerContext = {
+      videoCoverUrl, videoPosterUrl,
       ICONS, WINDOW_ACTIONS, selectedItem, viewerHeaderTime, windowToggleTip, windowToggleIcon,
       ratioStyle, viewerLayoutRef, showLeftPanel, showRightPanel, panelResizeSide,
       beginPanelResize, restoreViewerPanel, mediaStageRef, videoElementRef, audioElementRef,
