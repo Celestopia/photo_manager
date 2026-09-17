@@ -39,6 +39,16 @@ async function run() {
       paths, source: video, hash: 'a'.repeat(64), appRoot: resources, config: {}, beforePublish: async () => {},
     });
     assert.ok(cover.length > 0);
+    const { createViewerImageResources, handleViewerImageRequest } = require(path.join(code, 'src/main/viewer-image-resources.js'));
+    const sourceStat = await fs.stat(video);
+    const resourceItem = { MediaId: 'fixture', FilePath: 'video.mp4', SHA256Hash: 'a'.repeat(64), FileSystem: {
+      FileType: 'video', FileSize: sourceStat.size, ModificationTimeMs: sourceStat.mtimeMs } };
+    const libraryState = { paths, sessionId: 'fixture', state: 'open' };
+    const resourcesService = createViewerImageResources({ getLibrary: () => libraryState, getItem: () => resourceItem,
+      fetchFile: async url => new Response(await fs.readFile(require('node:url').fileURLToPath(url))) });
+    const imageResponse = await handleViewerImageRequest(new Request(resourcesService.urlFor(resourceItem)));
+    assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()), cover);
+    resourcesService.invalidate();
     const videoStat = await fs.stat(video);
     const batchStats = await require(path.join(code, 'scripts/build-video-covers.js')).ensureVideoCovers([
       { FilePath: 'video.mp4', SHA256Hash: 'a'.repeat(64), FileSystem: {

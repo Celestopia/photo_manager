@@ -12,6 +12,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Permanently delete one media item from the viewer or a selected batch from the gallery, removing both files and metadata after confirmation.
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Preview videos with uncropped first-frame covers, generated locally on demand and cached inside the library; gallery thumbnails remain separate.
+- Load photos and video covers through the same viewer image path; cached covers display independently of video preparation and remain visible until a playback frame is ready.
 - Use **Generate Video Covers** in the gallery menu to prepare all indexed videos in advance; optionally regenerate existing covers.
 - Video thumbnails also use the first frame. Run **Generate Thumbnails** to refresh an outdated cache; recipe changes automatically require a rebuild, even with the regeneration checkbox unchecked.
 - Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.

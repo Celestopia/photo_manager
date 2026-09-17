@@ -10,6 +10,7 @@ function createGalleryItemEnricher({
   assertPathInsideLibrary,
   thumbnailAbsolutePath,
   listThumbnailFiles,
+  viewerImageUrl = () => "",
   now = Date.now,
 }) {
   let thumbnailDirectory = "";
@@ -50,6 +51,7 @@ function createGalleryItemEnricher({
     return {
       ...item,
       __absolutePath: absolutePath,
+      __viewerImageUrl: viewerImageUrl(item),
       __thumbnailPath: thumbnailPath,
       __thumbnailAvailable: thumbnailStatus.available,
       __thumbnailVersion: thumbnailStatus.version,

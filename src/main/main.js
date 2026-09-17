@@ -7,7 +7,9 @@
  * 3) Route IPC handlers to the session that owns the trusted sender.
  * 4) Create and monitor renderer windows.
  */
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, protocol, net } = require("electron");
+const { SCHEME, registerViewerImageScheme, createViewerImageResources, handleViewerImageRequest } = require("./viewer-image-resources");
+registerViewerImageScheme(protocol);
 const { createVideoCoverService } = require("./video-cover-service.js");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
@@ -403,6 +405,7 @@ const { enrichItem, clearThumbnailStatusCache } = createGalleryItemEnricher({
   assertPathInsideLibrary,
   thumbnailAbsolutePath,
   listThumbnailFiles: (directory) => fs.readdirSync(directory, { withFileTypes: true }),
+  viewerImageUrl: item => sessionRouter.current().viewerImages.urlFor(item),
 });
 
 function resolveIndexedMediaPath(rawMediaId) {
@@ -631,6 +634,7 @@ async function closeLibrary() {
   }
   if (!state.activeLibrary) return getLibraryState();
   state.activeLibrary.state = "closing";
+  sessionRouter.current().viewerImages.invalidate();
   await videoCovers.stop();
   try { await chat.close(); }
   catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
@@ -758,6 +762,7 @@ function runOperationWorker(operation, root, options = {}) {
 async function runMaintenanceOperation(operation, options = {}) {
   const library = requireOpenLibrary({ writable: true });
   state.maintenanceState = { running: true };
+  sessionRouter.current().viewerImages.invalidate();
   emitLibraryState();
   try {
     await chat.close();
@@ -1008,6 +1013,7 @@ async function closeWindowSession(session) {
   if (session.closePromise) return session.closePromise;
   session.closePromise = sessionRouter.run(session, async () => {
     session.acceptingCommands = false;
+    session.viewerImages.invalidate();
     await videoCovers.stop();
     if (state.quickScanState) state.quickScanState.cancelled = true;
     await chat.stop().catch((error) => appendLog(`chat stop during window close failed: ${error.message}`));
@@ -1038,12 +1044,18 @@ async function createLibraryWindow() {
     mutate: createMutationCoordinator(),
   };
   session.chat = sessionRouter.run(session, () => createSessionChat(session));
+  session.viewerImages = createViewerImageResources({
+    getLibrary: () => session.acceptingCommands && !session.runtime.maintenanceState.running ? session.runtime.activeLibrary : null,
+    getItem: id => session.runtime.metadataIndex.get(id),
+    fetchFile: (url, options) => net.fetch(url, options),
+  });
   session.videoCovers = createVideoCoverService({
     getLibrary: () => requireOpenLibrary({ writable: true }),
     resolveMedia: resolveIndexedMediaPath,
     appRoot: PROGRAM_RESOURCE_ROOT,
     getConfig: () => config.media,
     log: appendLog,
+    resourceChanged: item => session.viewerImages.changed(item),
   });
   session.services = sessionRouter.run(session, () => createDomainServices());
 
@@ -1087,6 +1099,7 @@ async function createLibraryWindow() {
 
 /** Load shared application state once, then create the first entry window. */
 async function initializeApplication() {
+  protocol.handle(SCHEME, handleViewerImageRequest);
   const configResult = loadConfig(APPLICATION_PATHS.configFile);
   config = configResult.config;
   if (configResult.warning) appendLog(configResult.warning);

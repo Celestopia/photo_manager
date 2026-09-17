@@ -297,7 +297,8 @@ export function useLibrarySession({
     maintenanceDialog.result = result?.result || null;
     maintenanceDialog.error = result?.ok ? "" : result?.error || "Task failed";
     maintenanceDialog.reportText = JSON.stringify(result?.ok ? result.result : { error: maintenanceDialog.error }, null, 2);
-    if (result?.ok) await onMaintenanceRefresh?.(maintenanceDialog.operation);
+    // Resource URLs may be revoked even when a cache-changing worker fails.
+    await onMaintenanceRefresh?.(maintenanceDialog.operation, Boolean(result?.ok));
   }
 
   async function copyMaintenanceReport() {

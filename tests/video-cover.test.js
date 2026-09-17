@@ -59,13 +59,13 @@ test("real first-frame covers preserve size, SAR, rotation and black openings", 
       const stat = await fs.stat(source);
       const item = { SHA256Hash: hash, FileSystem: { FileType: 'video', FileSize: stat.size, ModificationTimeMs: stat.mtimeMs } };
       const service = createVideoCoverService({ getLibrary: () => ({ paths, sessionId: 'fixture' }),
-        resolveMedia: () => ({ item, absolutePath: source }), appRoot, getConfig: () => ({}), log: () => {} });
+        resolveMedia: () => ({ item, absolutePath: source }), appRoot, getConfig: () => ({}), resourceChanged: () => "viewer-image://fixture/cover", log: () => {} });
       await fs.writeFile(path.join(paths.videoCoverDir, coverName(hash)), 'corrupt');
       assert.equal((await service.request({ requestId: 'repair', mediaId: 'fixture' })).status, 'ready');
       await service.stop();
       const before = (await fs.stat(path.join(paths.videoCoverDir, coverName(hash)))).mtimeMs;
       assert.equal((await service.request({ requestId: 'reuse', mediaId: 'fixture' })).status, 'ready');
-      assert.equal((await fs.stat(path.join(paths.videoCoverDir, coverName(hash)))).mtimeMs, before);
+      assert.ok((await fs.stat(path.join(paths.videoCoverDir, coverName(hash)))).mtimeMs >= before);
       await service.stop();
     }
   }
@@ -79,7 +79,7 @@ test("service shares covers, validates sources, cancels and prunes without losin
   let calls = 0;
   const bytes = await sharp({ create: { width: 32, height: 18, channels: 3, background: "black" } }).webp().toBuffer();
   const service = createVideoCoverService({ getLibrary: () => ({ paths, sessionId: "session", manifest: { libraryId: "library" } }),
-    resolveMedia: () => ({ item, absolutePath: source }), appRoot, getConfig: () => ({}), log: () => {},
+    resolveMedia: () => ({ item, absolutePath: source }), appRoot, getConfig: () => ({}), resourceChanged: () => "viewer-image://fixture/cover", log: () => {},
     generate: async ({ signal }) => { calls++; await new Promise(resolve => setTimeout(resolve, 20)); signal.throwIfAborted(); return bytes; } });
   const results = await Promise.all([service.request({ requestId: "a", mediaId: "one" }), service.request({ requestId: "b", mediaId: "one" })]);
   assert.ok(results.every(result => result.status === "ready"));

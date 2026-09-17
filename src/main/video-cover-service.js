@@ -1,7 +1,6 @@
-const path = require("node:path");
 const cache = require("../../scripts/video-cover-cache.js");
 
-function createVideoCoverService({ getLibrary, resolveMedia, appRoot, getConfig, log, generate = cache.generateCover }) {
+function createVideoCoverService({ getLibrary, resolveMedia, appRoot, getConfig, log, resourceChanged, generate = cache.generateCover }) {
   let current = null, tail = Promise.resolve(), paused = 0;
   async function checkSource(library, item, source) {
     await cache.checkCoverSource(library.paths, item, source);
@@ -35,16 +34,11 @@ function createVideoCoverService({ getLibrary, resolveMedia, appRoot, getConfig,
           signal.throwIfAborted();
           await checkSource(library, item, source);
           await cache.assertCacheDirectory(library.paths);
-          const target = path.join(library.paths.videoCoverDir, cache.coverName(item.SHA256Hash));
-          let bytes;
-          try { bytes = await cache.readCover(target); } catch {
-            signal.throwIfAborted();
-            bytes = await generate({ paths: library.paths, source, hash: item.SHA256Hash, appRoot,
-              config: getConfig(), signal, beforePublish: () => checkSource(library, item, source) });
-          }
+          await generate({ paths: library.paths, source, hash: item.SHA256Hash, appRoot,
+            config: getConfig(), signal, beforePublish: () => checkSource(library, item, source) });
           signal.throwIfAborted();
           await checkSource(library, item, source);
-          return `data:image/webp;base64,${bytes.toString("base64")}`;
+          return resourceChanged(item);
         });
         tail = job.promise.catch(() => {});
         current = job;

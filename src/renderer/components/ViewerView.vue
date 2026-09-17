@@ -76,7 +76,7 @@
   ></div>
   <section class="image-stage" ref="mediaStageRef" @wheel="(!isSelectedVideo || videoPlaybackMode === 'video') && onMediaWheel($event)" @mouseup="endDrag" @mouseleave="endDrag" @contextmenu="openContextMenu">
     <button class="nav-btn left" aria-label="Previous media" data-tip="Previous media" @click="switchPhoto(-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg></button>
-    <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><img v-if="selectedItem" class="viewer-image" :src="buildImageUrl(selectedItem.__absolutePath)" :style="viewerMediaStyle" /></div>
+    <div v-if="!isSelectedVideo" class="image-container" @mousedown="startDrag" @dblclick.stop.prevent="toggleFullscreen"><ViewerImage :src="imageUrl" :media-style="viewerMediaStyle" @loaded="imageLoaded" @failed="imageFailed" /></div>
     <div v-else class="video-container">
       <template v-if="videoPlaybackMode === 'video'">
         <div
@@ -85,15 +85,16 @@
           @click="onVideoSurfaceClick"
           @dblclick.stop.prevent="onVideoSurfaceDoubleClick"
         >
+          <ViewerImage v-if="!videoFrameVisible" :src="imageUrl" :media-style="viewerMediaStyle" alt="Video cover" @loaded="imageLoaded" @failed="imageFailed" />
           <video
             :key="selectedItem?.MediaId"
             ref="videoElementRef"
             class="viewer-video"
+            :class="{ 'video-awaiting-frame': !videoFrameVisible }"
             preload="metadata"
             playsinline
             :style="viewerMediaStyle"
             :data-media-id="selectedItem?.MediaId"
-            :poster="videoPosterUrl || ICONS.videoPlaceholder"
             :src="buildImageUrl(selectedItem?.__absolutePath)"
             @loadedmetadata="onVideoLoadedMetadata"
             @canplay="onVideoCanPlay"
@@ -139,7 +140,7 @@
         />
       </template>
       <div v-else-if="videoPlaybackMode === 'audio'" class="video-fallback-panel">
-        <img :src="videoCoverUrl || ICONS.videoPlaceholder" alt="Video cover" />
+        <ViewerImage :src="imageUrl" alt="Video cover" @loaded="imageLoaded" @failed="imageFailed" />
         <p>{{ videoPlaybackMessage || 'Playing audio only' }}</p>
         <audio
           :key="selectedItem?.MediaId + '_audio'"
@@ -159,7 +160,7 @@
         ></audio>
       </div>
       <div v-else class="video-fallback-panel video-unsupported-panel">
-        <img :src="videoCoverUrl || ICONS.videoPlaceholder" alt="Video cover" />
+        <ViewerImage :src="imageUrl" alt="Video cover" @loaded="imageLoaded" @failed="imageFailed" />
         <p>{{ videoPlaybackMessage || selectedItem?.Video?.ProbeError || 'This player cannot play the media' }}</p>
         <div class="video-fallback-actions"><button class="btn btn-primary" @click.stop="openCurrentWithSystem">Open in System Player</button><button class="btn" @click.stop="showCurrentInFolder">Show in File Explorer</button></div>
       </div>
@@ -341,6 +342,7 @@ import LocationPicker from "./LocationPicker.vue";
 import TagPicker from "./TagPicker.vue";
 import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 import VideoPlaybackControls from "./VideoPlaybackControls.vue";
+import ViewerImage from "./ViewerImage.vue";
 import ChatPanel from "./ChatPanel.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts.js";
 const chat = inject(CHAT_CONTEXT);
@@ -370,7 +372,7 @@ function formatFlashUsed(value) {
 }
 
 const {
-  videoCoverUrl, videoPosterUrl,
+  imageUrl, imageFailed, imageLoaded, videoFrameVisible,
   ICONS,
   WINDOW_ACTIONS,
   selectedItem,

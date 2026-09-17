@@ -5,7 +5,7 @@ import { useUiFeedback } from "../composables/use-ui-feedback.js";
 import { useWindowControls } from "../composables/use-window-controls.js";
 import { useMediaTransform } from "../composables/use-media-transform.js";
 import { useVideoPlayback } from "../composables/use-video-playback.js";
-import { useVideoCover } from "../composables/use-video-cover.js";
+import { useViewerImage } from "../composables/use-viewer-image.js";
 import { useLibrarySession } from "../composables/use-library-session.js";
 import { useGalleryQuery } from "../composables/use-gallery-query.js";
 import { useGallerySelection } from "../composables/use-gallery-selection.js";
@@ -113,12 +113,12 @@ export function useRendererApplication() {
         await queryGallery();
       },
       onLibraryClosed: () => resetLibraryUiState(),
-      onMaintenanceRefresh: async (operation) => {
-        if (operation === "update") {
+      onMaintenanceRefresh: async (operation, succeeded) => {
+        if (operation === "update" && succeeded) {
           await loadAllRegistries();
           await queryGallery();
         }
-        if (operation === "thumbnails") await queryGallery();
+        if (operation !== "update" || !succeeded) await queryGallery();
       },
     });
     const {
@@ -259,6 +259,7 @@ export function useRendererApplication() {
       videoVolume,
       videoMuted,
       hasVideoPlaybackStarted,
+      videoFrameVisible,
       isSelectedVideo,
       canStepVideoBackward,
       canStepVideoForward,
@@ -294,8 +295,8 @@ export function useRendererApplication() {
       showToastMessage,
       onExternalAction: () => closeTransientPanels(),
     });
-    const { videoCoverUrl, videoPosterUrl } = useVideoCover({ api: API.videoCover,
-      selectedItem, libraryState, view, hasVideoPlaybackStarted });
+    const { imageUrl, imageFailed, imageLoaded } = useViewerImage({ api: API.videoCover,
+      selectedItem, libraryState, view, orderedItems });
     const {
       editDraft,
       editingDirty,
@@ -728,13 +729,13 @@ export function useRendererApplication() {
       openTagManager, returnToLibraryEntry,
     };
     const viewerContext = {
-      videoCoverUrl, videoPosterUrl,
+      imageUrl, imageFailed, imageLoaded,
       ICONS, WINDOW_ACTIONS, selectedItem, viewerHeaderTime, windowToggleTip, windowToggleIcon,
       ratioStyle, viewerLayoutRef, showLeftPanel, showRightPanel, panelResizeSide,
       beginPanelResize, restoreViewerPanel, mediaStageRef, videoElementRef, audioElementRef,
       videoPlaybackMode, videoPlaybackMessage, videoFrameStepping, videoDisplayedTime, videoDuration,
       videoPlaying, videoWaiting, videoReady, videoSeeking, videoBufferedPercent, videoVolume, videoMuted,
-      canStepVideoBackward, canStepVideoForward,
+      videoFrameVisible, canStepVideoBackward, canStepVideoForward,
       isSelectedVideo, showContextMenu, contextPosition, pendingViewerTransition,
       editDraft, editingDirty, saving, activeEditField,
       saveNotice, STAR_LEVELS, viewerMediaStyle, minZoom, maxZoom, zoomPercent, zoomStep,

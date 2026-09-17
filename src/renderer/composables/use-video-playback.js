@@ -41,6 +41,28 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   const videoSeekPreview = ref(0);
   const videoBufferedPercent = ref(0);
   const hasVideoPlaybackStarted = ref(false);
+  const videoFrameVisible = ref(false);
+  let frameElement = null, frameCallback = null, revealAnimation = null, frameEpoch = 0;
+  function cancelFrameReveal() {
+    frameEpoch++;
+    if (frameCallback !== null) frameElement?.cancelVideoFrameCallback?.(frameCallback);
+    if (revealAnimation !== null) window.cancelAnimationFrame(revealAnimation);
+    frameElement = null; frameCallback = null; revealAnimation = null;
+  }
+  function revealReadyFrame(element, presented = false) {
+    if (videoFrameVisible.value || !hasVideoPlaybackStarted.value || element !== videoElementRef.value
+      || !currentPlaybackElement({ currentTarget: element }, videoElementRef)) return;
+    cancelFrameReveal();
+    const epoch = frameEpoch;
+    const reveal = () => {
+      if (epoch !== frameEpoch || element !== videoElementRef.value || element.seeking || element.readyState < 2) return;
+      videoFrameVisible.value = true;
+      frameCallback = null; revealAnimation = null;
+    };
+    frameElement = element;
+    if (!presented && typeof element.requestVideoFrameCallback === "function") frameCallback = element.requestVideoFrameCallback(reveal);
+    else if (element.readyState >= 2) revealAnimation = window.requestAnimationFrame(reveal);
+  }
   const videoVolume = ref(readStoredNumber("photoManager.videoVolume", 1, 0, 1));
   const videoMuted = ref(readStoredBoolean("photoManager.videoMuted", false));
   let resumeAfterSeek = false;
@@ -81,6 +103,8 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   }
 
   function resetRuntimePlaybackState() {
+    cancelFrameReveal();
+    videoFrameVisible.value = false;
     videoFrameStepping.value = false;
     videoCurrentTime.value = 0;
     videoDuration.value = 0;
@@ -236,11 +260,13 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     hasVideoPlaybackStarted.value = true;
     videoPlaying.value = true;
     videoWaiting.value = false;
+    if (elementRef === videoElementRef) revealReadyFrame(event.currentTarget);
   }
 
   function onMediaPaused(event) {
     const elementRef = event?.currentTarget?.tagName === "AUDIO" ? audioElementRef : videoElementRef;
     if (currentPlaybackElement(event, elementRef)) videoPlaying.value = false;
+    if (elementRef === videoElementRef) revealReadyFrame(event.currentTarget, true);
   }
 
   function onMediaEnded(event) {
@@ -248,6 +274,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     if (!currentPlaybackElement(event, elementRef)) return;
     videoPlaying.value = false;
     videoWaiting.value = false;
+    if (elementRef === videoElementRef) revealReadyFrame(event.currentTarget, true);
   }
 
   function onMediaTimeUpdate(event) {
@@ -264,6 +291,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     if (!element) return;
     syncVideoTimeline(element);
     if (!videoSeeking.value) videoWaiting.value = false;
+    revealReadyFrame(element, true);
   }
 
   async function toggleVideoPlayback() {
@@ -271,10 +299,12 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
     if (!element) return;
     if (element.paused) {
       hasVideoPlaybackStarted.value = true;
+      if (element.tagName === "VIDEO") revealReadyFrame(element);
       videoWaiting.value = element.tagName === "VIDEO";
       try {
         await element.play();
       } catch (error) {
+        cancelFrameReveal();
         videoWaiting.value = false;
         showToastMessage(`Playback failed: ${error?.message || "Unknown error"}`);
       }
@@ -396,6 +426,7 @@ export function useVideoPlayback({ api, selectedItem, showToastMessage, onExtern
   }
 
   return {
+    videoFrameVisible,
     videoElementRef,
     audioElementRef,
     videoPlaybackMode,

@@ -1,6 +1,7 @@
 /* Run with Electron: node_modules/.bin/electron tests/helpers/chat-ui-smoke.cjs.
    All library/configuration data and the fake provider are isolated to this test. */
 const { app, BrowserWindow, dialog, clipboard, shell } = require("electron");
+require('../../src/main/viewer-image-resources').registerViewerImageScheme(require('electron').protocol);
 const openedSources = [];
 shell.openExternal = async url => { openedSources.push(url); };
 app.disableHardwareAcceleration();
@@ -267,8 +268,12 @@ async function run() {
     await waitFor(`Boolean(document.querySelector('.photo-card'))`);
     await win.webContents.executeJavaScript(`[...document.querySelectorAll('.photo-card')].find(e=>e.textContent.includes('viewer-video')).click()`);
     await waitFor(`Boolean(document.querySelector('video')) && document.querySelector('video').readyState >= 1`);
-    await waitFor(`document.querySelector('video').poster.startsWith('data:image/webp;base64,')`);
-    assert.deepEqual(await win.webContents.executeJavaScript(`new Promise(resolve => { const image=new Image(); image.onload=()=>resolve([image.naturalWidth,image.naturalHeight]); image.src=document.querySelector('video').poster; })`), [1280, 720]);
+    await waitFor(`document.querySelector('.video-transform-viewport .viewer-image')?.naturalWidth === 1280`);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.video-transform-viewport .viewer-image').src.startsWith('viewer-image://')`), true);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('video').hasAttribute('poster')`), false);
+    const coverFiles = await fsp.readdir(path.join(library, '.photo_manager', 'video_covers'));
+    const coverFile = path.join(library, '.photo_manager', 'video_covers', coverFiles.find(name => name.endsWith('.webp')));
+    const coverModified = (await fsp.stat(coverFile)).mtimeMs;
     await sleep(500);
     assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'false', 'Reopening the viewer resets parameter expansion');
     assert.equal(await win.webContents.executeJavaScript(`(()=>{const stage=document.querySelector('.image-stage').getBoundingClientRect();const video=document.querySelector('video').getBoundingClientRect();return video.width<=stage.width*.89 && video.height<=stage.height*.89})()`), true, 'Video fits inside the padded stage');
@@ -277,6 +282,7 @@ async function run() {
     await fsp.writeFile(path.resolve('release/viewer-video-v036.png'), (await win.webContents.capturePage()).toPNG());
     await click('.video-center-play-button');
     await waitFor(`!document.querySelector('video').paused`);
+    await waitFor(`!document.querySelector('video').classList.contains('video-awaiting-frame')`);
     await win.webContents.executeJavaScript(`document.querySelector('video').pause()`);
     const playingSource = await mediaSource();
     await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').focus()`);
@@ -293,6 +299,22 @@ async function run() {
     assert.notEqual(await mediaSource(), playingSource, 'Before playback arrows navigate');
     await arrow('Right');
     await click('[aria-label="Expand privacy level"]');
+    await waitFor(`document.querySelector('.video-transform-viewport .viewer-image')?.naturalWidth === 1280`);
+    assert.equal((await fsp.stat(coverFile)).mtimeMs, coverModified, 'Returning to a video reuses its cover without extraction');
+    const timings = [];
+    for (let sample = 0; sample < 3; sample++) {
+      for (const direction of ['left', 'right']) {
+        timings.push(await win.webContents.executeJavaScript(`new Promise((resolve,reject)=>{
+          const start=performance.now();
+          const finish=event=>{if(!event.target.classList?.contains('viewer-image'))return;
+            document.removeEventListener('load',finish,true);clearTimeout(timer);
+            requestAnimationFrame(()=>resolve({kind:'${direction === 'right' ? 'cover' : 'photo'}',ms:Math.round(performance.now()-start)}));};
+          const timer=setTimeout(()=>{document.removeEventListener('load',finish,true);reject(new Error('Image timing timeout'));},5000);
+          document.addEventListener('load',finish,true);document.querySelector('.nav-btn.${direction}').click();
+        })`));
+      }
+    }
+    console.log('VIEWER_IMAGE_TIMINGS', JSON.stringify(timings));
     await waitFor(`document.querySelectorAll('.privacy-level-btn svg').length === 5`);
     await sleep(150);
     await fsp.writeFile(path.resolve('release/viewer-video-v036.png'), (await win.webContents.capturePage()).toPNG());
