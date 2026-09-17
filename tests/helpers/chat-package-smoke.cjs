@@ -45,6 +45,10 @@ async function run() {
         FileType: 'video', FileSize: videoStat.size, ModificationTimeMs: videoStat.mtimeMs } },
     ], { paths, config: {}, force: true });
     assert.equal(batchStats.generated, 1);
+    const thumbnailPath = path.join(root, 'thumbnail.webp');
+    await require(path.join(code, 'scripts/thumbnail-cache.js')).generateVideoThumbnail({}, video, thumbnailPath,
+      { size: 32, webpQuality: 80, extremeAspectRatio: 4 }, {});
+    assert.ok((await fs.stat(thumbnailPath)).size > 0);
     const frames = await inputs.prepare(video, info, "sampled", 3, { tools });
     assert.equal(frames.length, 3);
     assert.ok(frames.every((f) => f.mime === "image/jpeg" && f.width === 32));

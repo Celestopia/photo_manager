@@ -13,6 +13,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Preview videos with uncropped first-frame covers, generated locally on demand and cached inside the library; gallery thumbnails remain separate.
 - Use **Generate Video Covers** in the gallery menu to prepare all indexed videos in advance; optionally regenerate existing covers.
+- Video thumbnails also use the first frame. Run **Generate Thumbnails** to refresh an outdated cache; recipe changes automatically require a rebuild, even with the regeneration checkbox unchecked.
 - Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.
 - Enable optional Tavily web research, inspect cited sources, and review researched metadata suggestions before saving.
 - Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.

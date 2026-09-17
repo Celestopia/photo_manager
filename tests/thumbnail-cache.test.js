@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { generateVideoThumbnail, normalizeThumbnailConfig } = require("../scripts/thumbnail-cache");
 
-test("video thumbnail generation falls back to the first frame and removes its temporary PNG", async () => {
+test("video thumbnail generation extracts only the first frame and removes its temporary PNG", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "photo-manager-thumbnail-test-"));
   try {
     const targetPath = path.join(root, "thumbnail.webp");
@@ -17,9 +17,8 @@ test("video thumbnail generation falls back to the first frame and removes its t
       normalizeThumbnailConfig({ size: 160 }),
       {},
       {
-        extractVideoFrame: async (_source, tempPath, seekTime) => {
-          seekCalls.push(seekTime);
-          if (seekTime > 0) throw new Error("target frame unavailable");
+        extractFirstVideoFrame: async (_source, tempPath) => {
+          seekCalls.push(0);
           await fsp.writeFile(tempPath, "temporary frame");
         },
         generateThumbnail: async (_tempPath, outputPath) => {
@@ -27,7 +26,7 @@ test("video thumbnail generation falls back to the first frame and removes its t
         },
       },
     );
-    assert.deepEqual(seekCalls, [2, 0]);
+    assert.deepEqual(seekCalls, [0]);
     assert.equal((await fsp.stat(targetPath)).isFile(), true);
     const remaining = await fsp.readdir(root);
     assert.equal(remaining.some((name) => name.endsWith(".png")), false);
@@ -47,7 +46,7 @@ test("failed video thumbnail rendering removes partial cache output", async () =
       normalizeThumbnailConfig({ size: 160 }),
       {},
       {
-        extractVideoFrame: async (_source, tempPath) => fsp.writeFile(tempPath, "temporary frame"),
+        extractFirstVideoFrame: async (_source, tempPath) => fsp.writeFile(tempPath, "temporary frame"),
         generateThumbnail: async (_tempPath, outputPath) => {
           await fsp.writeFile(outputPath, "partial output");
           throw new Error("encode failed");

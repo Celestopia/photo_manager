@@ -14,10 +14,9 @@ const crypto = require("node:crypto");
 const sharp = require("sharp");
 const {
   normalizeMediaConfig,
-  calculateVideoThumbnailTime,
-  extractVideoFrame,
   sanitizeMediaError,
 } = require("./media-tools");
+const { extractFirstVideoFrame } = require("./video-first-frame");
 const { resolveProgramResourceRoot } = require("./program-paths.js");
 
 const APP_ROOT = resolveProgramResourceRoot();
@@ -100,23 +99,16 @@ async function generateThumbnail(sourcePath, targetPath, options) {
 }
 
 async function generateVideoThumbnail(item, sourcePath, targetPath, options, mediaConfig, dependencies = {}) {
-  const extractFrame = dependencies.extractVideoFrame || extractVideoFrame;
+  const extractFrame = dependencies.extractFirstVideoFrame || extractFirstVideoFrame;
   const renderThumbnail = dependencies.generateThumbnail || generateThumbnail;
   const tempPath = path.join(
     path.dirname(targetPath),
     `.${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.png`,
   );
-  const seekTime = calculateVideoThumbnailTime(item?.Video?.DurationSeconds);
   let completed = false;
   try {
     await fsp.mkdir(path.dirname(targetPath), { recursive: true });
-    try {
-      await extractFrame(sourcePath, tempPath, seekTime, APP_ROOT, mediaConfig);
-    } catch (firstError) {
-      if (seekTime <= 0) throw firstError;
-      await fsp.rm(tempPath, { force: true });
-      await extractFrame(sourcePath, tempPath, 0, APP_ROOT, mediaConfig);
-    }
+    await extractFrame(sourcePath, tempPath, APP_ROOT, mediaConfig, { maxEdge: Infinity });
     await renderThumbnail(tempPath, targetPath, options);
     completed = true;
   } finally {

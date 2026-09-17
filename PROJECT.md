@@ -15,6 +15,7 @@ Current capabilities include:
 - Viewing images, playing videos, resizing or collapsing viewer-session side panels, and editing shared customization fields.
 - Generating separate first-frame video viewer covers on demand, with aspect-preserving scaling and library-scoped cancellation (see Media Processing and Playback).
 - Batch-generating video covers through gallery maintenance or the explicit-library CLI, with cache reuse and optional forced regeneration.
+- Using shared first-frame extraction for video thumbnails and covers, with explicit thumbnail maintenance rebuilding outdated cache recipes.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.

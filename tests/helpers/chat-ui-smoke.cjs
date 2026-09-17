@@ -528,6 +528,25 @@ async function run() {
     await waitFor(`Boolean(document.querySelector('.maintenance-progress .btn-primary'))`);
     assert.equal(await win.webContents.executeJavaScript(`JSON.parse(document.querySelector('.maintenance-progress pre').textContent).generated`), 1);
     await click('.maintenance-progress .btn-primary');
+    for (let pass = 0; pass < 3; pass++) {
+      if (pass === 1) {
+        const manifestPath = path.join(library, '.photo_manager', 'thumb_cache', 'cache_manifest.json');
+        const manifest = JSON.parse(await fsp.readFile(manifestPath, 'utf8'));
+        manifest.GeneratorVersion = 0;
+        await fsp.writeFile(manifestPath, JSON.stringify(manifest));
+      }
+      await click('.gallery-settings-trigger');
+      await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('Generate Thumbnails')).click()`);
+      await waitFor(`Boolean(document.querySelector('.maintenance-options'))`);
+      assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.maintenance-options input[type=checkbox]').checked`), false);
+      await click('.maintenance-options .btn-primary');
+      await waitFor(`Boolean(document.querySelector('.maintenance-progress .btn-primary'))`);
+      const stats = await win.webContents.executeJavaScript(`JSON.parse(document.querySelector('.maintenance-progress pre').textContent)`);
+      assert.equal(stats.failed, 0);
+      assert.equal(stats.force, pass < 2);
+      assert.equal(stats.generated > 0, pass < 2);
+      await click('.maintenance-progress .btn-primary');
+    }
   }
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed')`), 'false');
   await click('[aria-label="Web search"]');

@@ -60,7 +60,7 @@ Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation p
 - `operation-progress.js`, `maintenance-worker.js`: structured operation reporting and child-process dispatch.
 - `common.js`, `library-data.js`: scanning, hashing, record creation, registry loading, and reference validation.
 - `media-tools.js`, `media-time.js`, `thumbnail-cache.js`: FFmpeg execution/normalization, reference-time-zone logic, and thumbnail queues.
-- `video-cover-cache.js` and main-process `video-cover-service.js`: first-frame extraction, separate derived cache, and window-scoped cancellation; renderer `use-video-cover.js` owns selection/request state. See the media-pipeline reference for lifecycle and cache contracts.
+- `video-first-frame.js`: shared first-frame stream selection, orientation/aspect normalization, and cancellable FFmpeg execution for thumbnails and covers. `video-cover-cache.js` and main-process `video-cover-service.js` own the separate derived cover cache and window-scoped cancellation; renderer `use-video-cover.js` owns selection/request state. See the media-pipeline reference for lifecycle and cache contracts.
 - `init-metadata.js`, `update-metadata.js`, `verify-metadata.js`, `build-thumbnails.js`, `export-metadata-csv.js`: maintenance operations.
 - `start-electron.js`: sanitize the inherited environment and launch Electron.
 

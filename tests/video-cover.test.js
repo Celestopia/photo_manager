@@ -6,7 +6,8 @@ const os = require("node:os");
 const sharp = require("sharp");
 const { resolveLibraryPaths } = require("../scripts/library-core");
 const { resolveMediaToolPaths, runMediaTool } = require("../scripts/media-tools");
-const { generateCover, coverName, pruneVideoCovers, runCoverTool } = require("../scripts/video-cover-cache");
+const { generateCover, coverName, pruneVideoCovers } = require("../scripts/video-cover-cache");
+const { runCoverTool } = require("../scripts/video-first-frame");
 const { createVideoCoverService } = require("../src/main/video-cover-service");
 const appRoot = path.resolve(__dirname, "..");
 const hash = "a".repeat(64);
@@ -42,6 +43,14 @@ test("real first-frame covers preserve size, SAR, rotation and black openings", 
     if (name === "black") {
       const stats = await sharp(bytes).stats();
       assert.ok(stats.channels.slice(0, 3).every(channel => channel.mean < 3));
+      const thumbnail = path.join(paths.root, "first-frame-thumbnail.webp");
+      await require("../scripts/thumbnail-cache").generateVideoThumbnail(
+        { Video: { DurationSeconds: 20 } }, source, thumbnail,
+        { size: 160, webpQuality: 80, extremeAspectRatio: 4 }, {});
+      const thumbBytes = await fs.readFile(thumbnail);
+      const thumbInfo = await sharp(thumbBytes).metadata();
+      assert.deepEqual([thumbInfo.width, thumbInfo.height], [160, 160]);
+      assert.ok((await sharp(thumbBytes).stats()).channels.slice(0, 3).every(channel => channel.mean < 3));
     }
     if (name === "landscape") {
       await assert.rejects(generateCover({ paths, source, hash, appRoot, config: {},

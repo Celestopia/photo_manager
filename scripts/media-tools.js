@@ -339,31 +339,6 @@ async function probeVideoFile(filePath, appRoot, rawConfig) {
   return parseProbeJson(JSON.parse(result.stdout || "{}"));
 }
 
-function calculateVideoThumbnailTime(durationValue) {
-  const duration = positiveNumberOrNull(durationValue);
-  if (duration === null || duration <= 0) return 0;
-  return Math.max(0, Math.min(Math.max(duration * 0.1, 1), 10, duration / 2));
-}
-
-async function extractVideoFrame(sourcePath, targetPath, seekSeconds, appRoot, rawConfig) {
-  const paths = resolveMediaToolPaths(appRoot, rawConfig);
-  const args = ["-hide_banner", "-loglevel", "error"];
-  if (Number(seekSeconds) > 0) args.push("-ss", String(Number(seekSeconds).toFixed(3)));
-  args.push(
-    "-i", sourcePath,
-    "-map", "0:v:0",
-    "-frames:v", "1",
-    "-an",
-    "-sn",
-    "-y",
-    targetPath,
-  );
-  await runMediaTool(paths.ffmpegPath, args, {
-    timeoutMs: paths.config.thumbnailTimeoutSeconds * 1000,
-    maxBuffer: 8 * 1024 * 1024,
-  });
-}
-
 module.exports = {
   DEFAULT_MEDIA_CONFIG,
   normalizeMediaConfig,
@@ -374,6 +349,4 @@ module.exports = {
   parseProbeJson,
   failedVideoMetadata,
   probeVideoFile,
-  calculateVideoThumbnailTime,
-  extractVideoFrame,
 };

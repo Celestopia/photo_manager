@@ -13,7 +13,7 @@ const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPath
 const { createOperationReporter } = require("./operation-progress");
 const { readTransactionJournal } = require("./library-transaction");
 
-const THUMBNAIL_GENERATOR_VERSION = 1;
+const THUMBNAIL_GENERATOR_VERSION = 2;
 
 function buildThumbnailManifest(config) {
   return {
@@ -43,7 +43,7 @@ async function run(options = {}) {
     if (fs.existsSync(paths.thumbnailManifestFile)) {
       try { currentManifest = JSON.parse(await fsp.readFile(paths.thumbnailManifestFile, "utf8")); } catch { currentManifest = null; }
     }
-    const force = options.force ?? (process.argv.includes("--force") || !thumbnailManifestMatches(currentManifest, expectedManifest));
+    const force = Boolean(options.force ?? process.argv.includes("--force")) || !thumbnailManifestMatches(currentManifest, expectedManifest);
     const existing = await loadExisting(paths.metadataFile);
     validateMetadataPaths(paths, existing.values());
     const mediaItems = [...existing.values()].filter((item) => ["image", "video"].includes(item?.FileSystem?.FileType));

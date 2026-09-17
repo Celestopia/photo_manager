@@ -3,7 +3,6 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const {
   parseProbeJson,
-  calculateVideoThumbnailTime,
   failedVideoMetadata,
   normalizeMediaConfig,
   resolveMediaToolPaths,
@@ -106,12 +105,6 @@ test("keeps distinct QuickTime and stream creation-time candidates", () => {
   ]);
 });
 
-test("calculates bounded video thumbnail seek times", () => {
-  assert.equal(calculateVideoThumbnailTime(null), 0);
-  assert.equal(calculateVideoThumbnailTime(0.5), 0.25);
-  assert.equal(calculateVideoThumbnailTime(20), 2);
-  assert.equal(calculateVideoThumbnailTime(2000), 10);
-});
 
 test("failed metadata has a stable complete shape", () => {
   const result = failedVideoMetadata(new Error("broken input"), "C:\\media\\bad.mp4");
