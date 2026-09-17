@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from "vue";
 import { resolveHorizontalArrowAction } from "../video-playback.mjs";
-import { allowsViewerGlobalShortcut } from "../domain/viewer-keyboard.mjs";
+import { allowsViewerGlobalShortcut, allowsViewerHorizontalArrow, VIEWER_ARROW_OVERLAYS } from "../domain/viewer-keyboard.mjs";
 import { useViewerPanelLayout } from "./use-viewer-panel-layout.js";
 
 /** Owns one viewer navigation session, shell panels, context actions, and global shortcuts. */
@@ -229,11 +229,27 @@ export function useMediaViewer({
   function onGlobalKeydown(event) {
     if (view.value !== "viewer") return;
     const active = document.activeElement;
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
     if (pendingViewerTransition.visible) {
       if (event.key === "Escape") {
         event.preventDefault();
         cancelViewerTransition();
       }
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const overlayOpen = [...document.querySelectorAll(VIEWER_ARROW_OVERLAYS)]
+        .some(element => element.getClientRects().length > 0);
+      if (!allowsViewerHorizontalArrow(event, active, overlayOpen)) return;
+      event.preventDefault();
+      const direction = event.key === "ArrowLeft" ? -1 : 1;
+      const action = resolveHorizontalArrowAction({
+        isVideo: isSelectedVideo.value,
+        hasPlaybackStarted: hasVideoPlaybackStarted.value,
+        shiftKey: event.shiftKey,
+      });
+      if (action === "seek") seekVideo(direction * 5);
+      else switchPhoto(direction);
       return;
     }
     const allowsGlobalShortcut = allowsViewerGlobalShortcut(active);
@@ -245,18 +261,6 @@ export function useMediaViewer({
     }
     if (!allowsGlobalShortcut) return;
     if (isSelectedVideo.value) {
-      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-        event.preventDefault();
-        const direction = event.key === "ArrowLeft" ? -1 : 1;
-        const action = resolveHorizontalArrowAction({
-          isVideo: true,
-          hasPlaybackStarted: hasVideoPlaybackStarted.value,
-          shiftKey: event.shiftKey,
-        });
-        if (action === "seek") seekVideo(direction * 5);
-        else switchPhoto(direction);
-        return;
-      }
       if (event.key === " ") {
         event.preventDefault();
         toggleVideoPlayback();
@@ -272,14 +276,6 @@ export function useMediaViewer({
         stepVideoFrame(-1);
         return;
       }
-    }
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      switchPhoto(-1);
-    }
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      switchPhoto(1);
     }
     if (event.key === "Escape") closeTransientPanels();
   }

@@ -229,6 +229,34 @@ async function run() {
     await sleep(300);
     assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'true');
     const panelsFit = () => win.webContents.executeJavaScript(`['.left-panel','.right-panel'].every(s=>{const e=document.querySelector(s);return e.scrollWidth<=e.clientWidth+1})`);
+    const mediaSource = () => win.webContents.executeJavaScript(`document.querySelector('.image-stage video')?.src || document.querySelector('.image-stage img')?.src`);
+    const arrow = async (keyCode, modifiers = []) => {
+      win.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      win.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+      await sleep(250);
+    };
+    for (const selector of ['.parameters-toggle', '.viewer-tools button', '.viewer-sidebar-tabs button:first-child', '.viewer-detail-toggle', '.viewer-sidebar-tabs button:last-child']) {
+      const before = await mediaSource();
+      await win.webContents.executeJavaScript(`{const button=document.querySelector(${JSON.stringify(selector)});button.focus();button.click();}`);
+      await arrow('Right');
+      assert.notEqual(await mediaSource(), before, `Arrow navigates after ${selector}`);
+      await arrow('Left');
+      assert.equal(await mediaSource(), before);
+      if (selector === '.viewer-detail-toggle') await click(selector);
+    }
+    await click('.viewer-sidebar-tabs button:first-child');
+    const beforeNavButton = await mediaSource();
+    await win.webContents.executeJavaScript(`{const button=document.querySelector('.nav-btn.right');button.focus();button.click();}`);
+    await arrow('Left');
+    assert.equal(await mediaSource(), beforeNavButton, 'Arrows work after navigation button clicks');
+    const beforeInput = await mediaSource();
+    await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').focus()`);
+    await arrow('Right');
+    assert.equal(await mediaSource(), beforeInput, 'Text field owns arrows');
+    await win.webContents.executeJavaScript(`document.querySelector('.viewer-tools input[type=range]').focus()`);
+    await arrow('Right');
+    assert.equal(await mediaSource(), beforeInput, 'Zoom slider owns arrows');
+    await win.webContents.executeJavaScript(`document.activeElement.blur()`);
     for (const [width,height] of [[1280,720],[1920,1080]]) {
       win.setSize(width,height); await sleep(500);
       assert.equal(await panelsFit(), true, 'Side panels must not overflow horizontally');
@@ -250,6 +278,20 @@ async function run() {
     await click('.video-center-play-button');
     await waitFor(`!document.querySelector('video').paused`);
     await win.webContents.executeJavaScript(`document.querySelector('video').pause()`);
+    const playingSource = await mediaSource();
+    await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').focus()`);
+    await arrow('Right');
+    assert.equal(await mediaSource(), playingSource, 'After playback arrows seek without navigating');
+    assert.ok(await win.webContents.executeJavaScript(`document.querySelector('video').currentTime > 0.5`));
+    await arrow('Left');
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('video').currentTime`), 0);
+    await arrow('Left', ['shift']);
+    assert.notEqual(await mediaSource(), playingSource, 'Shift arrows navigate after playback');
+    await arrow('Right', ['shift']);
+    assert.equal(await mediaSource(), playingSource);
+    await arrow('Left');
+    assert.notEqual(await mediaSource(), playingSource, 'Before playback arrows navigate');
+    await arrow('Right');
     await click('[aria-label="Expand privacy level"]');
     await waitFor(`document.querySelectorAll('.privacy-level-btn svg').length === 5`);
     await sleep(150);

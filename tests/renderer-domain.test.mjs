@@ -31,7 +31,7 @@ import {
   normalizeQuarterTurn,
   resolveWheelZoomStep,
 } from "../src/renderer/domain/media-transform.mjs";
-import { allowsViewerGlobalShortcut } from "../src/renderer/domain/viewer-keyboard.mjs";
+import { allowsViewerGlobalShortcut, allowsViewerHorizontalArrow } from "../src/renderer/domain/viewer-keyboard.mjs";
 import {
   reconcileViewerPanelWidths,
   resolveViewerPanelDrag,
@@ -193,6 +193,27 @@ test("viewer global shortcuts do not override focused controls", () => {
     assert.equal(allowsViewerGlobalShortcut({ tagName, isContentEditable: false }), false);
   }
   assert.equal(allowsViewerGlobalShortcut({ tagName: "DIV", isContentEditable: true }), false);
+});
+
+test("viewer horizontal arrows allow buttons while respecting editors, adjustments and overlays", () => {
+  const event = { key: "ArrowRight" };
+  for (const tagName of ["BUTTON", "A", "BODY"]) {
+    assert.equal(allowsViewerHorizontalArrow(event, { tagName }), true);
+    assert.equal(allowsViewerHorizontalArrow({ ...event, shiftKey: true }, { tagName }), true);
+  }
+  for (const tagName of ["INPUT", "TEXTAREA", "SELECT", "AUDIO", "VIDEO"]) {
+    assert.equal(allowsViewerHorizontalArrow(event, { tagName }), false);
+  }
+  for (const type of ["range", "number", "text", "search"]) {
+    assert.equal(allowsViewerHorizontalArrow(event, { tagName: "INPUT", type }), false);
+  }
+  assert.equal(allowsViewerHorizontalArrow(event, { isContentEditable: true }), false);
+  assert.equal(allowsViewerHorizontalArrow(event, { closest: () => ({}) }), false);
+  assert.equal(allowsViewerHorizontalArrow(event, { tagName: "BUTTON" }, true), false);
+  for (const flag of ["defaultPrevented", "isComposing", "ctrlKey", "altKey", "metaKey"]) {
+    assert.equal(allowsViewerHorizontalArrow({ ...event, [flag]: true }, null), false);
+  }
+  assert.equal(allowsViewerHorizontalArrow({ key: "Enter" }, null), false);
 });
 
 test("viewer panel defaults follow configured ratios and preserve the center minimum", () => {
