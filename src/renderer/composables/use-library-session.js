@@ -51,12 +51,14 @@ export function useLibrarySession({
     update: "Update Metadata",
     verify: "Verify Metadata",
     thumbnails: "Generate Thumbnails",
+    "video-covers": "Generate Video Covers",
     export: "Export Metadata CSV",
   }[maintenanceDialog.operation] || "Library Maintenance"));
   const maintenanceDialogDescription = computed(() => ({
     update: "Rescan supported media in the current library, detect added, removed, moved, or changed files, and update metadata.",
     verify: "Compare the current library files with existing metadata in read-only mode. This produces a report without changing media, registries, or metadata.",
     thumbnails: "Check the current library's thumbnail cache and regenerate missing or stale image and video thumbnails.",
+    "video-covers": "Generate first-frame covers for all indexed videos in this library. Existing valid covers are reused; duplicate videos share one cover.",
     export: "Export file information, metadata, and customizations from the current library to a CSV file.",
   }[maintenanceDialog.operation] || ""));
 

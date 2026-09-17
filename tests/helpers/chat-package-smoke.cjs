@@ -4,6 +4,8 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
 const resources = path.resolve("release/win-unpacked/resources");
+// Match the resource-root environment passed to packaged maintenance workers.
+process.env.PHOTO_MANAGER_RESOURCE_ROOT = resources;
 const code = path.join(resources, "app.asar");
 const inputs = require(path.join(code, "src/main/chat/inputs.js"));
 const { resolveMediaToolPaths, runMediaTool } = require(
@@ -37,6 +39,12 @@ async function run() {
       paths, source: video, hash: 'a'.repeat(64), appRoot: resources, config: {}, beforePublish: async () => {},
     });
     assert.ok(cover.length > 0);
+    const videoStat = await fs.stat(video);
+    const batchStats = await require(path.join(code, 'scripts/build-video-covers.js')).ensureVideoCovers([
+      { FilePath: 'video.mp4', SHA256Hash: 'a'.repeat(64), FileSystem: {
+        FileType: 'video', FileSize: videoStat.size, ModificationTimeMs: videoStat.mtimeMs } },
+    ], { paths, config: {}, force: true });
+    assert.equal(batchStats.generated, 1);
     const frames = await inputs.prepare(video, info, "sampled", 3, { tools });
     assert.equal(frames.length, 3);
     assert.ok(frames.every((f) => f.mime === "image/jpeg" && f.width === 32));

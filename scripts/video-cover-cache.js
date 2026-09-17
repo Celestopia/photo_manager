@@ -4,6 +4,14 @@ const { randomUUID } = require("node:crypto");
 const { execFile } = require("node:child_process");
 const sharp = require("sharp");
 const { resolveMediaToolPaths, parseProbeJson } = require("./media-tools.js");
+const { assertPathInsideLibrary } = require("./library-core.js");
+
+async function checkCoverSource(paths, item, source) {
+  assertPathInsideLibrary(paths, source);
+  const stat = await fs.stat(source);
+  if (!stat.isFile() || stat.size !== item.FileSystem.FileSize || stat.mtimeMs !== item.FileSystem.ModificationTimeMs)
+    throw Object.assign(new Error("Source changed; update library metadata"), { code: "SOURCE_CHANGED" });
+}
 
 const RECIPE = "v1-2560-q90";
 const MAX_PIXELS = 64 * 1024 * 1024;
@@ -94,4 +102,4 @@ async function pruneVideoCovers(paths, entries) {
       await fs.unlink(path.join(paths.videoCoverDir, file.name));
   }
 }
-module.exports = { RECIPE, coverName, assertCacheDirectory, readCover, generateCover, pruneVideoCovers, runCoverTool };
+module.exports = { RECIPE, coverName, assertCacheDirectory, readCover, generateCover, pruneVideoCovers, runCoverTool, checkCoverSource };

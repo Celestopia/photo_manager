@@ -1,15 +1,10 @@
-const fs = require("node:fs/promises");
 const path = require("node:path");
 const cache = require("../../scripts/video-cover-cache.js");
-const { assertPathInsideLibrary } = require("../../scripts/library-core.js");
 
 function createVideoCoverService({ getLibrary, resolveMedia, appRoot, getConfig, log, generate = cache.generateCover }) {
   let current = null, tail = Promise.resolve(), paused = 0;
   async function checkSource(library, item, source) {
-    assertPathInsideLibrary(library.paths, source);
-    const stat = await fs.stat(source);
-    if (!stat.isFile() || stat.size !== item.FileSystem.FileSize || stat.mtimeMs !== item.FileSystem.ModificationTimeMs)
-      throw Object.assign(new Error("Source changed; update library metadata"), { code: "SOURCE_CHANGED" });
+    await cache.checkCoverSource(library.paths, item, source);
   }
   async function stop() {
     current?.controller.abort();

@@ -34,6 +34,7 @@
         <p class="maintenance-description">{{ maintenanceDialogDescription }}</p>
         <label v-if="maintenanceDialog.operation === 'verify'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.reprobe" />Reprobe videos with FFprobe (slower)</label>
         <label v-if="maintenanceDialog.operation === 'thumbnails'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.force" />Regenerate all thumbnails</label>
+        <label v-if="maintenanceDialog.operation === 'video-covers'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.force" />Regenerate all video covers</label>
         <p v-if="maintenanceDialog.operation === 'export'">The CSV will be written to <code>.photo_manager/data/photo_metadata.csv</code> in the current library.</p>
         <div class="tag-create-actions"><button class="btn" @click="closeMaintenanceDialog">Cancel</button><button class="btn btn-primary" @click="startMaintenanceOperation">Start</button></div>
       </div>

@@ -1,7 +1,7 @@
 {
   "name": "photo-manager",
   "productName": "PhotoManager",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Local image and video manager built with Electron and Vue",
   "author": "PhotoManager",
   "engines": {
@@ -14,6 +14,7 @@
     "pack:win": "npm run build:renderer && electron-builder --dir --win --x64",
     "dist:win": "npm test && npm run pack:win",
     "build-thumbnails": "node scripts/build-thumbnails.js",
+    "build-video-covers": "node scripts/build-video-covers.js",
     "init-metadata": "node scripts/init-metadata.js",
     "update-metadata": "node scripts/update-metadata.js",
     "verify-metadata": "node scripts/verify-metadata.js",

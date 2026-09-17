@@ -167,7 +167,7 @@ function registerIpcHandlers(options) {
   });
   ipcMain.handle("maintenance:start", async (_, payload) => {
     const operation = String(payload?.operation || "");
-    if (!["update", "verify", "thumbnails", "export"].includes(operation)) return { ok: false, error: "Unknown maintenance operation" };
+    if (!["update", "verify", "thumbnails", "video-covers", "export"].includes(operation)) return { ok: false, error: "Unknown maintenance operation" };
     const outputFile = runtime.activeLibrary?.paths ? path.join(runtime.activeLibrary.paths.dataDir, "photo_metadata.csv") : "";
     if (operation === "export" && fs.existsSync(outputFile) && !payload?.overwrite) {
       return { ok: false, code: "OUTPUT_EXISTS", error: "photo_metadata.csv already exists" };

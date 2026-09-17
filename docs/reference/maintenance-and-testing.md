@@ -13,6 +13,7 @@ The gallery settings menu, visible only in normal gallery mode, exposes library 
 - Update: create an update backup, incrementally replace metadata, strictly reload indexes, and refresh without generating thumbnails.
 - Verify: read-only rescan and full hashes; report missing metadata/files, changes, type mismatches, probe/read failures. Optional probe compares video status, duration, dimensions, and codec.
 - Thumbnails: generate missing/stale or forcibly rebuild all, without editing metadata; then requery.
+- Video covers: generate missing/damaged first-frame covers for all indexed videos, independently of gallery filters. Optional force regenerates all; progress counts unique video hashes. Reports include generated, skipped (reused), failed, and sourceChanged counts. Individual decode failures continue; source changes require Update Metadata. Existing covers survive failed regeneration. The maintenance barrier stops and awaits viewer extraction before the worker starts; repeated runs reuse completed covers.
 - CSV: fixed output at `.photo_manager/data/photo_metadata.csv`, overwrite confirmation, UTF-8 BOM, flattened user/technical fields, IDs plus resolved names, type-specific blank columns, and location ID/name/detail without duplicated administrative fields.
 
 ## CLI Maintenance
@@ -26,6 +27,8 @@ npm run verify-metadata -- --library "D:\Media\My Library"
 npm run verify-metadata -- --library "D:\Media\My Library" --probe
 npm run build-thumbnails -- --library "D:\Media\My Library"
 npm run build-thumbnails -- --library "D:\Media\My Library" --force
+npm run build-video-covers -- --library "D:\Media\My Library"
+npm run build-video-covers -- --library "D:\Media\My Library" --force
 npm run export-metadata-csv -- --library "D:\Media\My Library"
 ```
 

@@ -6,6 +6,7 @@ const OPERATIONS = {
   update: () => require("./update-metadata").run,
   verify: () => require("./verify-metadata").run,
   thumbnails: () => require("./build-thumbnails").run,
+  "video-covers": () => require("./build-video-covers").run,
   export: () => require("./export-metadata-csv").run,
 };
 

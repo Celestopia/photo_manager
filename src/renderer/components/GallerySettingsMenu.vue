@@ -8,6 +8,7 @@
       <button @click="openMaintenanceDialog('update')"><span>↻</span>Update Metadata</button>
       <button @click="openMaintenanceDialog('verify')"><span>✓</span>Verify Metadata</button>
       <button @click="openMaintenanceDialog('thumbnails')"><span>▦</span>Generate Thumbnails</button>
+      <button @click="openMaintenanceDialog('video-covers')"><span>▻</span>Generate Video Covers</button>
       <button @click="openMaintenanceDialog('export')"><span>⇩</span>Export Metadata CSV</button>
       <div class="gallery-settings-separator"></div>
       <button @click="openAlbumManager"><span>▣</span>Manage Albums</button>

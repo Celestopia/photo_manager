@@ -519,6 +519,16 @@ async function run() {
   await waitFor(`document.querySelector('.provider-banner-success')?.textContent.includes('extraction succeeded')`);
   await fsp.writeFile(path.resolve('release/web-settings.png'), (await win.webContents.capturePage()).toPNG());
   await click('[aria-label="Close provider settings"]');
+  if (process.env.VIEWER_VISUAL_SMOKE) {
+    await click('.gallery-settings-trigger');
+    await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('Generate Video Covers')).click()`);
+    await waitFor(`Boolean(document.querySelector('.maintenance-options'))`);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.maintenance-options input[type=checkbox]').checked`), false);
+    await click('.maintenance-options .btn-primary');
+    await waitFor(`Boolean(document.querySelector('.maintenance-progress .btn-primary'))`);
+    assert.equal(await win.webContents.executeJavaScript(`JSON.parse(document.querySelector('.maintenance-progress pre').textContent).generated`), 1);
+    await click('.maintenance-progress .btn-primary');
+  }
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed')`), 'false');
   await click('[aria-label="Web search"]');
   await waitFor(`document.querySelector('[aria-label="Web search"]').getAttribute('aria-pressed') === 'true'`);
