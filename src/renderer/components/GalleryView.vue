@@ -169,6 +169,7 @@
 </template>
 
 <script setup>
+import { formatDuration } from "../domain/media-formatters.mjs";
 function onToggleControls() {
   window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: "filter-panel-toggle" }));
   toggleGalleryControls();
@@ -356,17 +357,6 @@ function videoFrameRateBadge(item) {
   if (!isVideo(item)) return "";
   const frameRate = Number(item?.Video?.FrameRate);
   return Number.isFinite(frameRate) && frameRate > 0 ? `${Math.round(frameRate)}FPS` : "";
-}
-
-function formatDuration(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || value === null || value === undefined) return "-";
-  const total = Math.max(0, Math.floor(numeric));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-  if (hours) return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function mediaDimensions(item) {

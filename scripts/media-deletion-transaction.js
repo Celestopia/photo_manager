@@ -135,6 +135,7 @@ async function commitMediaDeletion(paths, media, remainingEntries, options = {})
     })),
   };
 
+  let committed = false;
   try {
     await writeJournal(paths, journal);
     for (let index = 0; index < journal.Media.length; index += 1) {
@@ -146,9 +147,14 @@ async function commitMediaDeletion(paths, media, remainingEntries, options = {})
     journal.Phase = "staged";
     await writeJournal(paths, journal);
     await writeJsonlAtomic(paths.metadataFile, remainingEntries);
+    committed = true;
     journal.Phase = "metadata-committed";
     await writeJournal(paths, journal);
   } catch (error) {
+    if (committed) {
+      options.onCleanupError?.(error);
+      return { committed: true, transactionId, cleanupPending: true };
+    }
     if (fs.existsSync(paths.mediaDeletionFile)) {
       try {
         const recovery = await recoverMediaDeletionTransaction(paths);

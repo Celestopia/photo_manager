@@ -1,4 +1,4 @@
-const LEVELS = Object.freeze([1, 2, 3, 4, 5]);
+import { RATING_LEVELS as LEVELS } from "../../shared/customization-levels.js";
 
 export function normalizeGalleryLevels(value) {
   if (!Array.isArray(value)) return [];
@@ -55,5 +55,3 @@ export function hasNonDefaultGalleryControls(query) {
     || query?.sortOrder !== "desc"
   );
 }
-
-export const GALLERY_LEVELS = LEVELS;

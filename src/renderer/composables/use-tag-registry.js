@@ -1,14 +1,11 @@
-import { computed, reactive, ref } from "vue";
-import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import { useFlatRegistryState, normalizeRegistryText as normalizeText } from "./use-flat-registry-state.js";
+import { createRegistryRequests } from "../domain/registry-requests.mjs";
 import {
   patchRegistryReferencesInPlace,
   registryDeletionInvalidatesFilter,
   removeRegistryReference,
 } from "../domain/registry-deletion.mjs";
 
-function normalizeText(value) {
-  return String(value ?? "").trim();
-}
 
 /** Owns the ID-backed tag registry, picker state, and tag-management workflow. */
 export function useTagRegistry({
@@ -17,37 +14,18 @@ export function useTagRegistry({
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
   queryGallery,
 }) {
-  const tagRegistry = ref([]);
-  const tagSearch = reactive({ viewer: "", batch: "" });
-  const tagDropdown = reactive({ viewer: false, batch: false });
-  const tagCreate = reactive({ visible: false, target: "viewer", text: "", description: "", error: "" });
-  const tagManager = reactive({
-    visible: false, search: "", editingId: "", editText: "", editDescription: "", saving: false, error: "",
+  const {
+    registry: tagRegistry, search: tagSearch, dropdown: tagDropdown,
+    create: tagCreate, manager: tagManager, managerFiltered: managerFilteredTags, apply: applyTagRegistry,
+  } = useFlatRegistryState({
+    idKey: "TagId", labelKey: "Text", filterKey: "tag", query, unassignedFilter, pruneRecent: pruneRecentTags,
   });
-
-  const managerFilteredTags = computed(() => {
-    const keyword = tagManager.search.trim();
-    const source = [...tagRegistry.value].sort((a, b) => a.Text.localeCompare(b.Text, "en-US"));
-    return keyword ? source.filter((tag) => tag.Text.includes(keyword) || tag.Description.includes(keyword)) : source;
-  });
-
-  function applyTagRegistry(tags) {
-    tagRegistry.value = (Array.isArray(tags) ? tags : []).map((tag) => ({
-      TagId: normalizeText(tag?.TagId),
-      Text: normalizeText(tag?.Text),
-      Description: normalizeText(tag?.Description),
-      CreatedAt: tag?.CreatedAt || "",
-      UpdatedAt: tag?.UpdatedAt || "",
-      UsageCount: Number(tag?.UsageCount || 0),
-    })).filter((tag) => tag.TagId && tag.Text);
-    const ids = tagRegistry.value.map((tag) => tag.TagId);
-    pruneRecentTags(ids);
-    if (!isRegistryFilterValueValid(query.filters.tag, ids, unassignedFilter)) query.filters.tag = "";
-  }
+  const requests = createRegistryRequests(tagManager);
 
   async function loadTags() {
-    const result = await api.listTags?.();
+    const result = await requests.run(() => api.listTags?.(), { read: true });
     if (result?.ok) applyTagRegistry(result.tags);
+    else if (result) showToastMessage(result.error || "Could not load tags");
   }
 
   function selectedTagIdsForTarget(target) {
@@ -97,6 +75,7 @@ export function useTagRegistry({
   }
 
   function openCreateTagMenu(target) {
+    if (tagManager.saving) return;
     closeOtherRegistryDropdowns?.();
     Object.assign(tagCreate, {
       visible: true,
@@ -107,15 +86,19 @@ export function useTagRegistry({
     });
     if (target !== "manager") closeTagDropdown(target);
   }
-  function closeCreateTagMenu() { Object.assign(tagCreate, { visible: false, text: "", description: "", error: "" }); }
+  function closeCreateTagMenu() {
+    if (tagManager.saving) return; Object.assign(tagCreate, { visible: false, text: "", description: "", error: "" }); }
 
   async function createTagAndSelect() {
+    if (tagManager.saving) return;
     const text = normalizeText(tagCreate.text);
     if (!text) { tagCreate.error = "Tag name is required"; return; }
-    const result = await api.createTag({ text, description: normalizeText(tagCreate.description) });
+    const target = tagCreate.target;
+    const mediaId = selectedItem.value?.MediaId;
+    const result = await requests.run(() => api.createTag({ text, description: normalizeText(tagCreate.description) }), { ownsTarget: () => tagCreate.visible && tagCreate.target === target && (target !== "viewer" || selectedItem.value?.MediaId === mediaId) });
+    if (!result) return;
     if (!result?.ok) { tagCreate.error = result?.error || "Could not create tag"; return; }
     applyTagRegistry(result.tags);
-    const target = tagCreate.target;
     if (target === "manager") showToastMessage(`Created tag “${result.tag.Text}”`);
     else addTagToTarget(target, result.tag.TagId);
     closeCreateTagMenu();
@@ -124,9 +107,10 @@ export function useTagRegistry({
   async function openTagManager() {
     gallerySettingsOpen.value = false;
     closeOtherRegistryDropdowns?.();
-    await loadTags();
+    if (tagManager.saving) return;
     tagManager.visible = true;
     tagManager.error = "";
+    await loadTags();
   }
   function closeTagManager() {
     if (tagManager.saving) return;
@@ -146,21 +130,14 @@ export function useTagRegistry({
     Object.assign(tagManager, { editingId: "", editText: "", editDescription: "", saving: false, error: "" });
   }
   async function saveTagEdit() {
+    if (tagManager.saving) return;
     const tagId = tagManager.editingId;
     const text = normalizeText(tagManager.editText);
     if (!tagId) { tagManager.error = "Tag not found"; return; }
     if (!text) { tagManager.error = "Tag name is required"; return; }
     const previousText = getTagText(tagId);
-    tagManager.saving = true;
-    let result;
-    try {
-      result = await api.updateTag({ tagId, text, description: normalizeText(tagManager.editDescription) });
-    } catch {
-      tagManager.saving = false;
-      tagManager.error = "Could not save tag";
-      return;
-    }
-    tagManager.saving = false;
+    const result = await requests.run(() => api.updateTag({ tagId, text, description: normalizeText(tagManager.editDescription) }));
+    if (!result) return;
     if (!result?.ok) { tagManager.error = result?.error || "Could not save tag"; return; }
     applyTagRegistry(result.tags);
     cancelTagEdit();
@@ -174,9 +151,11 @@ export function useTagRegistry({
     if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "tag", tagId);
   }
   async function deleteTagGlobally(tag) {
+    if (tagManager.saving) return;
     const usage = Number(tag?.UsageCount || 0);
     if (!window.confirm(`Delete tag “${tag.Text}” from the entire library? This will remove it from ${usage} media item(s).`)) return;
-    const result = await api.deleteTagGlobally({ tagId: tag.TagId });
+    const result = await requests.run(() => api.deleteTagGlobally({ tagId: tag.TagId }));
+    if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete tag: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.tag;
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
@@ -184,11 +163,14 @@ export function useTagRegistry({
     );
     applyTagRegistry(result.tags);
     syncDeletedTagLocally(tag.TagId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
+    const current = requests.capture();
     if (shouldRefreshGallery) await queryGallery();
+    if (!current()) return;
     showToastMessage(`Deleted tag “${tag.Text}” from the library`);
   }
 
   function resetTagState() {
+    requests.reset();
     tagRegistry.value = [];
     Object.assign(tagSearch, { viewer: "", batch: "" });
     closeAllTagDropdowns();

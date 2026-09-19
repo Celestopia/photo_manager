@@ -172,7 +172,7 @@ async function fixture(t, respond, searchFetchImpl) {
       inputs,
       groups,
       excludeInputs: [],
-      acceptChanges: false, webEnabled,
+      webEnabled,
       retryOf: null,
     });
     for (let n = 0; chat.isBusy() && n < 500; n++)

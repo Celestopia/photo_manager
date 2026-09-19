@@ -19,7 +19,8 @@ function handlers(copyFile, resolvePath, copyFiles = async () => {}) {
       return require(name);
     },
   });
-  module.exports.registerIpcHandlers({ services: {}, runtime: {}, resolveIndexedMediaPath: resolvePath });
+  module.exports.registerIpcHandlers({ services: {}, runtime: {}, resolveIndexedMediaPath: resolvePath,
+    runWithSession: (_event, operation) => operation(), mutate: operation => operation() });
   return registered;
 }
 test('Copy File supports photos and videos, preserves Unicode paths and waits for completion', async () => {

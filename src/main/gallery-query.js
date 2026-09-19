@@ -38,7 +38,6 @@ function createGalleryQueryService({
       : "";
     const searchActive = Boolean(search?.value && search?.field);
     const output = [];
-    const mediaCounts = { all: 0, images: 0, videos: 0 };
 
     for (const item of list) {
       const customization = item?.Customization;
@@ -72,9 +71,6 @@ function createGalleryQueryService({
       }
 
       const fileType = item?.FileSystem?.FileType;
-      mediaCounts.all += 1;
-      if (fileType === "image") mediaCounts.images += 1;
-      if (fileType === "video") mediaCounts.videos += 1;
       if (!requestedMediaType || fileType === requestedMediaType) output.push(item);
     }
 
@@ -85,7 +81,7 @@ function createGalleryQueryService({
       if (first > second) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
-    return { items: output, mediaCounts };
+    return { items: output };
   }
 
   function groupByDate(list) {

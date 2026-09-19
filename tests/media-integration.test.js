@@ -45,7 +45,8 @@ test("bundled FFmpeg probes a generated MP4 and creates a WebP thumbnail", { tim
       videoPath,
     ], { timeoutMs: 60000 });
 
-    const item = await buildMetadata(videoPath, tempRoot, { mediaConfig });
+    // Omitted configuration must reach the real probe with downstream defaults.
+    const item = await buildMetadata(videoPath, tempRoot);
     assert.match(tools.versions.ffmpeg, /8\.1\.2/);
     assert.equal(item.FileSystem.FileType, "video");
     assert.equal(item.Customization.Rating, 2);

@@ -1,6 +1,5 @@
 const {
   assertOptionalUuidV4,
-  assertUuidArray,
   assertUuidV4,
 } = require("./identity-schema.js");
 const { assertCustomization } = require("./customization-schema.js");
@@ -134,11 +133,9 @@ function validateMediaEntries(entries, registries = {}) {
 
     const albumId = assertOptionalUuidV4(item.Customization.AlbumId, `AlbumId for ${filePath}`);
     if (albumId && !knownAlbums.has(albumId)) throw new Error(`Unknown AlbumId for ${filePath}: ${albumId}`);
-    assertUuidArray(item.Customization.TagIds, `TagIds for ${filePath}`);
     for (const id of item.Customization.TagIds) {
       if (!knownTags.has(id)) throw new Error(`Unknown TagId for ${filePath}: ${id}`);
     }
-    assertUuidArray(item.Customization.PersonIds, `PersonIds for ${filePath}`);
     for (const id of item.Customization.PersonIds) {
       if (!knownPeople.has(id)) throw new Error(`Unknown PersonId for ${filePath}: ${id}`);
     }

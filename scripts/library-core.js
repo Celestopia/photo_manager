@@ -54,10 +54,6 @@ function resolveLibraryPaths(rawRoot) {
   };
 }
 
-function dataFilePath(paths, fileName) {
-  return path.join(paths.dataDir, fileName);
-}
-
 function assertPathInsideLibrary(paths, candidate) {
   const absolute = path.resolve(candidate);
   const relative = path.relative(paths.root, absolute);
@@ -189,9 +185,13 @@ async function readJsonlStrict(filePath, options = {}) {
   return output;
 }
 
-async function writeJsonlAtomic(filePath, entries) {
+function serializeJsonl(entries) {
   const lines = [...entries].map((entry) => JSON.stringify(entry));
-  await writeTextAtomic(filePath, `${lines.join("\n")}${lines.length ? "\n" : ""}`);
+  return `${lines.join("\n")}${lines.length ? "\n" : ""}`;
+}
+
+async function writeJsonlAtomic(filePath, entries) {
+  await writeTextAtomic(filePath, serializeJsonl(entries));
 }
 
 function parseLibraryArgument(argv = process.argv.slice(2)) {
@@ -246,7 +246,6 @@ module.exports = {
   DATA_FILE_NAMES,
   normalizeLibraryName,
   resolveLibraryPaths,
-  dataFilePath,
   assertPathInsideLibrary,
   createLibraryManifest,
   validateLibraryManifest,
@@ -257,6 +256,7 @@ module.exports = {
   writeTextAtomic,
   readJsonlStrict,
   writeJsonlAtomic,
+  serializeJsonl,
   parseLibraryArgument,
   findNestedManagerDirectory,
   findParentManagerDirectory,

@@ -18,36 +18,17 @@ const {
 } = require("./media-tools");
 const { extractFirstVideoFrame } = require("./video-first-frame");
 const { resolveProgramResourceRoot } = require("./program-paths.js");
+const { assertSha256Hash } = require("../src/shared/media-technical-schema");
 
 const APP_ROOT = resolveProgramResourceRoot();
 
-const DEFAULT_THUMBNAIL_CONFIG = {
-  size: 320,
-  webpQuality: 80,
-  extremeAspectRatio: 4,
-  maxConcurrency: 4,
-};
-
-/**
- * Normalize thumbnail-related config values into safe runtime numbers.
- */
-function normalizeThumbnailConfig(configThumbnail) {
-  const raw = configThumbnail || {};
-  return {
-    ...DEFAULT_THUMBNAIL_CONFIG,
-    ...raw,
-    size: Math.max(64, Number(raw.size || DEFAULT_THUMBNAIL_CONFIG.size)),
-    webpQuality: Math.max(1, Math.min(100, Number(raw.webpQuality || DEFAULT_THUMBNAIL_CONFIG.webpQuality))),
-    extremeAspectRatio: Math.max(2, Number(raw.extremeAspectRatio || DEFAULT_THUMBNAIL_CONFIG.extremeAspectRatio)),
-    maxConcurrency: Math.max(1, Number(raw.maxConcurrency || DEFAULT_THUMBNAIL_CONFIG.maxConcurrency)),
-  };
-}
+const { DEFAULT_THUMBNAIL_CONFIG, normalizeThumbnailConfig } = require("./thumbnail-config");
 
 /**
  * Build deterministic thumbnail file name from SHA256 hash.
  */
 function thumbnailFileNameFromHash(hash) {
-  return `${String(hash || "").trim()}.webp`;
+  return `${assertSha256Hash(hash)}.webp`;
 }
 
 /**
@@ -78,12 +59,8 @@ async function generateThumbnail(sourcePath, targetPath, options) {
   const wideRatio = width / height;
 
   let pipeline = sharp(sourcePath, { failOn: "none" });
-  if (tallRatio >= extremeAspectRatio) {
-    // Keep only top content for very tall screenshots.
-    const cropSize = Math.max(1, Math.min(width, height));
-    pipeline = pipeline.extract({ left: 0, top: 0, width: cropSize, height: cropSize });
-  } else if (wideRatio >= extremeAspectRatio) {
-    // Keep only left content for very wide screenshots.
+  if (Math.max(tallRatio, wideRatio) >= extremeAspectRatio) {
+    // Keep the top/left square for either extreme aspect ratio.
     const cropSize = Math.max(1, Math.min(width, height));
     pipeline = pipeline.extract({ left: 0, top: 0, width: cropSize, height: cropSize });
   }

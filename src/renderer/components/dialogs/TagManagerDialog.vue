@@ -29,12 +29,12 @@
   </div>
   <div class="registry-create-backdrop" v-if="tagCreate.visible && tagCreate.target === 'manager'" @click="closeCreateTagMenu">
     <section class="registry-create-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Tag</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateTagMenu">×</button></header>
+      <header class="tag-manager-header"><h3>Create Tag</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateTagMenu" :disabled="tagManager.saving">×</button></header>
       <div class="tag-manager-create-panel">
-        <label>Tag name</label><input class="input" v-model="tagCreate.text" />
-        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
+        <label>Tag name</label><input class="input" v-model="tagCreate.text" :disabled="tagManager.saving" />
+        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="tagCreate.description" :disabled="tagManager.saving"></textarea>
         <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
-        <div class="tag-create-actions"><button class="btn" @click="closeCreateTagMenu">Cancel</button><button class="btn btn-primary" @click="createTagAndSelect">Create</button></div>
+        <div class="tag-create-actions"><button class="btn" @click="closeCreateTagMenu" :disabled="tagManager.saving">Cancel</button><button class="btn btn-primary" @click="createTagAndSelect" :disabled="tagManager.saving">Create</button></div>
       </div>
     </section>
   </div>

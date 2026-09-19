@@ -29,12 +29,12 @@
   </div>
   <div class="registry-create-backdrop" v-if="personCreate.visible && personCreate.target === 'manager'" @click="closeCreatePersonMenu">
     <section class="registry-create-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Person</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreatePersonMenu">×</button></header>
+      <header class="tag-manager-header"><h3>Create Person</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreatePersonMenu" :disabled="personManager.saving">×</button></header>
       <div class="tag-manager-create-panel">
-        <label>Person name</label><input class="input" v-model="personCreate.name" />
-        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="personCreate.description"></textarea>
+        <label>Person name</label><input class="input" v-model="personCreate.name" :disabled="personManager.saving" />
+        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="personCreate.description" :disabled="personManager.saving"></textarea>
         <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
-        <div class="tag-create-actions"><button class="btn" @click="closeCreatePersonMenu">Cancel</button><button class="btn btn-primary" @click="createPersonAndSelect">Create</button></div>
+        <div class="tag-create-actions"><button class="btn" @click="closeCreatePersonMenu" :disabled="personManager.saving">Cancel</button><button class="btn btn-primary" @click="createPersonAndSelect" :disabled="personManager.saving">Create</button></div>
       </div>
     </section>
   </div>

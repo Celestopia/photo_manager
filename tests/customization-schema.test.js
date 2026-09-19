@@ -26,7 +26,7 @@ function customization(privacy, values = {}) {
   };
 }
 
-function createEditService(metadata) {
+function createEditService(metadata, overrides = {}) {
   return createMetadataEditService({
     getMetadata: () => metadata,
     requireOpenLibrary() {},
@@ -38,6 +38,7 @@ function createEditService(metadata) {
     saveMetadata: async () => {},
     enrichItem: (item) => structuredClone(item),
     appendLog() {},
+    ...overrides,
   });
 }
 
@@ -47,6 +48,31 @@ test("Privacy accepts only integer levels from one through five", () => {
   assert.equal(assertPrivacy(3), 3);
   assert.throws(() => assertPrivacy("3"), /integer from 1 to 5/);
   assert.throws(() => assertCustomization(customization(0), "image.jpg"), /image\.jpg/);
+});
+
+test("enrichment failure cannot publish a partial edit or roll back a committed write", async () => {
+  for (const batch of [false, true]) {
+    const metadata = new Map([MEDIA_A, MEDIA_B].map(MediaId => [MediaId, {
+      MediaId, FilePath: MediaId + '.jpg', Customization: customization(1), Location: { LocationId: null, Detail: '' },
+    }]));
+    const before = structuredClone([...metadata]); let writes = 0, enrichments = 0;
+    const failing = createEditService(metadata, {
+      saveMetadata: async () => { writes++; },
+      enrichItem: item => { if (++enrichments === (batch ? 2 : 1)) throw new Error('Enrichment failed'); return item; },
+    });
+    const payload = batch ? { mediaIds: [MEDIA_A, MEDIA_B], addTagIds: [], addPersonIds: [], locationPatch: {}, customizationPatch: { Title: 'Changed' } }
+      : { mediaId: MEDIA_A, customization: { Title: 'Changed' } };
+    const method = batch ? 'batchUpdate' : 'updateCustomization';
+    assert.equal((await failing[method](payload)).ok, false);
+    assert.equal(writes, 0); assert.deepEqual([...metadata], before);
+    let saved;
+    const successful = createEditService(metadata, {
+      saveMetadata: async () => { saved = structuredClone([...metadata]); },
+      enrichItem: item => { assert.equal(saved, undefined); return structuredClone(item); },
+    });
+    assert.equal((await successful[method](payload)).ok, true);
+    assert.deepEqual([...metadata], saved);
+  }
 });
 
 test("Customization requires the exact current field contract", () => {

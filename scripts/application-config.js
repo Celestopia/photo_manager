@@ -2,14 +2,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const yaml = require("js-yaml");
 const { DEFAULT_MEDIA_CONFIG, normalizeMediaConfig } = require("./media-tools.js");
+const { DEFAULT_THUMBNAIL_CONFIG, normalizeThumbnailConfig, finiteNumber } = require("./thumbnail-config.js");
 
 const DEFAULT_CONFIG = Object.freeze({
-  thumbnail: {
-    size: 320,
-    webpQuality: 80,
-    extremeAspectRatio: 4,
-    maxConcurrency: 4,
-  },
+  thumbnail: { ...DEFAULT_THUMBNAIL_CONFIG },
   media: { ...DEFAULT_MEDIA_CONFIG },
   backup: { retentionCount: 10 },
   ui: {
@@ -40,6 +36,8 @@ function isPlainObject(value) {
 }
 
 function mergeKnownShape(defaultValue, candidate) {
+  if (typeof defaultValue === "boolean") return typeof candidate === "boolean" ? candidate : defaultValue;
+  if (typeof defaultValue === "number") return Number(candidate) > 0 ? finiteNumber(candidate, defaultValue, Number.MIN_VALUE) : defaultValue;
   if (!isPlainObject(defaultValue)) return candidate === undefined ? defaultValue : candidate;
   const source = isPlainObject(candidate) ? candidate : {};
   return Object.fromEntries(
@@ -48,13 +46,15 @@ function mergeKnownShape(defaultValue, candidate) {
 }
 
 function normalizeConfig(parsed) {
+  const ui = mergeKnownShape(DEFAULT_CONFIG.ui, parsed?.ui);
+  ui.viewer.zoom.maxPercent = Math.max(ui.viewer.zoom.minPercent, ui.viewer.zoom.maxPercent);
   return {
-    thumbnail: mergeKnownShape(DEFAULT_CONFIG.thumbnail, parsed?.thumbnail),
+    thumbnail: normalizeThumbnailConfig(parsed?.thumbnail),
     media: normalizeMediaConfig(parsed?.media),
     backup: {
-      retentionCount: Math.max(1, Math.trunc(Number(parsed?.backup?.retentionCount) || DEFAULT_CONFIG.backup.retentionCount)),
+      retentionCount: finiteNumber(parsed?.backup?.retentionCount, DEFAULT_CONFIG.backup.retentionCount, 1, Infinity, true),
     },
-    ui: mergeKnownShape(DEFAULT_CONFIG.ui, parsed?.ui),
+    ui,
   };
 }
 

@@ -1,3 +1,4 @@
+const { allocateVisualInputs } = require("../../shared/visual-input-allocation");
 const fs = require("node:fs/promises");
 const { createReadStream } = require("node:fs");
 const path = require("node:path");
@@ -279,30 +280,9 @@ async function optimized(source, options = {}) {
   throw new Error("The optimized image could not fit within 1 MiB.");
 }
 function allocation(infos, slots = 8) {
-  const counts = infos.map((i) =>
-    i.kind === "text" ? 0 : i.kind === "image" ? 1 : 2,
-  );
-  if (counts.reduce((a, b) => a + b, 0) > slots)
-    throw new Error(
-      "Too many visual inputs. Each video or animated GIF needs at least two frames; remove an input.",
-    );
-  let left = slots - counts.reduce((a, b) => a + b, 0),
-    progress = true;
-  while (left && progress) {
-    progress = false;
-    infos.forEach((i, n) => {
-      const cap =
-        i.kind === "video"
-          ? 8
-          : i.kind === "gif"
-            ? Math.min(4, i.pages)
-            : counts[n];
-      if (left && counts[n] < cap) {
-        counts[n]++;
-        left--;
-        progress = true;
-      }
-    });
+  const counts = allocateVisualInputs(infos, slots);
+  if (counts.reduce((sum, count) => sum + count, 0) > slots) {
+    throw new Error("Too many visual inputs. Each video or animated GIF needs at least two frames; remove an input.");
   }
   return counts;
 }

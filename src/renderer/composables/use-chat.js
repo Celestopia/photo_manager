@@ -1,3 +1,4 @@
+import { allocateVisualInputs } from "../../shared/visual-input-allocation.js";
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 export function useChat({ api, copyText, selectedItem, libraryState, view, reviewBlocked = () => false, beforeReview = () => {}, afterReview = async () => {} }) {
   const copiedMessage = ref(null);
@@ -69,30 +70,9 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
       }
     },
   );
-  const counts = computed(() => {
-    const result = inputs.value.map((i) =>
-      i.mediaKind === "text" ? 0 : i.mediaKind === "image" ? 1 : 2,
-    );
-    let left = 8 - result.reduce((a, b) => a + b, 0),
-      progress = true;
-    while (left > 0 && progress) {
-      progress = false;
-      inputs.value.forEach((i, n) => {
-        const cap =
-          i.mediaKind === "video"
-            ? 8
-            : i.mediaKind === "gif"
-              ? Math.min(4, i.pages)
-              : result[n];
-        if (left > 0 && result[n] < cap) {
-          left--;
-          result[n]++;
-          progress = true;
-        }
-      });
-    }
-    return result;
-  });
+  const counts = computed(() => allocateVisualInputs(inputs.value.map(input => ({
+    kind: input.mediaKind, pages: input.pages,
+  }))));
   const hasOriginal = computed(() =>
     inputs.value.some(
       (i) =>
@@ -458,7 +438,6 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
             })),
           groups: retryUser?.groups || groups.value,
           excludeInputs: [],
-          acceptChanges: false,
           retryOf,
           webEnabled: webEnabled.value,
         };

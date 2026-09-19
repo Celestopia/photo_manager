@@ -3,14 +3,9 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { writeTextAtomic } = require("./library-core");
+const { writeTextAtomic, serializeJsonl } = require("./library-core");
 
 const TRANSACTION_VERSION = 1;
-
-function serializeJsonl(entries) {
-  const lines = [...entries].map((entry) => JSON.stringify(entry));
-  return `${lines.join("\n")}${lines.length ? "\n" : ""}`;
-}
 
 function resolveTransactionPath(paths, relativePath) {
   const absolute = path.resolve(paths.managerDir, String(relativePath || ""));
@@ -50,7 +45,11 @@ async function recoverPendingTransaction(paths) {
   if (!journal) return { recovered: false };
   const applied = Math.max(0, Math.trunc(Number(journal.Applied) || 0));
   if (journal.Phase === "committed" || applied >= journal.Targets.length) {
-    await removeTransactionArtifacts(paths, journal);
+    try {
+      await removeTransactionArtifacts(paths, journal);
+    } catch (error) {
+      return { recovered: true, action: "finalized", reason: journal.Reason || "", cleanupPending: true, cleanupError: error.message };
+    }
     return { recovered: true, action: "finalized", reason: journal.Reason || "" };
   }
 
@@ -79,6 +78,7 @@ async function commitTextTransaction(paths, changes, options = {}) {
   const directory = resolveTransactionPath(paths, directoryRelative);
   await fsp.mkdir(directory, { recursive: true });
   const targets = [];
+  let committed = false;
   try {
     for (let index = 0; index < changes.length; index += 1) {
       const change = changes[index];
@@ -117,16 +117,19 @@ async function commitTextTransaction(paths, changes, options = {}) {
       journal.Applied = index + 1;
       await writeTextAtomic(paths.transactionFile, `${JSON.stringify(journal, null, 2)}\n`);
     }
+    // The persisted Applied count already proves every target was committed.
+    committed = true;
     journal.Phase = "committed";
     await writeTextAtomic(paths.transactionFile, `${JSON.stringify(journal, null, 2)}\n`);
     await removeTransactionArtifacts(paths, journal);
     return { committed: true, transactionId };
   } catch (error) {
+    if (committed) return { committed: true, transactionId, cleanupPending: true, cleanupError: error.message };
     if (fs.existsSync(paths.transactionFile)) {
       try {
         const recovery = await recoverPendingTransaction(paths);
         if (recovery.action === "finalized") {
-          return { committed: true, transactionId, recovered: true };
+          return { committed: true, transactionId, recovered: true, cleanupPending: Boolean(recovery.cleanupPending), cleanupError: recovery.cleanupError };
         }
       } catch (recoveryError) {
         error.message = `${error.message}; rollback failed: ${recoveryError.message}`;

@@ -30,7 +30,7 @@ export function useMediaViewer({
   stepVideoFrame,
   onReturnToGallery,
 }) {
-  const selectedGlobalIndex = ref(-1);
+  const selectedGlobalIndex = computed(() => orderedItems.value.findIndex((item) => item.MediaId === selectedItem.value?.MediaId));
   const showContextMenu = ref(false);
   const contextPosition = reactive({ x: 0, y: 0 });
   const pendingViewerTransition = reactive({ visible: false, type: "", direction: 0 });
@@ -55,7 +55,6 @@ export function useMediaViewer({
     releaseCurrentMedia();
     panelLayout.resetViewerPanelLayout();
     selectedItem.value = item;
-    selectedGlobalIndex.value = orderedItems.value.findIndex((candidate) => candidate.MediaId === item.MediaId);
     setDraftFromItem(item);
     resetMediaTransform();
     resetVideoPlaybackState(item);
@@ -71,7 +70,11 @@ export function useMediaViewer({
     panelLayout.resetViewerPanelLayout();
   }
 
-  function performSwitchPhoto(direction) {
+  function navigationTarget(direction) {
+    if (selectedGlobalIndex.value < 0) {
+      showToastMessage("This media item is no longer in the current gallery");
+      return null;
+    }
     const next = selectedGlobalIndex.value + direction;
     if (next < 0) {
       showToastMessage("This is the first media item");
@@ -81,10 +84,15 @@ export function useMediaViewer({
       showToastMessage("This is the last media item");
       return;
     }
+    return orderedItems.value[next];
+  }
+
+  function performSwitchPhoto(direction) {
+    const nextItem = navigationTarget(direction);
+    if (!nextItem) return;
     clearVideoClickTimer();
     releaseCurrentMedia(true);
-    selectedGlobalIndex.value = next;
-    selectedItem.value = orderedItems.value[next];
+    selectedItem.value = nextItem;
     setDraftFromItem(selectedItem.value);
     resetMediaTransform();
     resetVideoPlaybackState(selectedItem.value);
@@ -95,13 +103,11 @@ export function useMediaViewer({
     showContextMenu.value = false;
     if (!nextItem) {
       selectedItem.value = null;
-      selectedGlobalIndex.value = -1;
       view.value = "gallery";
       panelLayout.resetViewerPanelLayout();
       return;
     }
     selectedItem.value = nextItem;
-    selectedGlobalIndex.value = orderedItems.value.findIndex((item) => item.MediaId === nextItem.MediaId);
     setDraftFromItem(nextItem);
     resetMediaTransform();
     resetVideoPlaybackState(nextItem);
@@ -122,15 +128,7 @@ export function useMediaViewer({
   }
 
   function switchPhoto(direction) {
-    const next = selectedGlobalIndex.value + direction;
-    if (next < 0) {
-      showToastMessage("This is the first media item");
-      return;
-    }
-    if (next >= orderedItems.value.length) {
-      showToastMessage("This is the last media item");
-      return;
-    }
+    if (!navigationTarget(direction)) return;
     requestViewerTransition("switch", direction);
   }
 
@@ -296,7 +294,6 @@ export function useMediaViewer({
     clearVideoClickTimer();
     releaseCurrentMedia();
     selectedItem.value = null;
-    selectedGlobalIndex.value = -1;
     showContextMenu.value = false;
     cancelViewerTransition();
     panelLayout.resetViewerPanelLayout();

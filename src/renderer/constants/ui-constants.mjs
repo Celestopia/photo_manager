@@ -1,3 +1,4 @@
+import { RATING_LEVELS, PRIVACY_LEVELS } from "../../shared/customization-levels.js";
 export const WINDOW_ACTIONS = Object.freeze({
   minimize: "minimize",
   maximize: "maximize",
@@ -6,8 +7,8 @@ export const WINDOW_ACTIONS = Object.freeze({
 });
 
 export const UNASSIGNED_FILTER = "__UNASSIGNED__";
-export const STAR_LEVELS = Object.freeze([1, 2, 3, 4, 5]);
-export const PRIVACY_LEVELS = Object.freeze([1, 2, 3, 4, 5]);
+export const STAR_LEVELS = RATING_LEVELS;
+export { PRIVACY_LEVELS };
 
 export const ICONS = Object.freeze({
   gallery: new URL("../assets/gallery.svg", import.meta.url).href,

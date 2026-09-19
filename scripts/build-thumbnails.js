@@ -1,3 +1,4 @@
+const { loadRegistryIndexes, validateMetadataMap } = require("./library-data");
 /** Generate missing, stale, or all thumbnails for one explicit library. */
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
@@ -11,7 +12,7 @@ const { validateMediaTools } = require("./media-tools");
 const { parseLibraryArgument, writeTextAtomic } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
-const { readTransactionJournal } = require("./library-transaction");
+const { assertLibraryReady } = require("./library-recovery");
 
 const THUMBNAIL_GENERATOR_VERSION = 2;
 
@@ -35,7 +36,7 @@ async function run(options = {}) {
   const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
-    if (await readTransactionJournal(paths)) throw new Error("A pending library transaction must be recovered by opening the library before thumbnail generation");
+    assertLibraryReady(paths);
     await validateMediaTools(APP_ROOT, config.media);
     const thumbnailConfig = normalizeThumbnailConfig(config.thumbnail);
     const expectedManifest = buildThumbnailManifest(thumbnailConfig);
@@ -46,6 +47,7 @@ async function run(options = {}) {
     const force = Boolean(options.force ?? process.argv.includes("--force")) || !thumbnailManifestMatches(currentManifest, expectedManifest);
     const existing = await loadExisting(paths.metadataFile);
     validateMetadataPaths(paths, existing.values());
+    validateMetadataMap(existing, await loadRegistryIndexes(paths));
     const mediaItems = [...existing.values()].filter((item) => ["image", "video"].includes(item?.FileSystem?.FileType));
     const stats = await ensureThumbnailsForItems(mediaItems, {
       libraryRoot: paths.root,

@@ -1,10 +1,11 @@
+const { loadRegistryIndexes, validateMetadataMap } = require("./library-data");
 /** Generate missing or all first-frame covers for one explicitly selected library. */
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { APP_ROOT, resolveConfig, loadExisting } = require("./common");
 const { parseLibraryArgument, assertPathInsideLibrary } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
-const { readTransactionJournal } = require("./library-transaction");
+const { assertLibraryReady } = require("./library-recovery");
 const { createOperationReporter } = require("./operation-progress");
 const { validateMediaTools } = require("./media-tools");
 const cache = require("./video-cover-cache");
@@ -77,10 +78,11 @@ async function run(options = {}) {
   const manifest = await validateExistingLibrary(paths, { onProgress: emit });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
-    if (await readTransactionJournal(paths)) throw new Error("Open the library to recover its pending transaction before generating covers");
+    assertLibraryReady(paths);
     await validateMediaTools(APP_ROOT, config.media);
     const existing = await loadExisting(paths.metadataFile);
     validateMetadataPaths(paths, existing.values());
+    validateMetadataMap(existing, await loadRegistryIndexes(paths));
     const force = options.force ?? process.argv.includes("--force");
     const stats = await ensureVideoCovers([...existing.values()], { paths, config, force, emit, logger });
     return { ...stats, force, warnings, errors };

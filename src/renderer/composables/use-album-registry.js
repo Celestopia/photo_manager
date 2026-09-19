@@ -1,12 +1,11 @@
-import { computed, reactive, ref } from "vue";
-import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import { useFlatRegistryState, normalizeRegistryText as normalizeText } from "./use-flat-registry-state.js";
+import { createRegistryRequests } from "../domain/registry-requests.mjs";
 import {
   patchRegistryReferencesInPlace,
   registryDeletionInvalidatesFilter,
   removeRegistryReference,
 } from "../domain/registry-deletion.mjs";
 
-function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed single-valued album registry and management workflow. */
 export function useAlbumRegistry({
@@ -14,36 +13,18 @@ export function useAlbumRegistry({
   orderedItems, gallerySettingsOpen, showToastMessage,
   closeOtherRegistryDropdowns, requestEdit, queryGallery,
 }) {
-  const albumRegistry = ref([]);
-  const albumSearch = reactive({ viewer: "", batch: "" });
-  const albumDropdown = reactive({ viewer: false, batch: false });
-  const albumCreate = reactive({ visible: false, target: "viewer", title: "", description: "", error: "" });
-  const albumManager = reactive({
-    visible: false, search: "", editingId: "", editTitle: "", editDescription: "", saving: false, error: "",
+  const {
+    registry: albumRegistry, search: albumSearch, dropdown: albumDropdown,
+    create: albumCreate, manager: albumManager, managerFiltered: managerFilteredAlbums, apply: applyAlbumRegistry,
+  } = useFlatRegistryState({
+    idKey: "AlbumId", labelKey: "Title", filterKey: "album", query, unassignedFilter,
   });
-
-  const managerFilteredAlbums = computed(() => {
-    const keyword = albumManager.search.trim();
-    const source = [...albumRegistry.value].sort((a, b) => a.Title.localeCompare(b.Title, "en-US"));
-    return keyword ? source.filter((album) => album.Title.includes(keyword) || album.Description.includes(keyword)) : source;
-  });
-
-  function applyAlbumRegistry(albums) {
-    albumRegistry.value = (Array.isArray(albums) ? albums : []).map((album) => ({
-      AlbumId: normalizeText(album?.AlbumId),
-      Title: normalizeText(album?.Title),
-      Description: normalizeText(album?.Description),
-      CreatedAt: album?.CreatedAt || "",
-      UpdatedAt: album?.UpdatedAt || "",
-      UsageCount: Number(album?.UsageCount || 0),
-    })).filter((album) => album.AlbumId && album.Title);
-    const ids = albumRegistry.value.map((album) => album.AlbumId);
-    if (!isRegistryFilterValueValid(query.filters.album, ids, unassignedFilter)) query.filters.album = "";
-  }
+  const requests = createRegistryRequests(albumManager);
 
   async function loadAlbums() {
-    const result = await api.listAlbums?.();
+    const result = await requests.run(() => api.listAlbums?.(), { read: true });
     if (result?.ok) applyAlbumRegistry(result.albums);
+    else if (result) showToastMessage(result.error || "Could not load albums");
   }
 
   function selectedAlbumIdForTarget(target) { return target === "batch" ? batchEdit.albumId : editDraft.AlbumId; }
@@ -81,6 +62,7 @@ export function useAlbumRegistry({
     closeAlbumDropdown(target);
   }
   function openCreateAlbumMenu(target) {
+    if (albumManager.saving) return;
     closeOtherRegistryDropdowns?.();
     Object.assign(albumCreate, {
       visible: true, target,
@@ -89,15 +71,19 @@ export function useAlbumRegistry({
     });
     if (target !== "manager") closeAlbumDropdown(target);
   }
-  function closeCreateAlbumMenu() { Object.assign(albumCreate, { visible: false, title: "", description: "", error: "" }); }
+  function closeCreateAlbumMenu() {
+    if (albumManager.saving) return; Object.assign(albumCreate, { visible: false, title: "", description: "", error: "" }); }
   async function createAlbumAndSelect() {
+    if (albumManager.saving) return;
     const title = normalizeText(albumCreate.title);
     const description = normalizeText(albumCreate.description);
     if (!title || !description) { albumCreate.error = "Album name and description are required"; return; }
-    const result = await api.createAlbum({ title, description });
+    const target = albumCreate.target;
+    const mediaId = selectedItem.value?.MediaId;
+    const result = await requests.run(() => api.createAlbum({ title, description }), { ownsTarget: () => albumCreate.visible && albumCreate.target === target && (target !== "viewer" || selectedItem.value?.MediaId === mediaId) });
+    if (!result) return;
     if (!result?.ok) { albumCreate.error = result?.error || "Could not create album"; return; }
     applyAlbumRegistry(result.albums);
-    const target = albumCreate.target;
     if (target === "manager") showToastMessage(`Created album “${result.album.Title}”`);
     else setAlbumForTarget(target, result.album.AlbumId);
     closeCreateAlbumMenu();
@@ -106,9 +92,10 @@ export function useAlbumRegistry({
   async function openAlbumManager() {
     gallerySettingsOpen.value = false;
     closeOtherRegistryDropdowns?.();
-    await loadAlbums();
+    if (albumManager.saving) return;
     albumManager.visible = true;
     albumManager.error = "";
+    await loadAlbums();
   }
   function closeAlbumManager() {
     if (albumManager.saving) return;
@@ -128,22 +115,15 @@ export function useAlbumRegistry({
     Object.assign(albumManager, { editingId: "", editTitle: "", editDescription: "", saving: false, error: "" });
   }
   async function saveAlbumEdit() {
+    if (albumManager.saving) return;
     const albumId = albumManager.editingId;
     const title = normalizeText(albumManager.editTitle);
     const description = normalizeText(albumManager.editDescription);
     if (!albumId) { albumManager.error = "Album not found"; return; }
     if (!title || !description) { albumManager.error = "Album name and description are required"; return; }
     const previousTitle = getAlbumTitle(albumId);
-    albumManager.saving = true;
-    let result;
-    try {
-      result = await api.updateAlbum({ albumId, title, description });
-    } catch {
-      albumManager.saving = false;
-      albumManager.error = "Could not save album";
-      return;
-    }
-    albumManager.saving = false;
+    const result = await requests.run(() => api.updateAlbum({ albumId, title, description }));
+    if (!result) return;
     if (!result?.ok) { albumManager.error = result?.error || "Could not save album"; return; }
     applyAlbumRegistry(result.albums);
     cancelAlbumEdit();
@@ -157,9 +137,11 @@ export function useAlbumRegistry({
     if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "album", albumId);
   }
   async function deleteAlbumGlobally(album) {
+    if (albumManager.saving) return;
     const usage = Number(album?.UsageCount || 0);
     if (!window.confirm(`Delete album “${album.Title}” from the entire library? This will clear the album field on ${usage} media item(s).`)) return;
-    const result = await api.deleteAlbumGlobally({ albumId: album.AlbumId });
+    const result = await requests.run(() => api.deleteAlbumGlobally({ albumId: album.AlbumId }));
+    if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete album: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.album;
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
@@ -167,11 +149,14 @@ export function useAlbumRegistry({
     );
     applyAlbumRegistry(result.albums);
     syncDeletedAlbumLocally(album.AlbumId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
+    const current = requests.capture();
     if (shouldRefreshGallery) await queryGallery();
+    if (!current()) return;
     showToastMessage(`Deleted album “${album.Title}” from the library`);
   }
 
   function resetAlbumState() {
+    requests.reset();
     albumRegistry.value = [];
     Object.assign(albumSearch, { viewer: "", batch: "" });
     closeAllAlbumDropdowns(); closeCreateAlbumMenu();

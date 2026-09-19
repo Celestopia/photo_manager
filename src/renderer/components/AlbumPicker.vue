@@ -43,13 +43,13 @@
     </div>
     <div class="tag-create-popover" v-if="albumCreate.visible && albumCreate.target === target" @click.stop>
       <label>Album name</label>
-      <input class="input" v-model="albumCreate.title" />
+      <input class="input" v-model="albumCreate.title" :disabled="albumManager.saving" />
       <label>Description</label>
-      <textarea class="input tag-create-description" v-model="albumCreate.description"></textarea>
+      <textarea class="input tag-create-description" v-model="albumCreate.description" :disabled="albumManager.saving"></textarea>
       <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreateAlbumMenu">Cancel</button>
-        <button class="btn btn-primary" @click="createAlbumAndSelect">Create and Set</button>
+        <button class="btn" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">Cancel</button>
+        <button class="btn btn-primary" @click="createAlbumAndSelect" :disabled="albumManager.saving">Create and Set</button>
       </div>
     </div>
   </div>
@@ -77,7 +77,7 @@ const {
   batchEdit,
   albumSearch,
   albumDropdown,
-  albumCreate,
+  albumManager, albumCreate,
   getAlbumOptions,
   getAlbumDescription,
   getAlbumTitle,

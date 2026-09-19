@@ -90,3 +90,21 @@ test("application state round-trips atomically in the local application-data dir
   fs.writeFileSync(stateFile, "{broken", "utf8");
   assert.deepEqual(await loadApplicationState(stateFile), { lastLibraryPath: "" });
 });
+
+test("application state preserves the previous file and removes staging after a failed replacement", async t => {
+  const fsp = require('node:fs/promises');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-manager-state-failure-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const destination = path.join(root, 'state.json');
+  await saveApplicationState(destination, { lastLibraryPath: 'D:\\Original' });
+  const before = fs.readFileSync(destination);
+  const rename = fsp.rename;
+  fsp.rename = async (from, to) => {
+    if (to === destination) throw new Error('Replacement denied');
+    return rename(from, to);
+  };
+  try { await assert.rejects(saveApplicationState(destination, { lastLibraryPath: 'E:\\New' }), /Replacement denied/); }
+  finally { fsp.rename = rename; }
+  assert.deepEqual(fs.readFileSync(destination), before);
+  assert.deepEqual(fs.readdirSync(root), ['state.json']);
+});

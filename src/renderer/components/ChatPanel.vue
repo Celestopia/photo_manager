@@ -251,7 +251,6 @@ import TokenUsage from "./TokenUsage.vue";
 import { sessionUsage, messageUsage } from "../domain/chat-usage.mjs";
 import ChatIcon from "./ChatIcon.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
-import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 const chat = inject(CHAT_CONTEXT);
 const {
   webEnabled, toggleWeb,

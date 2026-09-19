@@ -53,20 +53,21 @@
 
   <div class="registry-create-backdrop" v-if="locationCreate.visible && locationCreate.target === 'manager'" @click="closeCreateLocationMenu">
     <section class="registry-create-modal registry-create-location-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Location</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateLocationMenu">×</button></header>
+      <header class="tag-manager-header"><h3>Create Location</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateLocationMenu" :disabled="locationManager.saving">×</button></header>
       <div class="tag-manager-create-panel">
-        <label>Location name</label><input class="input" v-model="locationCreate.name" />
-        <label>Country</label><input class="input" v-model="locationCreate.country" />
-        <label>State/Province</label><input class="input" v-model="locationCreate.province" />
-        <label>City</label><input class="input" v-model="locationCreate.city" />
+        <label>Location name</label><input class="input" v-model="locationCreate.name" :disabled="locationManager.saving" />
+        <label>Country</label><input class="input" v-model="locationCreate.country" :disabled="locationManager.saving" />
+        <label>State/Province</label><input class="input" v-model="locationCreate.province" :disabled="locationManager.saving" />
+        <label>City</label><input class="input" v-model="locationCreate.city" :disabled="locationManager.saving" />
         <label>Parent</label>
         <LocationParentPicker
           :model-value="locationCreate.parentId || ''"
+          :disabled="locationManager.saving"
           @update:model-value="setCreateLocationParent"
         />
-        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="locationCreate.description"></textarea>
+        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="locationCreate.description" :disabled="locationManager.saving"></textarea>
         <div class="tag-create-error" v-if="locationCreate.error">{{ locationCreate.error }}</div>
-        <div class="tag-create-actions"><button class="btn" @click="closeCreateLocationMenu">Cancel</button><button class="btn btn-primary" @click="createLocationAndSelect">Create</button></div>
+        <div class="tag-create-actions"><button class="btn" @click="closeCreateLocationMenu" :disabled="locationManager.saving">Cancel</button><button class="btn btn-primary" @click="createLocationAndSelect" :disabled="locationManager.saving">Create</button></div>
       </div>
     </section>
   </div>

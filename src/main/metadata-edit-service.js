@@ -65,7 +65,7 @@ function createMetadataEditService(options) {
     const metadata = getMetadata();
     const current = metadata.get(mediaId);
     if (!current) return { ok: false, error: "Metadata item not found" };
-    const previous = structuredClone(current);
+    const previous = current;
 
     try {
       validateCustomizationReferences(customization);
@@ -86,17 +86,18 @@ function createMetadataEditService(options) {
       }
     }
 
-    current.Customization = {
+    const next = { ...current, Customization: {
       ...current.Customization,
       ...customization,
       MetadataUpdateDate: new Date().toISOString(),
-    };
-    if (normalizedLocation) current.Location = normalizedLocation;
-    metadata.set(mediaId, current);
+    } };
+    if (normalizedLocation) next.Location = normalizedLocation;
 
     try {
+      const item = enrichItem(next);
+      metadata.set(mediaId, next);
       await saveMetadata();
-      return { ok: true, item: enrichItem(current) };
+      return { ok: true, item };
     } catch (error) {
       metadata.set(mediaId, previous);
       appendLog(`Failed to write metadata: ${error.message}`);
@@ -164,33 +165,36 @@ function createMetadataEditService(options) {
     const metadata = getMetadata();
     const updatedItems = [];
     const previousItems = new Map();
+    const nextItems = new Map();
     let missingCount = 0;
-    for (const mediaId of mediaIds) {
-      const current = metadata.get(mediaId);
-      if (!current) {
-        missingCount += 1;
-        continue;
-      }
-      previousItems.set(mediaId, structuredClone(current));
-      const mergedTagIds = [...(Array.isArray(current?.Customization?.TagIds) ? current.Customization.TagIds : [])];
-      for (const tagId of tagValidation.tagIds) if (!mergedTagIds.includes(tagId)) mergedTagIds.push(tagId);
-      const mergedPersonIds = [...(Array.isArray(current?.Customization?.PersonIds) ? current.Customization.PersonIds : [])];
-      for (const personId of peopleValidation.personIds) if (!mergedPersonIds.includes(personId)) mergedPersonIds.push(personId);
-
-      current.Customization = {
-        ...current.Customization,
-        ...customizationPatch,
-        TagIds: mergedTagIds,
-        PersonIds: mergedPersonIds,
-        MetadataUpdateDate: new Date().toISOString(),
-      };
-      current.Location = normalizeLocationObject(current.Location);
-      if (normalizedLocationPatch) current.Location.LocationId = normalizedLocationPatch.LocationId;
-      metadata.set(mediaId, current);
-      updatedItems.push(enrichItem(current));
-    }
-
     try {
+      for (const mediaId of mediaIds) {
+        const current = metadata.get(mediaId);
+        if (!current) {
+          missingCount += 1;
+          continue;
+        }
+        previousItems.set(mediaId, current);
+        const next = { ...current };
+        const mergedTagIds = [...(Array.isArray(current?.Customization?.TagIds) ? current.Customization.TagIds : [])];
+        for (const tagId of tagValidation.tagIds) if (!mergedTagIds.includes(tagId)) mergedTagIds.push(tagId);
+        const mergedPersonIds = [...(Array.isArray(current?.Customization?.PersonIds) ? current.Customization.PersonIds : [])];
+        for (const personId of peopleValidation.personIds) if (!mergedPersonIds.includes(personId)) mergedPersonIds.push(personId);
+
+        next.Customization = {
+          ...current.Customization,
+          ...customizationPatch,
+          TagIds: mergedTagIds,
+          PersonIds: mergedPersonIds,
+          MetadataUpdateDate: new Date().toISOString(),
+        };
+        next.Location = { ...normalizeLocationObject(current.Location) };
+        if (normalizedLocationPatch) next.Location.LocationId = normalizedLocationPatch.LocationId;
+        nextItems.set(mediaId, next);
+        updatedItems.push(enrichItem(next));
+      }
+
+      for (const [mediaId, next] of nextItems) metadata.set(mediaId, next);
       if (updatedItems.length) await saveMetadata();
       return {
         ok: true,

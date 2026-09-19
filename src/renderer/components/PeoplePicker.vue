@@ -43,13 +43,13 @@
     </div>
     <div class="tag-create-popover" v-if="personCreate.visible && personCreate.target === target" @click.stop>
       <label>Person name</label>
-      <input class="input" v-model="personCreate.name" />
+      <input class="input" v-model="personCreate.name" :disabled="personManager.saving" />
       <label>Description (optional)</label>
-      <textarea class="input tag-create-description" v-model="personCreate.description"></textarea>
+      <textarea class="input tag-create-description" v-model="personCreate.description" :disabled="personManager.saving"></textarea>
       <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreatePersonMenu">Cancel</button>
-        <button class="btn btn-primary" @click="createPersonAndSelect">Create and Add</button>
+        <button class="btn" @click="closeCreatePersonMenu" :disabled="personManager.saving">Cancel</button>
+        <button class="btn btn-primary" @click="createPersonAndSelect" :disabled="personManager.saving">Create and Add</button>
       </div>
     </div>
   </div>
@@ -78,7 +78,7 @@ const {
   batchEdit,
   personSearch,
   personDropdown,
-  personCreate,
+  personManager, personCreate,
   getPersonOptions,
   getRecentPersonOptions,
   getPersonDescription,

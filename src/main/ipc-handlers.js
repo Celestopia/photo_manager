@@ -6,15 +6,24 @@ const path = require("node:path");
 const { assertUuidArray } = require("../shared/identity-schema.js");
 const { assertExactObjectKeys } = require("../shared/object-schema.js");
 
+const MUTATION_CHANNELS = new Set([
+  "library:open", "library:close", "library:initialize", "library:cleanup-failed-initialization", "library:update-info",
+  "maintenance:start", "photo:update-customization", "photo:batch-update", "photo:delete-media",
+  ...["tag", "person", "location", "album"].flatMap(kind => ["create", "update", "delete-global"].map(action => `${kind}:${action}`)),
+]);
+
 function registerIpcHandlers(options) {
-  const ipcMain = typeof options.runWithSession === "function" ? {
+  if (typeof options.runWithSession !== "function" || typeof options.mutate !== "function") {
+    throw new TypeError("IPC registration requires session routing and mutation coordination");
+  }
+  const ipcMain = {
     handle(channel, handler) {
       electronIpcMain.handle(channel, (event, ...args) => options.runWithSession(event, () => {
-        const write = /^(tag|person|location|album):(create|update|delete-global)$|^photo:(update-customization|batch-update|delete)|^library:(open|close|initialize|cleanup-failed-initialization|update-info)$|^maintenance:start$/.test(channel);
-        return write && options.mutate ? options.mutate(() => handler(event,...args)) : handler(event,...args);
+        const write = MUTATION_CHANNELS.has(channel);
+        return write ? options.mutate(() => handler(event, ...args)) : handler(event, ...args);
       }));
     },
-  } : electronIpcMain;
+  };
   const {
     runtime,
     toSerializable,
@@ -126,33 +135,18 @@ function registerIpcHandlers(options) {
       return { ok: false, error: error.message, code: error.code };
     }
   });
-  ipcMain.handle("library:open-root", async () => {
+  async function openLibraryFolder(key) {
     try {
       const library = requireOpenLibrary();
-      const error = await shell.openPath(library.paths.root);
+      const error = await shell.openPath(library.paths[key]);
       return error ? { ok: false, error } : { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };
     }
-  });
-  ipcMain.handle("library:open-manager-dir", async () => {
-    try {
-      const library = requireOpenLibrary();
-      const error = await shell.openPath(library.paths.managerDir);
-      return error ? { ok: false, error } : { ok: true };
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
-  });
-  ipcMain.handle("library:open-log-dir", async () => {
-    try {
-      const library = requireOpenLibrary();
-      const error = await shell.openPath(library.paths.logDir);
-      return error ? { ok: false, error } : { ok: true };
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
-  });
+  }
+  ipcMain.handle("library:open-root", () => openLibraryFolder("root"));
+  ipcMain.handle("library:open-manager-dir", () => openLibraryFolder("managerDir"));
+  ipcMain.handle("library:open-log-dir", () => openLibraryFolder("logDir"));
 
   ipcMain.handle("maintenance:show-output", async () => {
     try {

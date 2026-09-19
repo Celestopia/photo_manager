@@ -5,7 +5,6 @@ export function useGallerySelection({
   api,
   orderedItems,
   galleryGroups,
-  rebuildGalleryItemIndex,
   showToastMessage,
   openViewer,
   resetBatchPickers,
@@ -114,7 +113,6 @@ export function useGallerySelection({
     for (const group of galleryGroups.value) {
       group.items = group.items.map((item) => byId.get(item.MediaId) || item);
     }
-    rebuildGalleryItemIndex();
     triggerRef(galleryGroups);
   }
 

@@ -1,3 +1,5 @@
+const { groupMediaPathsByHash, countMediaTypes } = require("./media-summary");
+const { assertMediaTechnicalFields } = require("../src/shared/media-technical-schema");
 /** Initialize a new PhotoManager library. */
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
@@ -37,27 +39,41 @@ async function run(options = {}) {
   const { emit, logger, warnings, errors } = createOperationReporter(options);
   let cancelled = false;
   let lock = null;
+  let ownsManager = false;
+  let structureStarted = false;
+  let marker;
   const cancel = () => { cancelled = true; };
-  process.on?.("message", (message) => { if (message?.type === "cancel") cancel(); });
+  const onMessage = message => { if (message?.type === "cancel") cancel(); };
+  process.on("message", onMessage);
 
-  if (fs.existsSync(paths.managerDir)) throw new Error(`Library data already exists: ${paths.managerDir}`);
-  const rootStat = await fsp.stat(paths.root).catch(() => null);
-  if (!rootStat?.isDirectory()) throw new Error(`Library directory does not exist: ${paths.root}`);
-  const rootLinkStat = await fsp.lstat(paths.root);
-  if (rootLinkStat.isSymbolicLink()) throw new Error("A symbolic-link directory cannot be used as a library root");
-  const parentManager = findParentManagerDirectory(paths.root);
-  if (parentManager) throw new Error(`The selected directory is inside another PhotoManager library: ${parentManager}`);
-  emit({ phase: "validate", message: "Validating library directory" });
-  await assertDirectoryWritable(paths.root);
-  const nested = await findNestedManagerDirectory(paths.root, ({ visited, current }) => {
-    emit({ phase: "scan-directories", current, processed: visited });
-  }, () => cancelled);
-  if (nested) throw new Error(`Nested PhotoManager library detected: ${nested}`);
-  await validateMediaTools(APP_ROOT, config.media);
-
-  const manifest = createLibraryManifest(paths.root, options.name || path.basename(paths.root));
-  const marker = { Status: "initializing", StartedAt: new Date().toISOString(), Phase: "create-structure" };
   try {
+    if (fs.existsSync(paths.managerDir)) throw new Error(`Library data already exists: ${paths.managerDir}`);
+    const rootStat = await fsp.stat(paths.root).catch(() => null);
+    if (!rootStat?.isDirectory()) throw new Error(`Library directory does not exist: ${paths.root}`);
+    const rootLinkStat = await fsp.lstat(paths.root);
+    if (rootLinkStat.isSymbolicLink()) throw new Error("A symbolic-link directory cannot be used as a library root");
+    const parentManager = findParentManagerDirectory(paths.root);
+    if (parentManager) throw new Error(`The selected directory is inside another PhotoManager library: ${parentManager}`);
+    emit({ phase: "validate", message: "Validating library directory" });
+    await assertDirectoryWritable(paths.root);
+    const nested = await findNestedManagerDirectory(paths.root, ({ visited, current }) => {
+      emit({ phase: "scan-directories", current, processed: visited });
+    }, () => cancelled);
+    if (nested) throw new Error(`Nested PhotoManager library detected: ${nested}`);
+    await validateMediaTools(APP_ROOT, config.media);
+
+    const manifest = createLibraryManifest(paths.root, options.name || path.basename(paths.root));
+    marker = { Status: "initializing", StartedAt: new Date().toISOString(), Phase: "create-structure" };
+    // mkdir without recursive is the cross-process ownership claim. A loser
+    // must never write a manifest or clean up another attempt's contents.
+    await fsp.mkdir(paths.managerDir);
+    ownsManager = true;
+    const claimedParent = findParentManagerDirectory(paths.root);
+    if (claimedParent) throw new Error(`The selected directory is inside another PhotoManager library: ${claimedParent}`);
+    const claimedNested = await findNestedManagerDirectory(paths.root, null, () => cancelled);
+    if (claimedNested) throw new Error(`Nested PhotoManager library detected: ${claimedNested}`);
+    if (cancelled) throw Object.assign(new Error("Initialization cancelled"), { code: "OPERATION_CANCELLED" });
+    structureStarted = true;
     await ensureLibraryDirectories(paths);
     await writeLibraryManifest(paths, manifest);
     await writeTextAtomic(paths.initializationFile, `${JSON.stringify(marker, null, 2)}\n`);
@@ -96,15 +112,13 @@ async function run(options = {}) {
       }
     }
 
-    const byHash = new Map();
-    for (const item of entries) {
-      if (!byHash.has(item.SHA256Hash)) byHash.set(item.SHA256Hash, []);
-      byHash.get(item.SHA256Hash).push(item.FilePath);
-    }
+    const byHash = groupMediaPathsByHash(entries);
     for (const [hash, filePaths] of byHash) {
       if (filePaths.length > 1) logger.warn(`Duplicate SHA-256 ${hash}: ${filePaths.sort().join(", ")}`);
     }
 
+    if (cancelled) throw Object.assign(new Error("Initialization cancelled"), { code: "OPERATION_CANCELLED" });
+    entries.forEach(assertMediaTechnicalFields);
     validateMediaEntries(entries, {});
 
     emit({ phase: "write", processed: entries.length, total: entries.length, message: "Writing library data" });
@@ -125,14 +139,16 @@ async function run(options = {}) {
       ok: true,
       manifest,
       total: entries.length,
-      images: entries.filter((item) => item.FileSystem.FileType === "image").length,
-      videos: entries.filter((item) => item.FileSystem.FileType === "video").length,
+      ...countMediaTypes(entries),
       warnings,
       errors,
     };
   } catch (error) {
-    if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
-    lock = null;
+    if (!ownsManager) throw error;
+    if (!structureStarted) {
+      await fsp.rmdir(paths.managerDir);
+      throw error;
+    }
     if (error.code === "OPERATION_CANCELLED" || cancelled) {
       await fsp.rm(paths.managerDir, { recursive: true, force: true });
       throw error;
@@ -154,6 +170,7 @@ async function run(options = {}) {
     throw error;
   } finally {
     if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
+    process.removeListener("message", onMessage);
   }
 }
 

@@ -1,3 +1,5 @@
+const { groupMediaPathsByHash, countMediaTypes } = require("../../scripts/media-summary");
+const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
 /**
  * Electron main-process entry.
  *
@@ -50,7 +52,6 @@ const { createChatService } = require("./chat/service.js");
 const { registerChatIpc } = require("./chat/ipc.js");
 const { metadataGroups } = require("./chat/metadata.js");
 const { resolveMediaToolPaths } = require("../../scripts/media-tools.js");
-const { assertCustomization } = require("../shared/customization-schema.js");
 const { createUniqueEntityId } = require("../shared/identity-schema.js");
 const { validateMediaEntries } = require("../shared/library-data-schema.js");
 const {
@@ -69,7 +70,6 @@ const {
   readJsonlStrict,
   writeJsonlAtomic,
   assertPathInsideLibrary,
-  findNestedManagerDirectory,
   findParentManagerDirectory,
 } = require(path.join(__dirname, "..", "..", "scripts", "library-core.js"));
 const { validateExistingLibrary } = require(path.join(__dirname, "..", "..", "scripts", "library-access.js"));
@@ -80,13 +80,12 @@ const {
 } = require(path.join(__dirname, "..", "..", "scripts", "library-lock.js"));
 const { createLibraryBackup } = require(path.join(__dirname, "..", "..", "scripts", "library-backup.js"));
 const {
-  recoverPendingTransaction,
   commitJsonlTransaction,
 } = require(path.join(__dirname, "..", "..", "scripts", "library-transaction.js"));
 const {
-  recoverMediaDeletionTransaction,
   commitMediaDeletion,
 } = require(path.join(__dirname, "..", "..", "scripts", "media-deletion-transaction.js"));
+const { recoverLibraryTransactions } = require("../../scripts/library-recovery");
 const {
   walkFiles,
   extensionType,
@@ -227,13 +226,12 @@ function requireOpenLibrary({ writable = false } = {}) {
  */
 async function loadMetadataIndex() {
   state.metadataIndex.clear();
-  state.mediaPathIndex.clear();
   const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
   const entries = await readJsonlStrict(metadataFile, {
     label: DATA_FILE_NAMES.metadata,
     keyOf: (item) => item?.MediaId,
   });
-  const validated = validateMediaEntries(entries, {
+  validateMediaEntries(entries, {
     tags: state.tagRegistryIndex,
     albums: state.albumRegistryIndex,
     people: state.personRegistryIndex,
@@ -241,10 +239,9 @@ async function loadMetadataIndex() {
   });
   for (const item of entries) {
     assertPathInsideLibrary(state.activeLibrary.paths, path.join(state.activeLibrary.paths.root, item.FilePath));
-    assertCustomization(item.Customization, item.FilePath);
+    assertMediaTechnicalFields(item);
     state.metadataIndex.set(item.MediaId, item);
   }
-  state.mediaPathIndex = validated.byPath;
 }
 
 /**
@@ -374,7 +371,6 @@ const listAlbumDefinitions = albumCatalog.listDefinitions;
 const getAlbumUsageCounts = albumCatalog.getUsageCounts;
 const saveAlbumRegistryMap = albumCatalog.save;
 const loadAlbumRegistryIndex = albumCatalog.load;
-const getLocationUsageCounts = locationCatalog.getUsageCounts;
 const listLocationDefinitions = locationCatalog.listDefinitions;
 const saveLocationRegistryMap = locationCatalog.save;
 const loadLocationRegistryIndex = locationCatalog.load;
@@ -476,14 +472,14 @@ async function saveRegistryAndMetadataTransaction(registryFileName, registryEntr
       entries: state.metadataIndex.values(),
     });
   }
-  await commitJsonlTransaction(library.paths, changes, { reason });
+  const result = await commitJsonlTransaction(library.paths, changes, { reason });
+  if (result.cleanupPending) appendLog(`Transaction committed; temporary cleanup pending: ${result.cleanupError}`);
   await touchLibraryManifest();
 }
 
 function clearLibraryIndexes() {
   clearThumbnailStatusCache();
   state.metadataIndex.clear();
-  state.mediaPathIndex.clear();
   state.tagRegistryIndex.clear();
   state.albumRegistryIndex.clear();
   state.personRegistryIndex.clear();
@@ -496,6 +492,7 @@ function emitLibraryState(extra = {}) {
 }
 
 function getLibraryState(extra = {}) {
+  const counts = countMediaTypes(state.metadataIndex.values());
   return {
     state: state.activeLibrary?.state || "closed",
     active: state.activeLibrary ? {
@@ -505,8 +502,8 @@ function getLibraryState(extra = {}) {
       createdAt: state.activeLibrary.manifest.createdAt,
       updatedAt: state.activeLibrary.manifest.updatedAt,
       mediaCount: state.metadataIndex.size,
-      imageCount: [...state.metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "image").length,
-      videoCount: [...state.metadataIndex.values()].filter((item) => item?.FileSystem?.FileType === "video").length,
+      imageCount: counts.images,
+      videoCount: counts.videos,
     } : null,
     lastLibraryPath: appState.lastLibraryPath,
     lastLibraryName: state.activeLibrary?.manifest?.name || lastLibraryName,
@@ -539,12 +536,7 @@ async function loadAllLibraryIndexes() {
   await loadPersonRegistryIndex();
   await loadLocationRegistryIndex();
   await loadMetadataIndex();
-  const hashes = new Map();
-  for (const item of state.metadataIndex.values()) {
-    if (!item.SHA256Hash) continue;
-    if (!hashes.has(item.SHA256Hash)) hashes.set(item.SHA256Hash, []);
-    hashes.get(item.SHA256Hash).push(item.FilePath);
-  }
+  const hashes = groupMediaPathsByHash(state.metadataIndex.values(), { skipMissing: true });
   for (const [hash, filePaths] of hashes) {
     if (filePaths.length > 1) appendLog(`duplicate-sha256 hash=${hash} files=${filePaths.sort().join("|")}`);
   }
@@ -600,10 +592,7 @@ async function openLibrary(rawRoot, options = {}) {
         applicationStartedAt,
       });
       state.activeLibrary = { state: "opening", sessionId: lock.SessionId, paths, manifest, lock };
-      const deletionRecovery = await recoverMediaDeletionTransaction(paths);
-      if (deletionRecovery.recovered) appendLog(`media-deletion ${deletionRecovery.action} reason=${deletionRecovery.reason || "unknown"}`);
-      const recovery = await recoverPendingTransaction(paths);
-      if (recovery.recovered) appendLog(`library-transaction ${recovery.action} reason=${recovery.reason || "unknown"}`);
+      await recoverLibraryTransactions(paths, appendLog);
       await loadAllLibraryIndexes();
       if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
       state.activeLibrary.state = "open";
@@ -791,7 +780,6 @@ function queryGallery(query) {
   const items = result.items.map(enrichItem);
   return {
     total: items.length,
-    mediaCounts: result.mediaCounts,
     groups: groupByDate(items),
   };
 }
@@ -932,7 +920,6 @@ function createDomainServices() {
   });
   const mediaDeletionService = createMediaDeletionService({
     getMetadata: () => state.metadataIndex,
-    getMediaPathIndex: () => state.mediaPathIndex,
     requireOpenLibrary,
     resolveIndexedMediaPath,
     prepareLibraryWrite,

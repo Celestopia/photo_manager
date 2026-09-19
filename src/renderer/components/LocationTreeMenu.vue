@@ -15,14 +15,14 @@
         type="button"
         class="tag-option location-option location-tree-all-option"
         :class="{ 'is-selected': allSelected }"
-        @mousedown.prevent="emit('select-all')"
+        @mousedown.prevent @click="emit('select-all')"
       ><span>All</span></button>
       <button
         v-if="showUnassignedOption"
         type="button"
         class="tag-option location-option location-tree-unassigned-option"
         :class="{ 'is-selected': unassignedSelected }"
-        @mousedown.prevent="emit('select-unassigned')"
+        @mousedown.prevent @click="emit('select-unassigned')"
       ><span>Unassigned</span></button>
       <div
         v-if="showFixedOptionsDivider && hasHierarchyRows"
@@ -50,7 +50,7 @@
             :aria-expanded="isExpanded(row.Key)"
             :aria-label="isExpanded(row.Key) ? 'Collapse lower-level locations' : 'Expand lower-level locations'"
             :data-tip="isExpanded(row.Key) ? 'Collapse lower-level locations' : 'Expand lower-level locations'"
-            @mousedown.stop.prevent="toggleExpanded(row)"
+            @mousedown.prevent @click.stop="toggleExpanded(row)"
           ><img :src="ICONS.chevronDown" alt="" /></button>
           <span v-else class="location-tree-toggle-spacer" aria-hidden="true"></span>
           <button
@@ -58,7 +58,7 @@
             type="button"
             class="location-tree-label location-tree-group-label"
             :data-tip="getGroupTooltip(row)"
-            @mousedown.prevent="selectRow(row)"
+            @mousedown.prevent @click="selectRow(row)"
           >{{ row.Label }}</button>
           <span v-else class="location-tree-label location-tree-group-label">{{ row.Label }}</span>
         </div>
@@ -77,14 +77,14 @@
             :aria-expanded="isExpanded(row.Key)"
             :aria-label="isExpanded(row.Key) ? 'Collapse child locations' : 'Expand child locations'"
             :data-tip="isExpanded(row.Key) ? 'Collapse child locations' : 'Expand child locations'"
-            @mousedown.stop.prevent="toggleExpanded(row)"
+            @mousedown.prevent @click.stop="toggleExpanded(row)"
           ><img :src="ICONS.chevronDown" alt="" /></button>
           <span v-else class="location-tree-toggle-spacer" aria-hidden="true"></span>
           <button
             type="button"
             class="location-tree-label location-tree-location-label"
             :data-tip="getLocationTooltip(row.Location.LocationId)"
-            @mousedown.prevent="selectRow(row)"
+            @mousedown.prevent @click="selectRow(row)"
           >{{ row.Label }}</button>
         </div>
       </template>
@@ -206,6 +206,7 @@ function firstSelectableRow() {
 }
 
 function onSearchKeydown(event) {
+  if (event.isComposing || event.keyCode === 229) return;
   if (event.key === "Enter") {
     event.preventDefault();
     const first = firstSelectableRow();

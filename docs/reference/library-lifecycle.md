@@ -72,7 +72,7 @@ Initialization requires an explicit warning and confirmation stating that it wil
 Flow:
 
 1. Revalidate paths, parent/child nesting, and FFmpeg.
-2. Create the manifest, directories, initialization marker, and exclusive lock.
+2. Claim `.photo_manager` with an exclusive directory creation, recheck parent/child nesting, then create the manifest, directories, initialization marker, and exclusive lock. A competing initializer that did not claim the directory never modifies or removes it.
 3. Scan and build records one media file at a time.
 4. Skip unreadable or unhashable new media and report them; retain readable but corrupt images/videos as failed-probe records.
 5. Report duplicate SHA-256 values without rejecting initialization.
@@ -80,7 +80,7 @@ Flow:
 7. Write a committed marker and perform minimum read-back validation.
 8. Remove the marker, release the initialization lock, and open normally through the main process.
 
-Cancellation deletes the complete `.photo_manager` directory. Other failures retain `library.yml`, `initialization.json`, and the error log while removing incomplete data, caches, and temporary content for explicit diagnosis and retry.
+Cancellation deletes only the `.photo_manager` directory owned by that initialization attempt. Other failures after structure creation retain `library.yml`, `initialization.json`, and the error log while removing incomplete data, caches, and temporary content for explicit diagnosis and retry. The initialization lock remains held through owned cleanup, and the cancellation listener is always removed.
 
 ### Opening and Closing
 
@@ -142,11 +142,15 @@ Global tag, person, album, or location deletion normally changes both a registry
 1. Write old and new versions of every target under `temp/transactions/<uuid>`.
 2. Atomically write `transaction.json` in the prepared state.
 3. Atomically replace each target, updating the applied count after each one.
-4. Mark committed and clean the transaction directory and journal.
-5. On an exception, immediately restore every old version.
+4. Once all targets and their applied counts are durable, mark committed and clean the journal before its temporary directory.
+5. Before durable completion, an exception restores old versions. After durable completion, journal/temporary cleanup failure reports a committed outcome with cleanup pending; callers retain the committed in-memory result.
 6. On the next open after a crash, roll back an incomplete commit or clean an entirely applied commit according to the journal.
 
 An unparseable journal or missing rollback file rejects opening rather than guessing. Main-process global deletion keeps old in-memory objects only for media whose references actually change and transacts with copied replacements; unaffected media preserve object and Map identity. Do not deep-clone the entire active metadata set merely to simplify rollback.
+
+`scripts/library-recovery.js` is the shared readiness boundary. Opening and metadata update recover media deletion before text transactions under an authorized lock, before loading/scanning records. Other maintenance and ordinary mutations refuse either unresolved journal. A remaining committed journal still requires recovery; an orphaned temporary directory after journal removal cannot reverse a commit. Metadata edits prepare replacement records and their renderer results before publishing or persisting, so enrichment errors cannot cause partial edits or post-commit rollback.
+
+Opening and maintenance validate required technical structures, fingerprint syntax, and the existing nullable probe representations at disk boundaries. Reference and uniqueness validation remains separate. Validation does not normalize, migrate, repair, or rewrite records.
 
 ## Permanent Media Deletion
 

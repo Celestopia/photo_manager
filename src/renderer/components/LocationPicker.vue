@@ -41,24 +41,25 @@
     </div>
     <div class="tag-create-popover" v-if="locationCreate.visible && locationCreate.target === target" @click.stop>
       <label>Location name</label>
-      <input class="input" v-model="locationCreate.name" />
+      <input class="input" v-model="locationCreate.name" :disabled="locationManager.saving" />
       <label>Country</label>
-      <input class="input" v-model="locationCreate.country" />
+      <input class="input" v-model="locationCreate.country" :disabled="locationManager.saving" />
       <label>State/Province</label>
-      <input class="input" v-model="locationCreate.province" />
+      <input class="input" v-model="locationCreate.province" :disabled="locationManager.saving" />
       <label>City</label>
-      <input class="input" v-model="locationCreate.city" />
+      <input class="input" v-model="locationCreate.city" :disabled="locationManager.saving" />
       <label>Parent location</label>
       <LocationParentPicker
         :model-value="locationCreate.parentId || ''"
+        :disabled="locationManager.saving"
         @update:model-value="setCreateLocationParent"
       />
       <label>Description (optional)</label>
-      <textarea class="input tag-create-description location-create-description" v-model="locationCreate.description"></textarea>
+      <textarea class="input tag-create-description location-create-description" v-model="locationCreate.description" :disabled="locationManager.saving"></textarea>
       <div class="tag-create-error" v-if="locationCreate.error">{{ locationCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreateLocationMenu">Cancel</button>
-        <button class="btn btn-primary" @click="createLocationAndSelect">Create and Set</button>
+        <button class="btn" @click="closeCreateLocationMenu" :disabled="locationManager.saving">Cancel</button>
+        <button class="btn btn-primary" @click="createLocationAndSelect" :disabled="locationManager.saving">Create and Set</button>
       </div>
     </div>
   </div>
@@ -88,7 +89,7 @@ const {
   batchEdit,
   locationSearch,
   locationDropdown,
-  locationCreate,
+  locationManager, locationCreate,
   getLocationMenuRows,
   getLocationTooltip,
   getLocationName,

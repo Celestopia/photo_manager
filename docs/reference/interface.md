@@ -8,7 +8,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 `gallery:query` filters the in-memory index in this order: media type; unioned rating/privacy levels intersected with other dimensions; album/tag/person/location including `__UNASSIGNED__`; case-sensitive title, filename-only, or description substring; shooting-time order; capture-date grouping. Empty level arrays mean all; rating defaults all and privacy defaults `[1]`. Location includes descendants; administrative filters resolve exact country/province/city sets. Invalid regions are rejected. `Detail` never participates.
 
-Every query returns the complete result and all/image/video counts, without registries or pagination. One metadata pass applies common filters/counts; matched records are enriched and sorted once. Renderer uses shallow collections, creates all cards, and relies on native `loading="lazy"`; future virtualization must preserve complete-result semantics. Increasing request IDs discard stale responses.
+Every query returns the complete grouped result and its total, without registries or pagination. One metadata pass applies filters; matched records are enriched and sorted once. Library information retains its separate image/video counts. Renderer uses shallow collections, creates all cards, and relies on native `loading="lazy"`; future virtualization must preserve complete-result semantics. Increasing request IDs discard stale responses.
 
 Registry composables exclusively own their lists. They load in parallel on open/update and update directly from registry IPC results. Media edits do not reload registries; manager opening refreshes usage counts. Returning from viewer records one `MediaId`, centers that card after layout, then clears the target.
 
@@ -43,6 +43,10 @@ Search scans the full registry, adds every location ancestor, and reveals matchi
 ## Registry Management
 
 All four managers search name/description, show usage, atomically edit allowed fields, confirm global deletion with affected count, create through a nested modal, and block close/switch/resubmit during requests. Enter saves names; Ctrl+Enter saves multiline descriptions; Escape cancels editing.
+
+Flat registries share catalog/dialog state and all registries share request ownership and error cleanup; assignment cardinality and location topology remain with their owners. Library resets invalidate pending replies; create replies cannot assign to a replacement viewer item. Shared picker buttons activate on click, including native keyboard activation, while search shortcuts ignore IME composition. Location deletion validates the complete detached-child candidate before writing and refuses duplicate contexts. Removing an unused intermediate node refreshes affected ancestor filters when its children are detached.
+
+Viewer navigation derives its position from the selected `MediaId` and current result order. If the selected item leaves the results, navigation explains that condition and retains the item and unsaved draft until an explicit transition. Library entry and maintenance workflows release busy state after IPC rejection; superseded requests cannot publish results or clear a newer request's state.
 
 Location create/edit shares the parent picker. Selecting a parent during creation copies its exact administrative fields, which remain editable; clearing it does not clear them. Changing parent while editing does not rewrite administrative fields. Main-process validation rechecks requirements, uniqueness/context duplication, parent existence, and cycles.
 

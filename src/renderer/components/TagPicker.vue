@@ -43,13 +43,13 @@
     </div>
     <div class="tag-create-popover" v-if="tagCreate.visible && tagCreate.target === target" @click.stop>
       <label>Tag name</label>
-      <input class="input" v-model="tagCreate.text" />
+      <input class="input" v-model="tagCreate.text" :disabled="tagManager.saving" />
       <label>Description (optional)</label>
-      <textarea class="input tag-create-description" v-model="tagCreate.description"></textarea>
+      <textarea class="input tag-create-description" v-model="tagCreate.description" :disabled="tagManager.saving"></textarea>
       <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
       <div class="tag-create-actions">
-        <button class="btn" @click="closeCreateTagMenu">Cancel</button>
-        <button class="btn btn-primary" @click="createTagAndSelect">Create and Add</button>
+        <button class="btn" @click="closeCreateTagMenu" :disabled="tagManager.saving">Cancel</button>
+        <button class="btn btn-primary" @click="createTagAndSelect" :disabled="tagManager.saving">Create and Add</button>
       </div>
     </div>
   </div>
@@ -77,7 +77,7 @@ const {
   batchEdit,
   tagSearch,
   tagDropdown,
-  tagCreate,
+  tagManager, tagCreate,
   getTagOptions,
   getRecentTagOptions,
   getTagDescription,

@@ -64,7 +64,7 @@ function createChatService({
         "Stop the current reply before changing conversations or attachments.",
       );
   }
-  async function resolve(s, i, signal) {
+  async function resolve(s, i, signal, fingerprint = true) {
     let file,
       video = false,
       metadata = {};
@@ -79,7 +79,7 @@ function createChatService({
       tools: getMediaToolPaths(),
       signal,
     });
-    const sha256 = await media.fingerprint(file, signal);
+    const sha256 = fingerprint ? await media.fingerprint(file, signal) : null;
     const after = await fs.stat(file);
     if (before.size !== after.size || before.mtimeMs !== after.mtimeMs)
       throw new Error(
@@ -120,7 +120,7 @@ function createChatService({
     };
   }
   async function describe(s, i) {
-    const r = await resolve(s, i);
+    const r = await resolve(s, i, undefined, false);
     const name =
       i.kind === "media"
         ? path.basename(resolveMedia(i.id).item.FilePath)
@@ -426,7 +426,7 @@ function createChatService({
         schema.input(i);
         await current();
         const s = await store.load(sid);
-        const r = await resolve(s, i);
+        const r = await resolve(s, i, undefined, false);
         if (!["image", "gif"].includes(r.info.kind))
           throw new Error("Only images and GIFs can be previewed here.");
         const previewUrl = await media.displayPreview(
@@ -532,7 +532,6 @@ function createChatService({
             "inputs",
             "groups",
             "excludeInputs",
-            "acceptChanges",
             "retryOf",
             "webEnabled",
           ],
@@ -555,7 +554,7 @@ function createChatService({
           payload.excludeInputs.some(
             (k) => !/^((media)|(attachment)):[0-9a-f-]{36}$/.test(k),
           ) ||
-          typeof payload.acceptChanges !== "boolean" || typeof payload.webEnabled !== 'boolean'
+          typeof payload.webEnabled !== 'boolean'
         )
           throw new Error("Invalid request options");
         const s = await store.load(payload.sessionId);

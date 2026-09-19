@@ -12,8 +12,7 @@ const { validateMediaTools, probeVideoFile, sanitizeMediaError } = require("./me
 const { parseLibraryArgument } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
-const { readTransactionJournal } = require("./library-transaction");
-const { assertCustomization } = require("../src/shared/customization-schema");
+const { assertLibraryReady } = require("./library-recovery");
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
 function approximatelyEqual(a, b, tolerance = 0.1) {
@@ -30,7 +29,7 @@ async function run(options = {}) {
   const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
-    if (await readTransactionJournal(paths)) throw new Error("A pending library transaction must be recovered by opening the library before verification");
+    assertLibraryReady(paths);
     const existing = await loadExisting(paths.metadataFile);
     const registries = await loadRegistryIndexes(paths);
     validateMetadataMap(existing, registries);
@@ -49,14 +48,6 @@ async function run(options = {}) {
     readFailed: 0,
     privacyInvalid: 0,
     };
-  for (const item of existing.values()) {
-    try {
-      assertCustomization(item.Customization, item.FilePath);
-    } catch (error) {
-      counts.privacyInvalid += 1;
-      logger.warn(`[PRIVACY] ${error.message}`);
-    }
-  }
   for (let index = 0; index < files.length; index += 1) {
     const absFile = files[index];
     const relativePath = path.relative(paths.root, absFile).replace(/\\/g, "/");

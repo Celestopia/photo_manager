@@ -7,7 +7,6 @@ const { pruneVideoCovers } = require("../../scripts/video-cover-cache.js");
 function createMediaDeletionService(options) {
   const {
     getMetadata,
-    getMediaPathIndex,
     requireOpenLibrary,
     resolveIndexedMediaPath,
     prepareLibraryWrite,
@@ -44,10 +43,8 @@ function createMediaDeletionService(options) {
         onCleanupError: (error) => appendLog(`media-delete cleanup pending: ${error.message}`),
       });
 
-      const mediaPathIndex = getMediaPathIndex();
       for (const target of targets) {
         metadata.delete(target.MediaId);
-        mediaPathIndex.delete(target.item.FilePath);
       }
       await touchLibraryManifest();
 

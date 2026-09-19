@@ -64,6 +64,8 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 12. Media/library changes must clear old sound, menus, transforms, and library-scoped recents.
 13. Use `MediaId`, not `FilePath` or hash, for media state, IPC, and relationships.
 14. All entity IDs are lowercase UUID v4 and globally unique across media and registries.
+15. Check both recovery journals before ordinary writes or maintenance; recover deletion before text transactions while holding the library lock. Cleanup failure after a durable commit must not roll back committed in-memory state.
+16. Validate current technical structures at disk boundaries without coercing persisted metadata or narrowing parser-provided EXIF representations. Registry and library requests must not publish into a replacement renderer context.
 
 ## Explicitly Out of Scope
 

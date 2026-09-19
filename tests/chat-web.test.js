@@ -31,7 +31,7 @@ async function fixture(t, respond, webFetch = async url => json(url.endsWith('/s
   const chat = createChatService({ getLibrary: () => library, resolveMedia: () => { throw new Error('No media'); }, getMetadata: () => ({}), configFile, searchConfigFile, getMediaToolPaths: () => ({}), emit: () => {}, fetchImpl: async (_, options) => { const body = JSON.parse(options.body); requests.push(body); return respond(body, requests.length); }, searchFetchImpl: async (url, options) => { webRequests.push({ url, body: JSON.parse(options.body) }); return webFetch(url, options); } });
   t.after(async () => { await chat.close(); await fs.rm(root, { recursive: true, force: true }); });
   const session = await chat.create();
-  const payload = { sessionId: session.sessionId, text: 'Research the Eiffel Tower', inputs: [], groups: defaultGroups(), excludeInputs: [], acceptChanges: false, retryOf: null, webEnabled: true };
+  const payload = { sessionId: session.sessionId, text: 'Research the Eiffel Tower', inputs: [], groups: defaultGroups(), excludeInputs: [], retryOf: null, webEnabled: true };
   async function send(overrides = {}) {
     await chat.send({ ...payload, ...overrides });
     for (let i = 0; chat.isBusy() && i < 500; i++) await new Promise(r => setTimeout(r, 5));

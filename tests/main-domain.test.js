@@ -56,10 +56,10 @@ test("application runtime creates isolated mutable library sessions", () => {
   const first = createApplicationRuntime();
   const second = createApplicationRuntime();
   first.metadataIndex.set(IDS.campus, {});
-  first.mediaPathIndex.set("a.jpg", IDS.campus);
+  first.metadataIndex.set("a.jpg", IDS.campus);
   first.maintenanceState.running = true;
   assert.equal(second.metadataIndex.size, 0);
-  assert.equal(second.mediaPathIndex.size, 0);
+  assert.equal(second.metadataIndex.size, 0);
   assert.equal(second.maintenanceState.running, false);
 });
 
@@ -143,7 +143,7 @@ test("gallery query composes descendant location ID filters with shooting-time s
   assert.deepEqual(result.map((item) => item.FilePath), ["b.jpg"]);
 });
 
-test("gallery query filters and derives media-type counts in one result", () => {
+test("gallery query filters by media type", () => {
   const service = createGalleryQueryService({
     getLocationDescendants: () => [],
     getLocationIdsForRegion: () => [],
@@ -178,7 +178,6 @@ test("gallery query filters and derives media-type counts in one result", () => 
   });
 
   assert.deepEqual(result.items.map((item) => item.FilePath), ["matching-image.jpg"]);
-  assert.deepEqual(result.mediaCounts, { all: 2, images: 1, videos: 1 });
 });
 
 test("gallery query composes administrative region and registry filters", () => {

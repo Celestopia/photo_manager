@@ -1,5 +1,5 @@
 const fsp = require("node:fs/promises");
-const path = require("node:path");
+const { writeTextAtomic } = require("../../scripts/library-core");
 
 const EMPTY_APPLICATION_STATE = Object.freeze({ lastLibraryPath: "" });
 
@@ -18,14 +18,7 @@ async function loadApplicationState(filePath) {
 }
 
 async function saveApplicationState(filePath, value) {
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  try {
-    await fsp.writeFile(temporaryPath, `${JSON.stringify(normalizeApplicationState(value), null, 2)}\n`, "utf8");
-    await fsp.rename(temporaryPath, filePath);
-  } finally {
-    await fsp.rm(temporaryPath, { force: true }).catch(() => {});
-  }
+  await writeTextAtomic(filePath, `${JSON.stringify(normalizeApplicationState(value), null, 2)}\n`);
 }
 
 module.exports = {

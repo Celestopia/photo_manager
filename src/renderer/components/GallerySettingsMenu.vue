@@ -37,8 +37,6 @@ const GALLERY_SETTINGS_SURFACE = Symbol("gallery-settings");
 const app = inject(SETTINGS_CONTEXT);
 if (!app) throw new Error("GallerySettingsMenu must be used under App.vue provider");
 const {
-  ICONS,
-  isSelectionMode,
   gallerySettingsOpen,
   toggleGallerySettings,
   closeGallerySettings,

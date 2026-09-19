@@ -289,7 +289,7 @@ test("service sends only selected inputs, persists provenance and leaves sources
     inputs: [{ kind: "media", id: mid, mode: "original" }],
     groups: defaultGroups(),
     excludeInputs: [],
-    acceptChanges: false, webEnabled: false,
+    webEnabled: false,
     retryOf: null,
   });
   const saved = await finished;
@@ -365,7 +365,7 @@ async function serviceFixture(t, fetchImpl) {
       inputs: [],
       groups: defaultGroups(),
       excludeInputs: [],
-      acceptChanges: false, webEnabled: false,
+      webEnabled: false,
       retryOf: null,
       ...overrides,
     });
@@ -377,6 +377,21 @@ async function serviceFixture(t, fetchImpl) {
   t.after(() => chat.close());
   return { ...fixtureData, chat, session, send, mid, file, configFile };
 }
+test("display inspection avoids hashing while submission still fingerprints exact sources", async t => {
+  const inputs = require('../src/main/chat/inputs');
+  const original = inputs.fingerprint; let hashes = 0;
+  inputs.fingerprint = async (...args) => { hashes++; return original(...args); };
+  t.after(() => { inputs.fingerprint = original; });
+  const f = await serviceFixture(t);
+  const input = { kind: 'media', id: f.mid, mode: 'original' };
+  await f.chat.describe(f.session.sessionId, input);
+  await f.chat.preview(f.session.sessionId, input);
+  assert.equal(hashes, 0);
+  const sent = await f.send({ inputs: [input] });
+  assert.ok(hashes > 0);
+  assert.match(sent.messages.at(-1).attempt.inputs[0].sha256, /^[a-f0-9]{64}$/);
+});
+
 test("history sends at most twelve pairs and explicitly records omitted older turns", async (t) => {
   let sent;
   const { store, session, send } = await serviceFixture(
@@ -424,8 +439,6 @@ test("changed and missing sources require explicit choices; history remains immu
   let next = await f.send();
   assert.equal(calls, 1);
   assert.match(next.messages.at(-1).attempt.error, /changed/);
-  next = await f.send({ acceptChanges: true });
-  assert.equal(calls, 1);
   assert.equal(next.messages[1].attempt.inputs[0].sha256, originalHash);
   await fs.unlink(f.file);
   next = await f.send();
@@ -497,7 +510,7 @@ test("stopping a stream saves its partial reply and an explicit retry creates an
     inputs: [],
     groups: defaultGroups(),
     excludeInputs: [],
-    acceptChanges: false, webEnabled: false,
+    webEnabled: false,
     retryOf: null,
   });
   await receiving;

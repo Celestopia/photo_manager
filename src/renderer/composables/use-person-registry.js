@@ -1,12 +1,11 @@
-import { computed, reactive, ref } from "vue";
-import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import { useFlatRegistryState, normalizeRegistryText as normalizeText } from "./use-flat-registry-state.js";
+import { createRegistryRequests } from "../domain/registry-requests.mjs";
 import {
   patchRegistryReferencesInPlace,
   registryDeletionInvalidatesFilter,
   removeRegistryReference,
 } from "../domain/registry-deletion.mjs";
 
-function normalizeText(value) { return String(value ?? "").trim(); }
 
 /** Owns the ID-backed people registry, picker state, and management workflow. */
 export function usePersonRegistry({
@@ -15,37 +14,18 @@ export function usePersonRegistry({
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
   queryGallery,
 }) {
-  const personRegistry = ref([]);
-  const personSearch = reactive({ viewer: "", batch: "" });
-  const personDropdown = reactive({ viewer: false, batch: false });
-  const personCreate = reactive({ visible: false, target: "viewer", name: "", description: "", error: "" });
-  const personManager = reactive({
-    visible: false, search: "", editingId: "", editName: "", editDescription: "", saving: false, error: "",
+  const {
+    registry: personRegistry, search: personSearch, dropdown: personDropdown,
+    create: personCreate, manager: personManager, managerFiltered: managerFilteredPeople, apply: applyPersonRegistry,
+  } = useFlatRegistryState({
+    idKey: "PersonId", labelKey: "Name", filterKey: "person", query, unassignedFilter, pruneRecent: pruneRecentPeople,
   });
-
-  const managerFilteredPeople = computed(() => {
-    const keyword = personManager.search.trim();
-    const source = [...personRegistry.value].sort((a, b) => a.Name.localeCompare(b.Name, "en-US"));
-    return keyword ? source.filter((person) => person.Name.includes(keyword) || person.Description.includes(keyword)) : source;
-  });
-
-  function applyPersonRegistry(people) {
-    personRegistry.value = (Array.isArray(people) ? people : []).map((person) => ({
-      PersonId: normalizeText(person?.PersonId),
-      Name: normalizeText(person?.Name),
-      Description: normalizeText(person?.Description),
-      CreatedAt: person?.CreatedAt || "",
-      UpdatedAt: person?.UpdatedAt || "",
-      UsageCount: Number(person?.UsageCount || 0),
-    })).filter((person) => person.PersonId && person.Name);
-    const ids = personRegistry.value.map((person) => person.PersonId);
-    pruneRecentPeople(ids);
-    if (!isRegistryFilterValueValid(query.filters.person, ids, unassignedFilter)) query.filters.person = "";
-  }
+  const requests = createRegistryRequests(personManager);
 
   async function loadPeople() {
-    const result = await api.listPeople?.();
+    const result = await requests.run(() => api.listPeople?.(), { read: true });
     if (result?.ok) applyPersonRegistry(result.people);
+    else if (result) showToastMessage(result.error || "Could not load people");
   }
   function selectedPersonIdsForTarget(target) { return target === "batch" ? batchEdit.personIds : editDraft.PersonIds; }
   function getPersonDefinition(personId) { return personRegistry.value.find((person) => person.PersonId === personId) || null; }
@@ -86,6 +66,7 @@ export function usePersonRegistry({
     closePersonDropdown(target);
   }
   function openCreatePersonMenu(target) {
+    if (personManager.saving) return;
     closeOtherRegistryDropdowns?.();
     Object.assign(personCreate, {
       visible: true, target,
@@ -94,14 +75,18 @@ export function usePersonRegistry({
     });
     if (target !== "manager") closePersonDropdown(target);
   }
-  function closeCreatePersonMenu() { Object.assign(personCreate, { visible: false, name: "", description: "", error: "" }); }
+  function closeCreatePersonMenu() {
+    if (personManager.saving) return; Object.assign(personCreate, { visible: false, name: "", description: "", error: "" }); }
   async function createPersonAndSelect() {
+    if (personManager.saving) return;
     const name = normalizeText(personCreate.name);
     if (!name) { personCreate.error = "Person name is required"; return; }
-    const result = await api.createPerson({ name, description: normalizeText(personCreate.description) });
+    const target = personCreate.target;
+    const mediaId = selectedItem.value?.MediaId;
+    const result = await requests.run(() => api.createPerson({ name, description: normalizeText(personCreate.description) }), { ownsTarget: () => personCreate.visible && personCreate.target === target && (target !== "viewer" || selectedItem.value?.MediaId === mediaId) });
+    if (!result) return;
     if (!result?.ok) { personCreate.error = result?.error || "Could not create person"; return; }
     applyPersonRegistry(result.people);
-    const target = personCreate.target;
     if (target === "manager") showToastMessage(`Created person “${result.person.Name}”`);
     else addPersonToTarget(target, result.person.PersonId);
     closeCreatePersonMenu();
@@ -110,9 +95,10 @@ export function usePersonRegistry({
   async function openPersonManager() {
     gallerySettingsOpen.value = false;
     closeOtherRegistryDropdowns?.();
-    await loadPeople();
+    if (personManager.saving) return;
     personManager.visible = true;
     personManager.error = "";
+    await loadPeople();
   }
   function closePersonManager() {
     if (personManager.saving) return;
@@ -132,21 +118,14 @@ export function usePersonRegistry({
     Object.assign(personManager, { editingId: "", editName: "", editDescription: "", saving: false, error: "" });
   }
   async function savePersonEdit() {
+    if (personManager.saving) return;
     const personId = personManager.editingId;
     const name = normalizeText(personManager.editName);
     if (!personId) { personManager.error = "Person not found"; return; }
     if (!name) { personManager.error = "Person name is required"; return; }
     const previousName = getPersonName(personId);
-    personManager.saving = true;
-    let result;
-    try {
-      result = await api.updatePerson({ personId, name, description: normalizeText(personManager.editDescription) });
-    } catch {
-      personManager.saving = false;
-      personManager.error = "Could not save person";
-      return;
-    }
-    personManager.saving = false;
+    const result = await requests.run(() => api.updatePerson({ personId, name, description: normalizeText(personManager.editDescription) }));
+    if (!result) return;
     if (!result?.ok) { personManager.error = result?.error || "Could not save person"; return; }
     applyPersonRegistry(result.people);
     cancelPersonEdit();
@@ -160,9 +139,11 @@ export function usePersonRegistry({
     if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "person", personId);
   }
   async function deletePersonGlobally(person) {
+    if (personManager.saving) return;
     const usage = Number(person?.UsageCount || 0);
     if (!window.confirm(`Delete person “${person.Name}” from the entire library? This will remove them from ${usage} media item(s).`)) return;
-    const result = await api.deletePersonGlobally({ personId: person.PersonId });
+    const result = await requests.run(() => api.deletePersonGlobally({ personId: person.PersonId }));
+    if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete person: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.person;
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
@@ -170,11 +151,14 @@ export function usePersonRegistry({
     );
     applyPersonRegistry(result.people);
     syncDeletedPersonLocally(person.PersonId, Number(result.updatedCount) > 0 && !shouldRefreshGallery);
+    const current = requests.capture();
     if (shouldRefreshGallery) await queryGallery();
+    if (!current()) return;
     showToastMessage(`Deleted person “${person.Name}” from the library`);
   }
 
   function resetPersonState() {
+    requests.reset();
     personRegistry.value = [];
     Object.assign(personSearch, { viewer: "", batch: "" });
     closeAllPersonDropdowns(); closeCreatePersonMenu();

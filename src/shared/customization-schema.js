@@ -4,10 +4,7 @@ const {
 } = require("./identity-schema.js");
 const { assertExactObjectKeys } = require("./object-schema.js");
 
-const PRIVACY_MIN = 1;
-const PRIVACY_MAX = 5;
-const RATING_MIN = 1;
-const RATING_MAX = 5;
+const { PRIVACY_MIN, PRIVACY_MAX, RATING_MIN, RATING_MAX } = require("./customization-levels");
 const CUSTOMIZATION_FIELDS = Object.freeze([
   "Title",
   "AlbumId",

@@ -1,3 +1,4 @@
+import { createRegistryRequests } from "../domain/registry-requests.mjs";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import {
   applyLocationSelectionFilter,
@@ -41,6 +42,7 @@ export function useLocationRegistry({
     visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
     editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
   });
+  const requests = createRegistryRequests(locationManager);
   const locationManagerListRef = ref(null);
   const locationManagerContext = ref("");
 
@@ -75,8 +77,9 @@ export function useLocationRegistry({
   }
 
   async function loadLocations() {
-    const result = await api.listLocations?.();
+    const result = await requests.run(() => api.listLocations?.(), { read: true });
     if (result?.ok) applyLocationRegistry(result.locations);
+    else if (result) showToastMessage(result.error || "Could not load locations");
   }
 
   function getLocation(locationId) { return locationRegistry.value.find((item) => item.LocationId === locationId) || null; }
@@ -235,6 +238,7 @@ export function useLocationRegistry({
     });
   }
   function openCreateLocationMenu(target) {
+    if (locationManager.saving) return;
     closeOtherRegistryDropdowns?.();
     const currentId = target === "manager" ? null : selectedLocationIdForTarget(target);
     const current = getLocation(currentId);
@@ -247,22 +251,27 @@ export function useLocationRegistry({
     });
     if (target !== "manager") closeLocationDropdown(target);
   }
-  function closeCreateLocationMenu() { resetLocationCreateState(); }
+  function closeCreateLocationMenu() {
+    if (locationManager.saving) return; resetLocationCreateState(); }
   function setCreateLocationParent(parentId) {
+    if (locationManager.saving) return;
     const parent = getLocation(parentId);
     Object.assign(locationCreate, buildLocationCreateParentPatch(parent));
     rememberSelectedLocation(parent?.LocationId);
   }
   async function createLocationAndSelect() {
+    if (locationManager.saving) return;
     const name = normalizeLocationName(locationCreate.name);
     if (!name) { locationCreate.error = "Location name is required"; return; }
-    const result = await api.createLocation({
+    const target = locationCreate.target;
+    const mediaId = selectedItem.value?.MediaId;
+    const result = await requests.run(() => api.createLocation({
       name, country: locationCreate.country, province: locationCreate.province, city: locationCreate.city,
       parentId: locationCreate.parentId, description: locationCreate.description,
-    });
+    }), { ownsTarget: () => locationCreate.visible && locationCreate.target === target && (target !== "viewer" || selectedItem.value?.MediaId === mediaId) });
+    if (!result) return;
     if (!result?.ok) { locationCreate.error = result?.error || "Could not create location"; return; }
     applyLocationRegistry(result.locations);
-    const target = locationCreate.target;
     if (target === "manager") { showToastMessage(`Created location “${result.location.Name}”`); scheduleLocationManagerContextUpdate(); }
     else setLocationForTarget(target, result.location.LocationId);
     closeCreateLocationMenu();
@@ -271,9 +280,10 @@ export function useLocationRegistry({
   async function openLocationManager() {
     gallerySettingsOpen.value = false;
     closeOtherRegistryDropdowns?.();
-    await loadLocations();
+    if (locationManager.saving) return;
     locationManager.visible = true;
     locationManager.error = "";
+    await loadLocations();
     scheduleLocationManagerContextUpdate();
   }
   function cancelLocationEdit() {
@@ -298,10 +308,12 @@ export function useLocationRegistry({
     });
   }
   function setEditLocationParent(parentId) {
+    if (locationManager.saving) return;
     locationManager.editParentId = parentId || null;
     rememberSelectedLocation(parentId);
   }
   async function saveLocationEdit() {
+    if (locationManager.saving) return;
     const locationId = locationManager.editingId;
     if (!locationId) { locationManager.error = "Location not found"; return; }
     const name = normalizeLocationName(locationManager.editName);
@@ -311,19 +323,11 @@ export function useLocationRegistry({
     const province = normalizeLocationField(locationManager.editProvince);
     const city = normalizeLocationField(locationManager.editCity);
     const parentId = locationManager.editParentId || null;
-    locationManager.saving = true;
-    let result;
-    try {
-      result = await api.updateLocation({
+    const result = await requests.run(() => api.updateLocation({
         locationId, name, country, province, city, parentId,
         description: locationManager.editDescription,
-      });
-    } catch {
-      locationManager.saving = false;
-      locationManager.error = "Could not save location";
-      return;
-    }
-    locationManager.saving = false;
+      }));
+    if (!result) return;
     if (!result?.ok) { locationManager.error = result?.error || "Could not save location"; return; }
     const administrativeRegionChanged = Boolean(previous) && (
       previous.Country !== country || previous.Province !== province || previous.City !== city
@@ -336,7 +340,9 @@ export function useLocationRegistry({
     applyLocationRegistry(result.locations);
     cancelLocationEdit();
     scheduleLocationManagerContextUpdate();
+    const current = requests.capture();
     if (shouldRefreshGallery) await queryGallery();
+    if (!current()) return;
     showToastMessage(previous?.Name === name ? "Location updated" : `Renamed location “${previous?.Name || ""}” to “${name}”`);
   }
 
@@ -347,27 +353,32 @@ export function useLocationRegistry({
     if (patchGallery) patchRegistryReferencesInPlace(orderedItems.value, "location", locationId);
   }
   async function deleteLocationGlobally(location) {
+    if (locationManager.saving) return;
     const usage = Number(location?.UsageCount || 0);
     const childCount = Array.isArray(location?.ChildrenIds) ? location.ChildrenIds.length : 0;
     if (!window.confirm(`Delete location “${location.Name}” from the entire library? This will clear it from ${usage} media item(s) and detach ${childCount} direct child location(s).`)) return;
-    const result = await api.deleteLocationGlobally({ locationId: location.LocationId });
+    const result = await requests.run(() => api.deleteLocationGlobally({ locationId: location.LocationId }));
+    if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete location: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.location;
     const updatedCount = Number(result.updatedCount || 0);
     const filteredSubtreeChanged = filterBeforeDelete
       && filterBeforeDelete !== unassignedFilter
-      && updatedCount > 0
+      && (updatedCount > 0 || Number(result.orphanedChildren) > 0)
       && isLocationWithinSubtree(locationRegistry.value, location.LocationId, filterBeforeDelete);
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
       filterBeforeDelete, location.LocationId, unassignedFilter, updatedCount,
     ) || filteredSubtreeChanged || Boolean(query.filters.locationRegion);
     applyLocationRegistry(result.locations);
     syncDeletedLocationLocally(location.LocationId, updatedCount > 0 && !shouldRefreshGallery);
+    const current = requests.capture();
     if (shouldRefreshGallery) await queryGallery();
+    if (!current()) return;
     showToastMessage(`Deleted location “${location.Name}” from the library`);
   }
 
   function resetLocationState() {
+    requests.reset();
     locationRegistry.value = [];
     Object.assign(locationSearch, { viewer: "", batch: "" });
     closeAllLocationDropdowns(); resetLocationCreateState();

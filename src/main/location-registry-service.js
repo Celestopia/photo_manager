@@ -1,5 +1,6 @@
 const { assertUuidV4, createEntityId } = require("../shared/identity-schema.js");
 const { assertExactObjectKeys } = require("../shared/object-schema.js");
+const { validateLocationRegistryEntries } = require("../shared/library-data-schema.js");
 
 const LOCATION_CREATE_FIELDS = Object.freeze(["name", "country", "province", "city", "parentId", "description"]);
 
@@ -135,7 +136,17 @@ function createLocationRegistryService(options) {
     }
     const registry = getRegistry();
     if (!registry.has(locationId)) return { ok: false, error: "Location not found" };
+    const candidate = new Map(registry);
+    candidate.delete(locationId);
+    const now = new Date().toISOString();
+    let orphanedChildren = 0;
+    for (const [childId, location] of candidate) {
+      if (location.ParentId !== locationId) continue;
+      candidate.set(childId, { ...location, ParentId: null, UpdatedAt: now });
+      orphanedChildren++;
+    }
     try {
+      validateLocationRegistryEntries([...candidate.values()]);
       await prepareLibraryWrite("location-global-delete", { immediate: true });
     } catch (error) {
       return { ok: false, error: error.message };
@@ -145,14 +156,7 @@ function createLocationRegistryService(options) {
     const previousRegistry = new Map(registry);
     const previousMetadata = new Map();
     let updatedCount = 0;
-    let orphanedChildren = 0;
-    const now = new Date().toISOString();
-    registry.delete(locationId);
-    for (const [childId, location] of registry.entries()) {
-      if (location.ParentId !== locationId) continue;
-      registry.set(childId, { ...location, ParentId: null, UpdatedAt: now });
-      orphanedChildren += 1;
-    }
+    setRegistry(candidate);
     for (const [mediaId, item] of metadata.entries()) {
       if (item?.Location?.LocationId !== locationId) continue;
       previousMetadata.set(mediaId, item);
@@ -165,7 +169,7 @@ function createLocationRegistryService(options) {
     }
 
     try {
-      await saveTransaction(dataFileName, sortEntries(registry.values()), "location-global-delete", updatedCount > 0);
+      await saveTransaction(dataFileName, sortEntries(candidate.values()), "location-global-delete", updatedCount > 0);
       return { ok: true, deletedId: locationId, updatedCount, orphanedChildren, locations: listDefinitions() };
     } catch (error) {
       setRegistry(previousRegistry);

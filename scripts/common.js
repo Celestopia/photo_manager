@@ -1,3 +1,4 @@
+const { assertMediaTechnicalFields } = require("../src/shared/media-technical-schema");
 /**
  * Shared utilities for metadata maintenance scripts.
  *
@@ -269,7 +270,7 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
     }
   } else {
     try {
-      videoProbe = await probeVideoFile(filePath, APP_ROOT, options.mediaConfig || DEFAULT_MEDIA_CONFIG);
+      videoProbe = await probeVideoFile(filePath, APP_ROOT, options.mediaConfig);
     } catch (error) {
       videoProbe = {
         video: failedVideoMetadata(error, filePath),
@@ -374,6 +375,7 @@ async function loadExisting(metadataFile) {
   });
   const map = new Map();
   for (const item of lines) {
+    assertMediaTechnicalFields(item);
     assertUuidV4(item.MediaId, `MediaId for ${item?.FilePath || "metadata record"}`);
     if (typeof item.FilePath !== "string" || !item.FilePath.trim()) throw new Error("Metadata record is missing FilePath");
     if (map.has(item.FilePath)) throw new Error(`Metadata contains duplicate FilePath: ${item.FilePath}`);

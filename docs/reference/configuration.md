@@ -27,6 +27,8 @@ The release is install-free, not a self-contained portable user profile. Moving 
 
 The application and standalone maintenance scripts use the same configuration module. When the file is absent, the caller creates its parent directory, writes the complete defaults, and continues. Invalid YAML is left untouched and defaults are used for that run. There is no runtime configuration UI; the renderer can only read normalized configuration.
 
+Numeric normalization rejects non-finite values, uses integer dimensions/quality/concurrency/retention where required, and preserves valid fractional ratios. UI dimensions and zoom values remain positive, maximum zoom cannot be below minimum zoom, and visibility flags require booleans. Application loading and thumbnail workers share the same thumbnail defaults and normalization. Runtime fallback does not rewrite the user's configuration file.
+
 An absolute `media.ffmpegDir` is used directly. A relative value is always resolved from the program-resource root, never from the relocated AppData configuration directory. In development that root is the project root; in an installed build it is Electron's `resources` directory.
 
 ### Private Application State

@@ -16,7 +16,7 @@
         type="button"
         class="tag-option"
         :class="{ 'is-selected': isSelected(option.value) }"
-        @mousedown.prevent="emit('select', option.value)"
+        @mousedown.prevent @click="emit('select', option.value)"
       ><span>{{ option.label }}</span></button>
 
       <template v-if="recentOptions.length">
@@ -31,7 +31,7 @@
           class="tag-option"
           :class="{ 'is-selected': isSelected(optionValue(option)) }"
           :data-tip="optionDescription(option)"
-          @mousedown.prevent="emit('select', optionValue(option))"
+          @mousedown.prevent @click="emit('select', optionValue(option))"
         ><span>{{ optionLabel(option) }}</span></button>
       </template>
 
@@ -52,7 +52,7 @@
         class="tag-option"
         :class="{ 'is-selected': isSelected(optionValue(option)) }"
         :data-tip="optionDescription(option)"
-        @mousedown.prevent="emit('select', optionValue(option))"
+        @mousedown.prevent @click="emit('select', optionValue(option))"
       ><span>{{ optionLabel(option) }}</span></button>
       <div class="tag-option-empty" v-if="!options.length">{{ emptyText }}</div>
     </div>
@@ -104,6 +104,7 @@ function isSelected(value) {
 }
 
 function onSearchKeydown(event) {
+  if (event.isComposing || event.keyCode === 229) return;
   if (event.key === "Enter") {
     event.preventDefault();
     const first = props.recentOptions[0] || props.options[0];

@@ -1,3 +1,4 @@
+const { groupMediaPathsByHash, countMediaTypes } = require("./media-summary");
 /**
  * Incrementally synchronize image and video metadata while preserving user fields.
  * Unchanged files are reused by size + millisecond mtime; SHA256 is computed only
@@ -24,9 +25,8 @@ const {
 const { parseLibraryArgument, writeLibraryManifest } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createLibraryBackup } = require("./library-backup");
-const { recoverPendingTransaction } = require("./library-transaction");
+const { recoverLibraryTransactions } = require("./library-recovery");
 const { createOperationReporter } = require("./operation-progress");
-const { assertCustomization } = require("../src/shared/customization-schema");
 const {
   assertUuidV4,
   createUniqueEntityId,
@@ -84,7 +84,6 @@ async function synchronizeMetadata({
   onProgress = null,
   reservedEntityIds = [],
 }) {
-  for (const item of existing.values()) assertCustomization(item.Customization, item.FilePath);
   const usedEntityIds = new Set(reservedEntityIds);
   for (const item of existing.values()) usedEntityIds.add(assertUuidV4(item.MediaId, `MediaId for ${item.FilePath}`));
   function registerNewMediaId(item) {
@@ -192,12 +191,7 @@ async function synchronizeMetadata({
     const previous = existing.get(failedPath);
     if (previous) next.set(failedPath, previous);
   }
-  const duplicateHashes = new Map();
-  for (const item of next.values()) {
-    if (!item.SHA256Hash) continue;
-    if (!duplicateHashes.has(item.SHA256Hash)) duplicateHashes.set(item.SHA256Hash, []);
-    duplicateHashes.get(item.SHA256Hash).push(item.FilePath);
-  }
+  const duplicateHashes = groupMediaPathsByHash(next.values(), { skipMissing: true });
   for (const [hash, filePaths] of duplicateHashes) {
     if (filePaths.length > 1) logger.warn(`Duplicate SHA-256 ${hash}: ${filePaths.sort().join(", ")}`);
   }
@@ -212,7 +206,7 @@ async function run(options = {}) {
   const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
-    await recoverPendingTransaction(paths);
+    await recoverLibraryTransactions(paths, message => logger.warn(message));
     emit({ phase: "backup", message: "Backing up library data" });
     await createLibraryBackup(paths, {
       kind: "update",
@@ -264,8 +258,7 @@ async function run(options = {}) {
     const summary = {
       ...result.stats,
       total: nextEntries.length,
-      images: nextEntries.filter((item) => item?.FileSystem?.FileType === "image").length,
-      videos: nextEntries.filter((item) => item?.FileSystem?.FileType === "video").length,
+      ...countMediaTypes(nextEntries),
       probeFailed: nextEntries.filter((item) => item?.Video?.ProbeStatus === "failed" || item?.Picture?.ProbeStatus === "failed").length,
       thumbnailsRemoved,
       warnings,

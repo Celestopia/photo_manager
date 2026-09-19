@@ -29,12 +29,12 @@
   </div>
   <div class="registry-create-backdrop" v-if="albumCreate.visible && albumCreate.target === 'manager'" @click="closeCreateAlbumMenu">
     <section class="registry-create-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Album</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateAlbumMenu">×</button></header>
+      <header class="tag-manager-header"><h3>Create Album</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">×</button></header>
       <div class="tag-manager-create-panel">
-        <label>Album name</label><input class="input" v-model="albumCreate.title" />
-        <label>Description</label><textarea class="input tag-create-description" v-model="albumCreate.description"></textarea>
+        <label>Album name</label><input class="input" v-model="albumCreate.title" :disabled="albumManager.saving" />
+        <label>Description</label><textarea class="input tag-create-description" v-model="albumCreate.description" :disabled="albumManager.saving"></textarea>
         <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
-        <div class="tag-create-actions"><button class="btn" @click="closeCreateAlbumMenu">Cancel</button><button class="btn btn-primary" @click="createAlbumAndSelect">Create</button></div>
+        <div class="tag-create-actions"><button class="btn" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">Cancel</button><button class="btn btn-primary" @click="createAlbumAndSelect" :disabled="albumManager.saving">Create</button></div>
       </div>
     </section>
   </div>

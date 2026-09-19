@@ -73,6 +73,26 @@ test("media deletion commits the metadata change and removes every staged file",
   assert.equal(fs.existsSync(paths.mediaDeletionFile), false);
 });
 
+test("a failed final deletion journal write preserves the durable metadata outcome", async t => {
+  const paths = await createLibrary(t);
+  const item = record(ID_A, 'a.jpg', 'a'.repeat(64));
+  const source = path.join(paths.root, item.FilePath);
+  await fsp.writeFile(source, 'a'); await writeJsonlAtomic(paths.metadataFile, [item]);
+  const original = fsp.rename; let journals = 0;
+  fsp.rename = async (from, to) => {
+    if (to === paths.mediaDeletionFile && ++journals === 4) throw new Error('Final journal unavailable');
+    return original(from, to);
+  };
+  let result;
+  try { result = await commitMediaDeletion(paths, [{ MediaId: ID_A, absolutePath: source }], []); }
+  finally { fsp.rename = original; }
+  assert.equal(result.committed, true); assert.equal(result.cleanupPending, true);
+  assert.deepEqual(await readJsonlStrict(paths.metadataFile), []);
+  assert.equal(fs.existsSync(source), false);
+  assert.equal((await recoverMediaDeletionTransaction(paths)).action, 'finalized');
+  assert.equal(fs.existsSync(paths.mediaDeletionFile), false);
+});
+
 test("media deletion restores earlier files when a later staging move fails", async (t) => {
   const paths = await createLibrary(t);
   const first = record(ID_A, "a.jpg", "hash-a");
@@ -119,7 +139,6 @@ test("deletion service keeps a thumbnail shared by a remaining content hash", as
   const first = record(ID_A, "a.jpg", "shared-hash");
   const second = record(ID_B, "b.jpg", "shared-hash");
   const metadata = new Map([[ID_A, first], [ID_B, second]]);
-  const byPath = new Map([[first.FilePath, ID_A], [second.FilePath, ID_B]]);
   await fsp.writeFile(path.join(paths.root, first.FilePath), "a");
   await fsp.writeFile(path.join(paths.root, second.FilePath), "b");
   const thumbnail = path.join(paths.thumbnailDir, "shared-hash.webp");
@@ -128,7 +147,6 @@ test("deletion service keeps a thumbnail shared by a remaining content hash", as
   let backupCreated = false;
   const service = createMediaDeletionService({
     getMetadata: () => metadata,
-    getMediaPathIndex: () => byPath,
     requireOpenLibrary: () => ({ paths }),
     resolveIndexedMediaPath: (mediaId) => ({ item: metadata.get(mediaId), absolutePath: path.join(paths.root, metadata.get(mediaId).FilePath) }),
     prepareLibraryWrite: async () => { backupCreated = true; },
@@ -145,6 +163,5 @@ test("deletion service keeps a thumbnail shared by a remaining content hash", as
   assert.equal(result.ok, true);
   assert.equal(backupCreated, true);
   assert.equal(metadata.has(ID_A), false);
-  assert.equal(byPath.has(first.FilePath), false);
   assert.equal(fs.existsSync(thumbnail), true);
 });

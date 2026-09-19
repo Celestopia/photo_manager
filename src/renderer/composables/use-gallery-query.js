@@ -25,17 +25,8 @@ export function useGalleryQuery({
   const galleryGroups = shallowRef([]);
   const orderedItems = shallowRef([]);
   const total = ref(0);
-  const mediaCounts = reactive({ all: 0, images: 0, videos: 0 });
   const loading = ref(false);
-  const galleryItemIndex = new Map();
   let latestQueryId = 0;
-
-  function rebuildGalleryItemIndex() {
-    galleryItemIndex.clear();
-    for (const item of orderedItems.value) {
-      if (item?.MediaId) galleryItemIndex.set(item.MediaId, item);
-    }
-  }
 
   async function queryGallery() {
     const requestId = ++latestQueryId;
@@ -59,13 +50,9 @@ export function useGalleryQuery({
       const response = await api.queryGallery(safeQuery);
       if (requestId !== latestQueryId) return false;
       total.value = Number(response?.total || 0);
-      mediaCounts.all = Number(response?.mediaCounts?.all || 0);
-      mediaCounts.images = Number(response?.mediaCounts?.images || 0);
-      mediaCounts.videos = Number(response?.mediaCounts?.videos || 0);
 
       galleryGroups.value = Array.isArray(response?.groups) ? response.groups : [];
       orderedItems.value = galleryGroups.value.flatMap((group) => group.items);
-      rebuildGalleryItemIndex();
       onSelectionResultChanged?.();
       return true;
     } catch (error) {
@@ -132,9 +119,7 @@ export function useGalleryQuery({
     galleryReturnMediaId.value = "";
     galleryGroups.value = [];
     orderedItems.value = [];
-    galleryItemIndex.clear();
     total.value = 0;
-    Object.assign(mediaCounts, { all: 0, images: 0, videos: 0 });
   }
 
   return {
@@ -144,9 +129,7 @@ export function useGalleryQuery({
     galleryGroups,
     orderedItems,
     total,
-    mediaCounts,
     loading,
-    galleryItemIndex,
     queryGallery,
     applySearch,
     applyFilterSort,
@@ -158,6 +141,5 @@ export function useGalleryQuery({
     consumeGalleryReturnMediaId,
     resetAll,
     resetGalleryState,
-    rebuildGalleryItemIndex,
   };
 }

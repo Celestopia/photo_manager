@@ -10,7 +10,7 @@ const { loadExisting } = require("./common");
 const { parseLibraryArgument, writeTextAtomic } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
-const { readTransactionJournal } = require("./library-transaction");
+const { assertLibraryReady } = require("./library-recovery");
 const { assertCustomization } = require("../src/shared/customization-schema");
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
@@ -137,7 +137,7 @@ async function run(options = {}) {
     : path.join(paths.dataDir, "photo_metadata.csv");
 
   try {
-  if (await readTransactionJournal(paths)) throw new Error("A pending library transaction must be recovered by opening the library before export");
+  assertLibraryReady(paths);
   const map = await loadExisting(paths.metadataFile);
   const registryIndexes = await loadRegistryIndexes(paths);
   validateMetadataMap(map, registryIndexes);
