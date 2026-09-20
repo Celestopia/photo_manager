@@ -12,6 +12,7 @@
 | [Media and Registry Data Model](reference/data-model.md) | Strict media fields, capture-time semantics, UUID registries and location relationships. |
 | [Media Processing and Playback](reference/media-pipeline.md) | Scanning, incremental reuse, thumbnails, video playback and temporary transforms. |
 | [Interface and Editing](reference/interface.md) | Gallery queries, selection, viewer drafts, location hierarchy and registry management. |
+| [Semantic Search](reference/semantic-search.md) | Multilingual keyword search, local models, manual vector indexing and relevance ranking. |
 | [Maintenance and Acceptance](reference/maintenance-and-testing.md) | Library maintenance, explicit CLI commands, tests and Windows release checks. |
 
 ## Assistant

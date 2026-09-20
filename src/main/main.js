@@ -1,3 +1,5 @@
+const { createGallerySearch } = require('./semantic/gallery-search');
+const { createSearchService } = require('./semantic/search-service');
 const { groupMediaPathsByHash, countMediaTypes } = require("../../scripts/media-summary");
 const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
 /**
@@ -625,6 +627,8 @@ async function closeLibrary() {
   state.activeLibrary.state = "closing";
   sessionRouter.current().viewerImages.invalidate();
   await videoCovers.stop();
+  sessionRouter.current().semanticInstallation?.abort();
+  await sessionRouter.current().semanticSearch.close();
   try { await chat.close(); }
   catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
   emitLibraryState();
@@ -754,6 +758,7 @@ async function runMaintenanceOperation(operation, options = {}) {
   sessionRouter.current().viewerImages.invalidate();
   emitLibraryState();
   try {
+    await sessionRouter.current().semanticSearch.close();
     await chat.close();
     await videoCovers.stop();
     const result = await runOperationWorker(operation, library.paths.root, options);
@@ -774,13 +779,14 @@ async function runMaintenanceOperation(operation, options = {}) {
   }
 }
 
-function queryGallery(query) {
+async function queryGallery(query) {
   requireOpenLibrary();
-  const result = executeGalleryQuery(state.metadataIndex.values(), query);
+  const result = await sessionRouter.current().semanticSearch.query(query);
   const items = result.items.map(enrichItem);
   return {
     total: items.length,
-    groups: groupByDate(items),
+    groups: result.semantic ? [{ date: "Semantic results", items }] : groupByDate(items),
+    semantic: result.semantic,
   };
 }
 
@@ -943,6 +949,8 @@ function registerIpcHandlers() {
   const runWithSession = (event, operation) => sessionRouter.runForEvent(event, operation);
   ipcMain.handle("video-cover:request", (event, payload) => runWithSession(event, () => videoCovers.request(payload)));
   ipcMain.handle("video-cover:cancel", (event, requestId) => runWithSession(event, () => videoCovers.cancel(requestId)));
+  require('./semantic/ipc').registerSemanticIpc({ ipcMain, runWithSession, getSession: () => sessionRouter.current(), modelsRoot: APPLICATION_PATHS.modelsDir });
+  ipcMain.handle('gallery:cancel-search', event => runWithSession(event, () => sessionRouter.current().semanticSearch.stop()));
   registerChatIpc({
     chat,
     getWindow: () => state.mainWindow,
@@ -1002,6 +1010,8 @@ async function closeWindowSession(session) {
     session.acceptingCommands = false;
     session.viewerImages.invalidate();
     await videoCovers.stop();
+    session.semanticInstallation?.abort();
+    await session.semanticSearch.close();
     if (state.quickScanState) state.quickScanState.cancelled = true;
     await chat.stop().catch((error) => appendLog(`chat stop during window close failed: ${error.message}`));
     await Promise.allSettled([...session.pendingOperations]);
@@ -1031,6 +1041,18 @@ async function createLibraryWindow() {
     mutate: createMutationCoordinator(),
   };
   session.chat = sessionRouter.run(session, () => createSessionChat(session));
+  session.semanticSearch = createGallerySearch({
+    search: createSearchService({ modelsRoot: APPLICATION_PATHS.modelsDir,
+      spawn: entry => require('electron').utilityProcess.fork(entry, [], { serviceName: 'Semantic embeddings', stdio: 'pipe' }) }),
+    getLibrary: () => {
+      const lib = session.runtime.activeLibrary;
+      if (!session.acceptingCommands || !lib || lib.state !== 'open' || session.runtime.maintenanceState.running)
+        throw new Error('No available library');
+      return lib;
+    },
+    getItems: () => session.runtime.metadataIndex.values(),
+    executeQuery: (items, query) => sessionRouter.run(session, () => executeGalleryQuery(items, query)),
+  });
   session.viewerImages = createViewerImageResources({
     getLibrary: () => session.acceptingCommands && !session.runtime.maintenanceState.running ? session.runtime.activeLibrary : null,
     getItem: id => session.runtime.metadataIndex.get(id),

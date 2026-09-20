@@ -52,6 +52,7 @@ export function useLibrarySession({
     verify: "Verify Metadata",
     thumbnails: "Generate Thumbnails",
     "video-covers": "Generate Video Covers",
+    "semantic-index": "Build Semantic Index",
     export: "Export Metadata CSV",
   }[maintenanceDialog.operation] || "Library Maintenance"));
   const maintenanceDialogDescription = computed(() => ({
@@ -59,6 +60,7 @@ export function useLibrarySession({
     verify: "Compare the current library files with existing metadata in read-only mode. This produces a report without changing media, registries, or metadata.",
     thumbnails: "Check the current library's thumbnail cache and regenerate missing or stale image and video thumbnails.",
     "video-covers": "Generate first-frame covers for all indexed videos in this library. Existing valid covers are reused; duplicate videos share one cover.",
+    "semantic-index": "Build missing or changed local embeddings for the whole library. Completed work is reusable after cancellation. Searches never update the index automatically.",
     export: "Export file information, metadata, and customizations from the current library to a CSV file.",
   }[maintenanceDialog.operation] || ""));
 

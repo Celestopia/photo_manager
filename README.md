@@ -9,6 +9,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Browse images and videos on one shooting-time timeline.
 - Edit titles, ratings, privacy levels, descriptions, albums, tags, people, and hierarchical locations.
 - Filter, batch-copy, and batch-edit the complete matching media set.
+- Search locally by Chinese or English keywords using combined visual and metadata similarity, without an LLM provider.
 - Permanently delete one media item from the viewer or a selected batch from the gallery, removing both files and metadata after confirmation.
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Preview videos with uncropped first-frame covers, generated locally on demand and cached inside the library; gallery thumbnails remain separate.
@@ -22,9 +23,15 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
-Assistant is available in the viewer's right sidebar. Open the Provider settings gear in the Assistant header to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).
+Assistant is available in the viewer's left sidebar. Open the Provider settings gear in the Assistant header to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).
 
 Configure Tavily separately in **Provider settings → Web search**, then use the composer globe to enable search for the current conversation. Search is off by default. Its connection test uses a generic public query and page; it sends no library content.
+
+## Semantic Search
+
+For semantic search, open **Library settings > Build Semantic Index**, download or import the local embedding models, and build the library index. Then select **Semantic** in the search bar, enter keywords such as `海边 日落 风景` or `sea sunset scenery`, and press Enter or Search. Results defaults to 10, supports 1–100, and resets when the library closes. Existing filters still apply; semantic results appear in relevance order.
+
+All search modes—Title, File name, Description, and Semantic—require Enter or Search. Typing or changing filters does not submit unfinished search text. Semantic search returns approximate nearest matches; it does not interpret conversational commands or exact conditions embedded in the query. Index updates are manual, and media without embeddings cannot enter semantic results. Model weights live in Local AppData, indexes in `.photo_manager/semantic/`; inference is offline after model setup. See [Semantic Search](docs/reference/semantic-search.md).
 
 ## Run on Windows
 
@@ -77,6 +84,7 @@ Each library is self-contained:
     media-deletion.json          # only while a media deletion needs recovery
     data\
     thumb_cache\
+    semantic\              # optional, manually built semantic vectors
     backups\
     logs\
     temp\
@@ -96,6 +104,7 @@ Application-wide data stay outside the application directory:
 %LOCALAPPDATA%\PhotoManager\
   app-data\state.json
   app-data\chat-provider.yml
+  models\                  # optional local embedding models
   logs\
   session-data\
   crash-dumps\
@@ -116,6 +125,8 @@ npm run verify-metadata -- --library "D:\Media\Example Library"
 npm run verify-metadata -- --library "D:\Media\Example Library" --probe
 npm run build-thumbnails -- --library "D:\Media\Example Library"
 npm run build-thumbnails -- --library "D:\Media\Example Library" --force
+npm run build-semantic-index -- --library "D:\Media\Example Library"
+npm run build-semantic-index -- --library "D:\Media\Example Library" --force
 npm run export-metadata-csv -- --library "D:\Media\Example Library"
 ```
 

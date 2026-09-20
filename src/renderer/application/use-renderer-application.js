@@ -150,6 +150,8 @@ export function useRendererApplication() {
     provide(CHAT_CONTEXT, chat);
     const {
       query,
+      appliedSearchLabel, resultLimit, semanticActive, searchError,
+      submitSearchKey, stopSearch, clearSearch, setResultLimit,
       galleryControlsExpanded,
       galleryControlsModified,
       galleryGroups,
@@ -651,6 +653,7 @@ export function useRendererApplication() {
     });
 
     const libraryContext = {
+      semanticApi: API.semantic,
       ICONS, WINDOW_ACTIONS, libraryState, entry, initializationConfirm, libraryInfo,
       maintenanceDialog, maintenanceDialogTitle, maintenanceDialogDescription,
       chooseLibrary, enterLibraryFromEntry, recheckMediaTools, cancelLibraryOperation,
@@ -660,6 +663,8 @@ export function useRendererApplication() {
       doWindowAction, toggleWindowMaximizeRestore, windowToggleTip, windowToggleIcon,
     };
     const galleryContext = {
+      appliedSearchLabel, resultLimit, semanticActive, searchError,
+      submitSearchKey, stopSearch, clearSearch, setResultLimit, openMaintenanceDialog,
       ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
       isSelectionMode, selectedGalleryCount, selectedGalleryBytes, allGalleryItemsSelected,
       batchEdit, batchStatus, batchOperationBusy,

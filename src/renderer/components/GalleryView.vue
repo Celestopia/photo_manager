@@ -18,10 +18,11 @@
         <Transition name="gallery-filters">
         <section v-if="galleryControlsExpanded" id="gallery-filter-panel" class="gallery-controls-panel">
           <div class="gallery-controls-search">
-            <div class="search-panel">
-              <select v-model="query.search.field" class="input" aria-label="Search field"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option></select>
-              <input class="input grow" v-model="query.search.value" placeholder="Enter search text" aria-label="Search text" @keydown.enter="applySearch" />
+            <div class="search-panel" :class="{ 'semantic-search-panel': query.search.field === 'semantic' }">
+              <select v-model="query.search.field" class="input" aria-label="Search field"><option value="title">Title</option><option value="filename">File name</option><option value="description">Description</option><option value="semantic">Semantic</option></select>
+              <input class="input grow" v-model="query.search.value" :placeholder="query.search.field === 'semantic' ? 'Keywords, e.g. sea sunset scenery' : 'Enter search text'" maxlength="2000" aria-label="Search text" @keydown.enter="submitSearchKey" />
               <button class="btn btn-primary" @click="applySearch">Search</button>
+              <label v-if="query.search.field === 'semantic'" class="semantic-result-limit">Results<input class="input" type="number" min="1" max="100" step="1" :value="resultLimit" aria-label="Results" @change="setResultLimit" /></label>
             </div>
           </div>
           <div class="gallery-controls-primary">
@@ -29,7 +30,7 @@
             <div class="toolbar-group"><label>Tags</label><RegistryFilterPicker kind="tag" label="Tags" /></div>
             <div class="toolbar-group"><label>People</label><RegistryFilterPicker kind="person" label="People" /></div>
             <div class="toolbar-group location-filter-group"><label>Location</label><LocationFilterPicker /></div>
-            <div class="toolbar-group sort-tools"><label>Sort</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">Date taken</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
+            <div class="toolbar-group sort-tools"><label>Sort</label><span v-if="semanticActive" class="semantic-sort">Relevance</span><template v-else><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">Date taken</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">Descending</option><option value="asc">Ascending</option></select></template></div>
           </div>
           <div class="gallery-controls-secondary">
             <div class="gallery-media-type-filter">
@@ -73,8 +74,16 @@
     </section>
     <section ref="galleryListRef" class="gallery-list">
       <div class="summary">{{ loading ? 'Loading media...' : `${total} media items` }}</div>
+      <div v-if="appliedSearchLabel || loading || searchError" class="gallery-search-status" aria-live="polite">
+        <span v-if="appliedSearchLabel" class="gallery-applied-search" :title="appliedSearchLabel">{{ appliedSearchLabel }}</span>
+        <span v-if="semanticActive">Current gallery filters apply.</span>
+        <button v-if="loading" class="btn" @click="stopSearch">Cancel Search</button>
+        <button v-if="appliedSearchLabel" class="btn" @click="clearSearch">Clear Search</button>
+        <span v-if="searchError" role="alert">{{ searchError }}</span>
+        <button v-if="searchError && query.search.field === 'semantic'" class="btn" @click="openMaintenanceDialog('semantic-index')">Build Semantic Index</button>
+      </div>
       <template v-for="group in galleryGroups" :key="group.date">
-        <h2 class="date-title">{{ group.date }}</h2>
+        <h2 v-if="!semanticActive" class="date-title">{{ group.date }}</h2>
         <div class="photo-grid">
           <article
             class="photo-card"
@@ -202,6 +211,8 @@ const {
   ICONS,
   WINDOW_ACTIONS,
   query,
+  appliedSearchLabel, resultLimit, semanticActive, searchError,
+  submitSearchKey, stopSearch, clearSearch, setResultLimit, openMaintenanceDialog,
   galleryControlsExpanded,
   galleryControlsModified,
   isSelectionMode,

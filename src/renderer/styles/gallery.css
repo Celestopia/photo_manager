@@ -53,6 +53,12 @@
 .gallery-controls-secondary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .gallery-controls-search { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .gallery-controls-search .search-panel { width: min(100%, 620px); flex-wrap: wrap; }
+.gallery-controls-search .search-panel.semantic-search-panel { width: min(100%, 780px); }
+.semantic-result-limit { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.semantic-result-limit .input { width: 76px; }
+.gallery-search-status { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; color: var(--text-soft); }
+.gallery-applied-search { max-width: min(60vw, 650px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.semantic-index-options .retrieval-warning { color: #946315; }
 .gallery-controls-search .search-panel > select { flex: 0 0 110px; }
 .gallery-controls-search .search-panel > .grow { flex: 1 1 280px; min-width: 180px; }
 .gallery-controls-primary,

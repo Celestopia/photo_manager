@@ -16,6 +16,13 @@ function toSerializable(value) {
 }
 
 contextBridge.exposeInMainWorld("photoManagerApi", {
+  semantic: {
+    status: () => ipcRenderer.invoke('semantic:status'),
+    install: mode => ipcRenderer.invoke('semantic:install', mode),
+    cancel: () => ipcRenderer.invoke('semantic:cancel'),
+    onProgress: listener => subscribe('semantic:progress', listener),
+  },
+  cancelGallerySearch: () => ipcRenderer.invoke('gallery:cancel-search'),
   videoCover: {
     request: payload => ipcRenderer.invoke("video-cover:request", payload),
     cancel: requestId => ipcRenderer.invoke("video-cover:cancel", requestId),

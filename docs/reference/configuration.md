@@ -49,6 +49,7 @@ Global data are split between roaming configuration and machine-specific state:
   logs\                     # startup diagnostics produced before a library opens
   session-data\             # localStorage, Chromium cache, and session state
   crash-dumps\
+  models\                    # optional pinned semantic embedding models, shared on this machine
 ```
 
 `state.json` contains only the last successfully opened library path. Because that path is machine-specific, it is not stored under roaming data. Video volume and mute plus the recent tags, people, and locations namespaced by library UUID remain in renderer `localStorage`, whose physical storage follows Electron `sessionData` into Local AppData. Cache and crash dumps must not pollute roaming data.
@@ -90,6 +91,7 @@ Standard layout:
       <SHA256Hash>.webp
     video_covers/                 # Lazy, disposable first-frame viewer covers.
       <SHA256Hash>.v1-2560-q90.webp
+    semantic/                     # Optional, manually built derived vector index.
     backups/
       <timestamp>-<kind>-<suffix>/
         library.yml

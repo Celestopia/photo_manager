@@ -7,6 +7,7 @@ const OPERATIONS = {
   verify: () => require("./verify-metadata").run,
   thumbnails: () => require("./build-thumbnails").run,
   "video-covers": () => require("./build-video-covers").run,
+  "semantic-index": () => require("./build-semantic-index").run,
   export: () => require("./export-metadata-csv").run,
 };
 

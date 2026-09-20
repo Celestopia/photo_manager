@@ -27,18 +27,21 @@
     </section>
   </div>
 
-  <div class="tag-modal-backdrop" v-if="maintenanceDialog.visible" @click="maintenanceDialog.running ? null : closeMaintenanceDialog()">
+  <div class="tag-modal-backdrop" v-if="maintenanceDialog.visible" @click="maintenanceDialog.running || modelBusy ? null : closeMaintenanceDialog()">
     <section class="maintenance-modal" @click.stop>
-      <header class="tag-manager-header"><h3>{{ maintenanceDialogTitle }}</h3><button v-if="!maintenanceDialog.running" class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeMaintenanceDialog">×</button></header>
+      <header class="tag-manager-header"><h3>{{ maintenanceDialogTitle }}</h3><button v-if="!maintenanceDialog.running && !modelBusy" class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeMaintenanceDialog">×</button></header>
       <div v-if="!maintenanceDialog.running && !maintenanceDialog.completed" class="maintenance-options">
+        <SemanticIndexOptions v-if="maintenanceDialog.operation === 'semantic-index'" :api="semanticApi" @busy="modelBusy=$event" @ready="modelReady=$event" />
+        <label v-if="maintenanceDialog.operation === 'semantic-index'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.force" />Rebuild all semantic embeddings</label>
         <p class="maintenance-description">{{ maintenanceDialogDescription }}</p>
         <label v-if="maintenanceDialog.operation === 'verify'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.reprobe" />Reprobe videos with FFprobe (slower)</label>
         <label v-if="maintenanceDialog.operation === 'thumbnails'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.force" />Regenerate all thumbnails</label>
         <label v-if="maintenanceDialog.operation === 'video-covers'" class="library-confirm-check"><input type="checkbox" v-model="maintenanceDialog.force" />Regenerate all video covers</label>
         <p v-if="maintenanceDialog.operation === 'export'">The CSV will be written to <code>.photo_manager/data/photo_metadata.csv</code> in the current library.</p>
-        <div class="tag-create-actions"><button class="btn" @click="closeMaintenanceDialog">Cancel</button><button class="btn btn-primary" @click="startMaintenanceOperation">Start</button></div>
+        <div class="tag-create-actions"><button class="btn" :disabled="modelBusy" @click="closeMaintenanceDialog">Cancel</button><button class="btn btn-primary" :disabled="modelBusy || (maintenanceDialog.operation === 'semantic-index' && !modelReady)" @click="startMaintenanceOperation">Start</button></div>
       </div>
       <div v-else class="maintenance-progress">
+        <button v-if="maintenanceDialog.running && maintenanceDialog.operation === 'semantic-index'" class="btn" @click="semanticApi.cancel()">Stop Build</button>
         <strong>{{ maintenanceDialog.progress.message || (maintenanceDialog.completed ? 'Task complete' : 'Processing') }}</strong>
         <progress v-if="maintenanceDialog.progress.total" :value="maintenanceDialog.progress.processed || 0" :max="maintenanceDialog.progress.total"></progress>
         <div class="library-progress-path" v-if="maintenanceDialog.progress.current">{{ maintenanceDialog.progress.current }}</div>
@@ -50,13 +53,15 @@
 </template>
 
 <script setup>
-import { inject } from "vue";
+import { inject, ref } from "vue";
+import SemanticIndexOptions from "../SemanticIndexOptions.vue";
+const modelBusy=ref(false),modelReady=ref(false);
 import { LIBRARY_CONTEXT } from "../../context/renderer-contexts.js";
 
 const context = inject(LIBRARY_CONTEXT);
 if (!context) throw new Error("LibraryDialogs requires LIBRARY_CONTEXT");
 const {
-  initializationConfirm, libraryInfo, libraryState, maintenanceDialog,
+  semanticApi, initializationConfirm, libraryInfo, libraryState, maintenanceDialog,
   maintenanceDialogTitle, maintenanceDialogDescription, closeInitializationConfirm,
   confirmInitializeLibrary, closeLibraryInfo, openLibraryRoot, openLibraryManagerDir,
   saveLibraryInfo, closeMaintenanceDialog, startMaintenanceOperation,

@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "clip",
+      "repository": "Xenova/clip-vit-base-patch32",
+      "revision": "d15189d7028b43f1d3e65039190477f6af591c2a",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 4524,
+          "sha256": "493ef57ff783e42d1530c91b53469b7fdf8db8a9c1408e86998fcb7899a4f495"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 520,
+          "sha256": "6f638fb9401a6d6296feff533ee7efe657b787c49f954f82f5906b36ef2a1b1f"
+        },
+        {
+          "path": "onnx/vision_model_quantized.onnx",
+          "size": 89117001,
+          "sha256": "583fd1110a514667812fee7d684952aaf82a99b959760c8d7dca7e0ab9839299"
+        }
+      ]
+    },
+    {
+      "id": "minilm",
+      "repository": "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+      "revision": "2c4055b12046f11709e9df2c122e59ffbdc2f900",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 673,
+          "sha256": "05b570bff786faa5c4604152aa16f19f77ed6dfc31e47dd0f3dd987078693ac7"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 280,
+          "sha256": "06e405a36dfe4b9604f484f6a1e619af1a7f7d09e34a8555eb0b77b66318067f"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 17082913,
+          "sha256": "b60b6b43406a48bf3638526314f3d232d97058bc93472ff2de930d43686fa441"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 496,
+          "sha256": "3f5961b9ac86288cccdb97f32fb848d6187c78e1603958c53f3ea1f296b7d8a2"
+        },
+        {
+          "path": "onnx/model_quantized.onnx",
+          "size": 118308126,
+          "sha256": "66fc00f5f29afcaff34092e1bdd20008ca3918265a82fb9695a551e510cc4ebc"
+        }
+      ]
+    },
+    {
+      "id": "multilingual-clip",
+      "repository": "sentence-transformers/clip-ViT-B-32-multilingual-v1",
+      "revision": "58edf8cada9e398793dca955574a48cbb7f18be2",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 572,
+          "sha256": "edc12f518bfc445dedfe8a7c58374ea659525e0b6e67814686bd6cd57f90f8b3"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 1961847,
+          "sha256": "5b4e1a8171c81dfd666ae40265b9530c6e0b3d53923fe8ac493dcc84229adf81"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 371,
+          "sha256": "8f66d0ad85be46afc77e0bbf48312cff326ddb9e7290926df96a8228d69a814e"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 112,
+          "sha256": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3"
+        },
+        {
+          "path": "2_Dense/model.safetensors",
+          "size": 1572984,
+          "sha256": "d12568dc7300970a4d3dbb49068ad16cd89b99840b74b026f8e48071e9414f74"
+        },
+        {
+          "path": "onnx/model_quint8_avx2.onnx",
+          "size": 135377779,
+          "sha256": "fbc8fbeaa5237d96bd1bf430057c70d34de8334a463e933a5faa305f6caeed9c"
+        }
+      ]
+    }
+  ]
+}

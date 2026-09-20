@@ -12,6 +12,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 - Image parsing and thumbnails: Sharp and exifr.
 - Video probing and frame extraction: bundled Windows x64 FFmpeg/FFprobe 8.1.2.
 - Capture-location time zones: offline `geo-tz` coordinate boundaries plus Electron/Node `Intl` IANA time-zone rules; no runtime network request is made.
+- Optional semantic search: Transformers.js and ONNX Runtime CPU inference with separately downloaded local models.
 - Configuration: YAML.
 - Persistence: JSONL for media/registries and JSON for chat sessions; export: UTF-8 BOM CSV.
 - The main process and renderer communicate through an explicit IPC allowlist. The renderer cannot access Node or the filesystem directly.
@@ -49,7 +50,9 @@ Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directori
 
 Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation payloads camelCase, and each channel rejects unknown fields and obsolete PascalCase aliases. `FilePath` is never an action target: the main process resolves `MediaId` through its current index and verifies the resulting path remains inside the active library before any filesystem operation.
 
-IPC registration requires sender-session routing and a mutation coordinator. The registrar explicitly lists channels that enter the owning session's mutation queue; reads and cancellation remain independent. Gallery responses contain only `total` and `groups`. The unused private `acceptChanges` chat-send flag is removed; exact-source rejection and explicit input exclusion remain unchanged.
+IPC registration requires sender-session routing and a mutation coordinator. The registrar explicitly lists channels that enter the owning session's mutation queue; reads and cancellation remain independent. Gallery responses contain `total`, `groups`, and a `semantic` flag indicating relevance ordering. The unused private `acceptChanges` chat-send flag is removed; exact-source rejection and explicit input exclusion remain unchanged.
+
+Direct semantic search uses `gallery:query` and `gallery:cancel-search`; model setup and maintenance status use the sender-scoped `semantic:*` allowlist through preload. `src/main/semantic/gallery-search.js` owns submitted query vectors and cancellation for one window/library; embedding and vector scans run in workers. Library close, window close, and maintenance dispose those workers. Model files are shared immutable machine-local resources; indexes and query state remain library scoped. ONNX Runtime's native binaries are unpacked beside ASAR. See [Semantic Search](semantic-search.md) for model, storage and lifecycle contracts.
 
 ## Source Responsibilities
 

@@ -161,7 +161,7 @@ function registerIpcHandlers(options) {
   });
   ipcMain.handle("maintenance:start", async (_, payload) => {
     const operation = String(payload?.operation || "");
-    if (!["update", "verify", "thumbnails", "video-covers", "export"].includes(operation)) return { ok: false, error: "Unknown maintenance operation" };
+    if (!["update", "verify", "thumbnails", "video-covers", "semantic-index", "export"].includes(operation)) return { ok: false, error: "Unknown maintenance operation" };
     const outputFile = runtime.activeLibrary?.paths ? path.join(runtime.activeLibrary.paths.dataDir, "photo_metadata.csv") : "";
     if (operation === "export" && fs.existsSync(outputFile) && !payload?.overwrite) {
       return { ok: false, code: "OUTPUT_EXISTS", error: "photo_metadata.csv already exists" };
@@ -169,7 +169,7 @@ function registerIpcHandlers(options) {
     return runMaintenanceOperation(operation, { reprobe: Boolean(payload?.reprobe), force: Boolean(payload?.force) });
   });
 
-  ipcMain.handle("gallery:query", async (_, query) => toSerializable(queryGallery(query)));
+  ipcMain.handle("gallery:query", async (_, query) => toSerializable(await queryGallery(query)));
 
   ipcMain.handle("tag:list", async () => toSerializable(await tagService.list()));
   ipcMain.handle("tag:create", async (_, payload) => toSerializable(await tagService.create(payload)));

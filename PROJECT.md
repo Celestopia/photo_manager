@@ -19,6 +19,7 @@ Current capabilities include:
 - Using shared first-frame extraction for video thumbnails and covers, with explicit thumbnail maintenance rebuilding outdated cache recipes.
 - Displaying photos and video covers through one persistent image surface with stable library-scoped resource URLs, bounded adjacent preloading, and a decoded-frame handoff to video playback. Navigation retains the outgoing visual until the latest replacement decodes; see Shared Viewer Image Loading for transition and cleanup rules.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
+- Searching Chinese/English keywords locally through the gallery search bar using visual and metadata embeddings, manual library indexes, and relevance ordering; no LLM or gallery chat is involved.
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.
 - Batch-setting titles, ratings, privacy levels, albums, tags, people, and primary locations across mixed images and videos.
@@ -42,6 +43,7 @@ The application interface is English-only; there is no localization layer or lan
 | [Media and Registry Data Model](docs/reference/data-model.md) | Strict media fields, capture-time semantics, UUID registries and location relationships. |
 | [Media Processing and Playback](docs/reference/media-pipeline.md) | Scanning, incremental reuse, thumbnails, video playback and temporary transforms. |
 | [Interface and Editing](docs/reference/interface.md) | Gallery queries, selection, viewer drafts, location hierarchy and registry management. |
+| [Semantic Search](docs/reference/semantic-search.md) | Multilingual embedding models, direct keyword search, manual indexing, ranking, and worker lifecycle. |
 | [Maintenance and Acceptance](docs/reference/maintenance-and-testing.md) | Library maintenance, explicit CLI commands, tests and Windows release checks. |
 
 See the [documentation index](docs/README.md) for navigation and maintenance conventions.
