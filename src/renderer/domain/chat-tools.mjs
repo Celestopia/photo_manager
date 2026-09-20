@@ -27,6 +27,7 @@ export function toolLabel(message, id) {
     .find((c) => c.id === id);
   return (
     {
+      semantic_search: 'Search local embeddings',
       find_library_tags: "Find library tags",
       web_search: 'Search the web',
       read_web_page: 'Read a source',

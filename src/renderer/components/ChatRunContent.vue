@@ -11,6 +11,7 @@
     ></div>
     <p v-if="step.kind === 'completion' && message.status === 'executing' && pendingWebCall(step)" class="chat-notice" role="status">{{ pendingWebCall(step).name === 'web_search' ? 'Searching the web…' : 'Reading a source…' }}</p>
     <template v-if="step.kind === 'tool'">
+      <article v-if="step.outcome.searched" class="retrieval-applied" aria-label="Semantic results"><strong>Semantic search · {{step.outcome.count}} media</strong><p>{{step.outcome.summary}}</p></article>
       <details class="chat-tool-activity">
         <summary>
           {{ toolLabel(message, step.callId) }} · {{ outcomeLabel(step.outcome) }}
@@ -132,11 +133,12 @@ import { CHAT_CONTEXT } from "../context/renderer-contexts";
 import { renderChatMarkdown } from "../domain/chat-markdown.mjs";
 import { sourcesBefore, webUsage } from '../domain/chat-sources.mjs';
 const props = defineProps({
+  context: Object,
   message: Object,
   proposals: Array,
   previews: Object,
 });
-const { busy, working, decideProposal, reviewBlocked, session, openSource } = inject(CHAT_CONTEXT);
+const { busy, working, decideProposal, reviewBlocked, session, openSource } = props.context || inject(CHAT_CONTEXT);
 const ownSources = computed(() => (props.message.attempt?.steps || []).flatMap(s => s.kind === 'tool' ? s.outcome.sources || [] : []));
 const sourceHost = url => { try { return new URL(url).hostname; } catch { return ''; } };
 function citationClick(event, stepId) {

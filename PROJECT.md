@@ -19,6 +19,7 @@ Current capabilities include:
 - Using shared first-frame extraction for video thumbnails and covers, with explicit thumbnail maintenance rebuilding outdated cache recipes.
 - Displaying photos and video covers through one persistent image surface with stable library-scoped resource URLs, bounded adjacent preloading, and a decoded-frame handoff to video playback. Navigation retains the outgoing visual until the latest replacement decodes; see Shared Viewer Image Loading for transition and cleanup rules.
 - Filtering by media type, rating, privacy level, album, tag, person, and hierarchical location.
+- Retrieving whole media items through a central gallery Assistant using manually built local visual/description/context embeddings, temporary conversations, fixed result-count controls and relevance ordering intersected with ordinary gallery filters. There are no agent-generated predicates or registry lookup tools.
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.
 - Batch-setting titles, ratings, privacy levels, albums, tags, people, and primary locations across mixed images and videos.
@@ -41,6 +42,7 @@ The application interface is English-only; there is no localization layer or lan
 | [Library Lifecycle and Persistence](docs/reference/library-lifecycle.md) | Library identity, boundaries, startup, initialization, locking, backups and transaction recovery. |
 | [Media and Registry Data Model](docs/reference/data-model.md) | Strict media fields, capture-time semantics, UUID registries and location relationships. |
 | [Media Processing and Playback](docs/reference/media-pipeline.md) | Scanning, incremental reuse, thumbnails, video playback and temporary transforms. |
+| [Gallery Retrieval Assistant](docs/reference/retrieval.md) | Model assets, manual index snapshots, video sampling, semantic ranking, temporary chat and lifecycle. |
 | [Interface and Editing](docs/reference/interface.md) | Gallery queries, selection, viewer drafts, location hierarchy and registry management. |
 | [Maintenance and Acceptance](docs/reference/maintenance-and-testing.md) | Library maintenance, explicit CLI commands, tests and Windows release checks. |
 
@@ -66,6 +68,8 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 14. All entity IDs are lowercase UUID v4 and globally unique across media and registries.
 15. Check both recovery journals before ordinary writes or maintenance; recover deletion before text transactions while holding the library lock. Cleanup failure after a durable commit must not roll back committed in-memory state.
 16. Validate current technical structures at disk boundaries without coercing persisted metadata or narrowing parser-provided EXIF representations. Registry and library requests must not publish into a replacement renderer context.
+17. Semantic vectors are derived snapshots: only explicit index maintenance changes them. Metadata edits never trigger embedding work; outdated notices belong only in Build Semantic Index. Use current MediaIds and visible controls to restrict every search.
+18. Keep model assets in Local AppData and index objects inside the owning library. Do not send gallery media, metadata documents or vectors to the planning provider.
 
 ## Explicitly Out of Scope
 
@@ -73,7 +77,7 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 - Recent-library lists, nested libraries, symlink media, or external media references.
 - Automatic filesystem monitoring.
 - Album detail pages/covers or photo-group structures.
-- Video proxy transcoding, subtitles, chapters, track switching, manual covers, remembered position, looping, screenshots, or exact variable-frame-rate indexing.
+- Video proxy transcoding, subtitles, chapters, track switching, manual covers, remembered position, looping, screenshots, or frame-level retrieval.
 - In-application backup restoration.
 
 ## Architecture Summary

@@ -6,7 +6,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 ## Library Settings and Maintenance
 
-The gallery settings menu, visible only in normal gallery mode, exposes library information/directories, metadata update, verification, thumbnail generation, CSV export, registry management, and return to entry.
+The gallery settings menu, visible only in normal gallery mode, exposes library information/directories, metadata update, verification, thumbnail/cover generation, semantic index building, CSV export, registry management, and return to entry.
 
 `scripts/maintenance-worker.js` runs operations as child processes with structured progress, logs, and results. The UI shows phase/count/current path and supports copying reports or opening outputs/logs.
 
@@ -14,6 +14,7 @@ The gallery settings menu, visible only in normal gallery mode, exposes library 
 - Verify: read-only rescan and full hashes; report missing metadata/files, changes, type mismatches, probe/read failures. Optional probe compares video status, duration, dimensions, and codec.
 - Thumbnails: generate missing/stale or forcibly rebuild all, without editing metadata; then requery.
 - Video covers: generate missing/damaged first-frame covers for all indexed videos, independently of gallery filters. Optional force regenerates all; progress counts unique video hashes. Reports include generated, skipped (reused), failed, and sourceChanged counts. Individual decode failures continue; source changes require Update Metadata. Existing covers survive failed regeneration. The maintenance barrier stops and awaits viewer extraction before the worker starts; repeated runs reuse completed covers.
+- Semantic index: manually build missing/changed lanes or force rebuilding, over all indexed media independently of gallery filters. The options panel owns model download/import, coverage and outdated notices. Stop retains completed checkpoints; failures preserve previous usable vectors. Read-only search never builds or prunes index files. See [Semantic retrieval](retrieval.md) for the complete contract.
 - CSV: fixed output at `.photo_manager/data/photo_metadata.csv`, overwrite confirmation, UTF-8 BOM, flattened user/technical fields, IDs plus resolved names, type-specific blank columns, and location ID/name/detail without duplicated administrative fields.
 
 ## CLI Maintenance
@@ -29,6 +30,8 @@ npm run build-thumbnails -- --library "D:\Media\My Library"
 npm run build-thumbnails -- --library "D:\Media\My Library" --force
 npm run build-video-covers -- --library "D:\Media\My Library"
 npm run build-video-covers -- --library "D:\Media\My Library" --force
+npm run build-semantic-index -- --library "D:\Media\My Library"
+npm run build-semantic-index -- --library "D:\Media\My Library" --force
 npm run export-metadata-csv -- --library "D:\Media\My Library"
 ```
 
@@ -54,4 +57,6 @@ Desktop acceptance also covers entry prefilling/manual open, lock warnings, sett
 
 Assistant adds session, attachment, input-processing and fake-provider tests, plus isolated Electron UI and packaged-runtime smoke helpers. Their commands and validation boundaries are documented in [Viewer Chat Implementation](../agent/implementation.md#validation).
 
-Packaging acceptance additionally requires `npm run pack:win`, launch on a Windows account without Node.js, FFmpeg/FFprobe validation, image/video thumbnail generation, all four maintenance operations, paths containing spaces and Unicode, multi-window sender isolation, concurrent different-library locks, same-library rejection, and confirmation that runtime writes remain confined to AppData and the active libraries. Verify launching `PhotoManager.exe` directly and moving the entire unpacked folder to a path containing spaces and Unicode. There are no installer, upgrade-wizard, or uninstall flows; close all windows before replacing program files.
+Packaging acceptance additionally requires `npm run pack:win`, launch on a Windows account without Node.js, FFmpeg/FFprobe validation, image/video thumbnail generation, all supported maintenance operations, paths containing spaces and Unicode, multi-window sender isolation, concurrent different-library locks, same-library rejection, and confirmation that runtime writes remain confined to AppData and the active libraries. Verify launching `PhotoManager.exe` directly and moving the entire unpacked folder to a path containing spaces and Unicode. There are no installer, upgrade-wizard, or uninstall flows; close all windows before replacing program files.
+
+Semantic tests cover projection exclusions, independent fingerprints, manual snapshot reuse, result limits, planner correction, cancellation, partial indexes, immutable publication and real FFmpeg sampling. `RETRIEVAL_UI_SMOKE=1` selects the isolated gallery path in `tests/helpers/chat-ui-smoke.cjs`. Real-model smoke checks use explicitly prepared synthetic fixtures and model assets under `others/tmp/semantic-models`; those assets are neither tracked nor packaged. Package smoke checks run actual 384/512-dimensional inference from the ASAR runtime.

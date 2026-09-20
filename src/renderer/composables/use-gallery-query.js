@@ -12,6 +12,8 @@ export function useGalleryQuery({
   showToastMessage,
   onSelectionResultChanged,
   onResetSelection,
+  onRetrievalState,
+  beforeReset,
 }) {
   const query = reactive({
     sortBy: "shootingTime",
@@ -49,6 +51,7 @@ export function useGalleryQuery({
       };
       const response = await api.queryGallery(safeQuery);
       if (requestId !== latestQueryId) return false;
+      onRetrievalState?.(response.retrieval);
       total.value = Number(response?.total || 0);
 
       galleryGroups.value = Array.isArray(response?.groups) ? response.groups : [];
@@ -100,6 +103,7 @@ export function useGalleryQuery({
   }
 
   async function resetAll() {
+    await beforeReset?.();
     Object.assign(query.filters, createDefaultGalleryFilters());
     Object.assign(query.search, { field: "title", value: "" });
     query.sortBy = "shootingTime";

@@ -101,10 +101,7 @@
           {{ m.attempt.notice }}
         </p>
         <p v-if="m.attempt?.error" class="chat-error">{{ m.attempt.error }}</p>
-        <div class="chat-message-actions">
-          <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
-          <TokenUsage v-if="m.role === 'assistant'" :usage="messageUsage(m).usage" :incomplete="messageUsage(m).incomplete" />
-        </div>
+        <ChatMessageActions :message="m" :copied="copiedMessage === m.id" @copy="copyMessage" />
         <button
           v-if="
             m.role === 'assistant' &&
@@ -153,16 +150,7 @@
             <button class="chat-remove-attachment" :disabled="busy || working" :aria-label="'Remove ' + i.name" title="Remove attachment" @click="removeInput(n)"><ChatIcon name="close" /></button>
           </div>
         </div>
-        <textarea
-          ref="composerElement"
-          rows="2"
-          v-model="text"
-          placeholder="Message Assistant…"
-          aria-label="Message Assistant"
-          :disabled="busy"
-          @paste="paste"
-          @keydown="keydown"
-        ></textarea>
+        <ChatTextInput ref="composerElement" v-model="text" :disabled="busy" @paste="paste" @keydown="keydown" />
         <div class="chat-row">
           <div>
             <button
@@ -185,21 +173,7 @@
             </button>
             <button class="btn chat-web-toggle" :class="{ active: webEnabled }" :aria-pressed="webEnabled" :title="webEnabled ? 'Web search on' : 'Web search off'" aria-label="Web search" :disabled="busy || working" @click="toggleWeb"><ChatIcon name="globe" /></button>
           </div>
-          <button v-if="busy" class="btn btn-primary" title="Stop response" aria-label="Stop response" @click="stop"><ChatIcon name="stop" /></button
-          ><button
-            v-else
-            class="btn btn-primary"
-            title="Send message"
-            aria-label="Send message"
-            :disabled="
-              working ||
-              Boolean(inputLimitError) ||
-              (!text.trim() && !inputs.length)
-            "
-            @click="send()"
-          >
-            <ChatIcon name="send" />
-          </button>
+          <ChatSendControl :busy="busy" :disabled="working || Boolean(inputLimitError) || (!text.trim() && !inputs.length)" @send="send()" @stop="stop" />
         </div>
       </div>
       <div v-if="attachmentsOpen" ref="attachmentMenu" class="chat-attachment-menu" aria-label="Add attachments">
@@ -247,8 +221,11 @@ import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ConversationActionDialog from "./ConversationActionDialog.vue";
 import ChatImagePreviewDialog from "./ChatImagePreviewDialog.vue";
 import ChatRunContent from "./ChatRunContent.vue";
+import ChatMessageActions from './ChatMessageActions.vue';
+import ChatTextInput from './ChatTextInput.vue';
+import ChatSendControl from './ChatSendControl.vue';
 import TokenUsage from "./TokenUsage.vue";
-import { sessionUsage, messageUsage } from "../domain/chat-usage.mjs";
+import { sessionUsage } from "../domain/chat-usage.mjs";
 import ChatIcon from "./ChatIcon.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts";
 const chat = inject(CHAT_CONTEXT);
@@ -356,11 +333,6 @@ async function fillExample(prompt) {
 }
 
 const historyAction = ref(null);
-watch(text, async () => {
-  await nextTick();
-  const el = composerElement.value;
-  if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
-});
 watch(() => session.value?.sessionId, () => { historyAction.value = null; });
 watch(
   () => session.value?.messages.map((m) => m.text).join(""),

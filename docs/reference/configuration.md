@@ -47,6 +47,7 @@ Global data are split between roaming configuration and machine-specific state:
     chat-provider.yml        # optional Assistant provider; created from its Settings menu
     search-provider.yml      # independent optional Tavily key and environment fallback
   logs\                     # startup diagnostics produced before a library opens
+  models\                   # explicitly installed, pinned local embedding models
   session-data\             # localStorage, Chromium cache, and session state
   crash-dumps\
 ```
@@ -90,6 +91,10 @@ Standard layout:
       <SHA256Hash>.webp
     video_covers/                 # Lazy, disposable first-frame viewer covers.
       <SHA256Hash>.v1-2560-q90.webp
+    semantic/                    # Disposable, manually built vector index; excluded from backups.
+      current.json
+      generations/<UUID>.json
+      objects/<SHA256>.f32
     backups/
       <timestamp>-<kind>-<suffix>/
         library.yml
@@ -110,3 +115,5 @@ Standard layout:
 Assistant configuration and its strict conversation/attachment records are documented in the [chat implementation](../agent/implementation.md) and [session storage](../agent/sessions.md) references. Chat uses the active library lock. Sessions live under `chat/v2/`. Reviewed metadata changes share the existing recoverable transaction system with their session decision; tools never create registry entries.
 
 Search settings use the exact YAML fields `schemaVersion: 1`, `provider: tavily`, `apiKey: ''`, and `apiKeyEnv: TAVILY_API_KEY`. They are machine-local and independent of the Assistant key. Web-off chat does not require this file. Settings opening can create defaults; saving and testing are explicit, serialized operations. Stored/environment keys never return to the renderer. A blank key preserves the saved value; explicit removal preserves the separate environment fallback. In-flight turns use a configuration snapshot; other windows are notified after saves. Globe permission is transient and is not global configuration.
+
+Semantic model assets are shared by windows under the machine-local `models` directory, in repository/revision subdirectories. Installation is explicit through Build Semantic Index; it is serialized across windows and verifies pinned sizes and SHA-256 hashes. Gallery conversations, active semantic queries and Results counts are memory-only per-library state. See [Semantic retrieval](retrieval.md).

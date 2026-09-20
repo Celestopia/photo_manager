@@ -17,6 +17,7 @@ function resolveApplicationPaths(environment = process.env) {
   return {
     roamingRoot,
     localRoot,
+    modelsDir: path.join(localRoot, "models"),
     configDir: path.join(roamingRoot, "app-data"),
     configFile: path.join(roamingRoot, "app-data", "config.yml"),
     electronUserDataDir: path.join(roamingRoot, "electron"),

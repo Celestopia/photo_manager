@@ -10,6 +10,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 - Desktop container: Electron 44.
 - Renderer: Vue 3 SFC and Vite.
 - Image parsing and thumbnails: Sharp and exifr.
+- Local semantic embeddings: pinned Transformers.js 3.7.2 with CPU ONNX Runtime, quantized CLIP and multilingual MiniLM. Sharp is resolved to the application version to avoid loading conflicting native libraries. Native ONNX dependencies are unpacked alongside Sharp. Models are downloaded/imported separately.
 - Video probing and frame extraction: bundled Windows x64 FFmpeg/FFprobe 8.1.2.
 - Capture-location time zones: offline `geo-tz` coordinate boundaries plus Electron/Node `Intl` IANA time-zone rules; no runtime network request is made.
 - Configuration: YAML.
@@ -49,7 +50,7 @@ Request groups: `app:get-config`; `library:*` lifecycle, cancellation, directori
 
 Media IPC targets `mediaId`/`mediaIds`. Persisted IDs are PascalCase, mutation payloads camelCase, and each channel rejects unknown fields and obsolete PascalCase aliases. `FilePath` is never an action target: the main process resolves `MediaId` through its current index and verifies the resulting path remains inside the active library before any filesystem operation.
 
-IPC registration requires sender-session routing and a mutation coordinator. The registrar explicitly lists channels that enter the owning session's mutation queue; reads and cancellation remain independent. Gallery responses contain only `total` and `groups`. The unused private `acceptChanges` chat-send flag is removed; exact-source rejection and explicit input exclusion remain unchanged.
+IPC registration requires sender-session routing and a mutation coordinator. The registrar explicitly lists channels that enter the owning session's mutation queue; reads and cancellation remain independent. Gallery responses contain `total`, `groups`, and a window-scoped retrieval snapshot. The `retrieval:snapshot/send/stop/control/setLimit` allowlist and `retrieval:event` support the in-memory [gallery retrieval assistant](retrieval.md); viewer chat persistence is unchanged. The unused private `acceptChanges` chat-send flag is removed; exact-source rejection and explicit input exclusion remain unchanged.
 
 ## Source Responsibilities
 
@@ -72,6 +73,8 @@ IPC registration requires sender-session routing and a mutation coordinator. The
 `main.js` is the composition root and application coordinator. `application-window-lifecycle.js` converts later operating-system launches into windows; `window-session-router.js` owns sender-to-session routing; `library-claim-registry.js` prevents duplicate logical-library ownership inside the coordinator; `application-runtime.js` creates isolated per-window runtime state; `application-state.js` handles shared local state through the common atomic writer. Simple registry catalog/service modules share tag/person/album logic; location domain/catalog/service modules own hierarchy-specific behavior. `gallery-query.js` is pure filtering/grouping; `gallery-item-enricher.js` adds renderer paths and cached thumbnail status. `metadata-edit-service.js` owns validated edits and rollback. `ipc-handlers.js` registers the allowlist without owning session state; `window-manager.js` owns BrowserWindow lifecycle and awaits safe session closure; `preload.js` is the only renderer bridge.
 
 Shared schema modules enforce exact keys, UUID v4 identity, customization patches, global uniqueness, references, location contexts, and parent chains. Dependency direction is `main.js` assembly → IPC → domain services through explicit runtime accessors → `scripts/library-*` persistence. Domain modules never import the IPC registrar or window.
+
+The semantic subsystem lives in `src/main/semantic/`: projections, pinned model assets, CPU embedding workers, immutable index storage, manual building and vector ranking. `src/main/retrieval/service.js` owns the window-local planner and active query. `scripts/build-semantic-index.js` is the shared CLI/maintenance entry point. Electron inference runs in a utility process; CLI inference and ranking use workers. See [Semantic retrieval](retrieval.md) for persisted contracts and resource limits.
 
 ### `src/renderer/`
 

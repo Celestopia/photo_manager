@@ -1,3 +1,4 @@
+import { useRetrieval } from '../composables/use-retrieval.js';
 import { ref, onMounted, onBeforeUnmount, nextTick, provide } from "vue";
 import { ICONS, STAR_LEVELS, UNASSIGNED_FILTER, WINDOW_ACTIONS } from "../constants/ui-constants.mjs";
 import { buildImageUrl, formatBitRate, formatDuration, formatFileSize } from "../domain/media-formatters.mjs";
@@ -148,6 +149,7 @@ export function useRendererApplication() {
       },
     });
     provide(CHAT_CONTEXT, chat);
+    const retrieval = useRetrieval({api:API.retrieval,libraryState,refresh:()=>queryGallery(),copyText:API.copyText});
     const {
       query,
       galleryControlsExpanded,
@@ -172,6 +174,8 @@ export function useRendererApplication() {
       showToastMessage,
       onSelectionResultChanged: () => syncGallerySelectionWithLoadedItems(),
       onResetSelection: () => exitSelectionMode(),
+      onRetrievalState: value => retrieval.accept(value,false),
+      beforeReset: () => retrieval.control("clear"),
     });
 
     // --- Selection state ---
@@ -651,6 +655,7 @@ export function useRendererApplication() {
     });
 
     const libraryContext = {
+      semanticApi: API.semantic,
       ICONS, WINDOW_ACTIONS, libraryState, entry, initializationConfirm, libraryInfo,
       maintenanceDialog, maintenanceDialogTitle, maintenanceDialogDescription,
       chooseLibrary, enterLibraryFromEntry, recheckMediaTools, cancelLibraryOperation,
@@ -660,6 +665,7 @@ export function useRendererApplication() {
       doWindowAction, toggleWindowMaximizeRestore, windowToggleTip, windowToggleIcon,
     };
     const galleryContext = {
+      retrieval, openRetrievalSettings: () => chat.showSettings(),
       ICONS, WINDOW_ACTIONS, query, galleryControlsExpanded, galleryControlsModified,
       isSelectionMode, selectedGalleryCount, selectedGalleryBytes, allGalleryItemsSelected,
       batchEdit, batchStatus, batchOperationBusy,

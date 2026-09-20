@@ -9,6 +9,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Browse images and videos on one shooting-time timeline.
 - Edit titles, ratings, privacy levels, descriptions, albums, tags, people, and hierarchical locations.
 - Filter, batch-copy, and batch-edit the complete matching media set.
+- Search photos and videos by meaning through the gallery Assistant, using local visual and metadata embeddings. Results respect gallery filters; temporary conversations are never saved. Choose 1–100 results (default 10). See [Semantic retrieval](docs/reference/retrieval.md).
 - Permanently delete one media item from the viewer or a selected batch from the gallery, removing both files and metadata after confirmation.
 - Play supported videos in the viewer and fall back to the Windows default player when necessary.
 - Preview videos with uncropped first-frame covers, generated locally on demand and cached inside the library; gallery thumbnails remain separate.
@@ -22,9 +23,17 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
-Assistant is available in the viewer's right sidebar. Open the Provider settings gear in the Assistant header to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).
+Viewer Assistant shares the left sidebar with Information. Open the Provider settings gear in the Assistant header to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. Viewer chat requires no local model download. See [Using Assistant](docs/agent/usage.md).
 
 Configure Tavily separately in **Provider settings → Web search**, then use the composer globe to enable search for the current conversation. Search is off by default. Its connection test uses a generic public query and page; it sends no library content.
+
+## Semantic Search
+
+Open **Settings → Build Semantic Index**, explicitly download the local embedding models (about 278 MiB), or import a previously downloaded model folder, then start the build. This runs on the CPU and can take time, especially for videos. The model files are stored under `%LOCALAPPDATA%\PhotoManager\models`; the derived index is stored inside the library at `.photo_manager/semantic/`. Models are not bundled with the executable.
+
+Configure the Assistant provider, open the gallery **Assistant**, and describe what you want, for example “sea scenery at Santa Cruz Beach.” The configured LLM interprets your conversation; embeddings and similarity ranking run locally. Library media, metadata documents and vectors are not sent to that provider by gallery search. Results are approximate closest matches, not exact rules. Unindexed media cannot appear. Videos are returned as whole items and open at the beginning without autoplay.
+
+Index updates are **manual**. Editing metadata does not rebuild vectors; the previous vectors remain searchable. Open **Build Semantic Index** to see missing, partial or outdated coverage and update it. Hidden descriptions, file paths and ratings are not encoded. The Results control defaults to 10 whenever a library is opened; a number requested in chat cannot override it.
 
 ## Run on Windows
 
@@ -77,6 +86,8 @@ Each library is self-contained:
     media-deletion.json          # only while a media deletion needs recovery
     data\
     thumb_cache\
+    video_covers\
+    semantic\              # manually built, disposable embeddings; excluded from automatic backups
     backups\
     logs\
     temp\
@@ -97,6 +108,7 @@ Application-wide data stay outside the application directory:
   app-data\state.json
   app-data\chat-provider.yml
   logs\
+  models\                 # explicitly downloaded/imported local embedding models
   session-data\
   crash-dumps\
 ```
@@ -116,6 +128,8 @@ npm run verify-metadata -- --library "D:\Media\Example Library"
 npm run verify-metadata -- --library "D:\Media\Example Library" --probe
 npm run build-thumbnails -- --library "D:\Media\Example Library"
 npm run build-thumbnails -- --library "D:\Media\Example Library" --force
+npm run build-semantic-index -- --library "D:\Media\Example Library"
+npm run build-semantic-index -- --library "D:\Media\Example Library" --force
 npm run export-metadata-csv -- --library "D:\Media\Example Library"
 ```
 

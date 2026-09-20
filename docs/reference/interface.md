@@ -6,9 +6,11 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 ## Gallery Query and Filtering
 
+The [Gallery Retrieval Assistant](retrieval.md) adds an independently clearable semantic query that intersects with the visible controls. Results use relevance order and a dedicated 1–100 Results control (default 10 per library lifecycle); chronological sorting is hidden while semantic results are active. Its central floating chat panel is temporary; closing it does not cancel a running request.
+
 `gallery:query` filters the in-memory index in this order: media type; unioned rating/privacy levels intersected with other dimensions; album/tag/person/location including `__UNASSIGNED__`; case-sensitive title, filename-only, or description substring; shooting-time order; capture-date grouping. Empty level arrays mean all; rating defaults all and privacy defaults `[1]`. Location includes descendants; administrative filters resolve exact country/province/city sets. Invalid regions are rejected. `Detail` never participates.
 
-Every query returns the complete grouped result and its total, without registries or pagination. One metadata pass applies filters; matched records are enriched and sorted once. Library information retains its separate image/video counts. Renderer uses shallow collections, creates all cards, and relies on native `loading="lazy"`; future virtualization must preserve complete-result semantics. Increasing request IDs discard stale responses.
+Ordinary queries return the complete grouped result and its total, without registries or pagination. Semantic queries return the configured top N eligible indexed items as one relevance-ordered group, with no load-more action. One metadata pass applies filters; matched records are enriched and sorted once. Library information retains its separate image/video counts. Renderer uses shallow collections, creates all cards, and relies on native `loading="lazy"`; future virtualization must preserve complete-result semantics. Increasing request IDs discard stale responses.
 
 Registry composables exclusively own their lists. They load in parallel on open/update and update directly from registry IPC results. Media edits do not reload registries; manager opening refreshes usage counts. Returning from viewer records one `MediaId`, centers that card after layout, then clears the target.
 

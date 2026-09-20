@@ -102,6 +102,7 @@ async function run() {
     config: structuredClone(DEFAULT_CONFIG),
     logger: { info() {}, warn() {}, error() {} },
   });
+  if (process.env.RETRIEVAL_UI_SMOKE) await require("./semantic-library.cjs").assignSemanticRegistries(resolveLibraryPaths(library));
   const metadata = await fsp.readFile(
     path.join(library, ".photo_manager", "data", "photo_metadata.jsonl"),
   );
@@ -109,12 +110,29 @@ async function run() {
     paths.stateFile,
     JSON.stringify({ lastLibraryPath: library }),
   );
+  if (process.env.RETRIEVAL_UI_SMOKE) {
+    const modelManifest=require('../../src/main/semantic/model-manifest.json');
+    for(const m of modelManifest.models)for(const f of m.files){
+      const relative=path.join(m.repository,m.revision,f.path),target=path.join(paths.modelsDir,relative);
+      await fsp.mkdir(path.dirname(target),{recursive:true});await fsp.copyFile(path.resolve('others/tmp/semantic-models',relative),target);
+    }
+    const items=metadata.toString().trim().split(/\r?\n/).map(JSON.parse);
+    const lp=resolveLibraryPaths(library),manifest=yaml.load(await fsp.readFile(lp.manifestFile,'utf8'));
+    await require('../../src/main/semantic/index-builder').buildIndex({paths:lp,libraryId:manifest.libraryId,...await require('../../scripts/build-semantic-index').loadIndexInputs(lp),embeddings:{encode:async(kind,values)=>values.map(()=>kind==='image'?Array.from({length:512},(_,i)=>i===0?1:0):[{vector:Array.from({length:384},(_,i)=>i===0?1:0),start:0,end:1}])}});
+  }
   server = http.createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) body += chunk;
     const request=JSON.parse(body);
     requests.push(request);
     const latestUser=request.messages.filter(m=>m.role==='user').at(-1);
+    if (process.env.RETRIEVAL_UI_SMOKE) {
+      res.writeHead(200, {'Content-Type':'text/event-stream'});
+      const done=request.messages.at(-1).role==='tool';
+      const delta={tool_calls:[{index:0,id:'search-gallery',type:'function',function:{name:'semantic_search',arguments:JSON.stringify({visualQuery:'blue scenery',descriptiveQuery:'',contextualQuery:''})}}]};
+      setTimeout(()=>res.end('data: '+JSON.stringify({choices:[{delta,finish_reason:done?'stop':'tool_calls'}]})+'\n\ndata: '+JSON.stringify({choices:[],usage:{prompt_tokens:42,completion_tokens:8,prompt_tokens_details:{cached_tokens:10}}})+'\n\ndata: [DONE]\n\n'),done?50:450);
+      return;
+    }
     if (JSON.stringify(latestUser).includes('WEB TOOL TEST')) {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' });
       const outcomes = request.messages.filter(m => m.role === 'tool').map(m => JSON.parse(m.content));
@@ -185,6 +203,68 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.RETRIEVAL_UI_SMOKE) {
+    await click('[aria-label="Gallery Assistant"]');
+    await waitFor(`Boolean(document.querySelector('.retrieval-dialog[open]'))`);
+    assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.retrieval-dialog'),'::backdrop').backdropFilter.includes('blur')`),true);
+    assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.retrieval-dialog [aria-label="History"]'))`),false);
+    await click('.retrieval-dialog [aria-label="Provider settings"]');
+    await waitFor(`Boolean(document.querySelector('.provider-dialog[open]'))`);
+    await click('[aria-label="Close provider settings"]');
+    await setValue('.retrieval-dialog textarea','Show images');
+    await click('.retrieval-dialog [aria-label="Send message"]');
+    await click('[aria-label="Close Gallery Assistant"]');
+    await waitFor(`Boolean(document.querySelector('.retrieval-summary'))`);
+    await waitFor(`!document.querySelector('[aria-label="Gallery Assistant"]').textContent.includes('Working')`);
+    await click('[aria-label="Gallery Assistant"]');
+    await waitFor(`Boolean(document.querySelector('.retrieval-applied'))`);
+    assert.match(await win.webContents.executeJavaScript(`document.querySelector('.retrieval-applied').textContent`),/blue scenery/);
+    await click('.retrieval-dialog .chat-message.assistant [aria-label="Copy message"]');
+    assert.match(copiedText,/Showing 2 of 10 requested/);
+    await click('.retrieval-dialog [aria-label="Conversation token usage"]');
+    await waitFor(`Boolean(document.querySelector('.retrieval-dialog .usage-menu'))`);
+    assert.match(await win.webContents.executeJavaScript(`document.querySelector('.usage-menu').textContent`),/42/);
+    await click('.retrieval-dialog [aria-label="Conversation token usage"]');
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.semantic-result-count input').value`),'10');
+    const beforeCalls=requests.length;
+    await win.webContents.executeJavaScript(`(()=>{const e=document.querySelector('.semantic-result-count input');e.value='1';e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await waitFor(`document.querySelectorAll('.photo-card').length === 1`);
+    assert.equal(requests.length,beforeCalls);
+    await click('.retrieval-dialog [aria-label="New chat"]');
+    await waitFor(`document.querySelectorAll('.retrieval-dialog .chat-message').length === 0`);
+    assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.retrieval-summary'))`),true);
+    await click('[aria-label="Close Gallery Assistant"]');
+    await win.webContents.executeJavaScript(`document.querySelector('.retrieval-summary button').click()`);
+    await waitFor(`!document.querySelector('.retrieval-summary')`);
+    await click('[aria-label="Reset gallery"]');
+    await setValue('[aria-label="Search text"]','no-match');
+    await win.webContents.executeJavaScript(`document.querySelector('.search-panel button').click()`);
+    await click('[aria-label="Gallery Assistant"]');
+    await waitFor(`document.querySelector('.retrieval-warning')?.textContent.includes('text search')`);
+    await fsp.mkdir(path.resolve('release'),{recursive:true});
+    await fsp.writeFile(path.resolve('release/retrieval-v038.png'),(await win.webContents.capturePage()).toPNG());
+    const dataNames=await fsp.readdir(path.join(library,'.photo_manager'));
+    if(dataNames.includes('chat')) {
+      const chatFiles=await fsp.readdir(path.join(library,'.photo_manager','chat'),{recursive:true});
+      assert.equal(chatFiles.filter(name=>name.endsWith('.json')).length,0,'Retrieval does not save conversations');
+    }
+    assert.deepEqual(await fsp.readFile(path.join(library,'.photo_manager','data','photo_metadata.jsonl')),metadata);
+    await click('[aria-label="Close Gallery Assistant"]');
+    await click('.gallery-settings-trigger');
+    await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b=>b.textContent.includes('Build Semantic Index')).click()`);
+    await waitFor(`document.querySelector('.semantic-index-options')?.textContent.includes('Ready')`);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.semantic-index-options').length`),1);
+    await click('.maintenance-options input[type="checkbox"]');
+    await click('.maintenance-options .btn-primary');
+    await waitFor(`Boolean(document.querySelector('.maintenance-progress .btn-primary'))`,120000);
+    const report=await win.webContents.executeJavaScript(`document.querySelector('.maintenance-progress').textContent`);
+    assert.match(report,/generated.*6/s);assert.match(report,/failed.*0/s);
+    assert.deepEqual(await fsp.readFile(path.join(library,'.photo_manager','data','photo_metadata.jsonl')),metadata);
+    await click('.maintenance-progress .btn-primary');
+    assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.semantic-index-options'))`),false);
+    console.log('RETRIEVAL_UI_SMOKE_PASS: modal, hidden completion, shared copy/usage/settings, semantic count/reranking, clear/reset, warning and no media writes.');
+    return;
+  }
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getAttribute('aria-expanded')`), 'true');
   await click('.gallery-controls-toggle');
   await waitFor(`!document.querySelector('#gallery-filter-panel')`);

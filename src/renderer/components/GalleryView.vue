@@ -3,6 +3,7 @@
   <div class="left-tools gallery-header-tools"><GallerySettingsMenu /><button class="btn icon-btn gallery-reset" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
   <div class="gallery-brand"><img :src="appIcon" alt="" /><span>PhotoManager</span></div>
   <div class="gallery-right-tools">
+    <button class="btn" aria-label="Gallery Assistant" @click="retrieval.open()">{{retrieval.working.value ? 'Assistant · Working…' : 'Assistant'}}</button>
     <button v-if="!isSelectionMode" class="btn batch-selection-trigger" @click="enterSelectionMode">Batch operation</button>
     <div class="window-controls">
       <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>
@@ -13,6 +14,10 @@
 </header>
 <main class="gallery-main" :class="{ 'with-batch-panel': isSelectionMode }">
   <section class="gallery-content">
+    <div v-if="retrieval.state.value.semanticQuery" class="retrieval-summary" aria-label="Semantic search">
+      <span>{{retrieval.state.value.summary}} · {{total}} media</span>
+      <button class="btn" @click="retrieval.control('clear')">Clear search</button>
+    </div>
     <section class="gallery-controls-host">
       <div class="gallery-controls-drawer" :class="{ expanded: galleryControlsExpanded }">
         <Transition name="gallery-filters">
@@ -29,7 +34,7 @@
             <div class="toolbar-group"><label>Tags</label><RegistryFilterPicker kind="tag" label="Tags" /></div>
             <div class="toolbar-group"><label>People</label><RegistryFilterPicker kind="person" label="People" /></div>
             <div class="toolbar-group location-filter-group"><label>Location</label><LocationFilterPicker /></div>
-            <div class="toolbar-group sort-tools"><label>Sort</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">Date taken</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
+            <div v-if="!retrieval.state.value.semanticQuery" class="toolbar-group sort-tools"><label>Sort</label><select class="input" v-model="query.sortBy" @change="applyFilterSort"><option value="shootingTime">Date taken</option></select><select class="input" v-model="query.sortOrder" @change="applyFilterSort"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
           </div>
           <div class="gallery-controls-secondary">
             <div class="gallery-media-type-filter">
@@ -74,7 +79,7 @@
     <section ref="galleryListRef" class="gallery-list">
       <div class="summary">{{ loading ? 'Loading media...' : `${total} media items` }}</div>
       <template v-for="group in galleryGroups" :key="group.date">
-        <h2 class="date-title">{{ group.date }}</h2>
+        <h2 class="date-title">{{retrieval.state.value.semanticQuery ? 'Semantic results · Relevance order' : group.date}}</h2>
         <div class="photo-grid">
           <article
             class="photo-card"
@@ -149,7 +154,7 @@
     <label>Set location</label>
     <LocationPicker target="batch" placeholder="Search locations" />
     <div class="batch-actions">
-      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges" title="Clear fields">Clear</button>
+      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges" title="Clear fields">Clear search</button>
       <button class="btn btn-primary batch-apply-btn" title="Apply to selected media" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">Apply</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
@@ -166,6 +171,7 @@
   :x="galleryDetailsMenu.x"
   :y="galleryDetailsMenu.y"
 />
+<GalleryAssistant v-if="retrieval.visible.value" :assistant="retrieval" :open-settings="openRetrievalSettings" />
 </template>
 
 <script setup>
@@ -185,6 +191,7 @@ import LocationPicker from "./LocationPicker.vue";
 import LocationFilterPicker from "./LocationFilterPicker.vue";
 import RegistryFilterPicker from "./RegistryFilterPicker.vue";
 import TagPicker from "./TagPicker.vue";
+import GalleryAssistant from './GalleryAssistant.vue';
 import GallerySettingsMenu from "./GallerySettingsMenu.vue";
 import GalleryMediaDetailsMenu from "./GalleryMediaDetailsMenu.vue";
 import GalleryLevelFilter from "./GalleryLevelFilter.vue";
@@ -199,6 +206,7 @@ if (!app) {
 }
 
 const {
+  retrieval, openRetrievalSettings,
   ICONS,
   WINDOW_ACTIONS,
   query,

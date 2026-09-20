@@ -70,6 +70,14 @@ async function run() {
     });
     assert.deepEqual(original.bytes, frames[0].bytes);
     assert.equal(require(path.join(code, 'package.json')).version, require('../../package.json').version);
+    const semantic = require(path.join(code, 'src/main/semantic/domain'));
+    assert.equal(semantic.sampleCount(10),10);assert.equal(semantic.sampleCount(60),30);
+    const embeddings=require(path.join(code,'src/main/semantic/local-embedding-service')).createLocalEmbeddingService(path.resolve('others/tmp/semantic-models'));
+    try {
+      assert.equal((await embeddings.encode('metadata',['海边 613 dormitory']))[0][0].vector.length,384);
+      assert.equal((await embeddings.encode('visualText',['sea scenery']))[0].length,512);
+      assert.equal((await embeddings.encode('image',[original.bytes]))[0].length,512);
+    } finally { await embeddings.dispose(); }
     const { tools: agentTools } = require(path.join(code, 'src/main/chat/tools'));
     const scope = { mediaIds: [], groups: { basic: false }, webEnabled: true };
     assert.deepEqual(agentTools.available(scope).map(t => t.name), ['web_search', 'read_web_page']);
@@ -77,7 +85,7 @@ async function run() {
     const found = await search.adapter({ apiKey: 'fixture' }, async () => new Response(JSON.stringify({ results: [{ title: 'Tower', url: 'https://www.toureiffel.paris/en', content: 'Paris' }] }))).search({ query: 'Tower' });
     assert.equal(found.sources.length, 1);
     console.log(
-      "CHAT_PACKAGE_SMOKE_PASS: current-version ASAR, web tools/adapter, Sharp, bundled FFmpeg and original bytes.",
+      "CHAT_PACKAGE_SMOKE_PASS: current-version ASAR, real semantic embeddings, web tools/adapter, Sharp, bundled FFmpeg and original bytes.",
     );
   } finally {
     await fs.rm(root, { recursive: true, force: true });

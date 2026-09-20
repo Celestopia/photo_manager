@@ -1,3 +1,4 @@
+const { createRetrievalService } = require('./retrieval/service');
 const { groupMediaPathsByHash, countMediaTypes } = require("../../scripts/media-summary");
 const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
 /**
@@ -423,7 +424,7 @@ function createSessionChat(session) {
       locations: state.locationRegistryIndex, locationPath: buildLocationPath,
     }),
     tags: () => [...state.tagRegistryIndex.values()],
-    mutate: session.mutate,
+    mutate: async operation => { const result=await session.mutate(operation); session.retrieval?.changed(); return result; },
     commitMetadata: createMetadataCommit({getLibrary:requireOpenLibrary,getIndex:()=>state.metadataIndex,getTags:()=>state.tagRegistryIndex,
       prepareWrite:prepareLibraryWrite,metadataFile:()=>resolveDataFile(DATA_FILE_NAMES.metadata),enrich:enrichItem,touchManifest:touchLibraryManifest}),
     configFile: APPLICATION_PATHS.chatProviderFile,
@@ -625,6 +626,8 @@ async function closeLibrary() {
   state.activeLibrary.state = "closing";
   sessionRouter.current().viewerImages.invalidate();
   await videoCovers.stop();
+  sessionRouter.current().semanticInstallation?.abort();
+  await sessionRouter.current().retrieval.close();
   try { await chat.close(); }
   catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
   emitLibraryState();
@@ -754,6 +757,7 @@ async function runMaintenanceOperation(operation, options = {}) {
   sessionRouter.current().viewerImages.invalidate();
   emitLibraryState();
   try {
+    await sessionRouter.current().retrieval.suspend();
     await chat.close();
     await videoCovers.stop();
     const result = await runOperationWorker(operation, library.paths.root, options);
@@ -770,17 +774,19 @@ async function runMaintenanceOperation(operation, options = {}) {
   } finally {
     if (operation === "update" || operation === "thumbnails") clearThumbnailStatusCache();
     state.maintenanceState.running = false;
+    sessionRouter.current().retrieval.changed();
     emitLibraryState();
   }
 }
 
-function queryGallery(query) {
+async function queryGallery(query) {
   requireOpenLibrary();
-  const result = executeGalleryQuery(state.metadataIndex.values(), query);
-  const items = result.items.map(enrichItem);
+  const retrieval = sessionRouter.current().retrieval;
+  const items = (await retrieval.queryItems(query)).map(enrichItem);
   return {
     total: items.length,
-    groups: groupByDate(items),
+    groups: retrieval.snapshot().semanticQuery ? [{ date: "Semantic results", items }] : groupByDate(items),
+    retrieval: sessionRouter.current().retrieval.snapshot(),
   };
 }
 
@@ -943,6 +949,13 @@ function registerIpcHandlers() {
   const runWithSession = (event, operation) => sessionRouter.runForEvent(event, operation);
   ipcMain.handle("video-cover:request", (event, payload) => runWithSession(event, () => videoCovers.request(payload)));
   ipcMain.handle("video-cover:cancel", (event, requestId) => runWithSession(event, () => videoCovers.cancel(requestId)));
+  require('./semantic/ipc').registerSemanticIpc({ipcMain,runWithSession,getSession:()=>sessionRouter.current(),modelsRoot:APPLICATION_PATHS.modelsDir});
+  for (const action of ['snapshot','send','stop','control','setLimit']) {
+    ipcMain.handle(`retrieval:${action}`, (event,payload) => runWithSession(event, () => {
+      requireOpenLibrary({writable:action === 'send'});
+      return sessionRouter.current().retrieval[action](payload);
+    }));
+  }
   registerChatIpc({
     chat,
     getWindow: () => state.mainWindow,
@@ -971,7 +984,7 @@ function registerIpcHandlers() {
   ].map((name) => [name, sessionRouter.createProxy((session) => session.services[name], name)]));
   registerMainIpcHandlers({
     runtime,
-    mutate: operation => sessionRouter.current().mutate(operation),
+    mutate: async operation => { const session=sessionRouter.current(); const result=await session.mutate(operation); session.retrieval.changed(); return result; },
     runWithSession,
     toSerializable,
     appendLog,
@@ -1002,6 +1015,8 @@ async function closeWindowSession(session) {
     session.acceptingCommands = false;
     session.viewerImages.invalidate();
     await videoCovers.stop();
+    session.semanticInstallation?.abort();
+    await session.retrieval.close();
     if (state.quickScanState) state.quickScanState.cancelled = true;
     await chat.stop().catch((error) => appendLog(`chat stop during window close failed: ${error.message}`));
     await Promise.allSettled([...session.pendingOperations]);
@@ -1031,6 +1046,14 @@ async function createLibraryWindow() {
     mutate: createMutationCoordinator(),
   };
   session.chat = sessionRouter.run(session, () => createSessionChat(session));
+  session.retrieval = createRetrievalService({
+    search: require('./semantic/search-service').createSearchService({modelsRoot: APPLICATION_PATHS.modelsDir, spawn: entry => require('electron').utilityProcess.fork(entry, [], {serviceName:'Semantic embeddings', stdio:'pipe'})}),
+    getLibrary: () => { const lib=session.runtime.activeLibrary; if(!session.acceptingCommands || !lib || lib.state!=='open' || session.runtime.maintenanceState.running) throw new Error('No available library'); return lib; },
+    getItems: () => session.runtime.metadataIndex.values(),
+    executeQuery: (items,query) => sessionRouter.run(session,()=>executeGalleryQuery(items,query)),
+    configFile: APPLICATION_PATHS.chatProviderFile,
+    emit: payload => { const win=session.runtime.mainWindow; if(win && !win.isDestroyed()) win.webContents.send('retrieval:event',payload); },
+  });
   session.viewerImages = createViewerImageResources({
     getLibrary: () => session.acceptingCommands && !session.runtime.maintenanceState.running ? session.runtime.activeLibrary : null,
     getItem: id => session.runtime.metadataIndex.get(id),
