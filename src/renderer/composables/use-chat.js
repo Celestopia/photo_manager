@@ -48,6 +48,55 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
         !currentOnly.value || s.mediaIds?.includes(selectedItem.value?.MediaId),
     ),
   );
+  const selectingHistory = ref(false);
+  const selectedHistoryIds = ref([]);
+  const selectableHistory = computed(() => filteredHistory.value.filter(row => !row.error));
+  const selectedHistory = computed(() => selectableHistory.value.filter(row => selectedHistoryIds.value.includes(row.sessionId)));
+  const allHistorySelected = computed(() => selectableHistory.value.length > 0 && selectedHistory.value.length === selectableHistory.value.length);
+  function clearHistorySelection() { selectedHistoryIds.value = []; }
+  function finishHistorySelection() { selectingHistory.value = false; clearHistorySelection(); }
+  function toggleHistorySelection(id) {
+    if (working.value) return;
+    selectedHistoryIds.value = selectedHistoryIds.value.includes(id)
+      ? selectedHistoryIds.value.filter(value => value !== id) : [...selectedHistoryIds.value, id];
+  }
+  function selectAllHistory() {
+    if (!working.value) selectedHistoryIds.value = allHistorySelected.value ? [] : selectableHistory.value.map(row => row.sessionId);
+  }
+  watch(currentOnly, clearHistorySelection, { flush: 'sync' });
+  watch([historyOpen, visible, () => selectedItem.value?.MediaId, () => libraryState.value?.active?.libraryId], finishHistorySelection, { flush: 'sync' });
+  async function removeSessions(ids) {
+    if (working.value) return;
+    const epoch = generation;
+    const libraryId = libraryState.value?.active?.libraryId;
+    return action(async () => {
+      const failed = [];
+      let pending = false;
+      for (const id of [...new Set(ids)]) {
+        if (epoch !== generation) return;
+        try {
+          const result = await unwrap(api.delete(id));
+          if (!result.deleted) throw new Error('Conversation was not deleted.');
+          // Navigation drains this operation before abandoning the old session.
+          // Clear a deleted session even when that navigation has already begun.
+          if (libraryId === libraryState.value?.active?.libraryId && session.value?.sessionId === id) {
+            webEnabled.value = false;
+            session.value = null;
+            clearComposer();
+          }
+          if (epoch !== generation) return;
+          pending ||= result.pending;
+          history.value = history.value.filter(row => row.sessionId !== id);
+          selectedHistoryIds.value = selectedHistoryIds.value.filter(value => value !== id);
+        } catch (e) { failed.push({ id, message: e.message }); }
+      }
+      if (epoch !== generation) return;
+      if (!filteredHistory.value.length) finishHistorySelection();
+      if (pending) notice.value = 'Conversations deleted; cleanup of locked attachments will retry when the library opens.';
+      if (failed.length) error.value = `${failed.length} conversation(s) could not be deleted. Successful deletions are complete. ${failed[0].message}`;
+      return { failed: failed.map(item => item.id) };
+    });
+  }
   const sentPreviews = ref({});
   watch(
     () => JSON.stringify([session.value?.sessionId, (session.value?.messages || []).flatMap(m => m.inputs).map(i => i.kind + ':' + i.id)]),
@@ -563,6 +612,7 @@ export function useChat({ api, copyText, selectedItem, libraryState, view, revie
     void api.stop();
   });
   return {
+    selectingHistory, selectedHistory, allHistorySelected, selectableHistory, clearHistorySelection, finishHistorySelection, toggleHistorySelection, selectAllHistory, removeSessions,
     webEnabled, toggleWeb, openSource, settingsTab, searchConfiguration, configurationStale,
     decideProposal,
     reviewBlocked,

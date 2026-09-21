@@ -546,11 +546,19 @@ async function run() {
   await waitFor(`document.querySelector('.chat-history-open strong')?.textContent === 'Renamed conversation'`);
   await new Promise((resolve) => setTimeout(resolve, 200));
   await fsp.writeFile(path.resolve('release/chat-history.png'), (await win.webContents.capturePage()).toPNG());
-  await click(".chat-history-actions .chat-danger");
+  await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.chat-history-heading-actions button')).find(b=>b.textContent==='Select').click()`);
+  await click('[aria-label="Select all conversations"]');
+  await waitFor(`document.querySelector('.chat-selection-summary').textContent.includes('1 selected')`);
+  await fsp.writeFile(path.resolve('release/chat-history-selection.png'), (await win.webContents.capturePage()).toPNG());
+  await click('.chat-selection-footer .chat-danger');
+  await waitFor(`Boolean(document.querySelector('.conversation-action-dialog[open]'))`);
+  await click('.conversation-action-dialog footer button');
+  await waitFor(`!document.querySelector('.conversation-action-dialog[open]')`);
+  await click('.chat-selection-footer .chat-danger');
   await waitFor(`Boolean(document.querySelector('.conversation-action-dialog[open]'))`);
   await click(".conversation-delete-confirm");
   await waitFor(
-    `document.querySelector('.chat-history')?.textContent.includes('No saved conversations.')`,
+    `document.querySelector('.chat-history')?.textContent.includes('No saved chats.')`,
   );
   assert.deepEqual(
     await fsp.readFile(

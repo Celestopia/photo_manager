@@ -17,6 +17,7 @@
           class="btn"
           title="History"
           aria-label="History"
+          :disabled="working"
           @click="showHistory"
         >
           <ChatIcon name="history" />
@@ -34,22 +35,29 @@
     <div v-if="historyOpen" class="chat-history">
       <div class="chat-row">
         <strong class="chat-section-label">Saved chats</strong
-        ><button class="btn" @click="historyOpen = false">Back</button>
+        ><div class="chat-history-heading-actions"><button class="btn" :disabled="working || (!selectingHistory && !selectableHistory.length)" @click="selectingHistory ? finishHistorySelection() : selectingHistory = true">{{ selectingHistory ? 'Done' : 'Select' }}</button><button class="btn" :disabled="working" @click="historyOpen = false">Back</button></div>
       </div>
       <label
-        ><input type="checkbox" v-model="currentOnly" /> Current media
+        ><input type="checkbox" v-model="currentOnly" :disabled="working" /> Current media
         only</label
       >
-      <p v-if="!filteredHistory.length">No saved conversations.</p>
+      <div v-if="selectingHistory" class="chat-row chat-selection-summary">
+        <label><input type="checkbox" aria-label="Select all conversations" :checked="allHistorySelected" :indeterminate="selectedHistory.length > 0 && !allHistorySelected" :disabled="working" @change="selectAllHistory" /> Select all</label>
+        <span aria-live="polite">{{ selectedHistory.length }} selected</span>
+      </div>
+      <div class="chat-history-list">
+      <p v-if="!filteredHistory.length" class="chat-empty">{{ currentOnly ? 'No saved chats for this media.' : 'No saved chats.' }}</p>
       <article
         v-for="row in filteredHistory"
         :key="row.sessionId"
         class="chat-history-item"
+        :class="{ 'chat-history-selected': selectedHistory.some(item => item.sessionId === row.sessionId) }"
       >
+        <input v-if="selectingHistory" type="checkbox" :aria-label="'Select ' + row.title" :checked="selectedHistory.some(item => item.sessionId === row.sessionId)" :disabled="working || Boolean(row.error)" @change="toggleHistorySelection(row.sessionId)" />
         <button
           class="chat-history-open"
           :disabled="Boolean(row.error) || working"
-          @click="load(row.sessionId)"
+          @click="selectingHistory ? toggleHistorySelection(row.sessionId) : load(row.sessionId)"
         >
           <strong>{{ row.title }}</strong
           ><small>{{
@@ -57,12 +65,17 @@
           }}</small
           ><span>{{ row.error || row.excerpt }}</span>
         </button>
-        <div v-if="!row.error" class="chat-history-actions">
+        <div v-if="!selectingHistory && !row.error" class="chat-history-actions">
           <button class="btn" title="Rename conversation" aria-label="Rename conversation" :disabled="working" @click="historyAction = { kind: 'rename', row }"><ChatIcon name="edit" /></button>
           <button class="btn chat-danger" title="Delete conversation" aria-label="Delete conversation" :disabled="working" @click="historyAction = { kind: 'delete', row }"><ChatIcon name="trash" /></button>
         </div>
 
       </article>
+      </div>
+      <footer v-if="selectingHistory" class="chat-selection-footer">
+        <button class="btn" :disabled="working || !selectedHistory.length" @click="clearHistorySelection">Clear selection</button>
+        <button class="btn chat-danger" :disabled="working || !selectedHistory.length" @click="historyAction = { kind: 'delete-many', rows: [...selectedHistory] }"><ChatIcon name="trash" /> Delete ({{ selectedHistory.length }})</button>
+      </footer>
     </div>
     <div
       v-else
@@ -268,6 +281,7 @@ const {
   error,
   notice,
   options,
+  selectingHistory, selectedHistory, allHistorySelected, selectableHistory, clearHistorySelection, finishHistorySelection, toggleHistorySelection, selectAllHistory,
   historyOpen,
   filteredHistory,
   currentOnly,
@@ -361,7 +375,8 @@ watch(text, async () => {
   const el = composerElement.value;
   if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
 });
-watch(() => session.value?.sessionId, () => { historyAction.value = null; });
+watch(() => session.value?.sessionId, () => { if (historyAction.value?.kind !== "delete-many") historyAction.value = null; });
+watch(historyOpen, () => { historyAction.value = null; });
 watch(
   () => session.value?.messages.map((m) => m.text).join(""),
   async () => {

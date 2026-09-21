@@ -30,7 +30,7 @@ function fixture(t) {
   const app = renderer.createApp({ setup() { chat = useChat({ api, copyText() {}, selectedItem, libraryState: ref(null), view: ref('viewer') }); return () => null; } });
   app.mount({}); t.after(() => app.unmount());
   return {
-    chat, sessions, abandoned, selectedItem, previewCalls, event: e=>receive(e), stops: () => stops,
+    chat, api, sessions, abandoned, selectedItem, previewCalls, event: e=>receive(e), stops: () => stops,
     payloads, unconfigure: () => { configured = false; },
     delay: p => { delayDescribe = p; },
     failPreview: id => failedPreviews.add(id),
@@ -180,4 +180,79 @@ test('hiding Assistant preserves streaming and tool execution until completion',
   assert.equal(f.stops(), baseline);
   await c.stop();
   assert.equal(f.stops(), baseline + 1);
+});
+
+
+test('history selection follows filters and resets when leaving history', async t => {
+  const f = fixture(t), c = f.chat;
+  await c.open();
+  f.sessions.set('one', {sessionId:'one', title:'One', mediaIds:['A'], messages:[{}]});
+  f.sessions.set('two', {sessionId:'two', title:'Two', mediaIds:['B'], messages:[{}]});
+  await c.showHistory();
+  c.selectingHistory.value = true;
+  c.toggleHistorySelection('one');
+  assert.equal(c.selectedHistory.value.length, 1);
+  assert.equal(c.allHistorySelected.value, false);
+  c.selectAllHistory();
+  assert.equal(c.selectedHistory.value.length, 2);
+  assert.equal(c.allHistorySelected.value, true);
+  c.currentOnly.value = true;
+  assert.equal(c.selectedHistory.value.length, 0);
+  c.selectAllHistory();
+  assert.deepEqual(c.selectedHistory.value.map(row => row.sessionId), ['one']);
+  c.historyOpen.value = false;
+  assert.equal(c.selectingHistory.value, false);
+  assert.equal(c.selectedHistory.value.length, 0);
+});
+
+test('batch deletion retains failures for retry and clears the deleted active conversation', async t => {
+  const f = fixture(t), c = f.chat;
+  await c.open();
+  const active = c.session.value.sessionId;
+  c.session.value.messages.push({inputs:[]});
+  f.sessions.set('other', {sessionId:'other',title:'Other',messages:[{}]});
+  await c.showHistory();
+  c.selectingHistory.value = true;
+  c.selectAllHistory();
+  const calls = [];
+  f.api.delete = async id => {
+    calls.push(id);
+    if (id === 'other') return {ok:false,error:'File is locked'};
+    f.sessions.delete(id);
+    return {ok:true,value:{deleted:true,pending:true}};
+  };
+  const result = await c.removeSessions(c.selectedHistory.value.map(row => row.sessionId));
+  assert.deepEqual(result.failed, ['other']);
+  assert.equal(c.session.value, null);
+  assert.deepEqual(c.selectedHistory.value.map(row => row.sessionId), ['other']);
+  assert.match(c.error.value, /1 conversation/);
+  assert.match(c.notice.value, /locked attachments/);
+  f.api.delete = async id => {calls.push(id);f.sessions.delete(id);return {ok:true,value:{deleted:true}};};
+  await c.removeSessions(result.failed);
+  assert.deepEqual(calls, [active,'other','other']);
+  assert.equal(c.filteredHistory.value.length, 0);
+  assert.equal(c.selectingHistory.value, false);
+});
+
+
+test('navigation during batch deletion drains the current delete and skips remaining chats', async t => {
+  const f = fixture(t), c = f.chat;
+  await c.open();
+  const active = c.session.value.sessionId;
+  c.session.value.messages.push({inputs:[]});
+  await c.showHistory();
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const calls = [];
+  f.api.delete = async id => { calls.push(id); await pending; f.sessions.delete(id); return {ok:true,value:{deleted:true}}; };
+  const deleting = c.removeSessions([active, 'untouched']);
+  f.selectedItem.value = {MediaId:'B'};
+  await nextTick();
+  release();
+  await deleting;
+  await settle(f);
+  assert.deepEqual(calls, [active]);
+  assert.notEqual(c.session.value.sessionId, active);
+  assert.equal(c.inputs.value[0].id, 'B');
+  assert.equal(c.error.value, '');
 });
