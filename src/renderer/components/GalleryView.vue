@@ -3,7 +3,6 @@
   <div class="left-tools gallery-header-tools"><GallerySettingsMenu /><button class="btn icon-btn gallery-reset" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
   <div class="gallery-brand"><img :src="appIcon" alt="" /><span>PhotoManager</span></div>
   <div class="gallery-right-tools">
-    <button v-if="!isSelectionMode" class="btn batch-selection-trigger" @click="enterSelectionMode">Batch operation</button>
     <div class="window-controls">
       <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>
       <button class="btn ghost icon-btn" :data-tip="windowToggleTip" @click="toggleWindowMaximizeRestore"><img class="icon" :src="windowToggleIcon" :alt="windowToggleTip" /></button>
@@ -23,6 +22,7 @@
               <input class="input grow" v-model="query.search.value" placeholder="Enter search text" aria-label="Search text" @keydown.enter="applySearch" />
               <button class="btn btn-primary" @click="applySearch">Search</button>
             </div>
+            <button v-if="!isSelectionMode" type="button" class="btn btn-primary batch-selection-trigger" @click="enterSelectionMode">Batch operation</button>
           </div>
           <div class="gallery-controls-primary">
             <div class="toolbar-group"><label>Album</label><RegistryFilterPicker kind="album" label="Album" /></div>
