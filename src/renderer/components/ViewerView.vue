@@ -1,6 +1,6 @@
 <template>
 <header class="topbar">
-  <div class="left-tools"><button class="btn icon-btn" data-tip="Back to Gallery" @click="closeViewer"><img class="icon" :src="ICONS.gallery" alt="Back to Gallery" /></button></div>
+  <div class="left-tools"><button type="button" class="btn icon-btn" data-tip="Back to Gallery" aria-label="Back to Gallery" @click="closeViewer"><img class="icon" :src="ICONS.back" alt="" aria-hidden="true" /></button></div>
   <div class="viewer-title">{{ viewerHeaderTime }}</div>
   <div class="window-controls">
     <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>

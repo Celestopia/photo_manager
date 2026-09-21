@@ -11,7 +11,7 @@ export const STAR_LEVELS = RATING_LEVELS;
 export { PRIVACY_LEVELS };
 
 export const ICONS = Object.freeze({
-  gallery: new URL("../assets/gallery.svg", import.meta.url).href,
+  back: new URL("../assets/back.svg", import.meta.url).href,
   windowMinimize: new URL("../assets/window_minimize.svg", import.meta.url).href,
   windowMaximize: new URL("../assets/window_maximize.svg", import.meta.url).href,
   windowRestore: new URL("../assets/window_restore.svg", import.meta.url).href,
