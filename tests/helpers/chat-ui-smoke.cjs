@@ -179,12 +179,21 @@ async function run() {
     await sleep(100);
   }
   await waitFor(
-    `Boolean([...document.querySelectorAll('button')].find(b=>b.textContent==='Open Library'&&!b.disabled))`,
+    `Boolean([...document.querySelectorAll('button')].find(b=>b.textContent==='Open library'&&!b.disabled))`,
   );
+  if (process.env.LIBRARY_UI_SMOKE) {
+    await sleep(250);
+    await fsp.writeFile(path.resolve('release/library-entry-v0383.png'), (await win.webContents.capturePage()).toPNG());
+  }
   await win.webContents.executeJavaScript(
-    `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Library').click()`,
+    `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.LIBRARY_UI_SMOKE) {
+    await require('./library-dialog-checks.cjs')({ win, library, click, waitFor, setValue });
+    assert.deepEqual(await fsp.readFile(path.join(library, '.photo_manager', 'data', 'photo_metadata.jsonl')), metadata);
+    return;
+  }
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getAttribute('aria-expanded')`), 'true');
   await click('.gallery-controls-toggle');
   await waitFor(`!document.querySelector('#gallery-filter-panel')`);

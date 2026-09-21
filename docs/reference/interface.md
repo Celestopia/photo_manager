@@ -4,6 +4,14 @@ Gallery queries, selection, viewer drafts, location hierarchy and registry manag
 
 Part of the [project specification](../../PROJECT.md). See the [documentation index](../README.md) for related references. Source paths in prose are relative to the repository root.
 
+## Library Entry and Dialogs
+
+The entry page presents the selected folder and makes Open library the primary action when it is available; otherwise Choose a folder is primary. Folder selection, initialization consent, progress, and error handling retain their existing lifecycle. Management-data details are explained during initialization rather than in the entry heading.
+
+Library information shows the name as plain text by default. A pencil toggles editing and focuses the input; leaving edit mode retains the draft without saving. Reopening the dialog resets to display mode. Save changes is enabled only for a valid, changed name. Media counts, Library path, dates and Library ID remain visible as read-only information. Dates are displayed in local time as `YYYY-MM-DD HH:mm`, with the original timestamp available in a tooltip; Updated is the manifest timestamp, not a last-scan timestamp.
+
+Maintenance dialogs use operation-specific action labels and summaries derived from returned counters. Raw reports remain copyable under Detailed report, initially expanded on failure or reported issues. An incomplete or absent report never implies a clean verification. Running operations show progress and the current path; their existing close restrictions remain unchanged. This presentation does not change persistence or maintenance behavior.
+
 ## Gallery Query and Filtering
 
 `gallery:query` filters the in-memory index in this order: media type; unioned rating/privacy levels intersected with other dimensions; album/tag/person/location including `__UNASSIGNED__`; case-sensitive title, filename-only, or description substring; shooting-time order; capture-date grouping. Empty level arrays mean all; rating defaults all and privacy defaults `[1]`. Location includes descendants; administrative filters resolve exact country/province/city sets. Invalid regions are rejected. `Detail` never participates.

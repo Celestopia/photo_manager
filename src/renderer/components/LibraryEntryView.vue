@@ -1,6 +1,6 @@
 <template>
   <header class="topbar library-entry-topbar">
-    <div class="library-entry-brand">PhotoManager</div>
+    <div class="library-entry-brand"><img :src="appIcon" alt="" />PhotoManager</div>
     <div class="window-controls">
       <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>
       <button class="btn ghost icon-btn" :data-tip="windowToggleTip" @click="toggleWindowMaximizeRestore"><img class="icon" :src="windowToggleIcon" :alt="windowToggleTip" /></button>
@@ -10,8 +10,8 @@
   <main class="library-entry-main">
     <section class="library-entry-panel">
       <header>
-        <h1>Select a Library</h1>
-        <p>Library management data are stored in <code>.photo_manager</code> under the selected directory.</p>
+        <h1>Open a library</h1>
+        <p>Browse and organize your photos and videos.</p>
       </header>
 
       <div v-if="!libraryState.mediaTools?.available" class="library-entry-alert error">
@@ -20,12 +20,12 @@
         <button class="btn" :disabled="entry.busy" @click="recheckMediaTools">Check again</button>
       </div>
 
+      <p v-if="entry.libraryName || entry.libraryPath" class="library-field-label">Selected library</p>
       <div v-if="entry.libraryName || entry.libraryPath" class="library-entry-current">
         <div class="library-entry-current-info">
           <strong>{{ entry.libraryName || 'Unnamed Library' }}</strong>
           <span>{{ entry.libraryPath }}</span>
         </div>
-        <button v-if="entry.canOpenLibrary" class="btn" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="enterLibraryFromEntry">Open Library</button>
       </div>
 
       <div v-if="entry.busy" class="library-progress-panel">
@@ -41,14 +41,17 @@
       </div>
 
       <div class="library-entry-actions">
-        <button class="btn btn-primary" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="chooseLibrary">Select Library</button>
+        <button class="btn" :class="{ 'btn-primary': !entry.canOpenLibrary }" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="chooseLibrary">{{ entry.libraryPath ? 'Choose another folder…' : 'Choose a folder…' }}</button>
+        <button v-if="entry.canOpenLibrary" class="btn btn-primary" :disabled="entry.busy || !libraryState.mediaTools?.available" @click="enterLibraryFromEntry">Open library</button>
       </div>
+      <p class="library-entry-note">A library is a folder containing your photos and videos.</p>
     </section>
   </main>
 </template>
 
 <script setup>
 import { computed, inject } from "vue";
+import appIcon from "../../../build/icon.svg";
 import { LIBRARY_CONTEXT } from "../context/renderer-contexts.js";
 
 const app = inject(LIBRARY_CONTEXT);
