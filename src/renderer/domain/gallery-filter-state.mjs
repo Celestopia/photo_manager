@@ -17,11 +17,11 @@ export function toggleGalleryLevel(current, level) {
 export function createDefaultGalleryFilters() {
   return {
     mediaType: "",
-    album: "",
-    tag: "",
-    person: "",
-    location: "",
-    locationRegion: null,
+    album: [],
+    tag: [],
+    person: [],
+    location: [],
+    locationRegion: [],
     ratingLevels: [],
     privacyLevels: [1],
   };
@@ -33,8 +33,8 @@ export function isRegistryFilterValueValid(value, registeredIds, unassignedFilte
 }
 
 export function applyLocationSelectionFilter(filters, locationValue) {
-  filters.location = locationValue || "";
-  filters.locationRegion = null;
+  filters.location = locationValue ? [locationValue] : [];
+  filters.locationRegion = [];
 }
 
 export function hasNonDefaultGalleryControls(query) {
@@ -42,11 +42,11 @@ export function hasNonDefaultGalleryControls(query) {
   const privacyLevels = normalizeGalleryLevels(filters.privacyLevels);
   return Boolean(
     filters.mediaType
-    || filters.album
-    || filters.tag
-    || filters.person
-    || filters.location
-    || filters.locationRegion
+    || filters.album?.length
+    || filters.tag?.length
+    || filters.person?.length
+    || filters.location?.length
+    || filters.locationRegion?.length
     || normalizeGalleryLevels(filters.ratingLevels).length
     || privacyLevels.length !== 1
     || privacyLevels[0] !== 1
@@ -54,4 +54,10 @@ export function hasNonDefaultGalleryControls(query) {
     || query?.sortBy !== "shootingTime"
     || query?.sortOrder !== "desc"
   );
+}
+
+export function toggleRegistryFilter(current, value, additive = false) {
+  if (!value) return [];
+  if (!additive) return [value];
+  return current.includes(value) ? current.filter(id => id !== value) : [...current, value];
 }

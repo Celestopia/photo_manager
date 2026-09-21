@@ -39,6 +39,7 @@ import {
 } from "../src/renderer/domain/viewer-panel-layout.mjs";
 import {
   applyLocationSelectionFilter,
+  toggleRegistryFilter,
   createDefaultGalleryFilters,
   hasNonDefaultGalleryControls,
   isRegistryFilterValueValid,
@@ -81,7 +82,7 @@ test("unassigned registry filters survive refresh and location selection clears 
     locationRegion: { level: "city", country: "中国", province: "", city: "北京" },
   };
   applyLocationSelectionFilter(filters, unassigned);
-  assert.deepEqual(filters, { location: unassigned, locationRegion: null });
+  assert.deepEqual(filters, { location: [unassigned], locationRegion: [] });
 });
 
 test("registry deletion patches only referenced gallery items without replacing collection identity", () => {
@@ -107,10 +108,10 @@ test("registry deletion patches only referenced gallery items without replacing 
 
 test("registry deletion refreshes exact and newly unassigned filter results", () => {
   const unassigned = "__UNASSIGNED__";
-  assert.equal(registryDeletionInvalidatesFilter("deleted-id", "deleted-id", unassigned, 0), true);
-  assert.equal(registryDeletionInvalidatesFilter(unassigned, "deleted-id", unassigned, 2), true);
-  assert.equal(registryDeletionInvalidatesFilter(unassigned, "deleted-id", unassigned, 0), false);
-  assert.equal(registryDeletionInvalidatesFilter("other-id", "deleted-id", unassigned, 2), false);
+  assert.equal(registryDeletionInvalidatesFilter(["deleted-id"], "deleted-id", unassigned, 0), true);
+  assert.equal(registryDeletionInvalidatesFilter([unassigned], "deleted-id", unassigned, 2), true);
+  assert.equal(registryDeletionInvalidatesFilter([unassigned], "deleted-id", unassigned, 0), false);
+  assert.equal(registryDeletionInvalidatesFilter(["other-id"], "deleted-id", unassigned, 2), false);
 });
 
 test("location subtree membership follows registered parent IDs", () => {
@@ -505,4 +506,15 @@ test("location search keeps ancestors and never truncates the complete candidate
     visibleSearchRows.filter((row) => row.Type === "location").map((row) => row.Label),
     ["地点 0", "地点 74"],
   );
+});
+
+
+test('registry multi-selection uses All as reset and Unassigned as an ordinary alternative', () => {
+  const u = '__UNASSIGNED__';
+  assert.deepEqual(toggleRegistryFilter([], 'food', true), ['food']);
+  assert.deepEqual(toggleRegistryFilter(['food'], u, true), ['food', u]);
+  assert.deepEqual(toggleRegistryFilter(['food', u], 'food', true), [u]);
+  assert.deepEqual(toggleRegistryFilter([u], u, true), []);
+  assert.deepEqual(toggleRegistryFilter(['food'], 'travel'), ['travel']);
+  assert.deepEqual(toggleRegistryFilter(['food', u], '', true), []);
 });

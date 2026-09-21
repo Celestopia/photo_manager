@@ -20,17 +20,23 @@ function createGalleryQueryService({
   function execute(list, options) {
     const { filters, search, sortBy, sortOrder } = options;
     if (sortBy !== "shootingTime") throw new Error(`Unsupported gallery sort: ${sortBy}`);
-    if (filters.location && filters.locationRegion) {
-      throw new Error("Location and administrative region filters are mutually exclusive");
+    const selections = {};
+    for (const key of ['album', 'tag', 'person', 'location']) {
+      if (!Array.isArray(filters[key]) || filters[key].some(id => typeof id !== 'string' || !id)) throw new Error(`${key} filters must be arrays of nonempty IDs`);
+      selections[key] = new Set(filters[key]);
     }
-    let allowedLocationIds = null;
-    if (filters.locationRegion) {
-      allowedLocationIds = new Set(getLocationIdsForRegion(filters.locationRegion));
-    } else if (filters.location) {
-      allowedLocationIds = filters.location === unassignedFilter
-        ? null
-        : new Set([filters.location, ...getLocationDescendants(filters.location)]);
+    if (!Array.isArray(filters.locationRegion)) throw new Error('Location regions must be an array');
+    const allowedLocationIds = new Set();
+    for (const id of selections.location) {
+      if (id === unassignedFilter) continue;
+      allowedLocationIds.add(id);
+      for (const child of getLocationDescendants(id)) allowedLocationIds.add(child);
     }
+    for (const region of filters.locationRegion) {
+      for (const id of getLocationIdsForRegion(region)) allowedLocationIds.add(id);
+    }
+    const matches = (selected, values) => !selected.size || values.some(id => selected.has(id))
+      || (!values.length && selected.has(unassignedFilter));
     const ratingLevels = selectedLevels(filters.ratingLevels, "Rating");
     const privacyLevels = selectedLevels(filters.privacyLevels, "Privacy");
     const requestedMediaType = filters.mediaType === "image" || filters.mediaType === "video"
@@ -42,22 +48,12 @@ function createGalleryQueryService({
     for (const item of list) {
       const customization = item?.Customization;
       const locationId = item?.Location?.LocationId;
-      if (filters.album === unassignedFilter) {
-        if (customization?.AlbumId !== null) continue;
-      } else if (filters.album && customization?.AlbumId !== filters.album) continue;
-
-      if (filters.tag === unassignedFilter) {
-        if (!Array.isArray(customization?.TagIds) || customization.TagIds.length !== 0) continue;
-      } else if (filters.tag && (!Array.isArray(customization?.TagIds) || !customization.TagIds.includes(filters.tag))) continue;
-
-      if (filters.person === unassignedFilter) {
-        if (!Array.isArray(customization?.PersonIds) || customization.PersonIds.length !== 0) continue;
-      } else if (filters.person && (!Array.isArray(customization?.PersonIds) || !customization.PersonIds.includes(filters.person))) continue;
-
-      if (filters.locationRegion && !allowedLocationIds.has(locationId)) continue;
-      if (filters.location === unassignedFilter) {
-        if (locationId !== null) continue;
-      } else if (filters.location && !allowedLocationIds.has(locationId)) continue;
+      if (!matches(selections.album, customization?.AlbumId ? [customization.AlbumId] : [])) continue;
+      if (!matches(selections.tag, customization?.TagIds || [])) continue;
+      if (!matches(selections.person, customization?.PersonIds || [])) continue;
+      if ((selections.location.size || filters.locationRegion.length)
+        && !allowedLocationIds.has(locationId)
+        && !(locationId === null && selections.location.has(unassignedFilter))) continue;
 
       if (ratingLevels.size && !ratingLevels.has(customization?.Rating)) continue;
       if (privacyLevels.size && !privacyLevels.has(customization?.Privacy)) continue;

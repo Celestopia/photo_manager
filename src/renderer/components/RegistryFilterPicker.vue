@@ -1,6 +1,6 @@
 <template>
   <div class="registry-filter-picker" @click.stop>
-    <button type="button" class="input registry-trigger" @click="toggleDropdown">
+    <button type="button" class="input registry-trigger" @click="toggleDropdown" :data-tip="selectionTooltip">
       <span>{{ selectedLabel }}</span>
       <img class="registry-trigger-arrow" :src="ICONS.chevronDown" alt="" />
     </button>
@@ -11,7 +11,7 @@
       :search-placeholder="`Search ${label.toLowerCase()}`"
       :options="filteredOptions"
       :fixed-options="fixedOptions"
-      :selected-values="[selectedValue]"
+      :selected-values="selectedValues.length ? selectedValues : ['']"
       :id-key="optionIdKey"
       :label-key="optionLabelKey"
       :show-all-section-label="false"
@@ -26,6 +26,7 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { GALLERY_FILTER_CONTEXT } from "../context/renderer-contexts.js";
+import { toggleRegistryFilter } from "../domain/gallery-filter-state.mjs";
 import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
@@ -47,7 +48,7 @@ const {
 const dropdownOpen = ref(false);
 const pickerId = Symbol(props.kind);
 const searchText = ref("");
-const selectedValue = computed(() => query.filters[props.kind] || "");
+const selectedValues = computed(() => query.filters[props.kind]);
 const unassignedLabel = "Unassigned";
 const fixedOptions = computed(() => [
   { value: "", label: "All" },
@@ -63,11 +64,9 @@ const optionLabelKey = computed(() => {
   if (props.kind === "tag") return "Text";
   return "Name";
 });
-const selectedLabel = computed(() => {
-  if (!selectedValue.value) return "All";
-  if (selectedValue.value === UNASSIGNED_FILTER) return unassignedLabel;
-  return optionLabel(options.value.find((option) => optionId(option) === selectedValue.value)) || "All";
-});
+const selectionLabels = computed(() => selectedValues.value.map(id => id === UNASSIGNED_FILTER ? unassignedLabel : optionLabel(options.value.find(option => optionId(option) === id))));
+const selectedLabel = computed(() => !selectionLabels.value.length ? 'All' : selectionLabels.value[0] + (selectionLabels.value.length > 1 ? ` +${selectionLabels.value.length - 1}` : ''));
+const selectionTooltip = computed(() => `${selectionLabels.value.join(', ') || 'All'}\nCtrl+Click to select multiple`);
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
 const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("en-US"));
 const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
@@ -105,9 +104,9 @@ function closeFromOtherSurface(event) {
   if (event.detail !== pickerId) closeDropdown();
 }
 
-async function selectValue(value) {
-  query.filters[props.kind] = value;
-  closeDropdown();
+async function selectValue(value, event) {
+  query.filters[props.kind] = toggleRegistryFilter(selectedValues.value, value, Boolean(event?.ctrlKey));
+  if (!event?.ctrlKey || !value) closeDropdown();
   await applyFilterSort();
 }
 

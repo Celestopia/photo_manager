@@ -29,7 +29,7 @@ export function useFlatRegistryState({ idKey, labelKey, filterKey, query, unassi
     })).filter(item => item[idKey] && item[labelKey]);
     const ids = registry.value.map(item => item[idKey]);
     pruneRecent?.(ids);
-    if (!isRegistryFilterValueValid(query.filters[filterKey], ids, unassignedFilter)) query.filters[filterKey] = "";
+    query.filters[filterKey] = query.filters[filterKey].filter(value => isRegistryFilterValueValid(value, ids, unassignedFilter));
   }
   return { registry, search, dropdown, create, manager, managerFiltered, apply };
 }

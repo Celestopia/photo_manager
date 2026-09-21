@@ -102,6 +102,7 @@ async function run() {
     config: structuredClone(DEFAULT_CONFIG),
     logger: { info() {}, warn() {}, error() {} },
   });
+  if (process.env.REGISTRY_UI_SMOKE) await require('./registry-filter-checks.cjs').prepare(library);
   const metadata = await fsp.readFile(
     path.join(library, ".photo_manager", "data", "photo_metadata.jsonl"),
   );
@@ -189,6 +190,10 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.REGISTRY_UI_SMOKE) {
+    await require('./registry-filter-checks.cjs').check({win, click, waitFor, setValue});
+    return;
+  }
   if (process.env.LIBRARY_UI_SMOKE) {
     await require('./library-dialog-checks.cjs')({ win, library, click, waitFor, setValue });
     assert.deepEqual(await fsp.readFile(path.join(library, '.photo_manager', 'data', 'photo_metadata.jsonl')), metadata);

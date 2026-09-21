@@ -42,6 +42,6 @@ export function patchRegistryReferencesInPlace(items, kind, deletedId) {
 }
 
 export function registryDeletionInvalidatesFilter(filterValue, deletedId, unassignedFilter, updatedCount) {
-  if (filterValue === deletedId) return true;
-  return filterValue === unassignedFilter && Number(updatedCount) > 0;
+  if (filterValue.includes(deletedId)) return true;
+  return filterValue.includes(unassignedFilter) && Number(updatedCount) > 0;
 }

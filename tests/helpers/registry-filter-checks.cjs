@@ -1,0 +1,48 @@
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const assert = require('node:assert/strict');
+
+exports.prepare = async library => {
+  const data = path.join(library, '.photo_manager', 'data');
+  const stamp = { Description: '', CreatedAt: new Date().toISOString(), UpdatedAt: new Date().toISOString() };
+  const tags = ['Food', 'Travel'].map(Text => ({ ...stamp, TagId: randomUUID(), Text }));
+  const locations = ['Beach', 'Mountain'].map(Name => ({ ...stamp, LocationId: randomUUID(), Name, Country: 'Country', Province: '', City: '', ParentId: null }));
+  await fs.writeFile(path.join(data, 'tag_registry.jsonl'), tags.map(JSON.stringify).join('\n') + '\n');
+  await fs.writeFile(path.join(data, 'location_registry.jsonl'), locations.map(JSON.stringify).join('\n') + '\n');
+  const file = path.join(data, 'photo_metadata.jsonl');
+  const items = (await fs.readFile(file, 'utf8')).trim().split('\n').map(JSON.parse);
+  items[0].Customization.TagIds = [tags[0].TagId];
+  items[0].Location.LocationId = locations[0].LocationId;
+  await fs.writeFile(file, items.map(JSON.stringify).join('\n') + '\n');
+};
+
+exports.check = async ({win, click, waitFor, setValue}) => {
+  const evaluate = expression => win.webContents.executeJavaScript(expression);
+  const select = (selector, text, ctrl = false) => evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(e=>e.textContent.trim()===${JSON.stringify(text)}).dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:${ctrl}}))`);
+  await evaluate(`document.querySelectorAll('.registry-filter-picker .registry-trigger')[1].click()`);
+  await select('.registry-options-menu .tag-option','Food',true);
+  await waitFor(`!document.body.innerText.includes('Loading media') && document.querySelectorAll('.photo-card').length===1`);
+  await select('.registry-options-menu .tag-option','Unassigned',true);
+  await waitFor(`!document.body.innerText.includes('Loading media') && document.querySelectorAll('.photo-card').length===2`);
+  assert.equal(await evaluate(`document.querySelectorAll('.registry-options-menu .is-selected').length`),2);
+  await setValue('input[placeholder="Search tags"]','Travel');
+  await select('.registry-options-menu .tag-option','Travel',true);
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.registry-trigger')).some(e=>e.textContent.includes('+2'))`),true);
+  await evaluate(`Array.from(document.querySelectorAll('.registry-options-menu .tag-option')).find(e=>e.textContent.trim()==='Travel').dispatchEvent(new KeyboardEvent('keydown',{key:' ',ctrlKey:true,bubbles:true,cancelable:true}))`);
+  await waitFor(`Array.from(document.querySelectorAll('.registry-trigger')).some(e=>e.textContent.includes('+1'))`);
+  await select('.registry-options-menu .tag-option','All',true);
+  await waitFor(`!document.querySelector('.registry-options-menu')`);
+  await click('.location-filter-picker .registry-trigger');
+  await select('.location-tree-group-label','Country',true);
+  await waitFor(`!document.body.innerText.includes('Loading media') && document.querySelectorAll('.photo-card').length===1`);
+  await setValue('input[placeholder="Search locations"]','Beach');
+  await select('.location-tree-location-label','Beach',true);
+  await select('.location-tree-unassigned-option','Unassigned',true);
+  await waitFor(`!document.body.innerText.includes('Loading media') && document.querySelectorAll('.photo-card').length===2`);
+  assert.equal(await evaluate(`document.querySelector('.location-filter-picker .registry-trigger').textContent.includes('+2')`),true);
+  await fs.writeFile(path.resolve('release/registry-multiselect.png'),(await win.webContents.capturePage()).toPNG());
+  await select('.location-tree-all-option','All',true);
+  await waitFor(`!document.querySelector('.location-tree-menu')`);
+  console.log('REGISTRY_UI_SMOKE_PASS: Ctrl selection, All reset, Unassigned union, search retention, region and location union.');
+};

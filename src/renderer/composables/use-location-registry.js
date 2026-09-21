@@ -1,6 +1,7 @@
 import { createRegistryRequests } from "../domain/registry-requests.mjs";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import {
+  toggleRegistryFilter,
   applyLocationSelectionFilter,
   isRegistryFilterValueValid,
 } from "../domain/gallery-filter-state.mjs";
@@ -18,6 +19,7 @@ import {
   getLocationPathLabel,
   getLocationRegionLabel,
   isLocationWithinSubtree,
+  sameLocationRegionFilter,
   locationMatchesRegionFilter,
   locationMatchesKeyword,
   normalizeLocationField,
@@ -70,10 +72,8 @@ export function useLocationRegistry({
     })).filter((location) => location.LocationId && location.Name).sort(compareLocationsByRegionAndTree);
     const ids = locationRegistry.value.map((location) => location.LocationId);
     pruneRecentLocations(ids);
-    if (!isRegistryFilterValueValid(query.filters.location, ids, unassignedFilter)) query.filters.location = "";
-    if (query.filters.locationRegion && !locationRegistry.value.some((location) => locationMatchesRegionFilter(location, query.filters.locationRegion))) {
-      query.filters.locationRegion = null;
-    }
+    query.filters.location = query.filters.location.filter(value => isRegistryFilterValueValid(value, ids, unassignedFilter));
+    query.filters.locationRegion = query.filters.locationRegion.filter(region => locationRegistry.value.some(location => locationMatchesRegionFilter(location, region)));
   }
 
   async function loadLocations() {
@@ -158,19 +158,19 @@ export function useLocationRegistry({
     const candidates = filterLocationsWithAncestors(locationRegistry.value, keyword).sort(compareLocationsByRegionAndTree);
     return buildLocationHierarchyRows(candidates);
   }
-  async function setLocationFilter(locationId) {
-    applyLocationSelectionFilter(query.filters, locationId);
+  async function setLocationFilter(locationId, additive = false) {
+    if (!additive || !locationId) applyLocationSelectionFilter(query.filters, locationId);
+    else query.filters.location = toggleRegistryFilter(query.filters.location, locationId, true);
     await applyFilterSort();
   }
 
-  async function setLocationRegionFilter(region) {
-    query.filters.location = "";
-    query.filters.locationRegion = region ? {
-      level: normalizeLocationField(region.level),
-      country: normalizeLocationField(region.country),
-      province: normalizeLocationField(region.province),
-      city: normalizeLocationField(region.city),
-    } : null;
+  async function setLocationRegionFilter(region, additive = false) {
+    const regions = query.filters.locationRegion;
+    query.filters.locationRegion = additive
+      ? regions.some(value => sameLocationRegionFilter(value, region))
+        ? regions.filter(value => !sameLocationRegionFilter(value, region)) : [...regions, region]
+      : [region];
+    if (!additive) query.filters.location = [];
     await applyFilterSort();
   }
 
@@ -334,8 +334,8 @@ export function useLocationRegistry({
     );
     const parentChanged = Boolean(previous) && previous.ParentId !== parentId;
     const shouldRefreshGallery = (
-      (administrativeRegionChanged && Boolean(query.filters.locationRegion))
-      || (parentChanged && Boolean(query.filters.location))
+      (administrativeRegionChanged && Boolean(query.filters.locationRegion.length))
+      || (parentChanged && Boolean(query.filters.location.length))
     );
     applyLocationRegistry(result.locations);
     cancelLocationEdit();
@@ -362,13 +362,12 @@ export function useLocationRegistry({
     if (!result?.ok) { showToastMessage(`Could not delete location: ${result?.error || "Unknown error"}`); return; }
     const filterBeforeDelete = query.filters.location;
     const updatedCount = Number(result.updatedCount || 0);
-    const filteredSubtreeChanged = filterBeforeDelete
-      && filterBeforeDelete !== unassignedFilter
+    const filteredSubtreeChanged = filterBeforeDelete.length
       && (updatedCount > 0 || Number(result.orphanedChildren) > 0)
-      && isLocationWithinSubtree(locationRegistry.value, location.LocationId, filterBeforeDelete);
+      && filterBeforeDelete.some(id => id !== unassignedFilter && isLocationWithinSubtree(locationRegistry.value, location.LocationId, id));
     const shouldRefreshGallery = registryDeletionInvalidatesFilter(
       filterBeforeDelete, location.LocationId, unassignedFilter, updatedCount,
-    ) || filteredSubtreeChanged || Boolean(query.filters.locationRegion);
+    ) || filteredSubtreeChanged || Boolean(query.filters.locationRegion.length);
     applyLocationRegistry(result.locations);
     syncDeletedLocationLocally(location.LocationId, updatedCount > 0 && !shouldRefreshGallery);
     const current = requests.capture();

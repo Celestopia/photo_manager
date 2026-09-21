@@ -1,5 +1,5 @@
 <template>
-  <div class="tag-dropdown searchable-dropdown selection-dropdown registry-options-menu" @click.stop>
+  <div class="tag-dropdown searchable-dropdown selection-dropdown registry-options-menu" @click.stop @keydown.esc.stop.prevent="emit('close')">
     <input
       ref="searchInputRef"
       class="input dropdown-search-input"
@@ -16,7 +16,7 @@
         type="button"
         class="tag-option"
         :class="{ 'is-selected': isSelected(option.value) }"
-        @mousedown.prevent @click="emit('select', option.value)"
+        @keydown.ctrl.enter.prevent.stop="emit('select', option.value ?? optionValue(option), $event)" @keydown.ctrl.space.prevent.stop="emit('select', option.value ?? optionValue(option), $event)" @mousedown.prevent @click="emit('select', option.value, $event)"
       ><span>{{ option.label }}</span></button>
 
       <template v-if="recentOptions.length">
@@ -31,7 +31,7 @@
           class="tag-option"
           :class="{ 'is-selected': isSelected(optionValue(option)) }"
           :data-tip="optionDescription(option)"
-          @mousedown.prevent @click="emit('select', optionValue(option))"
+          @keydown.ctrl.enter.prevent.stop="emit('select', option.value ?? optionValue(option), $event)" @keydown.ctrl.space.prevent.stop="emit('select', option.value ?? optionValue(option), $event)" @mousedown.prevent @click="emit('select', optionValue(option), $event)"
         ><span>{{ optionLabel(option) }}</span></button>
       </template>
 
@@ -52,7 +52,7 @@
         class="tag-option"
         :class="{ 'is-selected': isSelected(optionValue(option)) }"
         :data-tip="optionDescription(option)"
-        @mousedown.prevent @click="emit('select', optionValue(option))"
+        @keydown.ctrl.enter.prevent.stop="emit('select', option.value ?? optionValue(option), $event)" @keydown.ctrl.space.prevent.stop="emit('select', option.value ?? optionValue(option), $event)" @mousedown.prevent @click="emit('select', optionValue(option), $event)"
       ><span>{{ optionLabel(option) }}</span></button>
       <div class="tag-option-empty" v-if="!options.length">{{ emptyText }}</div>
     </div>
@@ -108,7 +108,7 @@ function onSearchKeydown(event) {
   if (event.key === "Enter") {
     event.preventDefault();
     const first = props.recentOptions[0] || props.options[0];
-    if (first) emit("select", optionValue(first));
+    if (first) emit("select", optionValue(first), event);
     return;
   }
   if (event.key === "Escape") {

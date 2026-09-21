@@ -20,6 +20,8 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.
 - Launch PhotoManager again to open another independent library window; the same library cannot be opened twice.
 
+In gallery registry filters, use **Ctrl+Click** to select multiple albums, tags, people, or locations. Results match any selection within a field and all active fields. **All** clears that field; **Unassigned** can be combined with named entries.
+
 Supported images: JPG, JPEG, PNG, BMP, WebP, and GIF. Supported videos: MP4, MOV, MKV, and AVI.
 
 Assistant is available in the viewer's right sidebar. Open the Provider settings gear in the Assistant header to configure your API base URL, key and model. Images default to optimized uploads, with an unchanged-original option; videos and animated GIFs use sampled frames without audio. Remote requests upload selected content and may incur charges. No model download is required. See [Using Assistant](docs/agent/usage.md).

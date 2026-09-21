@@ -137,7 +137,7 @@ test("gallery query composes descendant location ID filters with shooting-time s
     { FilePath: "a.jpg", FileSystem: { ShootingTimeString: "2026-01-01" }, Location: { LocationId: IDS.other }, Customization: { Rating: 3 } },
   ];
   const { items: result } = service.execute(items, {
-    filters: { mediaType: "", album: "", tag: "", person: "", location: IDS.campus },
+    filters: { mediaType: "", album: [], tag: [], person: [], location: [IDS.campus], locationRegion: [] },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   });
   assert.deepEqual(result.map((item) => item.FilePath), ["b.jpg"]);
@@ -171,7 +171,7 @@ test("gallery query filters by media type", () => {
   ];
   const result = service.execute(items, {
     filters: {
-      mediaType: "image", album: "", tag: "", person: "", location: "", locationRegion: null,
+      mediaType: "image", album: [], tag: [], person: [], location: [], locationRegion: [],
       ratingLevels: [], privacyLevels: [1],
     },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
@@ -193,19 +193,19 @@ test("gallery query composes administrative region and registry filters", () => 
   ];
   const { items: result } = service.execute(items, {
     filters: {
-      mediaType: "", album: IDS.tag, tag: "", person: "", location: "",
-      locationRegion: { level: "city", country: "中国", province: "", city: "北京" },
+      mediaType: "", album: [IDS.tag], tag: [], person: [], location: [],
+      locationRegion: [{ level: "city", country: "中国", province: "", city: "北京" }],
     },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   });
   assert.deepEqual(result.map((item) => item.FilePath), ["campus.jpg"]);
-  assert.throws(() => service.execute(items, {
+  assert.deepEqual(service.execute(items, {
     filters: {
-      mediaType: "", album: "", tag: "", person: "", location: IDS.campus,
-      locationRegion: { level: "country", country: "中国", province: "", city: "" },
+      mediaType: "", album: [], tag: [], person: [], location: [IDS.campus],
+      locationRegion: [{ level: "country", country: "中国", province: "", city: "" }],
     },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
-  }), /mutually exclusive/);
+  }).items.map(item => item.FilePath), ["campus.jpg"]);
 });
 
 test("gallery query supports unassigned album, tag, person, and location filters", () => {
@@ -242,17 +242,17 @@ test("gallery query supports unassigned album, tag, person, and location filters
   ];
   const query = (filterPatch) => service.execute(items, {
     filters: {
-      mediaType: "", album: "", tag: "", person: "", location: "", locationRegion: null,
+      mediaType: "", album: [], tag: [], person: [], location: [], locationRegion: [],
       ratingLevels: [], privacyLevels: [], ...filterPatch,
     },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   }).items.map((item) => item.FilePath);
 
-  assert.deepEqual(query({ album: "__UNASSIGNED__" }), ["all-unassigned.jpg", "album-unassigned.jpg"]);
-  assert.deepEqual(query({ tag: "__UNASSIGNED__" }), ["all-unassigned.jpg", "arrays-unassigned.jpg"]);
-  assert.deepEqual(query({ person: "__UNASSIGNED__" }), ["all-unassigned.jpg", "arrays-unassigned.jpg"]);
-  assert.deepEqual(query({ location: "__UNASSIGNED__" }), ["all-unassigned.jpg", "location-unassigned.jpg"]);
-  assert.deepEqual(query({ album: "__UNASSIGNED__", person: "__UNASSIGNED__" }), ["all-unassigned.jpg"]);
+  assert.deepEqual(query({ album: ["__UNASSIGNED__"] }), ["all-unassigned.jpg", "album-unassigned.jpg"]);
+  assert.deepEqual(query({ tag: ["__UNASSIGNED__"] }), ["all-unassigned.jpg", "arrays-unassigned.jpg"]);
+  assert.deepEqual(query({ person: ["__UNASSIGNED__"] }), ["all-unassigned.jpg", "arrays-unassigned.jpg"]);
+  assert.deepEqual(query({ location: ["__UNASSIGNED__"] }), ["all-unassigned.jpg", "location-unassigned.jpg"]);
+  assert.deepEqual(query({ album: ["__UNASSIGNED__"], person: ["__UNASSIGNED__"] }), ["all-unassigned.jpg"]);
 });
 
 test("gallery query groups the complete result without a page-size cutoff", () => {
@@ -264,7 +264,7 @@ test("gallery query groups the complete result without a page-size cutoff", () =
     Customization: { Rating: 2 },
   }));
   const { items: sorted } = service.execute(items, {
-    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
+    filters: { mediaType: "", album: [], tag: [], person: [], location: [], locationRegion: [] },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "desc",
   });
   const groups = service.groupByDate(sorted);
@@ -278,7 +278,7 @@ test("gallery query treats empty rating and privacy level selections as all", ()
     FilePath: `privacy-${privacy}.jpg`, FileSystem: { ShootingTimeString: "2026-01-01" }, Customization: { Rating: 2, Privacy: privacy },
   }));
   const { items: result } = service.execute(items, {
-    filters: { mediaType: "", album: "", tag: "", person: "", location: "", ratingLevels: [], privacyLevels: [] },
+    filters: { mediaType: "", album: [], tag: [], person: [], location: [], locationRegion: [], ratingLevels: [], privacyLevels: [] },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "asc",
   });
   assert.equal(result.length, 5);
@@ -294,7 +294,7 @@ test("gallery query combines rating and privacy multi-select filters", () => {
   ];
   const { items: result } = service.execute(items, {
     filters: {
-      mediaType: "", album: "", tag: "", person: "", location: "",
+      mediaType: "", album: [], tag: [], person: [], location: [], locationRegion: [],
       ratingLevels: [2, 4], privacyLevels: [1, 2],
     },
     search: { field: "", value: "" }, sortBy: "shootingTime", sortOrder: "desc",
@@ -305,7 +305,7 @@ test("gallery query combines rating and privacy multi-select filters", () => {
 test("gallery query rejects removed sorting modes", () => {
   const service = createGalleryQueryService({ getLocationDescendants: () => [], unassignedFilter: "__UNASSIGNED__" });
   const options = {
-    filters: { mediaType: "", album: "", tag: "", person: "", location: "" },
+    filters: { mediaType: "", album: [], tag: [], person: [], location: [], locationRegion: [] },
     search: { field: "", value: "" }, sortOrder: "asc",
   };
   assert.throws(() => service.execute([], { ...options, sortBy: "filename" }), /Unsupported gallery sort/);
@@ -556,4 +556,27 @@ test("location global deletion restores changed records and child links after tr
   assert.equal(registry.get(IDS.dining).ParentId, IDS.campus);
   assert.equal(metadata.get(IDS.tag), affected);
   assert.equal(metadata.get(IDS.other), untouched);
+});
+
+
+test('gallery registry selections union alternatives and intersect dimensions', () => {
+  const u = '__UNASSIGNED__';
+  const service = createGalleryQueryService({
+    getLocationDescendants: id => id === 'parent' ? ['child'] : [],
+    getLocationIdsForRegion: region => region.country === 'Country' ? ['regional'] : [],
+    unassignedFilter: u,
+  });
+  const items = [
+    {MediaId:'a', Customization:{AlbumId:'one',TagIds:['food'],PersonIds:['alice']},Location:{LocationId:'child'}},
+    {MediaId:'b', Customization:{AlbumId:'two',TagIds:['travel'],PersonIds:['bob']},Location:{LocationId:'regional'}},
+    {MediaId:'c', Customization:{AlbumId:null,TagIds:[],PersonIds:[]},Location:{LocationId:null}},
+    {MediaId:'d', Customization:{AlbumId:'other',TagIds:['food'],PersonIds:['alice']},Location:{LocationId:'elsewhere'}},
+  ];
+  const query = patch => service.execute(items, {filters:{album:[],tag:[],person:[],location:[],locationRegion:[],...patch},sortBy:'shootingTime',sortOrder:'asc'}).items.map(item => item.MediaId);
+  assert.deepEqual(query({tag:['food','travel']}), ['a','b','d']);
+  assert.deepEqual(query({tag:['food','travel'],person:['bob']}), ['b']);
+  assert.deepEqual(query({album:['one',u],tag:['food',u]}), ['a','c']);
+  assert.deepEqual(query({location:['parent',u],locationRegion:[{level:'country',country:'Country'}]}), ['a','b','c']);
+  assert.deepEqual(query({location:['parent','child']}), ['a']);
+  assert.throws(() => query({album:'one'}), /arrays/);
 });

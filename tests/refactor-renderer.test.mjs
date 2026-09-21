@@ -38,7 +38,7 @@ test('an old entry request cannot clear a newer busy state or publish after disp
 function registryFixture(useRegistry, api) {
   const selectedItem = ref({ MediaId: 'first' }), editDraft = reactive({ TagIds: [], PersonIds: [], AlbumId: null, LocationId: null });
   let refreshes = 0;
-  const query = reactive({ filters: { tag: '', person: '', album: '', location: '', locationRegion: null } });
+  const query = reactive({ filters: { tag: [], person: [], album: [], location: [], locationRegion: [] } });
   const state = useRegistry({ api, selectedItem, editDraft, query, batchEdit: reactive({ tagIds: [], personIds: [], albumId: null, locationId: null }), orderedItems: ref([]),
     gallerySettingsOpen: ref(false), unassignedFilter: 'unassigned', recentTags: ref([]), recentPeople: ref([]), recentLocations: ref([]),
     rememberRecentTag: noop, rememberRecentPerson: noop, rememberRecentLocation: noop, pruneRecentTags: noop, pruneRecentPeople: noop, pruneRecentLocations: noop,
@@ -84,7 +84,7 @@ test('deleting an unused intermediate location refreshes its ancestor filter', a
   browser(t);
   const locations = [{ LocationId: 'parent', Name: 'Parent', ParentId: null }, { LocationId: 'middle', Name: 'Middle', ParentId: 'parent', ChildrenIds: ['child'] }, { LocationId: 'child', Name: 'Child', ParentId: 'middle' }];
   const f = registryFixture(useLocationRegistry, { listLocations: async () => ({ ok: true, locations }), deleteLocationGlobally: async () => ({ ok: true, updatedCount: 0, orphanedChildren: 1, locations: [locations[0], { ...locations[2], ParentId: null }] }) });
-  await f.state.loadLocations(); f.query.filters.location = 'parent';
+  await f.state.loadLocations(); f.query.filters.location = ['parent'];
   await f.state.deleteLocationGlobally(locations[1]); assert.equal(f.refreshes(), 1);
 });
 
@@ -98,4 +98,26 @@ test('viewer navigation follows MediaId after reordering and preserves an absent
   editingDirty.value = true; orderedItems.value = [b, c]; viewer.switchPhoto(1);
   assert.equal(selectedItem.value.MediaId, 'a'); assert.equal(viewer.pendingViewerTransition.visible, false);
   assert.match(notices.at(-1), /no longer/);
+});
+
+
+test('registry refresh prunes only removed selections and retains Unassigned', async () => {
+  const f = registryFixture(useTagRegistry, {listTags: async () => ({ok:true,tags:[{TagId:'kept',Text:'Kept'}]})});
+  f.query.filters.tag = ['gone','kept','unassigned'];
+  await f.state.loadTags();
+  assert.deepEqual(f.query.filters.tag, ['kept','unassigned']);
+});
+
+test('location modifiers combine regions, concrete locations and Unassigned', async () => {
+  const f = registryFixture(useLocationRegistry, {});
+  const country = {level:'country',country:'Country',province:'',city:''};
+  await f.state.setLocationRegionFilter(country);
+  await f.state.setLocationFilter('beach', true);
+  await f.state.setLocationFilter('unassigned', true);
+  assert.deepEqual(f.query.filters.location, ['beach','unassigned']);
+  assert.deepEqual(f.query.filters.locationRegion, [country]);
+  await f.state.setLocationRegionFilter({...country}, true);
+  assert.deepEqual(f.query.filters.locationRegion, []);
+  await f.state.setLocationFilter('', true);
+  assert.deepEqual(f.query.filters.location, []);
 });

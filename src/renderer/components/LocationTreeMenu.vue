@@ -1,5 +1,5 @@
 <template>
-  <div class="tag-dropdown location-dropdown selection-dropdown location-tree-menu" @click.stop>
+  <div class="tag-dropdown location-dropdown selection-dropdown location-tree-menu" @click.stop @keydown.esc.stop.prevent="emit('close')">
     <input
       ref="searchInputRef"
       class="input dropdown-search-input location-dropdown-search"
@@ -15,14 +15,14 @@
         type="button"
         class="tag-option location-option location-tree-all-option"
         :class="{ 'is-selected': allSelected }"
-        @mousedown.prevent @click="emit('select-all')"
+        @mousedown.prevent @click="emit('select-all', $event)" @keydown.ctrl.enter.prevent.stop="emit('select-all', $event)" @keydown.ctrl.space.prevent.stop="emit('select-all', $event)"
       ><span>All</span></button>
       <button
         v-if="showUnassignedOption"
         type="button"
         class="tag-option location-option location-tree-unassigned-option"
         :class="{ 'is-selected': unassignedSelected }"
-        @mousedown.prevent @click="emit('select-unassigned')"
+        @mousedown.prevent @click="emit('select-unassigned', $event)" @keydown.ctrl.enter.prevent.stop="emit('select-unassigned', $event)" @keydown.ctrl.space.prevent.stop="emit('select-unassigned', $event)"
       ><span>Unassigned</span></button>
       <div
         v-if="showFixedOptionsDivider && hasHierarchyRows"
@@ -58,7 +58,7 @@
             type="button"
             class="location-tree-label location-tree-group-label"
             :data-tip="getGroupTooltip(row)"
-            @mousedown.prevent @click="selectRow(row)"
+            @mousedown.prevent @click="selectRow(row, $event)" @keydown.ctrl.enter.prevent.stop="selectRow(row, $event)" @keydown.ctrl.space.prevent.stop="selectRow(row, $event)"
           >{{ row.Label }}</button>
           <span v-else class="location-tree-label location-tree-group-label">{{ row.Label }}</span>
         </div>
@@ -66,7 +66,7 @@
         <div
           v-else-if="row.Location"
           class="location-tree-row location-tree-location-row is-interactive"
-          :class="{ 'is-selected': selectedLocationId === row.Location.LocationId }"
+          :class="{ 'is-selected': isLocationSelected(row.Location.LocationId) }"
           :style="rowIndent(row)"
         >
           <button
@@ -84,7 +84,7 @@
             type="button"
             class="location-tree-label location-tree-location-label"
             :data-tip="getLocationTooltip(row.Location.LocationId)"
-            @mousedown.prevent @click="selectRow(row)"
+            @mousedown.prevent @click="selectRow(row, $event)" @keydown.ctrl.enter.prevent.stop="selectRow(row, $event)" @keydown.ctrl.space.prevent.stop="selectRow(row, $event)"
           >{{ row.Label }}</button>
         </div>
       </template>
@@ -109,7 +109,8 @@ const props = defineProps({
   searchText: { type: String, default: "" },
   searchPlaceholder: { type: String, default: "Search locations" },
   selectedLocationId: { type: String, default: "" },
-  selectedRegion: { type: Object, default: null },
+  selectedLocationIds: { type: Array, default: () => [] },
+  selectedRegions: { type: Array, default: () => [] },
   mode: { type: String, default: "location" },
   showAllOption: { type: Boolean, default: false },
   allSelected: { type: Boolean, default: false },
@@ -174,10 +175,9 @@ function isGroupSelectable(row) {
 
 function isRowSelected(row) {
   if (props.mode === "filter") {
-    return Boolean(props.selectedRegion && isKnownRegion(row.Region)
-      && sameLocationRegionFilter(props.selectedRegion, row.Region));
+    return isKnownRegion(row.Region) && props.selectedRegions.some(region => sameLocationRegionFilter(region, row.Region));
   }
-  return Boolean(row.Location && props.selectedLocationId === row.Location.LocationId);
+  return Boolean(row.Location && isLocationSelected(row.Location.LocationId));
 }
 
 function getGroupTooltip(row) {
@@ -187,12 +187,16 @@ function getGroupTooltip(row) {
   return row.Location ? getLocationTooltip(row.Location.LocationId) : "";
 }
 
-function selectRow(row) {
+function isLocationSelected(id) {
+  return props.mode === "filter" ? props.selectedLocationIds.includes(id) : props.selectedLocationId === id;
+}
+
+function selectRow(row, event) {
   if (row.Type === "group" && props.mode === "filter") {
-    if (isKnownRegion(row.Region)) emit("select-region", row.Region);
+    if (isKnownRegion(row.Region)) emit("select-region", row.Region, event);
     return;
   }
-  if (row.Location) emit("select-location", row.Location.LocationId);
+  if (row.Location) emit("select-location", row.Location.LocationId, event);
 }
 
 function updateSearch(event) {
@@ -210,7 +214,7 @@ function onSearchKeydown(event) {
   if (event.key === "Enter") {
     event.preventDefault();
     const first = firstSelectableRow();
-    if (first) selectRow(first);
+    if (first) selectRow(first, event);
     return;
   }
   if (event.key === "Escape") {
