@@ -230,5 +230,8 @@ function onSearchKeydown(event) {
 
 onMounted(() => {
   searchInputRef.value?.focus();
+  const panel = searchInputRef.value?.closest(".batch-panel-scroll");
+  const menu = searchInputRef.value?.parentElement;
+  if (panel && menu) menu.scrollIntoView({ block: menu.offsetHeight > panel.clientHeight ? "start" : "nearest", inline: "nearest", behavior: "instant" });
 });
 </script>

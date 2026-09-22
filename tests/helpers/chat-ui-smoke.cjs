@@ -102,7 +102,8 @@ async function run() {
     config: structuredClone(DEFAULT_CONFIG),
     logger: { info() {}, warn() {}, error() {} },
   });
-  if (process.env.REGISTRY_UI_SMOKE) await require('./registry-filter-checks.cjs').prepare(library);
+  if (process.env.REGISTRY_UI_SMOKE || process.env.BATCH_POPUP_SMOKE) await require('./registry-filter-checks.cjs').prepare(library);
+  if (process.env.BATCH_POPUP_SMOKE) await require('./batch-popup-checks.cjs').prepare(library);
   if (process.env.VIEWER_VISUAL_SMOKE) await require('../../scripts/build-video-covers').run({paths:resolveLibraryPaths(library),config:structuredClone(DEFAULT_CONFIG),logger:{info(){},warn(){},error(){}}});
   const metadata = await fsp.readFile(
     path.join(library, ".photo_manager", "data", "photo_metadata.jsonl"),
@@ -193,6 +194,10 @@ async function run() {
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
   if (process.env.MANUAL_CACHE_SMOKE) {
     await require('./manual-cache-checks.cjs')({win,library,click,waitFor});
+    return;
+  }
+  if (process.env.BATCH_POPUP_SMOKE) {
+    await require('./batch-popup-checks.cjs')({win, click, waitFor, setValue});
     return;
   }
   if (process.env.REGISTRY_UI_SMOKE) {

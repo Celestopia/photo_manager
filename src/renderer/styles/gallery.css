@@ -213,7 +213,8 @@
 .card-caption .meta { margin-top: 8px; font-size: 12px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--text-soft); }
 .card-rating-stars { color: #e5a100; letter-spacing: 0; white-space: nowrap; }
 .batch-panel { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
-.batch-panel-scroll { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.batch-panel-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.batch-panel-scroll > * { flex-shrink: 0; }
 .batch-panel-scroll > label { font-weight: 700; }
 .batch-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .batch-panel-header h3 { margin: 0; }
