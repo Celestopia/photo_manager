@@ -37,6 +37,7 @@ export function useUiFeedback() {
   }
 
   function hideDynamicTooltip() {
+    dynamicTooltipRef.value?.hidePopover();
     dynamicTooltip.visible = false;
     if (tooltipTimer) {
       clearTimeout(tooltipTimer);
@@ -69,8 +70,11 @@ export function useUiFeedback() {
       if (!tooltipTarget) return;
       dynamicTooltip.text = tooltipTarget.dataset.tip || "";
       if (!dynamicTooltip.text) return;
+      dynamicTooltip.host = tooltipTarget.closest("dialog[open]") || document.body;
       dynamicTooltip.visible = true;
       await nextTick();
+      if (!dynamicTooltip.visible || !tooltipTarget?.isConnected) return;
+      dynamicTooltipRef.value?.showPopover();
       await positionDynamicTooltip(tooltipTarget);
     }, 500);
   }

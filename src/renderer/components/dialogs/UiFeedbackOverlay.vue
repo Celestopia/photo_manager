@@ -1,11 +1,15 @@
 <template>
   <div class="copy-toast" v-if="toast.visible">{{ toast.message }}</div>
+  <Teleport :to="dynamicTooltip.host || 'body'">
   <div
     class="dynamic-tooltip"
+    popover="manual"
+    role="tooltip"
     v-if="dynamicTooltip.visible"
     ref="dynamicTooltipRef"
     :style="{ left: dynamicTooltip.x + 'px', top: dynamicTooltip.y + 'px' }"
   >{{ dynamicTooltip.text }}</div>
+  </Teleport>
 </template>
 
 <script setup>

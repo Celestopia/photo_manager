@@ -2,6 +2,8 @@
 
 .dynamic-tooltip {
   position: fixed;
+  inset: auto;
+  margin: 0;
   max-width: min(360px, calc(100vw - 16px));
   white-space: normal;
   font-size: 12px;

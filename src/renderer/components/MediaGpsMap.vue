@@ -7,7 +7,7 @@
     </div>
     <Teleport to="body">
       <dialog ref="dialog" class="gps-map-dialog" aria-label="Location map" @cancel.prevent @keydown.stop>
-        <header><h3>Location</h3><button ref="closeButton" type="button" class="btn icon-btn" aria-label="Close map" title="Close map" @click="close"><img :src="closeIcon" alt="" /></button></header>
+        <header><h3>Location</h3><button ref="closeButton" type="button" class="btn icon-btn" aria-label="Close map" data-tip="Close map" @click="close"><img :src="closeIcon" alt="" /></button></header>
         <div class="gps-map-large">
           <GpsMapCanvas v-if="expanded && supported" :coordinates="coordinates" :viewport="viewport" expanded @viewport="viewport = $event" />
         </div>
