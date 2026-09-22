@@ -27,7 +27,7 @@ Library inputs use `MediaId`, so renaming or moving a file within the library do
 Use this layout:
 
 ```text
-<library>/.photo_manager/chat/v2/
+<library>/.photo_manager/chat/
   sessions/
     <session-id>/
       session.json
@@ -70,7 +70,7 @@ Deletion requires confirmation because it removes the conversation and its impor
 Perform deletion in this order:
 
 1. Stop any active request for the session and wait for preparation and writes to finish.
-2. Atomically move the entire session directory into `chat/v2/trash` on the same filesystem.
+2. Atomically move the entire session directory into `chat/trash` on the same filesystem.
 3. Remove the session from visible History.
 4. Recursively delete that session's validated trash directory.
 
@@ -80,7 +80,7 @@ Chat storage is excluded from automatic library backups. Copying or moving the e
 
 ## Define the Stored Records
 
-Use `schemaVersion: 2`, strict field validation and validated references. Do not introduce implicit migrations or partially load invalid records.
+Use `schemaVersion: 2`, strict field validation and validated references. The sole storage root is `chat/`; there are no version-directory readers, fallback paths, or automatic migrations. Do not introduce implicit migrations or partially load invalid records.
 
 | Record | Required information |
 | --- | --- |

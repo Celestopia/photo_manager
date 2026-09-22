@@ -590,7 +590,7 @@ async function run() {
   assert.equal(
     (
       await fsp.readdir(
-        path.join(library, ".photo_manager", "chat", "v2", "sessions"),
+        path.join(library, ".photo_manager", "chat", "sessions"),
       )
     ).length,
     0,

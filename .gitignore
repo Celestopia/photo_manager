@@ -11,6 +11,7 @@ pnpm-debug.log*
 *.log
 
 # Temporary files
+/tmp/
 *.tmp
 *.temp
 *.bak

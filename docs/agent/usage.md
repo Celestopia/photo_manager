@@ -64,7 +64,7 @@ Generated queries go to Tavily, and retrieved text goes to the Assistant model. 
 
 Each message accepts up to eight attachments. A model request accepts up to eight images in total, so each video/GIF consumes several of those slots. Older whole turns can be omitted to stay within the request limits; the reply records a notice when that happens. See [input processing](inputs.md) for exact limits.
 
-Conversations and imported attachments are saved under `<library>/.photo_manager/chat/v2/`. They are excluded from automatic library backups. Deleting a conversation deletes its imported attachments after confirmation, but preserves original library media. If a locked file delays cleanup, the app reports it and retries on the next library open.
+Conversations and imported attachments are saved under `<library>/.photo_manager/chat/`. They are excluded from automatic library backups. Deleting a conversation deletes its imported attachments after confirmation, but preserves original library media. If a locked file delays cleanup, the app reports it and retries on the next library open.
 
 
 The composer’s + button opens upward with Add current media and Add text or image files. Provider settings is opened by the header gear. Message options contains only image quality and directly visible saved-metadata choices.

@@ -459,30 +459,24 @@ test("stale proposals need a fresh explicit review and backup failure leaves dis
   assert.equal(f.index.get(f.id).Customization.Title, "Manual");
 });
 
-test("chat recovery stays within its owned storage namespace", async (t) => {
+test("chat uses flat storage without discovering historical version directories", async (t) => {
   const f = await fixture(t);
-  const outside = path.join(
-    f.library.paths.managerDir,
-    "chat",
-    "sessions",
-    "old",
-  );
-  const trash = path.join(f.library.paths.managerDir, "chat", "trash", "old");
-  await fs.mkdir(outside, { recursive: true });
-  await fs.mkdir(trash, { recursive: true });
-  await fs.writeFile(path.join(outside, "session.json"), "outside bytes");
-  await fs.writeFile(path.join(trash, "attachment"), "keep");
+  assert.equal(f.store.root, path.join(f.library.paths.managerDir, "chat"));
+  const session = await f.store.create();
+  const file = path.join(f.store.root, "sessions", session.sessionId, "session.json");
+  const bytes = await fs.readFile(file, "utf8");
+  assert.equal(JSON.parse(bytes).schemaVersion, 2);
+  await assert.rejects(fs.access(path.join(f.store.root, "v2")), { code: "ENOENT" });
+  // Leftover directories must never become fallback sources or cleanup targets.
+  const historical = path.join(f.store.root, "v2", "sessions", session.sessionId);
+  await fs.mkdir(historical, { recursive: true });
+  await fs.writeFile(path.join(historical, "session.json"), bytes);
+  assert.equal((await f.store.load(session.sessionId)).sessionId, session.sessionId);
+  assert.deepEqual(await f.store.remove(session.sessionId), { pending: false });
   await f.store.recover();
-  const opened = await f.chat.open();
-  assert.deepEqual(Object.keys(opened), ["sessions"]);
-  assert.equal(
-    await fs.readFile(path.join(outside, "session.json"), "utf8"),
-    "outside bytes",
-  );
-  assert.equal(
-    await fs.readFile(path.join(trash, "attachment"), "utf8"),
-    "keep",
-  );
+  assert.deepEqual(await f.store.list(true), []);
+  await assert.rejects(f.store.load(session.sessionId), { code: "ENOENT" });
+  assert.equal(await fs.readFile(path.join(historical, "session.json"), "utf8"), bytes);
 });
 
 test("fake tools and an alternative normalized adapter do not require runner changes", async () => {

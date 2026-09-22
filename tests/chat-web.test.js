@@ -103,7 +103,7 @@ test('search and page results round-trip with same-attempt provenance and safe s
     return completion(`The tower is in Paris [source:${searchResult.sources[0].sourceId}].`);
   });
   const s = await f.send(); assert.equal(s.messages[1].status, 'complete');
-  const raw = JSON.parse(await fs.readFile(path.join(f.library.paths.managerDir, 'chat/v2/sessions', s.sessionId, 'session.json'), 'utf8'));
+  const raw = JSON.parse(await fs.readFile(path.join(f.library.paths.managerDir, 'chat/sessions', s.sessionId, 'session.json'), 'utf8'));
   assertSession(raw, f.library.manifest.libraryId);
   const source = raw.messages[1].attempt.steps[1].outcome.sources[0];
   assert.equal(await f.chat.sourceUrl(s.sessionId, source.sourceId), source.url);

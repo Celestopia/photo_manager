@@ -42,7 +42,7 @@ async function safeRemove(root, target) {
   await fs.rm(target, { recursive: true, force: true });
 }
 function createStore(library) {
-  const root = path.join(library.paths.managerDir, "chat", "v2");
+  const root = path.join(library.paths.managerDir, "chat");
   const libraryId = library.manifest.libraryId;
   const file = async (sid) =>
     safePath(root, "sessions", id(sid), "session.json");

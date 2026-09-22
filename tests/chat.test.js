@@ -306,7 +306,6 @@ test("service sends only selected inputs, persists provenance and leaves sources
     path.join(
       library.paths.managerDir,
       "chat",
-      "v2",
       "sessions",
       session.sessionId,
       "session.json",
