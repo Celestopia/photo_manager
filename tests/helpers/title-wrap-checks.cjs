@@ -1,0 +1,46 @@
+const assert = require('node:assert/strict');
+
+module.exports = async ({win,setValue,click,waitFor}) => {
+  const evaluate = expression => win.webContents.executeJavaScript(expression);
+  const size = () => evaluate(`(()=>{const e=document.querySelector('.viewer-title-input');return {height:e.getBoundingClientRect().height,scroll:e.scrollHeight,width:e.clientWidth,scrollWidth:e.scrollWidth,value:e.value};})()`);
+  assert.equal(await evaluate(`CSS.supports('field-sizing','content')`),true);
+  const originalDraft = (await size()).value;
+  await setValue('.viewer-title-input','Short title');
+  assert.equal((await size()).height,34);
+  const long = '长标题测试'.repeat(100) + 'unbroken'.repeat(100);
+  await setValue('.viewer-title-input',long);
+  let measured = await size();
+  assert.equal(measured.height,74);
+  assert.ok(measured.scroll > measured.height);
+  assert.equal(measured.scrollWidth,measured.width);
+  assert.equal(measured.value,long,'Visual wrapping preserves stored text');
+  await evaluate(`document.querySelector('.viewer-title-input').focus()`);
+  win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter'});
+  win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter'});
+  assert.equal((await size()).value,long,'Enter must not insert a newline');
+  assert.equal(await evaluate(`(()=>{const e=new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true});document.querySelector('.viewer-title-input').dispatchEvent(e);return e.defaultPrevented;})()`),false,'IME Enter remains available');
+  await setValue('.viewer-title-input','One\nTwo');
+  assert.equal((await size()).height,54);
+  assert.equal((await size()).value,'One\nTwo');
+  await setValue('.viewer-title-input','W'.repeat(50));
+  const normal = (await size()).height;
+  await evaluate(`document.querySelector('.viewer-title-input').style.width='150px'`);
+  await waitFor(`document.querySelector('.viewer-title-input').getBoundingClientRect().height===74`);
+  await evaluate(`document.querySelector('.viewer-title-input').style.width=''`);
+  await waitFor(`document.querySelector('.viewer-title-input').getBoundingClientRect().height===${normal}`);
+  await click('.inline-feedback .btn:not(.btn-primary)');
+  assert.equal((await size()).height,34,'Cancelling restores compact title sizing');
+  if (process.env.TITLE_UI_SMOKE) {
+    await setValue('.viewer-title-input',long);
+    await evaluate(`document.querySelector('.viewer-title-input').focus()`);
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter',modifiers:['control']});
+    win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter',modifiers:['control']});
+    await waitFor(`!document.querySelector('.inline-feedback')`);
+    await click('.nav-btn.right');
+    await waitFor(`document.querySelector('.viewer-title-input').getBoundingClientRect().height===34`);
+    await click('.nav-btn.left');
+    await waitFor(`document.querySelector('.viewer-title-input').getBoundingClientRect().height===74`);
+    assert.equal((await size()).value,long,'Ctrl+Enter saves without adding visual newlines');
+  } else await setValue('.viewer-title-input',originalDraft);
+  console.log('TITLE_WRAP_CHECKS_PASS: bounded wrapping, long Unicode text, width changes, cancellation, Enter and IME.');
+};

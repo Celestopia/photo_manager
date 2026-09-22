@@ -184,7 +184,7 @@
   <aside class="side-panel right-panel" :class="{ collapsed: !showRightPanel, 'is-saving': saving }" :inert="saving ? '' : undefined" :aria-busy="saving">
     <div class="viewer-metadata-fields">
     <h3>Customization</h3>
-    <label for="viewer-title-input">Title</label><textarea id="viewer-title-input" class="input viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.ctrl.enter.exact="confirmTextEdit" @keydown.escape="blurTextEdit" rows="1" wrap="off"></textarea>
+    <label for="viewer-title-input">Title</label><textarea id="viewer-title-input" class="input viewer-title-input" v-model="editDraft.Title" @input="onFieldTextareaInput($event, 'Title')" @keydown.enter="onTitleEnter" @keydown.escape="blurTextEdit" rows="1" wrap="soft"></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Title'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Title'">{{ saveNotice.message }}</div>
     <div class="viewer-field-heading">
@@ -491,6 +491,12 @@ const showVideoCenterPlay = computed(() => (
   && !videoSeeking.value
   && !videoFrameStepping.value
 ));
+
+function onTitleEnter(event) {
+  if (event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  if (event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) confirmTextEdit(event);
+}
 
 function confirmTextEdit(event) {
   if (!editingDirty.value || event.isComposing || event.repeat) return;

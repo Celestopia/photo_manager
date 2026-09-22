@@ -233,8 +233,10 @@ async function run() {
   assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.right-panel .registry-field-icon').length`), 4);
   const titleHeight = await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').getBoundingClientRect().height`);
   await setValue('.viewer-title-input', 'Unicode title 首钢园\nSecond line');
-  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').getBoundingClientRect().height`), titleHeight, 'Title must not grow for multiline stored text');
-  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').value.includes('\\n')`), true, 'One-line presentation must not destroy stored line breaks');
+  assert.ok(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').getBoundingClientRect().height`) > titleHeight, 'Title grows for multiline stored text');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-title-input').value.includes('\\n')`), true, 'Wrapping must not destroy stored line breaks');
+  await require('./title-wrap-checks.cjs')({win,setValue,click,waitFor});
+  if (process.env.TITLE_UI_SMOKE) return;
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.viewer-left-tools button').textContent.trim()`), '', 'Delete stays icon-only');
   await fsp.mkdir(path.resolve('release'), { recursive: true });
   await sleep(400);
