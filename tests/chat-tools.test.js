@@ -700,3 +700,61 @@ test("an unrecovered transaction blocks new mutations until recovery", async t =
   await fs.rm(f.library.paths.transactionFile);
   assertMutationReady(f.library);
 });
+
+
+test("tag pagination distinguishes invalid cursors, different queries and registry changes", async () => {
+  const tags = Array.from({length: 55}, (_, i) => ({TagId: randomUUID(), Text: `Tag ${String(i).padStart(2,'0')}`, Description: ''}));
+  const ctx = { signal: new AbortController().signal, budget: createBudget(), enabled: ['find_library_tags'], scope: {groups:{basic:true},mediaIds:[randomUUID()]}, represented:new Set(), checkLibrary(){}, tags:()=>tags };
+  const lookup = (query, cursor) => metadataTools.execute({name:'find_library_tags',arguments:JSON.stringify({query,cursor})},ctx);
+  const first = await lookup('Tag',null);
+  assert.equal(first.tags.length,50);
+  const last = await lookup('Tag',first.cursor);
+  assert.equal(last.tags.length,5); assert.equal(last.cursor,null);
+  assert.equal((await lookup('Tag','null')).code,'invalid_cursor');
+  assert.equal((await lookup('Other',first.cursor)).code,'cursor_query_mismatch');
+  tags[0].Description='Updated';
+  assert.equal((await lookup('Tag',first.cursor)).code,'resource_conflict');
+  assert.equal((await lookup('Tag',null)).status,'success');
+});
+
+test("tag lookup stops after two failures including queued calls and resets next turn", async t => {
+  let offered = [];
+  const f = await fixture(t, body => {
+    const current = body.messages.slice(body.messages.findLastIndex(m=>m.role==='user')+1);
+    const outcomes = current.filter(m=>m.role==='tool').map(m=>JSON.parse(m.content));
+    offered = (body.tools || []).map(t=>t.function.name);
+    if (!outcomes.length) return reply('',Array.from({length:3},()=>({name:'find_library_tags',args:{query:'',cursor:'bad'}})));
+    assert.equal(outcomes[0].code,'invalid_cursor');
+    assert.equal(outcomes[1].code,'invalid_cursor');
+    assert.match(outcomes[1].message,/disabled for the rest of this turn/);
+    assert.equal(outcomes[2].code,'permission_denied');
+    assert.ok(!offered.includes('find_library_tags'));
+    assert.ok(offered.includes('propose_title'));
+    return reply('Tag lookup could not complete.');
+  });
+  await f.send('Suggest tags');
+  await f.send('Try finding tags again');
+  const initial = f.requests.filter(body => !body.messages.slice(body.messages.findLastIndex(m=>m.role==='user')+1).some(m=>m.role==='tool'));
+  assert.equal(initial.length,2);
+  assert.ok(initial.every(body=>body.tools.some(t=>t.function.name==='find_library_tags')));
+});
+
+test("one corrected tag lookup succeeds and ordinary discussion retains its own request", async t => {
+  const f = await fixture(t, body => {
+    const text = body.messages.filter(m=>m.role==='user').at(-1).content[0].text;
+    const system = body.messages[0].content;
+    assert.match(system,/ordinary conversation, not requests to edit metadata/);
+    assert.match(system,/Previous tool activity does not authorize more proposals/);
+    if (text==='What is this?') return reply('A red image.');
+    const outcomes = body.messages.filter(m=>m.role==='tool').map(m=>JSON.parse(m.content));
+    if (!outcomes.length) return reply('',[{name:'find_library_tags',args:{query:'',cursor:'bad'}}]);
+    if (outcomes.length===1) return reply('',[{name:'find_library_tags',args:{query:'',cursor:null}}]);
+    assert.equal(outcomes[1].status,'success');
+    assert.ok(body.tools.some(t=>t.function.name==='find_library_tags'));
+    return reply('Existing tags found.');
+  });
+  await f.send('Find existing tags');
+  const result = await f.send('What is this?');
+  assert.equal(result.proposals.length,0);
+  assert.equal(f.index.get(f.id).Customization.Title,'Original');
+});

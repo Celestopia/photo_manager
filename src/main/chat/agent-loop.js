@@ -25,6 +25,10 @@ async function runAgent({
   );
   const combined = AbortSignal.any([signal, deadlineSignal]);
   let reason = "stop";
+  const failures = new Map();
+  const enabledTools = (round) => round >= budget.policy.completions - 1 ? [] : definitions.filter(
+    (d) => !d.maxFailuresPerTurn || (failures.get(d.name) || 0) < d.maxFailuresPerTurn,
+  );
   try {
     for (let round = 0; ; round++) {
       combined.throwIfAborted();
@@ -36,7 +40,7 @@ async function runAgent({
       const result = await complete(
         [...messages, ...transcript(message.attempt.steps)],
         {
-          tools: round >= budget.policy.completions - 1 ? [] : definitions,
+          tools: enabledTools(round),
           signal: combined,
           onText: (text) => {
             step.text = text;
@@ -60,15 +64,18 @@ async function runAgent({
       await save();
       for (const call of step.calls) {
         combined.throwIfAborted();
-        const outcome = await executor(call, {
+        let outcome = await executor(call, {
           ...context,
           signal: combined,
           budget,
-          enabled:
-            round >= budget.policy.completions - 1
-              ? []
-              : definitions.map((d) => d.name),
+          enabled: enabledTools(round).map((d) => d.name),
         });
+        const limit = definitions.find((d) => d.name === call.name)?.maxFailuresPerTurn;
+        if (limit && outcome.status === "error") {
+          const count = (failures.get(call.name) || 0) + 1;
+          failures.set(call.name, count);
+          if (count >= limit) outcome = { ...outcome, message: outcome.message.slice(0, 350) + " This tool is disabled for the rest of this turn after repeated failures. Do not retry; explain the limitation briefly." };
+        }
         context.afterTool?.(call, outcome);
         message.attempt.steps.push({ kind: "tool", callId: call.id, outcome });
         // A proposal staged by an executor and its result become durable together.

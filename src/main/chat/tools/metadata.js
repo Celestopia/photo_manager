@@ -29,12 +29,13 @@ const definitions = [
     name: "find_library_tags",
     contractVersion: 1,
     effect: "read",
+    maxFailuresPerTurn: 2,
     replay: "explicit",
     description:
-      "Find existing tags in this library. Query matches tag name or description. Use returned TagIds for proposals. Empty results mean no match; do not invent tags.",
+      "Find existing tags only when the user requests tag lookup or tag suggestions/changes, not ordinary image discussion. Query matches name or description. Start with cursor null; use a returned cursor unchanged only with the exact same query. Empty results mean no match; do not invent tags.",
     parameters: parameters({
-      query: string,
-      cursor: { type: ["string", "null"] },
+      query: { type: "string", description: "Tag name or description search; keep identical while paging." },
+      cursor: { type: ["string", "null"], description: "null for a new query or one corrected retry; otherwise the exact cursor returned for this query." },
     }),
     available: (scope) => scope.groups.basic && scope.mediaIds.length > 0,
     validate(a) {
@@ -71,23 +72,20 @@ const definitions = [
           a.Text.localeCompare(b.Text, "en-US") ||
           a.TagId.localeCompare(b.TagId),
       );
+      const queryHash = createHash("sha256").update(a.query).digest("hex");
       const revision = createHash("sha256")
-        .update(JSON.stringify([a.query, tags]))
+        .update(JSON.stringify(tags))
         .digest("hex");
       let offset = 0;
       if (a.cursor !== null) {
         const parts = a.cursor.split(":");
-        offset = Number(parts[1]);
-        if (
-          parts.length !== 2 ||
-          parts[0] !== revision ||
-          !Number.isSafeInteger(offset) ||
-          offset < 0
-        )
-          throw new AgentError(
-            "resource_conflict",
-            "Tags changed. Repeat the lookup with a null cursor.",
-          );
+        offset = Number(parts[2]);
+        if (parts.length !== 3 || !/^[a-f0-9]{64}$/.test(parts[0]) || !/^[a-f0-9]{64}$/.test(parts[1]) || !/^[1-9][0-9]*$/.test(parts[2]) || !Number.isSafeInteger(offset))
+          throw new AgentError("invalid_cursor", "Invalid tag lookup cursor. Retry once with cursor null; copy returned cursors exactly.");
+        if (parts[0] !== queryHash)
+          throw new AgentError("cursor_query_mismatch", "This cursor belongs to a different query. Retry once with cursor null.");
+        if (parts[1] !== revision)
+          throw new AgentError("resource_conflict", "The tag registry changed since this page was read. Retry once with cursor null.");
       }
       const q = a.query.toLocaleLowerCase("en-US");
       const matches = tags.filter((t) =>
@@ -112,7 +110,7 @@ const definitions = [
         tags: result,
         cursor:
           offset + result.length < matches.length
-            ? `${revision}:${offset + result.length}`
+            ? `${queryHash}:${revision}:${offset + result.length}`
             : null,
       };
     },
@@ -126,7 +124,7 @@ const definitions = [
     contractVersion: 1,
     effect: "proposal",
     replay: "local-call-id",
-    description: `Prepare a ${name} suggestion for human review. Does not save metadata. ${name === "tags" ? "Only existing TagIds are allowed. Default to add unless removal or replacement is requested." : "An empty string proposes clearing this field."}`,
+    description: `Only when the user explicitly requests ${name} metadata suggestions or changes (including clear follow-ups), prepare a ${name} suggestion for human review. Do not use for ordinary image questions or requests about other metadata fields. Does not save metadata. ${name === "tags" ? "Only existing TagIds are allowed. Default to add unless removal or replacement is requested." : "An empty string proposes clearing this field."}`,
     parameters: parameters(
       name === "tags"
         ? {

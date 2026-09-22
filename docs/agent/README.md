@@ -2,7 +2,7 @@
 
 Viewer chat supports tool calling and reviewed metadata suggestions. Start with [Using Assistant](usage.md) for provider setup and everyday use. These pages document its behavior and implementation as part of [PROJECT.md](../../PROJECT.md).
 
-Assistant sits beside the photo or video in the viewer. Users can ask questions, attach images or text files, and return to saved conversations later. The agent can look up existing tags and propose titles, descriptions and tag assignments for explicitly supplied library media. Each change requires Accept in its conversation preview. Optional Tavily search and page extraction supply cited web evidence. Gallery agent panels, embeddings, audio transcription and cross-library access remain out of scope.
+Assistant sits beside the photo or video in the viewer. Users can ask questions, attach images or text files, and return to saved conversations later. The agent can look up existing tags and propose titles, descriptions and tag assignments for explicitly supplied library media. Each change requires Accept in its conversation preview. Ordinary image questions receive direct conversational answers: metadata suggestions and changes require a clear user request for the relevant field. The Assistant should not append unsolicited editing offers; previous proposals do not authorize further editing. Optional Tavily search and page extraction supply cited web evidence. Gallery agent panels, embeddings, audio transcription and cross-library access remain out of scope.
 
 ## A Conversation from Start to Finish
 
