@@ -1,3 +1,4 @@
+const { configureMapNetwork } = require("./map-network");
 const { groupMediaPathsByHash, countMediaTypes } = require("../../scripts/media-summary");
 const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
 /**
@@ -9,7 +10,7 @@ const { assertMediaTechnicalFields } = require("../shared/media-technical-schema
  * 3) Route IPC handlers to the session that owns the trusted sender.
  * 4) Create and monitor renderer windows.
  */
-const { app, BrowserWindow, ipcMain, protocol, net } = require("electron");
+const { app, BrowserWindow, ipcMain, protocol, net, shell } = require("electron");
 const { SCHEME, registerViewerImageScheme, createViewerImageResources, handleViewerImageRequest } = require("./viewer-image-resources");
 registerViewerImageScheme(protocol);
 const fs = require("node:fs");
@@ -1037,6 +1038,7 @@ async function createLibraryWindow() {
         preloadPath: path.join(__dirname, "preload.js"),
         appendLog: (message) => sessionRouter.run(session, () => appendLog(message)),
         onCreated: (window) => {
+          configureMapNetwork(window, { app, shell });
           session.runtime.mainWindow = window;
           sessionRouter.register(session);
           window.on("closed", () => {

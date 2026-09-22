@@ -12,6 +12,7 @@ Current capabilities include:
 
 - Managing images and videos on one timeline.
 - Opening multiple independent library windows by launching PhotoManager again, with one active library per window.
+- Viewing saved media GPS on read-only embedded or expanded OpenStreetMap maps (see Interface and Editing).
 - Viewing images, playing videos, resizing or collapsing viewer-session side panels, and editing shared customization fields.
 - Keeping viewer arrow navigation available after ordinary button clicks while preserving text editing, control adjustment, popup handling and video seeking shortcuts.
 - Generating separate first-frame video viewer covers only through explicit maintenance or CLI commands, with aspect-preserving scaling (see Media Processing and Playback).

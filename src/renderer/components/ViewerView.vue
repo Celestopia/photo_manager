@@ -250,6 +250,7 @@
     ></textarea>
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'Location'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
     <div class="save-notice inline-save-notice" v-if="saveNotice.visible && saveNotice.field === 'Location'">{{ saveNotice.message }}</div>
+    <MediaGpsMap :key="selectedItem?.MediaId" :gps="selectedItem?.GPS" :active="locationDetailExpanded" />
     <label>People</label>
     <PeoplePicker target="viewer" placeholder="Add an existing person" search-placeholder="Search people" />
     <div class="inline-feedback" v-if="editingDirty && activeEditField === 'People'"><span class="confirm-text">Save changes?</span><button class="btn btn-primary" @click="confirmEdit">Yes</button><button class="btn" @click="cancelEdit">No</button></div>
@@ -346,6 +347,7 @@ import TagPicker from "./TagPicker.vue";
 import PrivacyLevelPicker from "./PrivacyLevelPicker.vue";
 import VideoPlaybackControls from "./VideoPlaybackControls.vue";
 import ViewerImage from "./ViewerImage.vue";
+import MediaGpsMap from "./MediaGpsMap.vue";
 import ChatPanel from "./ChatPanel.vue";
 import { CHAT_CONTEXT } from "../context/renderer-contexts.js";
 const chat = inject(CHAT_CONTEXT);

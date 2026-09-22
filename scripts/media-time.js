@@ -1,3 +1,4 @@
+const { validGps, dmsToDecimal, gpsFromStoredMetadata } = require("../src/shared/gps.mjs");
 const { find: findTimeZones } = require("geo-tz");
 
 const formatterCache = new Map();
@@ -184,15 +185,6 @@ function formatInstantAtOffset(stamp, offsetMinutes) {
   };
 }
 
-function validGps(gps) {
-  if (gps?.latitude === null || gps?.latitude === undefined || gps?.latitude === "") return null;
-  if (gps?.longitude === null || gps?.longitude === undefined || gps?.longitude === "") return null;
-  const latitude = Number(gps?.latitude);
-  const longitude = Number(gps?.longitude);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
-  return { latitude, longitude };
-}
 
 function zonesForGps(gps, lookup = findTimeZones) {
   const coordinates = validGps(gps);
@@ -321,15 +313,6 @@ function resolveMediaShootingTime({ candidates = [], gps = null, fallback = null
   return null;
 }
 
-function dmsToDecimal(value, reference) {
-  if (!Array.isArray(value) || value.length < 3) return null;
-  const degrees = Number(value[0]);
-  const minutes = Number(value[1]);
-  const seconds = Number(value[2]);
-  if (![degrees, minutes, seconds].every(Number.isFinite)) return null;
-  const sign = /^(S|W)$/i.test(String(reference || "")) ? -1 : 1;
-  return sign * (Math.abs(degrees) + minutes / 60 + seconds / 3600);
-}
 
 function gpsFromExif(exif) {
   const latitude = dmsToDecimal(exif?.GPSLatitude, exif?.GPSLatitudeRef);
@@ -337,11 +320,6 @@ function gpsFromExif(exif) {
   return validGps({ latitude, longitude });
 }
 
-function gpsFromStoredMetadata(gps) {
-  const latitude = dmsToDecimal(gps?.Latitude, gps?.LatitudeRef);
-  const longitude = dmsToDecimal(gps?.Longitude, gps?.LongitudeRef);
-  return validGps({ latitude, longitude });
-}
 
 function resolveStoredMediaTimeContext(item, lookup = findTimeZones) {
   const fileSystem = item?.FileSystem || {};

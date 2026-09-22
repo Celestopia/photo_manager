@@ -1,7 +1,7 @@
 {
   "name": "photo-manager",
   "productName": "PhotoManager",
-  "version": "0.39.4",
+  "version": "0.40.0",
   "description": "Local image and video manager built with Electron and Vue",
   "author": "PhotoManager",
   "engines": {
@@ -32,6 +32,7 @@
     "exifr": "^7.1.3",
     "geo-tz": "^8.1.8",
     "js-yaml": "^4.3.2",
+    "leaflet": "1.9.4",
     "markdown-it": "^15.0.1",
     "sharp": "^0.35.4"
   }

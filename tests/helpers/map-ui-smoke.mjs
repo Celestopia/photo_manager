@@ -1,0 +1,22 @@
+// Standalone offscreen Electron test; synthetic tiles only. Artifacts stay in tmp/.
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { build } from 'vite';
+import vue from '@vitejs/plugin-vue';
+const root=resolve(import.meta.dirname,'../..');
+const source=resolve(root,'tmp/map-smoke-src'), output=resolve(root,'tmp/map-smoke-dist');
+await mkdir(source,{recursive:true});
+await writeFile(resolve(source,'index.html'),'<html><body><div id="app"></div><script type="module" src="./entry.js"></script></body></html>');
+await writeFile(resolve(source,'entry.js'), `import {createApp,h,ref} from 'vue';
+import Map from '../../src/renderer/components/MediaGpsMap.vue';
+import '../../src/renderer/styles/tokens.css';
+import '../../src/renderer/styles/base.css';
+const active=ref(false),gps=ref({}),id=ref(1);
+window.mapTest={active:v=>active.value=v,gps:v=>{gps.value=v;id.value++}};
+createApp({setup:()=>()=>h('div',{style:'width:360px;padding:20px'},[h(Map,{key:id.value,active:active.value,gps:gps.value})])}).mount('#app');`);
+await build({configFile:false,root:source,base:'./',plugins:[vue()],build:{outDir:output,emptyOutDir:true}});
+const require=createRequire(import.meta.url),env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+const child=spawn(require('electron'),[resolve(root,'tests/helpers/map-ui-electron.cjs'),resolve(output,'index.html')],{env,stdio:'inherit',windowsHide:true});
+child.on('exit',code=>process.exit(code??1));

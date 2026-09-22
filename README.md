@@ -130,3 +130,7 @@ git diff --check
 ```
 
 For changed CommonJS files, also run `node --check <file>`. Metadata verification always requires an explicit test-library path.
+
+### GPS maps
+
+Expand Location details in the media viewer to show an interactive OpenStreetMap map when saved GPS coordinates are available. Expand the map for a larger view; maps are read-only and do not change metadata. Visible maps load online automatically: tile requests reveal the viewed area and IP address to the provider, but photos and descriptive metadata are not uploaded. Internet access is required for uncached tiles.

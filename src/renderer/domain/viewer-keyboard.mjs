@@ -1,6 +1,7 @@
 /** Return whether a global viewer shortcut may act while this element owns focus. */
 export function allowsViewerGlobalShortcut(activeElement) {
   if (!activeElement) return true;
+  if (activeElement.closest?.(".media-gps-map, .gps-map-dialog")) return false;
   const tagName = String(activeElement.tagName || "").toUpperCase();
   if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(tagName)) return false;
   return !activeElement.isContentEditable;
@@ -11,6 +12,7 @@ export function allowsViewerHorizontalArrow(event, activeElement, overlayOpen = 
   if (!["ArrowLeft", "ArrowRight"].includes(event.key) || event.defaultPrevented
     || event.isComposing || event.keyCode === 229 || event.ctrlKey || event.altKey || event.metaKey || overlayOpen) return false;
   if (!activeElement) return true;
+  if (activeElement.closest?.(".media-gps-map, .gps-map-dialog")) return false;
   if (activeElement.isContentEditable) return false;
   const tag = String(activeElement.tagName || "").toUpperCase();
   if (["TEXTAREA", "SELECT", "AUDIO", "VIDEO"].includes(tag)) return false;
