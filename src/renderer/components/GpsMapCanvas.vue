@@ -47,7 +47,7 @@ onBeforeUnmount(() => { clearTimer(); observer?.disconnect(); map?.remove(); });
 </script>
 
 <style>
-.gps-map-surface { position: relative; height: 100%; min-height: 200px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-card-soft); }
+.gps-map-surface { position: relative; isolation: isolate; height: 100%; min-height: 200px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-card-soft); }
 .gps-map-canvas { height: 100%; min-height: 200px; width: 100%; }
 .gps-map-surface .leaflet-container { background: var(--bg-card-soft); font-family: inherit; }
 .gps-map-surface .leaflet-control-zoom a { color: var(--text); width: 24px; height: 24px; line-height: 24px; font-size: 18px; }

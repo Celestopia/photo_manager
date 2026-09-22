@@ -17,6 +17,7 @@ import '../../src/renderer/styles/feedback.css';
 import Map from '../../src/renderer/components/MediaGpsMap.vue';
 import '../../src/renderer/styles/tokens.css';
 import '../../src/renderer/styles/base.css';
+import '../../src/renderer/styles/registry-controls.css';
 const active=ref(false),gps=ref({}),id=ref(1);
 window.mapTest={active:v=>active.value=v,gps:v=>{gps.value=v;id.value++}};
 createApp({setup:()=>{const feedback=useUiFeedback();provide(UI_FEEDBACK_CONTEXT,feedback);feedback.install();onBeforeUnmount(feedback.dispose);return ()=>h('div',{style:'width:360px;padding:20px'},[h(Overlay),h(Map,{key:id.value,active:active.value,gps:gps.value})])}}).mount('#app');`);

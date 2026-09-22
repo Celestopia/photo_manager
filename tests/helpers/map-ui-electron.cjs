@@ -31,6 +31,19 @@ async function run(){
  await js('mapTest.active(true)');await until('document.body.textContent.includes("GPS unavailable")');assert.equal(requests,0);
  await js(`mapTest.gps(${JSON.stringify(gps)})`);
  await until('!!document.querySelector(".leaflet-tile-loaded")');assert.ok(requests>0);
+ // Real registry overlay styles must cover every map layer, including controls.
+ for (const className of ['tag-dropdown','tag-create-popover']) {
+   assert.equal(await js(`(() => {
+     const map=document.querySelector('.gps-map-surface'), r=map.getBoundingClientRect();
+     const panel=document.createElement('div');panel.className='${className}';
+     Object.assign(panel.style,{position:'fixed',left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px',maxHeight:'none'});
+     const host=document.querySelector('.media-gps-map');host.before(panel);
+     let clicked=false;panel.addEventListener('click',()=>clicked=true);
+     const points=[[r.x+r.width/2,r.y+r.height/2],...['.leaflet-control-zoom-in','.gps-map-recenter','.gps-map-expand','.gps-map-attribution'].map(selector=>{const b=map.querySelector(selector).getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2]})];
+     const above=points.every(([x,y])=>document.elementFromPoint(x,y)===panel);
+     document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).click();panel.remove();return above&&clicked;
+   })()`),true,className+' must cover the map and receive clicks');
+ }
  await checkTooltip('.gps-map-recenter','Recenter');
  await checkTooltip('.leaflet-control-zoom-in','Zoom in');
  await checkTooltip('.leaflet-control-zoom-out','Zoom out');
