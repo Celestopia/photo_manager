@@ -1,5 +1,5 @@
 import { createRegistryRequests } from "../domain/registry-requests.mjs";
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref } from "vue";
 import {
   toggleRegistryFilter,
   applyLocationSelectionFilter,
@@ -13,9 +13,11 @@ import {
 import {
   buildLocationCreateParentPatch,
   buildLocationHierarchyRows,
+  getDefaultLocationExpansionKeys,
+  getVisibleLocationHierarchyRows,
   compareLocationsByRegionAndTree,
   filterLocationsWithAncestors,
-  getLocationManagerRowContext,
+  buildLocationSubtreeCounts,
   getLocationPathLabel,
   getLocationRegionLabel,
   isLocationWithinSubtree,
@@ -26,7 +28,7 @@ import {
   normalizeLocationName,
 } from "../domain/location-hierarchy.mjs";
 
-/** Owns ID-backed hierarchical location pickers, context bars, and registry mutations. */
+/** Owns ID-backed hierarchical location pickers, manager folding, and registry mutations. */
 export function useLocationRegistry({
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   gallerySettingsOpen, recentLocations, rememberRecentLocation,
@@ -46,13 +48,53 @@ export function useLocationRegistry({
   });
   const requests = createRegistryRequests(locationManager);
   const locationManagerListRef = ref(null);
-  const locationManagerContext = ref("");
 
+  const managerExpandedKeys = ref(new Set());
+  const managerSearchActive = computed(() => Boolean(locationManager.search.trim()));
   const managerFilteredLocations = computed(() => {
     const keyword = locationManager.search.trim();
-    return keyword ? locationRegistry.value.filter((location) => locationMatchesKeyword(location, keyword)) : [...locationRegistry.value];
+    return filterLocationsWithAncestors(locationRegistry.value, keyword);
   });
-  const managerLocationRows = computed(() => buildLocationHierarchyRows(managerFilteredLocations.value));
+  const managerHierarchyRows = computed(() => buildLocationHierarchyRows(managerFilteredLocations.value));
+  const managerLocationRows = computed(() => getVisibleLocationHierarchyRows(
+    managerHierarchyRows.value, managerExpandedKeys.value, managerSearchActive.value,
+  ));
+  const managerSubtreeCounts = computed(() => buildLocationSubtreeCounts(locationRegistry.value));
+  function managerLocationCount(row) {
+    return managerRowExpanded(row)
+      ? row.Location.UsageCount || 0
+      : managerSubtreeCounts.value.get(row.Location.LocationId) || 0;
+  }
+  function managerRowExpanded(row) { return managerSearchActive.value || managerExpandedKeys.value.has(row.Key); }
+  function managerFoldDisabled(row) {
+    if (locationManager.saving || managerSearchActive.value) return true;
+    const editing = managerHierarchyRows.value.find(item => item.Location?.LocationId === locationManager.editingId);
+    return Boolean(editing && (!row || editing.RequiredExpansionKeys.includes(row.Key)));
+  }
+  function toggleManagerRow(row) {
+    if (managerFoldDisabled(row)) return;
+    const next = new Set(managerExpandedKeys.value);
+    const keys = row.Type === "group" ? [row.Key, `group-locations:${row.Key}`] : [row.Key];
+    if (next.has(row.Key)) keys.forEach(key => next.delete(key));
+    else keys.forEach(key => next.add(key));
+    managerExpandedKeys.value = next;
+  }
+  function expandManagerLocations() {
+    if (locationManager.saving || managerSearchActive.value) return;
+    managerExpandedKeys.value = new Set(managerHierarchyRows.value.flatMap(row => [row.Key, ...row.RequiredExpansionKeys]));
+  }
+  function collapseManagerLocations() {
+    if (managerFoldDisabled()) return;
+    managerExpandedKeys.value = new Set(getDefaultLocationExpansionKeys(managerHierarchyRows.value));
+  }
+  function revealManagerLocation(id) {
+    if (!locationManager.visible) return;
+    locationManager.search = "";
+    const row = managerHierarchyRows.value.find(item => item.Location?.LocationId === id);
+    if (!row) return;
+    managerExpandedKeys.value = new Set([...managerExpandedKeys.value, ...row.RequiredExpansionKeys]);
+    nextTick(() => locationManagerListRef.value?.querySelector(`[data-location-id="${id}"]`)?.scrollIntoView({ block: "nearest" }));
+  }
 
   function applyLocationRegistry(locations) {
     locationRegistry.value = (Array.isArray(locations) ? locations : []).map((location) => ({
@@ -93,21 +135,6 @@ export function useLocationRegistry({
     const location = getLocation(locationId);
     return location ? [getLocationRegionLabel(location), getLocationPathLabel(location), location.Description].filter(Boolean).join("\n") : "";
   }
-
-  function updateLocationManagerContext() {
-    const list = locationManagerListRef.value;
-    if (!list) { locationManagerContext.value = ""; return; }
-    const listTop = list.getBoundingClientRect().top;
-    const items = [...list.querySelectorAll(".location-manager-item[data-location-context]")];
-    let current = null;
-    for (const item of items) {
-      const rect = item.getBoundingClientRect();
-      if (rect.top <= listTop + 1 && rect.bottom > listTop) current = item;
-      else if (!current && rect.top > listTop) { current = item; break; }
-    }
-    locationManagerContext.value = current?.dataset?.locationContext || "";
-  }
-  function scheduleLocationManagerContextUpdate() { if (locationManager.visible) nextTick(updateLocationManagerContext); }
 
   function getLocationCandidates(target) {
     const keyword = normalizeLocationName(locationSearch[target]);
@@ -272,7 +299,7 @@ export function useLocationRegistry({
     if (!result) return;
     if (!result?.ok) { locationCreate.error = result?.error || "Could not create location"; return; }
     applyLocationRegistry(result.locations);
-    if (target === "manager") { showToastMessage(`Created location “${result.location.Name}”`); scheduleLocationManagerContextUpdate(); }
+    if (target === "manager") { revealManagerLocation(result.location.LocationId); showToastMessage(`Created location “${result.location.Name}”`); }
     else setLocationForTarget(target, result.location.LocationId);
     closeCreateLocationMenu();
   }
@@ -284,7 +311,8 @@ export function useLocationRegistry({
     locationManager.visible = true;
     locationManager.error = "";
     await loadLocations();
-    scheduleLocationManagerContextUpdate();
+    managerExpandedKeys.value = new Set(getDefaultLocationExpansionKeys(managerHierarchyRows.value));
+
   }
   function cancelLocationEdit() {
     if (locationManager.saving) return;
@@ -296,7 +324,7 @@ export function useLocationRegistry({
   function closeLocationManager() {
     if (locationManager.saving) return;
     if (locationCreate.target === "manager") closeCreateLocationMenu();
-    locationManager.visible = false; locationManager.search = ""; locationManagerContext.value = ""; cancelLocationEdit();
+    locationManager.visible = false; locationManager.search = ""; cancelLocationEdit();
   }
   function startLocationEdit(location) {
     if (locationManager.saving) return;
@@ -339,7 +367,8 @@ export function useLocationRegistry({
     );
     applyLocationRegistry(result.locations);
     cancelLocationEdit();
-    scheduleLocationManagerContextUpdate();
+    if (administrativeRegionChanged || parentChanged) revealManagerLocation(locationId);
+
     const current = requests.capture();
     if (shouldRefreshGallery) await queryGallery();
     if (!current()) return;
@@ -385,15 +414,16 @@ export function useLocationRegistry({
       visible: false, search: "", editingId: "", editName: "", editCountry: "", editProvince: "",
       editCity: "", editParentId: null, editDescription: "", saving: false, error: "",
     });
-    locationManagerContext.value = "";
+
+    managerExpandedKeys.value = new Set();
   }
-  watch(() => [locationManager.visible, locationManager.search, managerLocationRows.value.length], scheduleLocationManagerContextUpdate);
 
   return {
     locationRegistry, locationSearch, locationDropdown, locationCreate, locationManager,
-    locationManagerListRef, locationManagerContext, managerFilteredLocations, managerLocationRows,
+    locationManagerListRef, managerFilteredLocations, managerLocationRows,
+    managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
     loadLocations, getLocationName, getLocationTreeLabel, getLocationTooltip,
-    getLocationManagerRowContext, updateLocationManagerContext, scheduleLocationManagerContextUpdate,
+
     getLocationOptions, getRecentLocationOptions, getLocationMenuRows, getLocationFilterRows,
     setLocationFilter, setLocationRegionFilter, getLocationParentRows, openLocationDropdown,
     closeLocationDropdown, closeAllLocationDropdowns, setLocationForTarget, clearLocationForTarget,

@@ -9,20 +9,26 @@
         </div>
       </header>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="locationManager.search" placeholder="Search locations, descriptions, or regions" /></div>
-      <div class="location-manager-current-context" v-if="locationManagerContext">{{ locationManagerContext }}</div>
-      <div class="tag-manager-list location-manager-list" ref="locationManagerListRef" @scroll="updateLocationManagerContext">
+      <div class="location-manager-fold-actions">
+        <button class="btn" :disabled="locationManager.saving || managerSearchActive" @click="expandManagerLocations">Expand all</button>
+        <button class="btn" data-tip="Collapse to city level" :disabled="managerFoldDisabled()" @click="collapseManagerLocations">Collapse all</button>
+      </div>
+      <div class="tag-manager-list location-manager-list" ref="locationManagerListRef">
         <template v-for="row in managerLocationRows" :key="'location_manager_' + row.Key">
-          <div v-if="row.Type === 'group' && !row.Location" class="location-manager-group-row" :style="{ paddingLeft: 12 + row.Depth * 18 + 'px' }">{{ row.Label }}</div>
+          <div v-if="row.Type === 'group' && !row.Location" class="location-manager-group-row" :style="{ paddingLeft: 12 + row.Depth * 18 + 'px' }">
+            <button v-if="row.HasExpandableChildren" class="location-manager-fold" :aria-expanded="managerRowExpanded(row)" :disabled="managerFoldDisabled(row)" @click="toggleManagerRow(row)"><img :src="ICONS.chevronDown" :class="{ 'is-expanded': managerRowExpanded(row) }" alt="" />{{ row.Label }}</button>
+            <span v-else class="location-manager-leaf">{{ row.Label }}</span>
+          </div>
           <article
             v-else-if="row.Location"
             class="tag-manager-item location-manager-item"
             :style="{ marginLeft: row.Depth * 18 + 'px' }"
-            :data-location-context="getLocationManagerRowContext(row)"
+            :data-location-id="row.Location.LocationId"
           >
             <div class="tag-manager-item-main">
               <div class="tag-manager-item-title location-manager-item-title">
-                <div class="location-manager-title-text"><strong>{{ row.Label }}</strong><small v-if="row.Location.Description">{{ row.Location.Description }}</small></div>
-                <span>{{ row.Location.UsageCount || 0 }} media items</span>
+                <div class="location-manager-title-text"><button v-if="row.HasExpandableChildren" class="location-manager-fold" :aria-expanded="managerRowExpanded(row)" :disabled="managerFoldDisabled(row)" @click="toggleManagerRow(row)"><img :src="ICONS.chevronDown" :class="{ 'is-expanded': managerRowExpanded(row) }" alt="" /><strong>{{ row.Label }}</strong></button><strong v-else class="location-manager-leaf">{{ row.Label }}</strong><small v-if="row.Location.Description">{{ row.Location.Description }}</small></div>
+                <span :data-tip="managerRowExpanded(row) || !row.HasExpandableChildren ? 'Directly assigned to this location' : 'Includes descendant locations'">{{ managerLocationCount(row) }} {{ managerLocationCount(row) === 1 ? 'media item' : 'media items' }}</span>
               </div>
               <div v-if="locationManager.editingId === row.Location.LocationId" class="location-manager-edit">
                 <label>Location name</label><input autofocus class="input" v-model="locationManager.editName" :disabled="locationManager.saving" @keydown.enter.exact.prevent="saveLocationEdit" @keydown.escape.prevent="cancelLocationEdit" />
@@ -80,9 +86,9 @@ import LocationParentPicker from "../LocationParentPicker.vue";
 const context = inject(LOCATION_CONTEXT);
 if (!context) throw new Error("LocationManagerDialog requires LOCATION_CONTEXT");
 const {
-  locationManager, locationManagerContext, locationManagerListRef, managerLocationRows,
-  locationCreate, openCreateLocationMenu, closeLocationManager, updateLocationManagerContext,
-  getLocationManagerRowContext,
+  ICONS, locationManager, locationManagerListRef, managerLocationRows,
+  managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
+  locationCreate, openCreateLocationMenu, closeLocationManager,
   startLocationEdit, saveLocationEdit, cancelLocationEdit, deleteLocationGlobally,
   closeCreateLocationMenu, setEditLocationParent,
   setCreateLocationParent, createLocationAndSelect,

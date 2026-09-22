@@ -13,7 +13,6 @@ import {
   filterLocationsWithAncestors,
   getDefaultLocationExpansionKeys,
   getLocationRegionFilterLabel,
-  getLocationManagerRowContext,
   getVisibleLocationHierarchyRows,
   isLocationWithinSubtree,
   sameLocationRegionFilter,
@@ -405,7 +404,6 @@ test("location hierarchy emits administrative rows and stable manager context", 
   assert.equal(getLocationRegionFilterLabel(cityGroup.Region), "中国 / 湖南 / 长沙");
   assert.equal(sameLocationRegionFilter(cityGroup.Region, { ...cityGroup.Region }), true);
   const locationRow = rows.find((row) => row.Label === "五一广场");
-  assert.equal(getLocationManagerRowContext(locationRow), "中国 | 湖南 | 长沙");
 });
 
 test("new location parent selection copies direct administrative fields without binding clear", () => {

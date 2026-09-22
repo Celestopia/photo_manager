@@ -22,6 +22,7 @@ Current capabilities include:
 - Explorer-compatible copying of one viewer file or an ordered gallery selection through the Windows file clipboard.
 - Permanent single-item and all-or-nothing batch media deletion with filesystem/metadata transaction recovery.
 - Batch-setting titles, ratings, privacy levels, albums, tags, people, and primary locations across mixed images and videos.
+- Managing locations in a foldable card hierarchy with city-level defaults and expand/collapse controls (see Interface and Editing).
 - Managing tags, albums, people, and locations through registries, while preventing metadata from referencing unregistered values.
 - Keeping metadata, registries, thumbnails, logs, and backups separate for every library.
 - Running initialization, incremental updates, integrity verification, thumbnail generation, and CSV export inside the application.

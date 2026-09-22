@@ -112,10 +112,23 @@ export function isLocationWithinSubtree(locations, locationId, rootLocationId) {
   return false;
 }
 
-export function getLocationManagerRowContext(row) {
-  if (row?.Location) return getLocationRegionParts(row.Location).join(" | ");
-  if (Array.isArray(row?.ContextParts) && row.ContextParts.length) return row.ContextParts.filter(Boolean).join(" | ");
-  return "";
+/** Direct usage plus all ParentId descendants; independent of search and folding. */
+export function buildLocationSubtreeCounts(locations) {
+  const children = new Map();
+  for (const location of locations) {
+    if (!children.has(location.ParentId)) children.set(location.ParentId, []);
+    children.get(location.ParentId).push(location);
+  }
+  const totals = new Map();
+  function count(location) {
+    if (totals.has(location.LocationId)) return totals.get(location.LocationId);
+    const total = (location.UsageCount || 0)
+      + (children.get(location.LocationId) || []).reduce((sum, child) => sum + count(child), 0);
+    totals.set(location.LocationId, total);
+    return total;
+  }
+  locations.forEach(count);
+  return totals;
 }
 
 function getLocationGroupSpecs(location) {
