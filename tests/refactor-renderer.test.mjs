@@ -199,3 +199,28 @@ test('location manager counts descendants only on collapsed cards and refreshes 
   assert.equal(s.managerLocationCount(row('parent')),9);
   assert.equal(row('parent').Location.UsageCount,2);
 });
+
+test('administrative count tooltips use full scoped direct usage independently of search and folding', async () => {
+  let locations = [
+    {LocationId:'city',Name:'Town',Country:'Country',Province:'North',City:'Town',UsageCount:1},
+    {LocationId:'park',Name:'Park',Country:'Country',Province:'North',City:'Town',ParentId:'city',UsageCount:4},
+    {LocationId:'other',Name:'Other',Country:'Country',Province:'South',City:'Town',UsageCount:2},
+    {LocationId:'empty',Name:'Empty',Country:'Elsewhere',City:'Town',UsageCount:0},
+  ];
+  const {state:s}=registryFixture(useLocationRegistry,{listLocations:async()=>({ok:true,locations})});
+  await s.openLocationManager();
+  const city=s.managerLocationRows.value.find(row=>row.Location?.LocationId==='city');
+  const south=s.managerLocationRows.value.find(row=>row.Level==='city' && row.Region.province==='South');
+  const country=s.managerLocationRows.value.find(row=>row.Level==='country' && row.Label==='Country');
+  assert.equal(s.managerRegionTooltip(city),'5 media items');
+  assert.equal(s.managerRegionTooltip(south),'2 media items');
+  assert.equal(s.managerRegionTooltip(country),'7 media items');
+  assert.equal(s.managerRegionTooltip(s.managerLocationRows.value.find(row=>row.Level==='city' && row.Region.country==='Elsewhere')),'0 media items');
+  s.expandManagerLocations(); s.locationManager.search='Park';
+  assert.equal(s.managerRegionTooltip(country),'7 media items');
+  assert.equal(s.managerRegionTooltip(city),'5 media items');
+  assert.equal(s.managerRegionTooltip(s.managerLocationRows.value.find(row=>row.Location?.LocationId==='park')),'');
+  locations=locations.map(item=>item.LocationId==='park'?{...item,UsageCount:0}:item);
+  await s.loadLocations();
+  assert.equal(s.managerRegionTooltip(city),'1 media item');
+});

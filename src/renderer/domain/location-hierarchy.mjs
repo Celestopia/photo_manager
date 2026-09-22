@@ -326,3 +326,22 @@ export function getDefaultLocationExpansionKeys(rows) {
     .filter((row) => row.Type === "group" && ["country", "province"].includes(row.Level))
     .map((row) => row.Key);
 }
+
+export function locationRegionCountKey(region) {
+  const length = { country: 1, province: 2, city: 3 }[region?.level];
+  return length ? JSON.stringify([region.country, region.province, region.city].slice(0, length)) : "";
+}
+
+/** Aggregate direct usage once per administrative level, never subtree totals. */
+export function buildLocationRegionCounts(locations) {
+  const counts = new Map();
+  for (const location of locations) {
+    const parts = [location.Country, location.Province, location.City];
+    parts.forEach((part, index) => {
+      if (!part) return;
+      const key = JSON.stringify(parts.slice(0, index + 1));
+      counts.set(key, (counts.get(key) || 0) + (location.UsageCount || 0));
+    });
+  }
+  return counts;
+}

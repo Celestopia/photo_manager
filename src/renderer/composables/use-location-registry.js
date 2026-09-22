@@ -18,6 +18,8 @@ import {
   compareLocationsByRegionAndTree,
   filterLocationsWithAncestors,
   buildLocationSubtreeCounts,
+  buildLocationRegionCounts,
+  locationRegionCountKey,
   getLocationPathLabel,
   getLocationRegionLabel,
   isLocationWithinSubtree,
@@ -59,6 +61,13 @@ export function useLocationRegistry({
   const managerLocationRows = computed(() => getVisibleLocationHierarchyRows(
     managerHierarchyRows.value, managerExpandedKeys.value, managerSearchActive.value,
   ));
+  const managerRegionCounts = computed(() => buildLocationRegionCounts(locationRegistry.value));
+  function managerRegionTooltip(row) {
+    const key = locationRegionCountKey(row.Region);
+    if (!key) return "";
+    const count = managerRegionCounts.value.get(key) || 0;
+    return `${count} ${count === 1 ? "media item" : "media items"}`;
+  }
   const managerSubtreeCounts = computed(() => buildLocationSubtreeCounts(locationRegistry.value));
   function managerLocationCount(row) {
     return managerRowExpanded(row)
@@ -421,7 +430,7 @@ export function useLocationRegistry({
   return {
     locationRegistry, locationSearch, locationDropdown, locationCreate, locationManager,
     locationManagerListRef, managerFilteredLocations, managerLocationRows,
-    managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
+    managerRegionTooltip, managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
     loadLocations, getLocationName, getLocationTreeLabel, getLocationTooltip,
 
     getLocationOptions, getRecentLocationOptions, getLocationMenuRows, getLocationFilterRows,

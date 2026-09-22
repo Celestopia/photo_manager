@@ -458,7 +458,7 @@ export function useRendererApplication() {
       locationManager,
       locationManagerListRef,
       managerLocationRows,
-      managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
+      managerRegionTooltip, managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
       loadLocations,
       getLocationTreeLabel,
       getLocationName,
@@ -705,7 +705,7 @@ export function useRendererApplication() {
     const locationContext = {
       ICONS, UNASSIGNED_FILTER, query, editDraft, batchEdit, locationSearch, locationDropdown, locationCreate,
       locationManager, locationManagerListRef, managerLocationRows,
-      managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
+      managerRegionTooltip, managerLocationCount, managerSearchActive, managerRowExpanded, managerFoldDisabled, toggleManagerRow, expandManagerLocations, collapseManagerLocations,
       getLocationMenuRows, getLocationFilterRows,
       getLocationName,
       setLocationFilter, setLocationRegionFilter, getLocationParentRows, getLocationTooltip,
