@@ -289,7 +289,7 @@ export function useRendererApplication() {
       onExternalAction: () => closeTransientPanels(),
     });
     const viewerImageRef = ref(null);
-    const { imageUrl, imageFailed, imageLoaded } = useViewerImage({ api: API.videoCover,
+    const { imageUrl, imageLoaded } = useViewerImage({
       selectedItem, libraryState, view, orderedItems });
     const {
       editDraft,
@@ -725,7 +725,7 @@ export function useRendererApplication() {
       openTagManager, returnToLibraryEntry,
     };
     const viewerContext = {
-      viewerImageRef, imageUrl, imageFailed, imageLoaded,
+      viewerImageRef, imageUrl, imageLoaded,
       ICONS, WINDOW_ACTIONS, selectedItem, viewerHeaderTime, windowToggleTip, windowToggleIcon,
       ratioStyle, viewerLayoutRef, showLeftPanel, showRightPanel, panelResizeSide,
       beginPanelResize, restoreViewerPanel, mediaStageRef, videoElementRef, audioElementRef,

@@ -14,7 +14,7 @@ Current capabilities include:
 - Opening multiple independent library windows by launching PhotoManager again, with one active library per window.
 - Viewing images, playing videos, resizing or collapsing viewer-session side panels, and editing shared customization fields.
 - Keeping viewer arrow navigation available after ordinary button clicks while preserving text editing, control adjustment, popup handling and video seeking shortcuts.
-- Generating separate first-frame video viewer covers on demand, with aspect-preserving scaling and library-scoped cancellation (see Media Processing and Playback).
+- Generating separate first-frame video viewer covers only through explicit maintenance or CLI commands, with aspect-preserving scaling (see Media Processing and Playback).
 - Batch-generating video covers through gallery maintenance or the explicit-library CLI, with cache reuse and optional forced regeneration.
 - Using shared first-frame extraction for video thumbnails and covers, with explicit thumbnail maintenance rebuilding outdated cache recipes.
 - Displaying photos and video covers through one persistent image surface with stable library-scoped resource URLs, bounded adjacent preloading, and a decoded-frame handoff to video playback. Navigation retains the outgoing visual until the latest replacement decodes; see Shared Viewer Image Loading for transition and cleanup rules.

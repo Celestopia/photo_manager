@@ -26,7 +26,8 @@ test('viewer resources stream photos and covers without decoding and revoke stal
   const url = resources.urlFor(item);
   assert.equal(resources.urlFor(item), url, 'URL is stable for an unchanged resource');
   assert.equal(await (await handleViewerImageRequest(new Request(url))).text(), 'cover bytes');
-  const revised = resources.changed(item);
+  resources.invalidate();
+  const revised = resources.urlFor(item);
   assert.notEqual(revised, url);
   assert.equal((await handleViewerImageRequest(new Request(url))).status, 404);
   item.FileSystem.FileType = 'image';

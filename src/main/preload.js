@@ -16,10 +16,6 @@ function toSerializable(value) {
 }
 
 contextBridge.exposeInMainWorld("photoManagerApi", {
-  videoCover: {
-    request: payload => ipcRenderer.invoke("video-cover:request", payload),
-    cancel: requestId => ipcRenderer.invoke("video-cover:cancel", requestId),
-  },
   chat: {
     openSource: (sessionId, sourceId) => ipcRenderer.invoke('chat:openSource', { sessionId, sourceId }),
     searchConfiguration: () => ipcRenderer.invoke('chat:searchConfiguration'),

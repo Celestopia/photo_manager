@@ -1,43 +1,14 @@
 import { computed, watch, onScopeDispose } from "vue";
 
-/** Selected image loading is identical for photos and covers; only failed covers request repair. */
-export function useViewerImage({ api, selectedItem, libraryState, view, orderedItems, createImage = () => new Image() }) {
+/** Selected image loading is identical for photos and covers; neither path generates cache files. */
+export function useViewerImage({ selectedItem, libraryState, view, orderedItems, createImage = () => new Image() }) {
   const imageUrl = computed(() => selectedItem.value?.__viewerImageUrl || "");
-  let requestId = "", attempted = false, generation = 0;
   let preloads = [];
   function clearPreloads() {
     for (const image of preloads) { image.onload = null; image.onerror = null; image.src = ""; }
     preloads = [];
   }
-  function cancel() {
-    generation++;
-    if (requestId) void api.cancel(requestId).catch(() => {});
-    requestId = "";
-    attempted = false;
-  }
-  watch([() => libraryState.value?.active?.libraryId, () => view.value,
-    ], () => { cancel(); clearPreloads(); }, { flush: "sync" });
-  watch(() => selectedItem.value?.MediaId, cancel, { flush: "sync" });
-  async function imageFailed(failedUrl) {
-    const item = selectedItem.value;
-    if (failedUrl !== imageUrl.value || view.value !== "viewer" || item?.FileSystem?.FileType !== "video" || attempted) return;
-    attempted = true;
-    const token = generation;
-    requestId = crypto.randomUUID();
-    const id = requestId;
-    try {
-      const result = await api.request({ requestId: id, mediaId: item.MediaId });
-      if (generation !== token || result.requestId !== id || result.mediaId !== item.MediaId
-        || result.libraryId !== libraryState.value?.active?.libraryId) return;
-      if (result.status === "ready") {
-        const revision = new URL(result.url).search;
-        for (const candidate of [item, ...orderedItems.value]) {
-          if (candidate.SHA256Hash === item.SHA256Hash && candidate.__viewerImageUrl)
-            candidate.__viewerImageUrl = candidate.__viewerImageUrl.split("?")[0] + revision;
-        }
-      }
-    } catch { /* Keep the neutral error surface; no retry loop. */ }
-  }
+  watch([() => libraryState.value?.active?.libraryId, () => view.value], clearPreloads, { flush: "sync" });
   function imageLoaded(url) {
     if (url !== imageUrl.value || view.value !== "viewer") return;
     const previous = preloads;
@@ -67,6 +38,6 @@ export function useViewerImage({ api, selectedItem, libraryState, view, orderedI
     }
     for (const image of previous) if (!preloads.includes(image)) image.src = "";
   }
-  onScopeDispose(() => { cancel(); clearPreloads(); });
-  return { imageUrl, imageFailed, imageLoaded };
+  onScopeDispose(clearPreloads);
+  return { imageUrl, imageLoaded };
 }

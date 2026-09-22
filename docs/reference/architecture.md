@@ -62,8 +62,8 @@ IPC registration requires sender-session routing and a mutation coordinator. The
 - `operation-progress.js`, `maintenance-worker.js`: structured operation reporting and child-process dispatch.
 - `common.js`, `library-data.js`: scanning, hashing, record creation, registry loading, and reference validation.
 - `media-tools.js`, `media-time.js`, `thumbnail-cache.js`: FFmpeg execution/normalization, reference-time-zone logic, and thumbnail queues.
-- `video-first-frame.js`: shared first-frame stream selection, orientation/aspect normalization, and cancellable FFmpeg execution for thumbnails and covers. `video-cover-cache.js` and main-process `video-cover-service.js` own the separate derived cover cache and window-scoped cancellation.
-- `viewer-image-resources.js` owns capability-scoped viewer image URLs and streams trusted photo/cover files to Chromium. `ViewerImage.vue` and `use-viewer-image.js` own shared image display, bounded adjacent preloads and selected-cover repair; playback owns the decoded-frame handoff. See the media-pipeline reference for lifecycle and cache contracts.
+- `video-first-frame.js`: shared first-frame stream selection, orientation/aspect normalization, and cancellable FFmpeg execution for thumbnails and covers. `video-cover-cache.js` owns the separate derived cover cache; generation is available only through explicit maintenance/CLI operations.
+- `viewer-image-resources.js` owns capability-scoped viewer image URLs and streams trusted photo/cover files to Chromium. `ViewerImage.vue` and `use-viewer-image.js` own shared image display, bounded read-only adjacent preloads and unavailable states; playback owns the decoded-frame handoff. See the media-pipeline reference for lifecycle and cache contracts.
 - `init-metadata.js`, `update-metadata.js`, `verify-metadata.js`, `build-thumbnails.js`, `export-metadata-csv.js`: maintenance operations.
 - `start-electron.js`: sanitize the inherited environment and launch Electron.
 

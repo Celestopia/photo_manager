@@ -14,7 +14,6 @@ function registerViewerImageScheme(protocol) {
 }
 function createViewerImageResources({ getLibrary, getItem, fetchFile }) {
   let token = "", sessionId = "";
-  const revisions = new Map();
   const readers = new Set();
   function invalidate() {
     for (const reader of readers) reader.abort();
@@ -22,7 +21,6 @@ function createViewerImageResources({ getLibrary, getItem, fetchFile }) {
     owners.delete(token);
     token = "";
     sessionId = "";
-    revisions.clear();
   }
   function urlFor(item) {
     const library = getLibrary();
@@ -33,11 +31,7 @@ function createViewerImageResources({ getLibrary, getItem, fetchFile }) {
       token = randomBytes(24).toString("hex");
       owners.set(token, serve);
     }
-    return `${SCHEME}://${token}/${encodeURIComponent(item.MediaId)}?v=${item.SHA256Hash}.${revisions.get(item.SHA256Hash) || 0}`;
-  }
-  function changed(item) {
-    revisions.set(item.SHA256Hash, (revisions.get(item.SHA256Hash) || 0) + 1);
-    return urlFor(item);
+    return `${SCHEME}://${token}/${encodeURIComponent(item.MediaId)}?v=${item.SHA256Hash}`;
   }
   async function serve(request) {
     const library = getLibrary();
@@ -78,7 +72,7 @@ function createViewerImageResources({ getLibrary, getItem, fetchFile }) {
       "Cache-Control": "private, max-age=31536000, immutable",
     } });
   }
-  return { urlFor, changed, invalidate };
+  return { urlFor, invalidate };
 }
 async function handleViewerImageRequest(request) {
   try {

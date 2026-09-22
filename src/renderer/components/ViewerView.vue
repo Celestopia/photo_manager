@@ -79,7 +79,7 @@
     <div v-show="!videoFrameVisible" class="image-container" :class="{ 'viewer-surface-inactive': imagePending }"
       @mousedown="!imagePending && startDrag($event)" @click="!imagePending && isSelectedVideo && onVideoSurfaceClick($event)"
       @dblclick.stop.prevent="!imagePending && (isSelectedVideo ? onVideoSurfaceDoubleClick() : toggleFullscreen())">
-      <ViewerImage ref="viewerImageRef" :src="imageUrl" :media-style="viewerMediaStyle" :repair="imageFailed"
+      <ViewerImage ref="viewerImageRef" :src="imageUrl" :media-style="viewerMediaStyle" :unavailable-text="isSelectedVideo ? 'Video cover unavailable. Use Generate Video Covers in the gallery menu.' : 'Image unavailable'"
         @loaded="imageLoaded" @pending="imagePending = $event" />
     </div>
     <div v-if="isSelectedVideo" class="video-container">
@@ -375,7 +375,7 @@ function formatFlashUsed(value) {
 }
 
 const {
-  viewerImageRef, imageUrl, imageFailed, imageLoaded, videoFrameVisible,
+  viewerImageRef, imageUrl, imageLoaded, videoFrameVisible,
   ICONS,
   WINDOW_ACTIONS,
   selectedItem,

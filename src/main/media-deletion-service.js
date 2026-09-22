@@ -71,8 +71,7 @@ function createMediaDeletionService(options) {
     }
   }
 
-  return { deleteMedia: payload => options.withCoverMutation
-    ? options.withCoverMutation(() => deleteMedia(payload)) : deleteMedia(payload) };
+  return { deleteMedia };
 }
 
 module.exports = { createMediaDeletionService };

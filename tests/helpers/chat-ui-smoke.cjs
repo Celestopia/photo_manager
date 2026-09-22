@@ -89,7 +89,7 @@ async function run() {
     .toFile(path.join(library, "second.jpg"));
   const oldDate = new Date("2025-01-01T00:00:00Z");
   await fsp.utimes(path.join(library, "second.jpg"), oldDate, oldDate);
-  if (process.env.VIEWER_VISUAL_SMOKE) {
+  if (process.env.VIEWER_VISUAL_SMOKE || process.env.MANUAL_CACHE_SMOKE) {
     const { resolveMediaToolPaths, runMediaTool } = require('../../scripts/media-tools');
     const tools = resolveMediaToolPaths(path.resolve('.'), {});
     await runMediaTool(tools.ffmpegPath, ['-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-t', '2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(library, 'viewer-video.mp4')]);
@@ -103,6 +103,7 @@ async function run() {
     logger: { info() {}, warn() {}, error() {} },
   });
   if (process.env.REGISTRY_UI_SMOKE) await require('./registry-filter-checks.cjs').prepare(library);
+  if (process.env.VIEWER_VISUAL_SMOKE) await require('../../scripts/build-video-covers').run({paths:resolveLibraryPaths(library),config:structuredClone(DEFAULT_CONFIG),logger:{info(){},warn(){},error(){}}});
   const metadata = await fsp.readFile(
     path.join(library, ".photo_manager", "data", "photo_metadata.jsonl"),
   );
@@ -190,6 +191,10 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.MANUAL_CACHE_SMOKE) {
+    await require('./manual-cache-checks.cjs')({win,library,click,waitFor});
+    return;
+  }
   if (process.env.REGISTRY_UI_SMOKE) {
     await require('./registry-filter-checks.cjs').check({win, click, waitFor, setValue});
     return;

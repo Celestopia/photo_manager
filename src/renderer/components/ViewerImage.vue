@@ -5,13 +5,13 @@
       @load="loaded($event, entry)" @error="failed(entry)" />
     <canvas v-show="heldFrame" ref="frameCanvas" class="viewer-held-frame" />
     <span v-if="slow" class="viewer-image-status" role="status">Loading…</span>
-    <span v-if="unavailable" class="viewer-image-status" role="status">Image unavailable</span>
+    <span v-if="unavailable" class="viewer-image-status" role="status">{{ unavailableText }}</span>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, shallowRef, watch, onBeforeUnmount } from "vue";
-const props = defineProps({ src: { type: String, default: "" }, alt: { type: String, default: "" }, mediaStyle: Object, repair: Function });
+const props = defineProps({ src: { type: String, default: "" }, alt: { type: String, default: "" }, mediaStyle: Object, unavailableText: { type: String, default: "Image unavailable" } });
 const emit = defineEmits(["loaded", "pending"]);
 const displayed = shallowRef(null), incoming = shallowRef(null);
 const frameCanvas = ref(null), heldFrame = ref(false), slow = ref(false), unavailable = ref(false);
@@ -38,12 +38,9 @@ async function loaded(event, entry) {
   displayed.value = entry; incoming.value = null;
   clearTimer(); clearFrame(); emit("pending", false); emit("loaded", entry.src);
 }
-async function failed(entry) {
+function failed(entry) {
   if (incoming.value !== entry || entry.failed) return;
   entry.failed = true;
-  try { await props.repair?.(entry.src); } catch { /* Show the final unavailable state below. */ }
-  // A successful repair supplies a new URL; its incoming image owns the next transition.
-  if (incoming.value !== entry || props.src !== entry.src) return;
   incoming.value = null; displayed.value = null; clearFrame(); clearTimer();
   unavailable.value = true; emit("pending", false);
 }

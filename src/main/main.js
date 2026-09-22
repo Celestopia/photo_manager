@@ -12,7 +12,6 @@ const { assertMediaTechnicalFields } = require("../shared/media-technical-schema
 const { app, BrowserWindow, ipcMain, protocol, net } = require("electron");
 const { SCHEME, registerViewerImageScheme, createViewerImageResources, handleViewerImageRequest } = require("./viewer-image-resources");
 registerViewerImageScheme(protocol);
-const { createVideoCoverService } = require("./video-cover-service.js");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -101,7 +100,6 @@ const RENDERER_INDEX_PATH = path.join(APP_CODE_ROOT, "dist", "renderer", "index.
 const sessionRouter = createWindowSessionRouter();
 const state = sessionRouter.createProxy((session) => session.runtime, "window runtime");
 const chat = sessionRouter.createProxy((session) => session.chat, "window chat service");
-const videoCovers = sessionRouter.createProxy((session) => session.videoCovers, "window video covers");
 let config = null;
 let appState = { lastLibraryPath: "" };
 let lastLibraryName = "";
@@ -624,7 +622,6 @@ async function closeLibrary() {
   if (!state.activeLibrary) return getLibraryState();
   state.activeLibrary.state = "closing";
   sessionRouter.current().viewerImages.invalidate();
-  await videoCovers.stop();
   try { await chat.close(); }
   catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
   emitLibraryState();
@@ -755,7 +752,6 @@ async function runMaintenanceOperation(operation, options = {}) {
   emitLibraryState();
   try {
     await chat.close();
-    await videoCovers.stop();
     const result = await runOperationWorker(operation, library.paths.root, options);
     if (operation === "update") {
       // The worker has released its inherited operation lock, so the main
@@ -929,7 +925,6 @@ function createDomainServices() {
     touchLibraryManifest,
     emitLibraryState,
     stopChat: () => chat.stop(),
-    withCoverMutation: (operation) => videoCovers.exclusive(operation),
     appendLog,
   });
   return { albumService, locationService, mediaDeletionService, metadataEditService, personService, tagService };
@@ -941,8 +936,6 @@ function createDomainServices() {
  */
 function registerIpcHandlers() {
   const runWithSession = (event, operation) => sessionRouter.runForEvent(event, operation);
-  ipcMain.handle("video-cover:request", (event, payload) => runWithSession(event, () => videoCovers.request(payload)));
-  ipcMain.handle("video-cover:cancel", (event, requestId) => runWithSession(event, () => videoCovers.cancel(requestId)));
   registerChatIpc({
     chat,
     getWindow: () => state.mainWindow,
@@ -1001,7 +994,6 @@ async function closeWindowSession(session) {
   session.closePromise = sessionRouter.run(session, async () => {
     session.acceptingCommands = false;
     session.viewerImages.invalidate();
-    await videoCovers.stop();
     if (state.quickScanState) state.quickScanState.cancelled = true;
     await chat.stop().catch((error) => appendLog(`chat stop during window close failed: ${error.message}`));
     await Promise.allSettled([...session.pendingOperations]);
@@ -1035,14 +1027,6 @@ async function createLibraryWindow() {
     getLibrary: () => session.acceptingCommands && !session.runtime.maintenanceState.running ? session.runtime.activeLibrary : null,
     getItem: id => session.runtime.metadataIndex.get(id),
     fetchFile: (url, options) => net.fetch(url, options),
-  });
-  session.videoCovers = createVideoCoverService({
-    getLibrary: () => requireOpenLibrary({ writable: true }),
-    resolveMedia: resolveIndexedMediaPath,
-    appRoot: PROGRAM_RESOURCE_ROOT,
-    getConfig: () => config.media,
-    log: appendLog,
-    resourceChanged: item => session.viewerImages.changed(item),
   });
   session.services = sessionRouter.run(session, () => createDomainServices());
 
