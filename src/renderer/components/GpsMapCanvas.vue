@@ -27,11 +27,14 @@ function retry() { loading(); tiles.redraw(); }
 function recenter() { map.setView([props.coordinates.latitude, props.coordinates.longitude], 15, { animate: false }); }
 onMounted(() => {
   const center = props.viewport?.center || [props.coordinates.latitude, props.coordinates.longitude];
-  map = L.map(container.value, { attributionControl: false, scrollWheelZoom: true, minZoom: 1, maxZoom: 19 }).setView(center, props.viewport?.zoom ?? 15);
+  map = L.map(container.value, { attributionControl: false, scrollWheelZoom: true, doubleClickZoom: false, minZoom: 1, maxZoom: 19 }).setView(center, props.viewport?.zoom ?? 15);
   for (const control of map.zoomControl.getContainer().querySelectorAll("a")) {
     control.dataset.tip = control.title;
     control.removeAttribute("title");
   }
+  map.on("dblclick", event => {
+    if (!props.expanded && !event.originalEvent.target.closest(".leaflet-control")) emit("expand");
+  });
   map.on("moveend", () => emit("viewport", { center: [map.getCenter().lat, map.getCenter().lng], zoom: map.getZoom() }));
   L.circleMarker([props.coordinates.latitude, props.coordinates.longitude], { radius: 8, weight: 3, color: "#fff", fillColor: "#1f72cc", fillOpacity: 1, interactive: false }).addTo(map);
   tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, keepBuffer: 0, updateWhenIdle: true, detectRetina: false });

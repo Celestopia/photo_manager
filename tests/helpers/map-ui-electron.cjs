@@ -43,7 +43,11 @@ async function run(){
  assert.equal(await js(`document.querySelector('.media-gps-map').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:20}))`),true);
  await js('document.querySelector(".leaflet-control-zoom-in").click()');await pause(350);
  await until('[...document.querySelectorAll(".leaflet-tile-loaded")].some(e=>e.src.includes("/16/"))');
- await js('document.querySelector(".gps-map-expand").click()');
+ for (const selector of ['.gps-map-recenter','.gps-map-attribution','.leaflet-control-zoom-in']) {
+   await js(`document.querySelector('${selector}').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
+   assert.equal(await js('!!document.querySelector("dialog[open]")'),false);
+ }
+ await js('document.querySelector(".gps-map-canvas").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');
  await until('!!document.querySelector("dialog[open] .leaflet-tile-loaded")');
  assert.equal(await js('document.querySelectorAll(".leaflet-container").length'),1);
  await until('!document.querySelector(".gps-map-status")');await pause(250);
@@ -53,6 +57,8 @@ async function run(){
  await checkTooltip('.leaflet-control-zoom-in','Zoom in');
  await checkTooltip('.leaflet-control-zoom-out','Zoom out');
  await checkTooltip('.gps-map-dialog header button','Close map');
+ await js('document.querySelector(".gps-map-canvas").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');await pause(350);
+ assert.equal(await js(tileZoom(17)),false);
  await fs.writeFile(path.resolve('tmp/map-smoke-expanded.png'),(await window.webContents.capturePage()).toPNG());
  assert.equal(await js('[...document.querySelectorAll(".leaflet-tile-loaded")].some(e=>e.src.includes("/16/"))'),true);
  assert.equal(await wheel(false,20),false);await until(tileZoom(15));await pause(350);
