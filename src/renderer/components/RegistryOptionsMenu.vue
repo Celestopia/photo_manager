@@ -1,5 +1,5 @@
 <template>
-  <div class="tag-dropdown searchable-dropdown selection-dropdown registry-options-menu" @click.stop @keydown.esc.stop.prevent="emit('close')">
+  <div class="tag-dropdown searchable-dropdown selection-dropdown registry-options-menu" @click.stop v-escape-dismiss="() => emit('close')">
     <input
       ref="searchInputRef"
       class="input dropdown-search-input"
@@ -60,6 +60,7 @@
 </template>
 
 <script setup>
+import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { onMounted, ref } from "vue";
 
 const props = defineProps({
@@ -109,11 +110,6 @@ function onSearchKeydown(event) {
     event.preventDefault();
     const first = props.recentOptions[0] || props.options[0];
     if (first) emit("select", optionValue(first), event);
-    return;
-  }
-  if (event.key === "Escape") {
-    event.preventDefault();
-    emit("close");
     return;
   }
   if (event.key === "Backspace" && !props.searchText) {

@@ -1,5 +1,5 @@
 <template>
-  <div class="tag-dropdown location-dropdown selection-dropdown location-tree-menu" @click.stop @keydown.esc.stop.prevent="emit('close')">
+  <div class="tag-dropdown location-dropdown selection-dropdown location-tree-menu" @click.stop v-escape-dismiss="() => emit('close')">
     <input
       ref="searchInputRef"
       class="input dropdown-search-input location-dropdown-search"
@@ -95,6 +95,7 @@
 </template>
 
 <script setup>
+import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { computed, inject, onMounted, ref } from "vue";
 import { LOCATION_CONTEXT } from "../context/renderer-contexts.js";
 import {
@@ -215,11 +216,6 @@ function onSearchKeydown(event) {
     event.preventDefault();
     const first = firstSelectableRow();
     if (first) selectRow(first, event);
-    return;
-  }
-  if (event.key === "Escape") {
-    event.preventDefault();
-    emit("close");
     return;
   }
   if (event.key === "Backspace" && !props.searchText && props.selectedLocationId && props.mode === "location") {

@@ -168,7 +168,7 @@
       </div>
     </div>
     <button class="nav-btn right" aria-label="Next media" data-tip="Next media" @click="switchPhoto(1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5 7 7-7 7" /></svg></button>
-    <div v-if="showContextMenu" class="context-menu" :style="{ left: contextPosition.x + 'px', top: contextPosition.y + 'px' }" @click.stop>
+    <div v-if="showContextMenu" v-escape-dismiss="() => showContextMenu = false" class="context-menu" :style="{ left: contextPosition.x + 'px', top: contextPosition.y + 'px' }" @click.stop>
       <button @click="contextCopyFile">Copy File</button><button @click="contextCopyPath">Copy File Path</button><button @click="contextCopyJson">Copy Media Metadata JSON</button><button @click="openCurrentWithSystem">Open with Default App</button><button @click="showCurrentInFolder">Show in File Explorer</button>
     </div>
   </section>
@@ -336,6 +336,7 @@
 </template>
 
 <script setup>
+import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { computed, inject, ref } from "vue";
 import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";
 import AlbumPicker from "./AlbumPicker.vue";

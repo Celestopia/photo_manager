@@ -3,7 +3,7 @@
     <button class="btn icon-btn gallery-settings-trigger" data-tip="Library settings" aria-label="Library settings" :aria-expanded="gallerySettingsOpen" @click="onToggleGallerySettings">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
     </button>
-    <div v-if="gallerySettingsOpen" class="gallery-settings-menu">
+    <div v-if="gallerySettingsOpen" v-escape-dismiss="() => gallerySettingsOpen = false" class="gallery-settings-menu">
       <button @click="openLibraryInfo"><span>ⓘ</span>Library Information</button>
       <button @click="openMaintenanceDialog('update')"><span>↻</span>Update Metadata</button>
       <button @click="openMaintenanceDialog('verify')"><span>✓</span>Verify Metadata</button>
@@ -24,6 +24,7 @@
 </template>
 
 <script setup>
+import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { inject, onBeforeUnmount, onMounted } from "vue";
 import { SETTINGS_CONTEXT, CHAT_CONTEXT } from "../context/renderer-contexts.js";
 

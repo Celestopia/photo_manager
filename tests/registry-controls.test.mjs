@@ -11,7 +11,8 @@ async function mount(t, filename, props) {
   let code = compileScript(descriptor, { id: filename, inlineTemplate: true }).content;
   code = code.replace(/from (["'])([^"']+)\1/g, (_, quote, source) => `from ${quote}${source === 'vue' ? import.meta.resolve('vue') : new URL(source, url).href}${quote}`);
   const component = (await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'))).default;
-  const node = (type, text = '') => ({ type, text, children: [], props: {}, focus() {}, closest() { return null; } });
+  const ownerDocument = { activeElement: null, addEventListener() {}, removeEventListener() {} };
+  const node = (type, text = '') => ({ ownerDocument, type, text, children: [], props: {}, focus() {}, closest() { return null; } });
   const renderer = createRenderer({
     createElement: node, createText: text => node('text', text), createComment: text => node('comment', text),
     setText: (target, text) => { target.text = text; }, setElementText: (target, text) => { target.text = text; },

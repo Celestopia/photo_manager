@@ -1,5 +1,5 @@
 <template>
-  <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="attachmentsOpen = false; options = false; settings = false">
+  <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="onPanelEscape">
     <header class="chat-header">
       <button class="btn" title="Provider settings" aria-label="Provider settings" @click="attachmentsOpen = false; showSettings()"><ChatIcon name="gear" /></button>
       <div>
@@ -215,7 +215,7 @@
           </button>
         </div>
       </div>
-      <div v-if="attachmentsOpen" ref="attachmentMenu" class="chat-attachment-menu" aria-label="Add attachments">
+      <div v-if="attachmentsOpen" v-escape-dismiss="() => attachmentsOpen = false" ref="attachmentMenu" class="chat-attachment-menu" aria-label="Add attachments">
         <button class="btn" :disabled="busy || working" @click="attachmentsOpen = false; addCurrent()"><ChatIcon name="plus" />Add current media</button>
         <button class="btn" :disabled="busy || working" @click="attachmentsOpen = false; attach()"><ChatIcon name="file" />Add text or image files</button>
       </div>
@@ -256,6 +256,7 @@
 </section>
 </template>
 <script setup>
+import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { inject, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import ConversationActionDialog from "./ConversationActionDialog.vue";
 import ChatImagePreviewDialog from "./ChatImagePreviewDialog.vue";
@@ -348,6 +349,10 @@ const metadataLabels = {
   hidden: "Hidden description",
   technical: "Technical details",
 };
+function onPanelEscape(event) {
+  if (event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229) return;
+  options.value = false; settings.value = false;
+}
 const attachmentsOpen = ref(false);
 const attachmentMenu = ref(null);
 function dismissAttachments(event) {

@@ -161,6 +161,7 @@
 </main>
 
 <GalleryMediaDetailsMenu
+  v-escape-dismiss="closeGalleryDetailsMenu"
   v-if="galleryDetailsMenu.visible && galleryDetailsMenu.item"
   :item="galleryDetailsMenu.item"
   :x="galleryDetailsMenu.x"
@@ -169,6 +170,7 @@
 </template>
 
 <script setup>
+import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { formatDuration } from "../domain/media-formatters.mjs";
 function onToggleControls() {
   window.dispatchEvent(new CustomEvent("gallery-transient-open", { detail: "filter-panel-toggle" }));
@@ -285,7 +287,7 @@ function closeDetailsOnScroll(event) {
 }
 
 function handleGalleryKeydown(event) {
-  if (event.key !== "Escape" || event.repeat) return;
+  if (event.key !== "Escape" || event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229) return;
   if (galleryDetailsMenu.visible) {
     closeGalleryDetailsMenu();
     return;

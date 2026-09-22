@@ -192,6 +192,10 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.ESCAPE_UI_SMOKE) {
+    await require('./escape-popup-checks.cjs')({win, click, waitFor, setValue});
+    return;
+  }
   if (process.env.MANUAL_CACHE_SMOKE) {
     await require('./manual-cache-checks.cjs')({win,library,click,waitFor});
     return;
