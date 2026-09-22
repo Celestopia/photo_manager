@@ -392,8 +392,3 @@ button.location-tree-label {
 }
 
 .location-manager-fold-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.location-manager-fold { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; padding: 2px 0; cursor: pointer; }
-.location-manager-fold > img { width: 14px; height: 14px; flex-shrink: 0; transform: rotate(-90deg); }
-.location-manager-fold > img.is-expanded { transform: rotate(0deg); }
-.location-manager-fold:disabled { cursor: default; }
-.location-manager-leaf { padding-left: 20px; }

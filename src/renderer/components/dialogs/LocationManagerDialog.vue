@@ -16,8 +16,9 @@
       <div class="tag-manager-list location-manager-list" ref="locationManagerListRef">
         <template v-for="row in managerLocationRows" :key="'location_manager_' + row.Key">
           <div v-if="row.Type === 'group' && !row.Location" class="location-manager-group-row" :style="{ paddingLeft: 12 + row.Depth * 18 + 'px' }">
-            <button v-if="row.HasExpandableChildren" class="location-manager-fold" :aria-expanded="managerRowExpanded(row)" :disabled="managerFoldDisabled(row)" @click="toggleManagerRow(row)"><img :src="ICONS.chevronDown" :class="{ 'is-expanded': managerRowExpanded(row) }" alt="" />{{ row.Label }}</button>
-            <span v-else class="location-manager-leaf">{{ row.Label }}</span>
+            <button v-if="row.HasExpandableChildren" type="button" class="location-tree-toggle" :class="{ 'is-expanded': managerRowExpanded(row) }" :aria-label="managerRowExpanded(row) ? 'Collapse child locations' : 'Expand child locations'" :data-tip="managerRowExpanded(row) ? 'Collapse child locations' : 'Expand child locations'" :aria-expanded="managerRowExpanded(row)" :disabled="managerFoldDisabled(row)" @click="toggleManagerRow(row)"><img :src="ICONS.chevronDown" alt="" /></button>
+            <span v-else class="location-tree-toggle-spacer" aria-hidden="true"></span>
+            <span>{{ row.Label }}</span>
           </div>
           <article
             v-else-if="row.Location"
@@ -27,7 +28,7 @@
           >
             <div class="tag-manager-item-main">
               <div class="tag-manager-item-title location-manager-item-title">
-                <div class="location-manager-title-text"><button v-if="row.HasExpandableChildren" class="location-manager-fold" :aria-expanded="managerRowExpanded(row)" :disabled="managerFoldDisabled(row)" @click="toggleManagerRow(row)"><img :src="ICONS.chevronDown" :class="{ 'is-expanded': managerRowExpanded(row) }" alt="" /><strong>{{ row.Label }}</strong></button><strong v-else class="location-manager-leaf">{{ row.Label }}</strong><small v-if="row.Location.Description">{{ row.Location.Description }}</small></div>
+                <div class="location-manager-title-text"><button v-if="row.HasExpandableChildren" type="button" class="location-tree-toggle" :class="{ 'is-expanded': managerRowExpanded(row) }" :aria-label="managerRowExpanded(row) ? 'Collapse child locations' : 'Expand child locations'" :data-tip="managerRowExpanded(row) ? 'Collapse child locations' : 'Expand child locations'" :aria-expanded="managerRowExpanded(row)" :disabled="managerFoldDisabled(row)" @click="toggleManagerRow(row)"><img :src="ICONS.chevronDown" alt="" /></button><span v-else class="location-tree-toggle-spacer" aria-hidden="true"></span><strong>{{ row.Label }}</strong><small v-if="row.Location.Description">{{ row.Location.Description }}</small></div>
                 <span :data-tip="managerRowExpanded(row) || !row.HasExpandableChildren ? 'Directly assigned to this location' : 'Includes descendant locations'">{{ managerLocationCount(row) }} {{ managerLocationCount(row) === 1 ? 'media item' : 'media items' }}</span>
               </div>
               <div v-if="locationManager.editingId === row.Location.LocationId" class="location-manager-edit">
