@@ -13,8 +13,7 @@
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ album.Title }}</strong><span>{{ album.UsageCount || 0 }} media items</span></div>
             <div v-if="albumManager.editingId === album.AlbumId" class="registry-manager-edit">
-              <label>Album name</label><input autofocus class="input" v-model="albumManager.editTitle" :disabled="albumManager.saving" @keydown.enter.exact.prevent="saveAlbumEdit" @keydown.escape.prevent="cancelAlbumEdit" />
-              <label>Description</label><textarea class="input tag-manager-description-input" v-model="albumManager.editDescription" :disabled="albumManager.saving" @keydown.ctrl.enter.prevent="saveAlbumEdit"></textarea>
+              <RegistryNameFields label="Album name" v-model:name="albumManager.editTitle" v-model:description="albumManager.editDescription" :disabled="albumManager.saving" required-description editing @save="saveAlbumEdit" @cancel="cancelAlbumEdit" />
             </div>
             <p v-else>{{ album.Description }}</p>
             <div class="tag-manager-error" v-if="albumManager.error && albumManager.editingId === album.AlbumId">{{ albumManager.error }}</div>
@@ -28,8 +27,7 @@
   <AppDialog v-if="albumCreate.visible && albumCreate.target === 'manager'" class="registry-create-modal" dismiss-on-backdrop :busy="albumManager.saving" @close="closeCreateAlbumMenu">
       <template #header><h3>Create Album</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
-        <label>Album name</label><input class="input" v-model="albumCreate.title" :disabled="albumManager.saving" />
-        <label>Description</label><textarea class="input tag-create-description" v-model="albumCreate.description" :disabled="albumManager.saving"></textarea>
+        <RegistryNameFields label="Album name" v-model:name="albumCreate.title" v-model:description="albumCreate.description" :disabled="albumManager.saving" required-description />
         <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">Cancel</button><button class="btn btn-primary" @click="createAlbumAndSelect" :disabled="albumManager.saving">Create</button></div>
       </div>
@@ -37,6 +35,7 @@
 </template>
 
 <script setup>
+import RegistryNameFields from "../RegistryNameFields.vue";
 import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { ALBUM_CONTEXT } from "../../context/renderer-contexts.js";

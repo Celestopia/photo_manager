@@ -18,6 +18,7 @@ export function usePersonRegistry({
   const {
     registry: personRegistry, search: personSearch, dropdown: personDropdown,
     create: personCreate, manager: personManager, managerFiltered: managerFilteredPeople, apply: applyPersonRegistry,
+    find: getPersonDefinition, candidates, startEdit: startPersonEdit, cancelEdit: cancelPersonEdit,
   } = useFlatRegistryState({
     idKey: "PersonId", labelKey: "Name", filterKey: "person", query, unassignedFilter, pruneRecent: pruneRecentPeople,
   });
@@ -29,16 +30,9 @@ export function usePersonRegistry({
     else if (result) showToastMessage(result.error || "Could not load people");
   }
   function selectedPersonIdsForTarget(target) { return target === "batch" ? batchEdit.personIds : editDraft.PersonIds; }
-  function getPersonDefinition(personId) { return personRegistry.value.find((person) => person.PersonId === personId) || null; }
   function getPersonDescription(personId) { return getPersonDefinition(personId)?.Description || ""; }
   function getPersonName(personId) { return getPersonDefinition(personId)?.Name || ""; }
-  function getPersonCandidates(target) {
-    const keyword = normalizeText(personSearch[target]);
-    const selected = new Set(selectedPersonIdsForTarget(target));
-    return personRegistry.value
-      .filter((person) => !keyword || person.Name.includes(keyword) || person.Description.includes(keyword))
-      .sort((a, b) => Number(selected.has(b.PersonId)) - Number(selected.has(a.PersonId)) || a.Name.localeCompare(b.Name, "en-US"));
-  }
+  function getPersonCandidates(target) { return candidates(target, selectedPersonIdsForTarget(target)); }
   function getPersonOptions(target) { return getPersonCandidates(target).slice(0, 50); }
   function getRecentPersonOptions(target) {
     const byId = new Map(getPersonCandidates(target).map((person) => [person.PersonId, person]));
@@ -107,16 +101,6 @@ export function usePersonRegistry({
     Object.assign(personManager, {
       visible: false, search: "", editingId: "", editName: "", editDescription: "", saving: false, error: "",
     });
-  }
-  function startPersonEdit(person) {
-    if (personManager.saving) return;
-    Object.assign(personManager, {
-      editingId: person.PersonId, editName: person.Name || "", editDescription: person.Description || "", saving: false, error: "",
-    });
-  }
-  function cancelPersonEdit() {
-    if (personManager.saving) return;
-    Object.assign(personManager, { editingId: "", editName: "", editDescription: "", saving: false, error: "" });
   }
   async function savePersonEdit() {
     if (personManager.saving) return;

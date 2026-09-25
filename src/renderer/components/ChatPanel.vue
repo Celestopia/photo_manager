@@ -1,12 +1,12 @@
 <template>
   <section class="chat-panel" aria-label="Assistant" @keydown.stop @keydown.esc="onPanelEscape">
     <header class="chat-header">
-      <button class="btn" title="Provider settings" aria-label="Provider settings" @click="attachmentsOpen = false; showSettings()"><ChatIcon name="gear" /></button>
+      <button class="btn btn-compact" data-tip="Provider settings" aria-label="Provider settings" @click="attachmentsOpen = false; showSettings()"><ChatIcon name="gear" /></button>
       <div>
         <TokenUsage label="Session token usage" :usage="sessionUsage(session?.messages || []).usage" :incomplete="sessionUsage(session?.messages || []).incomplete" />
         <button
-          class="btn"
-          title="New chat"
+          class="btn btn-compact"
+          data-tip="New chat"
           aria-label="New chat"
           :disabled="working"
           @click="newChat"
@@ -14,8 +14,8 @@
           <ChatIcon name="plus" />
         </button>
         <button
-          class="btn"
-          title="History"
+          class="btn btn-compact"
+          data-tip="History"
           aria-label="History"
           :disabled="working"
           @click="showHistory"
@@ -23,8 +23,8 @@
           <ChatIcon name="history" />
         </button>
         <button
-          class="btn"
-          title="Close Assistant"
+          class="btn btn-compact"
+          data-tip="Close Assistant"
           aria-label="Close Assistant"
           @click="close"
         >
@@ -35,7 +35,7 @@
     <div v-if="historyOpen" class="chat-history">
       <div class="chat-row">
         <strong class="chat-section-label">Saved chats</strong
-        ><div class="chat-history-heading-actions"><button class="btn" :disabled="working || (!selectingHistory && !selectableHistory.length)" @click="selectingHistory ? finishHistorySelection() : selectingHistory = true">{{ selectingHistory ? 'Done' : 'Select' }}</button><button class="btn" :disabled="working" @click="historyOpen = false">Back</button></div>
+        ><div class="chat-history-heading-actions"><button class="btn btn-compact" :disabled="working || (!selectingHistory && !selectableHistory.length)" @click="selectingHistory ? finishHistorySelection() : selectingHistory = true">{{ selectingHistory ? 'Done' : 'Select' }}</button><button class="btn btn-compact" :disabled="working" @click="historyOpen = false">Back</button></div>
       </div>
       <label
         ><input type="checkbox" v-model="currentOnly" :disabled="working" /> Current media
@@ -66,15 +66,15 @@
           ><span>{{ row.error || row.excerpt }}</span>
         </button>
         <div v-if="!selectingHistory && !row.error" class="chat-history-actions">
-          <button class="btn" title="Rename conversation" aria-label="Rename conversation" :disabled="working" @click="historyAction = { kind: 'rename', row }"><ChatIcon name="edit" /></button>
-          <button class="btn chat-danger" title="Delete conversation" aria-label="Delete conversation" :disabled="working" @click="historyAction = { kind: 'delete', row }"><ChatIcon name="trash" /></button>
+          <button class="btn btn-compact" data-tip="Rename conversation" aria-label="Rename conversation" :disabled="working" @click="historyAction = { kind: 'rename', row }"><ChatIcon name="edit" /></button>
+          <button class="btn btn-compact chat-danger" data-tip="Delete conversation" aria-label="Delete conversation" :disabled="working" @click="historyAction = { kind: 'delete', row }"><ChatIcon name="trash" /></button>
         </div>
 
       </article>
       </div>
       <footer v-if="selectingHistory" class="chat-selection-footer">
-        <button class="btn" :disabled="working || !selectedHistory.length" @click="clearHistorySelection">Clear selection</button>
-        <button class="btn chat-danger" :disabled="working || !selectedHistory.length" @click="historyAction = { kind: 'delete-many', rows: [...selectedHistory] }"><ChatIcon name="trash" /> Delete ({{ selectedHistory.length }})</button>
+        <button class="btn btn-compact" :disabled="working || !selectedHistory.length" @click="clearHistorySelection">Clear selection</button>
+        <button class="btn btn-compact chat-danger" :disabled="working || !selectedHistory.length" @click="historyAction = { kind: 'delete-many', rows: [...selectedHistory] }"><ChatIcon name="trash" /> Delete ({{ selectedHistory.length }})</button>
       </footer>
     </div>
     <div
@@ -87,7 +87,7 @@
       <div v-if="!session?.messages.length" class="chat-empty">
         <div class="chat-empty-icon"><ChatIcon name="chat" /></div><h2>A closer look.</h2><p>Ask a question about your photo or video.</p>
         <div v-if="!text.trim()" class="chat-suggestions">
-          <button v-for="example in examples" :key="example.label" class="btn" @click="fillExample(example.prompt)">{{ example.label }}</button>
+          <button v-for="example in examples" :key="example.label" class="btn btn-compact" @click="fillExample(example.prompt)">{{ example.label }}</button>
         </div>
       </div>
       <article
@@ -115,7 +115,7 @@
         </p>
         <p v-if="m.attempt?.error" class="chat-error">{{ m.attempt.error }}</p>
         <div class="chat-message-actions">
-          <button v-if="m.text" class="chat-message-copy" :title="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
+          <button v-if="m.text" class="chat-message-copy" :data-tip="copiedMessage === m.id ? 'Copied' : 'Copy message'" :aria-label="copiedMessage === m.id ? 'Copied' : 'Copy message'" @click="copyMessage(m)"><ChatIcon :name="copiedMessage === m.id ? 'check' : 'copy'" /></button>
           <TokenUsage v-if="m.role === 'assistant'" :usage="messageUsage(m).usage" :incomplete="messageUsage(m).incomplete" />
         </div>
         <button
@@ -123,7 +123,7 @@
             m.role === 'assistant' &&
             ['failed', 'stopped', 'interrupted'].includes(m.status)
           "
-          class="btn"
+          class="btn btn-compact"
           :disabled="busy || working"
           @click="retry(m)"
         >
@@ -163,7 +163,7 @@
             <img v-if="i.previewUrl" :src="i.previewUrl" :alt="i.name" @click="openComposerImagePreview(i)" />
             <div v-else class="chat-file-tile"><ChatIcon name="file" /><span>{{ i.name.split('.').pop().slice(0, 5).toUpperCase() }}</span></div>
             <span v-if="['gif', 'video'].includes(i.mediaKind)" class="chat-tile-badge">{{ i.mediaKind === 'gif' ? 'GIF' : 'Video' }}</span>
-            <button class="chat-remove-attachment" :disabled="busy || working" :aria-label="'Remove ' + i.name" title="Remove attachment" @click="removeInput(n)"><ChatIcon name="close" /></button>
+            <button class="chat-remove-attachment" :disabled="busy || working" :aria-label="'Remove ' + i.name" data-tip="Remove attachment" @click="removeInput(n)"><ChatIcon name="close" /></button>
           </div>
         </div>
         <textarea
@@ -179,30 +179,30 @@
         <div class="chat-row">
           <div>
             <button
-              class="btn"
+              class="btn btn-compact"
               :disabled="busy || working"
-              title="Add attachments"
+              data-tip="Add attachments"
               aria-label="Add attachments"
               :aria-expanded="attachmentsOpen"
               @click="attachmentsOpen = !attachmentsOpen; options = false"
             >
               <ChatIcon name="plus" /></button
             ><button
-              class="btn"
-              title="Options"
+              class="btn btn-compact"
+              data-tip="Options"
               aria-label="Options"
               :aria-expanded="options"
               @click="options = !options; attachmentsOpen = false"
             >
               <ChatIcon name="options" />
             </button>
-            <button class="btn chat-web-toggle" :class="{ active: webEnabled }" :aria-pressed="webEnabled" :title="webEnabled ? 'Web search on' : 'Web search off'" aria-label="Web search" :disabled="busy || working" @click="toggleWeb"><ChatIcon name="globe" /></button>
+            <button class="btn btn-compact chat-web-toggle" :class="{ active: webEnabled }" :aria-pressed="webEnabled" :data-tip="webEnabled ? 'Web search on' : 'Web search off'" aria-label="Web search" :disabled="busy || working" @click="toggleWeb"><ChatIcon name="globe" /></button>
           </div>
-          <button v-if="busy" class="btn btn-primary" title="Stop response" aria-label="Stop response" @click="stop"><ChatIcon name="stop" /></button
+          <button v-if="busy" class="btn btn-compact btn-primary" data-tip="Stop response" aria-label="Stop response" @click="stop"><ChatIcon name="stop" /></button
           ><button
             v-else
-            class="btn btn-primary"
-            title="Send message"
+            class="btn btn-compact btn-primary"
+            data-tip="Send message"
             aria-label="Send message"
             :disabled="
               working ||
@@ -216,14 +216,14 @@
         </div>
       </div>
       <div v-if="attachmentsOpen" v-escape-dismiss="() => attachmentsOpen = false" ref="attachmentMenu" class="chat-attachment-menu" aria-label="Add attachments">
-        <button class="btn" :disabled="busy || working" @click="attachmentsOpen = false; addCurrent()"><ChatIcon name="plus" />Add current media</button>
-        <button class="btn" :disabled="busy || working" @click="attachmentsOpen = false; attach()"><ChatIcon name="file" />Add text or image files</button>
+        <button class="btn btn-compact" :disabled="busy || working" @click="attachmentsOpen = false; addCurrent()"><ChatIcon name="plus" />Add current media</button>
+        <button class="btn btn-compact" :disabled="busy || working" @click="attachmentsOpen = false; attach()"><ChatIcon name="file" />Add text or image files</button>
       </div>
       <div v-if="options" class="chat-options">
         <div class="chat-row">
           <strong>Message options</strong
           ><button
-            class="btn"
+            class="btn btn-compact"
             @click="options = false"
             aria-label="Close options"
           >

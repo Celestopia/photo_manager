@@ -13,8 +13,7 @@
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ tag.Text }}</strong><span>{{ tag.UsageCount || 0 }} media items</span></div>
             <div v-if="tagManager.editingId === tag.TagId" class="registry-manager-edit">
-              <label>Tag name</label><input autofocus class="input" v-model="tagManager.editText" :disabled="tagManager.saving" @keydown.enter.exact.prevent="saveTagEdit" @keydown.escape.prevent="cancelTagEdit" />
-              <label>Description</label><textarea class="input tag-manager-description-input" v-model="tagManager.editDescription" placeholder="Optional" :disabled="tagManager.saving" @keydown.ctrl.enter.prevent="saveTagEdit"></textarea>
+              <RegistryNameFields label="Tag name" v-model:name="tagManager.editText" v-model:description="tagManager.editDescription" :disabled="tagManager.saving" editing @save="saveTagEdit" @cancel="cancelTagEdit" />
             </div>
             <p v-else>{{ tag.Description || 'No description' }}</p>
             <div class="tag-manager-error" v-if="tagManager.error && tagManager.editingId === tag.TagId">{{ tagManager.error }}</div>
@@ -28,8 +27,7 @@
   <AppDialog v-if="tagCreate.visible && tagCreate.target === 'manager'" class="registry-create-modal" dismiss-on-backdrop :busy="tagManager.saving" @close="closeCreateTagMenu">
       <template #header><h3>Create Tag</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateTagMenu" :disabled="tagManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
-        <label>Tag name</label><input class="input" v-model="tagCreate.text" :disabled="tagManager.saving" />
-        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="tagCreate.description" :disabled="tagManager.saving"></textarea>
+        <RegistryNameFields label="Tag name" v-model:name="tagCreate.text" v-model:description="tagCreate.description" :disabled="tagManager.saving" />
         <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreateTagMenu" :disabled="tagManager.saving">Cancel</button><button class="btn btn-primary" @click="createTagAndSelect" :disabled="tagManager.saving">Create</button></div>
       </div>
@@ -37,6 +35,7 @@
 </template>
 
 <script setup>
+import RegistryNameFields from "../RegistryNameFields.vue";
 import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { TAG_CONTEXT } from "../../context/renderer-contexts.js";

@@ -19,7 +19,6 @@
 .library-entry-actions .btn { min-height: 40px; }
 .library-entry-actions .library-entry-choose { background: transparent; border-color: transparent; color: var(--accent); }
 :is(.library-entry-panel, .library-info-modal, .library-confirm-modal, .maintenance-modal) .btn:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
-:is(.library-entry-panel, .library-info-modal, .library-confirm-modal, .maintenance-modal) .btn:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
 .library-entry-panel code,
 .library-confirm-modal code,
 .maintenance-modal code { font-family: Consolas, monospace; color: #245b91; }

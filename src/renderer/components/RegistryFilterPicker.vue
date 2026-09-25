@@ -26,7 +26,7 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { GALLERY_FILTER_CONTEXT } from "../context/renderer-contexts.js";
-import { toggleRegistryFilter } from "../domain/gallery-filter-state.mjs";
+import { toggleRegistryFilter, matchesRegistrySearch } from "../domain/gallery-filter-state.mjs";
 import RegistryOptionsMenu from "./RegistryOptionsMenu.vue";
 
 const props = defineProps({
@@ -68,11 +68,10 @@ const selectionLabels = computed(() => selectedValues.value.map(id => id === UNA
 const selectedLabel = computed(() => !selectionLabels.value.length ? 'All' : selectionLabels.value[0] + (selectionLabels.value.length > 1 ? ` +${selectionLabels.value.length - 1}` : ''));
 const selectionTooltip = computed(() => `${selectionLabels.value.join(', ') || 'All'}\nCtrl+Click to select multiple`);
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
-const normalizedSearch = computed(() => searchText.value.trim().toLocaleLowerCase("en-US"));
 const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
 
 function matches(value) {
-  return !normalizedSearch.value || String(value).toLocaleLowerCase("en-US").includes(normalizedSearch.value);
+  return matchesRegistrySearch(searchText.value, value);
 }
 
 function optionId(option) {

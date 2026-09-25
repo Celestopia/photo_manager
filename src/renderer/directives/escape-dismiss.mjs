@@ -11,7 +11,7 @@ export default {
         if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229) return;
         const entry = state.stack.at(-1);
         if (!entry) return;
-        const modal = document.activeElement?.closest('dialog[open], .tag-modal-backdrop');
+        const modal = document.activeElement?.closest('dialog[open]');
         if (modal && !modal.contains(entry.element)) return;
         event.preventDefault();
         event.stopImmediatePropagation();

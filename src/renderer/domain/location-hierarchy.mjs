@@ -1,3 +1,4 @@
+import { matchesRegistrySearch } from "./gallery-filter-state.mjs";
 export function normalizeLocationName(value) {
   return String(value ?? "").trim();
 }
@@ -75,7 +76,7 @@ export function locationMatchesKeyword(location, keyword) {
     getLocationPathLabel(location),
     ...(location.Path || []),
   ].join(" ");
-  return haystack.includes(keyword);
+  return matchesRegistrySearch(keyword, haystack);
 }
 
 /** Keeps keyword matches together with every registered location ancestor needed to explain their path. */

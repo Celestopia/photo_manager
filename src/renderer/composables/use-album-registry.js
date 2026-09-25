@@ -17,6 +17,7 @@ export function useAlbumRegistry({
   const {
     registry: albumRegistry, search: albumSearch, dropdown: albumDropdown,
     create: albumCreate, manager: albumManager, managerFiltered: managerFilteredAlbums, apply: applyAlbumRegistry,
+    find: getAlbumDefinition, candidates, startEdit: startAlbumEdit, cancelEdit: cancelAlbumEdit,
   } = useFlatRegistryState({
     idKey: "AlbumId", labelKey: "Title", filterKey: "album", query, unassignedFilter,
   });
@@ -29,17 +30,9 @@ export function useAlbumRegistry({
   }
 
   function selectedAlbumIdForTarget(target) { return target === "batch" ? batchEdit.albumId : editDraft.AlbumId; }
-  function getAlbumDefinition(albumId) { return albumRegistry.value.find((album) => album.AlbumId === albumId) || null; }
   function getAlbumDescription(albumId) { return getAlbumDefinition(albumId)?.Description || ""; }
   function getAlbumTitle(albumId) { return getAlbumDefinition(albumId)?.Title || ""; }
-  function getAlbumOptions(target) {
-    const keyword = normalizeText(albumSearch[target]);
-    const selectedId = selectedAlbumIdForTarget(target);
-    return albumRegistry.value
-      .filter((album) => !keyword || album.Title.includes(keyword) || album.Description.includes(keyword))
-      .sort((a, b) => Number(b.AlbumId === selectedId) - Number(a.AlbumId === selectedId) || a.Title.localeCompare(b.Title, "en-US"))
-      .slice(0, 50);
-  }
+  function getAlbumOptions(target) { return candidates(target, [selectedAlbumIdForTarget(target)]).slice(0, 50); }
 
   function openAlbumDropdown(target) {
     const shouldOpen = !albumDropdown[target];
@@ -104,16 +97,6 @@ export function useAlbumRegistry({
     Object.assign(albumManager, {
       visible: false, search: "", editingId: "", editTitle: "", editDescription: "", saving: false, error: "",
     });
-  }
-  function startAlbumEdit(album) {
-    if (albumManager.saving) return;
-    Object.assign(albumManager, {
-      editingId: album.AlbumId, editTitle: album.Title || "", editDescription: album.Description || "", saving: false, error: "",
-    });
-  }
-  function cancelAlbumEdit() {
-    if (albumManager.saving) return;
-    Object.assign(albumManager, { editingId: "", editTitle: "", editDescription: "", saving: false, error: "" });
   }
   async function saveAlbumEdit() {
     if (albumManager.saving) return;

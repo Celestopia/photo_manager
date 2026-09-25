@@ -13,7 +13,7 @@
           class="chat-image-preview-close"
           type="button"
           aria-label="Close image preview"
-          title="Close image preview"
+          data-tip="Close image preview"
           @click="closeImagePreview"
         >
           <ChatIcon name="close" />
@@ -24,7 +24,7 @@
             class="chat-image-preview-nav chat-image-preview-previous"
             type="button"
             aria-label="Previous image"
-            title="Previous image"
+            data-tip="Previous image"
             :disabled="imagePreview.index === 0"
             @click="previousImagePreview"
           >
@@ -35,7 +35,7 @@
             class="chat-image-preview-nav chat-image-preview-next"
             type="button"
             aria-label="Next image"
-            title="Next image"
+            data-tip="Next image"
             :disabled="imagePreview.index === imagePreview.items.length - 1"
             @click="nextImagePreview"
           >

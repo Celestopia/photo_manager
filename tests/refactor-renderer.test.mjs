@@ -224,3 +224,53 @@ test('administrative count tooltips use full scoped direct usage independently o
   await s.loadLocations();
   assert.equal(s.managerRegionTooltip(city),'1 media item');
 });
+
+import { matchesRegistrySearch } from '../src/renderer/domain/gallery-filter-state.mjs';
+import { filterLocationsWithAncestors } from '../src/renderer/domain/location-hierarchy.mjs';
+
+test('registry matching ignores case and outer whitespace without changing Unicode values', () => {
+  assert.equal(matchesRegistrySearch(' fOoD ', 'Food'), true);
+  assert.equal(matchesRegistrySearch('CAFÉ', 'Café 北京'), true);
+  assert.equal(matchesRegistrySearch('北京', 'Café 北京'), true);
+  assert.equal(matchesRegistrySearch('  ', null), true);
+  assert.equal(matchesRegistrySearch('missing', null, 'Food'), false);
+});
+for (const [kind, useRegistry, label, plural, ids] of [
+  ['tag', useTagRegistry, 'Text', 'Tags', 'TagIds'],
+  ['person', usePersonRegistry, 'Name', 'People', 'PersonIds'],
+  ['album', useAlbumRegistry, 'Title', 'Albums', 'AlbumId'],
+]) {
+  test(`${kind} manager and picker share search while preserving selected ordering and edit guards`, async () => {
+    const cap = kind[0].toUpperCase() + kind.slice(1), idKey = cap + 'Id';
+    const entries = [{[idKey]:'a',[label]:'Alpha',Description:'TRAVEL'}, {[idKey]:'b',[label]:'Beta',Description:'Travel'}, {[idKey]:'c',[label]:'北京',Description:''}];
+    const responseKey = plural.toLowerCase();
+    const f = registryFixture(useRegistry, {['list'+plural]: async () => ({ok:true,[responseKey]:entries})});
+    await f.state['load'+plural]();
+    f.editDraft[ids] = kind === 'album' ? 'b' : ['b'];
+    f.state[kind+'Search'].viewer = 'travel';
+    f.state[kind+'Manager'].search = ' TRAVEL ';
+    assert.deepEqual(f.state['get'+cap+'Options']('viewer').map(x=>x[idKey]), ['b','a']);
+    assert.deepEqual(f.state['managerFiltered'+plural].value.map(x=>x[idKey]), ['a','b']);
+    f.state['start'+cap+'Edit'](entries[0]);
+    f.state[kind+'Manager'].saving = true;
+    f.state['cancel'+cap+'Edit']();
+    assert.equal(f.state[kind+'Manager'].editingId, 'a');
+    f.state[kind+'Manager'].saving = false;
+    f.state['cancel'+cap+'Edit']();
+    assert.equal(f.state[kind+'Manager'].editingId, '');
+    assert.equal(f.state[kind+'Registry'].value[0][label], 'Alpha');
+  });
+}
+test('album creation still requires description before invoking IPC', async () => {
+  let calls=0;
+  const f=registryFixture(useAlbumRegistry,{createAlbum:async()=>{calls++;}});
+  Object.assign(f.state.albumCreate,{title:'Album',description:'',visible:true});
+  await f.state.createAlbumAndSelect();
+  assert.equal(calls,0);
+  assert.match(f.state.albumCreate.error,/description/);
+});
+test('case-insensitive location search retains ancestors and matches regions', () => {
+  const locations=[{LocationId:'parent',Name:'District',City:'Beijing'}, {LocationId:'child',ParentId:'parent',Name:'Café',City:'Beijing'}];
+  assert.deepEqual(filterLocationsWithAncestors(locations,'CAFÉ').map(x=>x.LocationId),['parent','child']);
+  assert.equal(filterLocationsWithAncestors(locations,'beijing').length,2);
+});

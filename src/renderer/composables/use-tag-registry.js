@@ -18,6 +18,7 @@ export function useTagRegistry({
   const {
     registry: tagRegistry, search: tagSearch, dropdown: tagDropdown,
     create: tagCreate, manager: tagManager, managerFiltered: managerFilteredTags, apply: applyTagRegistry,
+    find: getTagDefinition, candidates, startEdit: startTagEdit, cancelEdit: cancelTagEdit,
   } = useFlatRegistryState({
     idKey: "TagId", labelKey: "Text", filterKey: "tag", query, unassignedFilter, pruneRecent: pruneRecentTags,
   });
@@ -33,13 +34,7 @@ export function useTagRegistry({
     return target === "batch" ? batchEdit.tagIds : editDraft.TagIds;
   }
 
-  function getTagCandidates(target) {
-    const keyword = normalizeText(tagSearch[target]);
-    const selected = new Set(selectedTagIdsForTarget(target));
-    return tagRegistry.value
-      .filter((tag) => !keyword || tag.Text.includes(keyword) || tag.Description.includes(keyword))
-      .sort((a, b) => Number(selected.has(b.TagId)) - Number(selected.has(a.TagId)) || a.Text.localeCompare(b.Text, "en-US"));
-  }
+  function getTagCandidates(target) { return candidates(target, selectedTagIdsForTarget(target)); }
 
   function getTagOptions(target) { return getTagCandidates(target).slice(0, 50); }
 
@@ -48,7 +43,6 @@ export function useTagRegistry({
     return recentTags.value.map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
   }
 
-  function getTagDefinition(tagId) { return tagRegistry.value.find((tag) => tag.TagId === tagId) || null; }
   function getTagDescription(tagId) { return getTagDefinition(tagId)?.Description || ""; }
   function getTagText(tagId) { return getTagDefinition(tagId)?.Text || ""; }
 
@@ -119,16 +113,6 @@ export function useTagRegistry({
     Object.assign(tagManager, {
       visible: false, search: "", editingId: "", editText: "", editDescription: "", saving: false, error: "",
     });
-  }
-  function startTagEdit(tag) {
-    if (tagManager.saving) return;
-    Object.assign(tagManager, {
-      editingId: tag.TagId, editText: tag.Text || "", editDescription: tag.Description || "", saving: false, error: "",
-    });
-  }
-  function cancelTagEdit() {
-    if (tagManager.saving) return;
-    Object.assign(tagManager, { editingId: "", editText: "", editDescription: "", saving: false, error: "" });
   }
   async function saveTagEdit() {
     if (tagManager.saving) return;

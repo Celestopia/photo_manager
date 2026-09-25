@@ -42,10 +42,7 @@
       </div>
     </div>
     <div class="tag-create-popover" v-if="albumCreate.visible && albumCreate.target === target" @click.stop>
-      <label>Album name</label>
-      <input class="input" v-model="albumCreate.title" :disabled="albumManager.saving" />
-      <label>Description</label>
-      <textarea class="input tag-create-description" v-model="albumCreate.description" :disabled="albumManager.saving"></textarea>
+      <RegistryNameFields label="Album name" v-model:name="albumCreate.title" v-model:description="albumCreate.description" :disabled="albumManager.saving" required-description />
       <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
       <div class="tag-create-actions">
         <button class="btn" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">Cancel</button>
@@ -56,6 +53,7 @@
 </template>
 
 <script setup>
+import RegistryNameFields from "./RegistryNameFields.vue";
 import RegistryFieldIcon from "./RegistryFieldIcon.vue";
 import { computed, inject } from "vue";
 import { ALBUM_CONTEXT } from "../context/renderer-contexts.js";

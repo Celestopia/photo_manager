@@ -115,7 +115,7 @@
   </section>
   <aside class="side-panel batch-panel" v-if="isSelectionMode" :class="{ 'is-saving': batchOperationBusy }" :inert="batchOperationBusy ? '' : undefined" :aria-busy="batchOperationBusy">
     <div class="batch-panel-scroll">
-    <div class="batch-panel-header"><h3>Batch Operation</h3><button class="btn batch-close" title="Close batch operations" aria-label="Close batch operations" @click="exitSelectionMode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
+    <div class="batch-panel-header"><h3>Batch Operation</h3><button class="btn batch-close" data-tip="Close batch operations" aria-label="Close batch operations" @click="exitSelectionMode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
     <div class="batch-selection-actions">
       <button class="btn icon-btn batch-panel-action-btn" data-tip="Copy selected files" aria-label="Copy selected files" :disabled="selectedGalleryCount === 0 || batchOperationBusy" @click="copySelectedFiles"><img class="icon" :src="ICONS.copyFiles" alt="" /></button>
       <button class="btn icon-btn batch-panel-action-btn batch-selection-btn" :class="{ active: allGalleryItemsSelected }" :data-tip="allGalleryItemsSelected ? 'Clear selection' : 'Select all media'" :aria-label="allGalleryItemsSelected ? 'Clear selection' : 'Select all media'" :aria-pressed="allGalleryItemsSelected" :disabled="total === 0 || batchOperationBusy" @click="toggleAllGallerySelection">
@@ -149,8 +149,8 @@
     <label>Set location</label>
     <LocationPicker target="batch" placeholder="Search locations" />
     <div class="batch-actions">
-      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges" title="Clear fields">Clear</button>
-      <button class="btn btn-primary batch-apply-btn" title="Apply to selected media" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">Apply</button>
+      <button class="btn" @click="clearBatchEditInputs" :disabled="!batchHasChanges" data-tip="Clear fields">Clear</button>
+      <button class="btn btn-primary batch-apply-btn" data-tip="Apply to selected media" @click="applyBatchEdit" :disabled="!canApplyBatchEdit">Apply</button>
     </div>
     <div class="batch-status" v-if="batchStatus.visible" :class="batchStatus.tone">{{ batchStatus.message }}</div>
     </div>
@@ -295,7 +295,7 @@ function handleGalleryKeydown(event) {
 
   const target = event.target;
   const isEditableTarget = ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName) || target?.isContentEditable;
-  const hasModalOverlay = Boolean(document.querySelector("dialog[open], .tag-modal-backdrop"));
+  const hasModalOverlay = Boolean(document.querySelector("dialog[open]"));
   if (isEditableTarget || hasModalOverlay || !isSelectionMode.value) return;
 
   event.preventDefault();

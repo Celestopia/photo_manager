@@ -1,5 +1,5 @@
 import { computed, reactive, ref } from "vue";
-import { isRegistryFilterValueValid } from "../domain/gallery-filter-state.mjs";
+import { isRegistryFilterValueValid, matchesRegistrySearch } from "../domain/gallery-filter-state.mjs";
 
 export function normalizeRegistryText(value) { return String(value ?? "").trim(); }
 
@@ -16,7 +16,7 @@ export function useFlatRegistryState({ idKey, labelKey, filterKey, query, unassi
   const managerFiltered = computed(() => {
     const keyword = manager.search.trim();
     const source = [...registry.value].sort((a, b) => a[labelKey].localeCompare(b[labelKey], "en-US"));
-    return keyword ? source.filter(item => item[labelKey].includes(keyword) || item.Description.includes(keyword)) : source;
+    return source.filter(item => matchesRegistrySearch(keyword, item[labelKey], item.Description));
   });
   function apply(entries) {
     registry.value = (Array.isArray(entries) ? entries : []).map(item => ({
@@ -31,5 +31,20 @@ export function useFlatRegistryState({ idKey, labelKey, filterKey, query, unassi
     pruneRecent?.(ids);
     query.filters[filterKey] = query.filters[filterKey].filter(value => isRegistryFilterValueValid(value, ids, unassignedFilter));
   }
-  return { registry, search, dropdown, create, manager, managerFiltered, apply };
+  function find(id) { return registry.value.find(item => item[idKey] === id) || null; }
+  function candidates(target, selectedIds) {
+    const selected = new Set(selectedIds);
+    return registry.value
+      .filter(item => matchesRegistrySearch(search[target], item[labelKey], item.Description))
+      .sort((a, b) => Number(selected.has(b[idKey])) - Number(selected.has(a[idKey])) || a[labelKey].localeCompare(b[labelKey], "en-US"));
+  }
+  function startEdit(item) {
+    if (manager.saving) return;
+    Object.assign(manager, { editingId: item[idKey], ["edit" + labelKey]: item[labelKey] || "", editDescription: item.Description || "", error: "" });
+  }
+  function cancelEdit() {
+    if (manager.saving) return;
+    Object.assign(manager, { editingId: "", ["edit" + labelKey]: "", editDescription: "", error: "" });
+  }
+  return { registry, search, dropdown, create, manager, managerFiltered, apply, find, candidates, startEdit, cancelEdit };
 }

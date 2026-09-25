@@ -8,7 +8,7 @@
 .chat-panel .chat-history-selected { background: #e9f3ff; box-shadow: inset 0 0 0 1px #bbd9ff; }
 .chat-selection-footer { display: flex; justify-content: space-between; gap: 8px; padding: 12px 0 2px; border-top: 1px solid #c9dfff; }
 .chat-selection-footer .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
-.chat-panel .chat-selection-footer .btn.chat-danger { color: #c84450; background: #fff5f6; border: 1px solid #f2d4d8; }
+.chat-panel .chat-selection-footer .btn.chat-danger { color: var(--danger); background: #fff5f6; border: 1px solid #f2d4d8; }
 .viewer-sidebar-tabs {
   display: flex;
   gap: 6px;
@@ -257,11 +257,10 @@
 .viewer-sidebar-tabs { gap: 2px; padding: 3px; width: fit-content; background: #f1f3f5; border-radius: 10px; margin-bottom: 14px; }
 .viewer-sidebar-tabs .btn { border: 0; background: transparent; border-radius: 8px; padding: 6px 12px; font-size: 12px; color: #69717c; }
 .viewer-sidebar-tabs [aria-pressed="true"] { background: #fff; color: #20252d; box-shadow: 0 1px 3px #00000012; }
-.chat-panel { color: #292d34; font-size: 14px; }
-.chat-panel .btn { border: 0; background: #f2f3f5; color: #424851; border-radius: 9px; padding: 7px 11px; font: inherit; font-size: 12px; cursor: pointer; box-shadow: none; }
-.chat-panel button:hover:not(:disabled) { background: #e9ecf0; }
+.chat-panel { color: var(--text); font-size: 14px; }
+.chat-panel button:hover:not(:disabled) { background: var(--bg-card-soft); }
 .chat-panel button:disabled { opacity: .4; cursor: default; }
-.chat-panel button:focus-visible, .chat-panel summary:focus-visible { outline: 2px solid #7198c4; outline-offset: 2px; }
+.chat-panel button:focus-visible, .chat-panel summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .chat-icon { width: 19px; height: 19px; flex-shrink: 0; display: block; }
 .chat-header { padding: 0 2px 14px; }
 .chat-heading { font-size: 13px; font-weight: 600; color: #747b85; }
@@ -292,8 +291,8 @@
 .chat-composer:focus-within { outline: none; border-color: #c7cfd9; box-shadow: 0 2px 10px #20252d06; }
 .chat-composer textarea { box-sizing: border-box; display: block; resize: none; min-height: 48px; max-height: 160px; padding: 2px 3px 8px; font-size: 13px; line-height: 1.6; }
 .chat-composer textarea::placeholder { color: #9298a1; }
-.chat-composer .btn-primary { width: 32px; min-width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; padding: 0; background: #303844; color: white; }
-.chat-composer .btn-primary:hover:not(:disabled) { background: #485565; }
+.chat-composer .btn-primary { width: 32px; min-width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; padding: 0; background: var(--accent); color: white; }
+.chat-composer .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .chat-composer .btn-primary:disabled { background: #c3c9d1; opacity: 1; }
 .chat-attachments { margin-bottom: 6px; }
 .chat-chip { border-color: #e5e8ed; background: #fafbfc; color: #68717d; padding: 6px 9px; font-size: 11px; }
@@ -320,10 +319,10 @@
 .chat-history-open span { font-size: 11px; color: #8c939e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
 .chat-history-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
 .chat-history-actions .btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 6px; background: transparent; color: #738092; border-radius: 8px; }
-.chat-history-actions .chat-danger { color: #c34b4b; }
+.chat-history-actions .chat-danger { color: var(--danger); }
 .chat-history-actions .chat-danger:hover:not(:disabled) { background: #fcebea; color: #ab3030; }
 .chat-history-item:focus-within { background: #f5f6f8; }
-.chat-history-actions .btn:focus-visible { outline: 2px solid #839ab5; outline-offset: 2px; }
+.chat-history-actions .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .chat-rename { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; margin-top: 8px; }
 .chat-rename .input { width: 100%; min-width: 0; font-size: 12px; }
 .chat-input-detail { font-size: 12px; line-height: 1.7; padding: 12px 0; border-bottom: 1px solid #eceef1; }

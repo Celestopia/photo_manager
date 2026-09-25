@@ -40,22 +40,7 @@
       </div>
     </div>
     <div class="tag-create-popover" v-if="locationCreate.visible && locationCreate.target === target" @click.stop>
-      <label>Location name</label>
-      <input class="input" v-model="locationCreate.name" :disabled="locationManager.saving" />
-      <label>Country</label>
-      <input class="input" v-model="locationCreate.country" :disabled="locationManager.saving" />
-      <label>State/Province</label>
-      <input class="input" v-model="locationCreate.province" :disabled="locationManager.saving" />
-      <label>City</label>
-      <input class="input" v-model="locationCreate.city" :disabled="locationManager.saving" />
-      <label>Parent location</label>
-      <LocationParentPicker
-        :model-value="locationCreate.parentId || ''"
-        :disabled="locationManager.saving"
-        @update:model-value="setCreateLocationParent"
-      />
-      <label>Description (optional)</label>
-      <textarea class="input tag-create-description location-create-description" v-model="locationCreate.description" :disabled="locationManager.saving"></textarea>
+      <LocationFields v-model:name="locationCreate.name" v-model:country="locationCreate.country" v-model:province="locationCreate.province" v-model:city="locationCreate.city" v-model:description="locationCreate.description" :parent-id="locationCreate.parentId || ''" :disabled="locationManager.saving" @update:parent-id="setCreateLocationParent" />
       <div class="tag-create-error" v-if="locationCreate.error">{{ locationCreate.error }}</div>
       <div class="tag-create-actions">
         <button class="btn" @click="closeCreateLocationMenu" :disabled="locationManager.saving">Cancel</button>
@@ -69,7 +54,7 @@
 import RegistryFieldIcon from "./RegistryFieldIcon.vue";
 import { computed, inject } from "vue";
 import { LOCATION_CONTEXT } from "../context/renderer-contexts.js";
-import LocationParentPicker from "./LocationParentPicker.vue";
+import LocationFields from "./LocationFields.vue";
 import LocationTreeMenu from "./LocationTreeMenu.vue";
 
 const props = defineProps({

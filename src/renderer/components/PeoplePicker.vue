@@ -42,10 +42,7 @@
       </div>
     </div>
     <div class="tag-create-popover" v-if="personCreate.visible && personCreate.target === target" @click.stop>
-      <label>Person name</label>
-      <input class="input" v-model="personCreate.name" :disabled="personManager.saving" />
-      <label>Description (optional)</label>
-      <textarea class="input tag-create-description" v-model="personCreate.description" :disabled="personManager.saving"></textarea>
+      <RegistryNameFields label="Person name" v-model:name="personCreate.name" v-model:description="personCreate.description" :disabled="personManager.saving" />
       <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
       <div class="tag-create-actions">
         <button class="btn" @click="closeCreatePersonMenu" :disabled="personManager.saving">Cancel</button>
@@ -56,6 +53,7 @@
 </template>
 
 <script setup>
+import RegistryNameFields from "./RegistryNameFields.vue";
 import RegistryFieldIcon from "./RegistryFieldIcon.vue";
 import { computed, inject } from "vue";
 import { PERSON_CONTEXT } from "../context/renderer-contexts.js";

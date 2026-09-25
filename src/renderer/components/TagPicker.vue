@@ -42,10 +42,7 @@
       </div>
     </div>
     <div class="tag-create-popover" v-if="tagCreate.visible && tagCreate.target === target" @click.stop>
-      <label>Tag name</label>
-      <input class="input" v-model="tagCreate.text" :disabled="tagManager.saving" />
-      <label>Description (optional)</label>
-      <textarea class="input tag-create-description" v-model="tagCreate.description" :disabled="tagManager.saving"></textarea>
+      <RegistryNameFields label="Tag name" v-model:name="tagCreate.text" v-model:description="tagCreate.description" :disabled="tagManager.saving" />
       <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
       <div class="tag-create-actions">
         <button class="btn" @click="closeCreateTagMenu" :disabled="tagManager.saving">Cancel</button>
@@ -56,6 +53,7 @@
 </template>
 
 <script setup>
+import RegistryNameFields from "./RegistryNameFields.vue";
 import RegistryFieldIcon from "./RegistryFieldIcon.vue";
 import { computed, inject } from "vue";
 import { TAG_CONTEXT } from "../context/renderer-contexts.js";

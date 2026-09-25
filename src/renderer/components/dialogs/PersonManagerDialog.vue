@@ -13,8 +13,7 @@
           <div class="tag-manager-item-main">
             <div class="tag-manager-item-title"><strong>{{ person.Name }}</strong><span>{{ person.UsageCount || 0 }} media items</span></div>
             <div v-if="personManager.editingId === person.PersonId" class="registry-manager-edit">
-              <label>Person name</label><input autofocus class="input" v-model="personManager.editName" :disabled="personManager.saving" @keydown.enter.exact.prevent="savePersonEdit" @keydown.escape.prevent="cancelPersonEdit" />
-              <label>Description</label><textarea class="input tag-manager-description-input" v-model="personManager.editDescription" placeholder="Optional" :disabled="personManager.saving" @keydown.ctrl.enter.prevent="savePersonEdit"></textarea>
+              <RegistryNameFields label="Person name" v-model:name="personManager.editName" v-model:description="personManager.editDescription" :disabled="personManager.saving" editing @save="savePersonEdit" @cancel="cancelPersonEdit" />
             </div>
             <p v-else>{{ person.Description || 'No description' }}</p>
             <div class="tag-manager-error" v-if="personManager.error && personManager.editingId === person.PersonId">{{ personManager.error }}</div>
@@ -28,8 +27,7 @@
   <AppDialog v-if="personCreate.visible && personCreate.target === 'manager'" class="registry-create-modal" dismiss-on-backdrop :busy="personManager.saving" @close="closeCreatePersonMenu">
       <template #header><h3>Create Person</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreatePersonMenu" :disabled="personManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
-        <label>Person name</label><input class="input" v-model="personCreate.name" :disabled="personManager.saving" />
-        <label>Description (optional)</label><textarea class="input tag-create-description" v-model="personCreate.description" :disabled="personManager.saving"></textarea>
+        <RegistryNameFields label="Person name" v-model:name="personCreate.name" v-model:description="personCreate.description" :disabled="personManager.saving" />
         <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreatePersonMenu" :disabled="personManager.saving">Cancel</button><button class="btn btn-primary" @click="createPersonAndSelect" :disabled="personManager.saving">Create</button></div>
       </div>
@@ -37,6 +35,7 @@
 </template>
 
 <script setup>
+import RegistryNameFields from "../RegistryNameFields.vue";
 import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { PERSON_CONTEXT } from "../../context/renderer-contexts.js";

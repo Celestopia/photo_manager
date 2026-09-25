@@ -21,4 +21,4 @@ export function allowsViewerHorizontalArrow(event, activeElement, overlayOpen = 
 }
 
 // These surfaces are conditionally mounted; native dialogs remain mounted when closed.
-export const VIEWER_ARROW_OVERLAYS = 'dialog[open], [aria-modal="true"], .tag-modal-backdrop, .registry-create-backdrop, .tag-dropdown, .tag-create-popover, .context-menu, .chat-attachment-menu, .chat-options, .chat-history, .usage-menu';
+export const VIEWER_ARROW_OVERLAYS = 'dialog[open], [aria-modal="true"], .tag-dropdown, .tag-create-popover, .context-menu, .chat-attachment-menu, .chat-options, .chat-history, .usage-menu';

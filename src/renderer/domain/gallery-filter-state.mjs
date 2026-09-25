@@ -61,3 +61,9 @@ export function toggleRegistryFilter(current, value, additive = false) {
   if (!additive) return [value];
   return current.includes(value) ? current.filter(id => id !== value) : [...current, value];
 }
+
+/** Shared UI registry matching; never changes stored text or general media search. */
+export function matchesRegistrySearch(search, ...values) {
+  const keyword = String(search ?? "").trim().toLocaleLowerCase("en-US");
+  return !keyword || values.some(value => String(value ?? "").toLocaleLowerCase("en-US").includes(keyword));
+}

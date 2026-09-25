@@ -32,7 +32,7 @@
           <div><dt>Updated</dt><dd :title="libraryState.active?.updatedAt">{{ formatLibraryDate(libraryState.active?.updatedAt) }}</dd></div>
           <div class="library-fact-wide"><dt>Library ID</dt><dd>{{ libraryState.active?.libraryId }}</dd></div>
         </dl>
-        <div class="library-folder-actions"><button class="btn" title="Open the library folder in File Explorer" @click="openLibraryRoot">Open folder</button><button class="btn" title="Open the .photo_manager data folder in File Explorer" @click="openLibraryManagerDir">Open data folder</button></div>
+        <div class="library-folder-actions"><button class="btn" data-tip="Open the library folder in File Explorer" @click="openLibraryRoot">Open folder</button><button class="btn" data-tip="Open the .photo_manager data folder in File Explorer" @click="openLibraryManagerDir">Open data folder</button></div>
       </div>
       <div class="library-dialog-actions"><button class="btn" @click="closeLibraryInfo">Cancel</button><button class="btn btn-primary" :disabled="!canSaveName" @click="saveLibraryInfo">Save changes</button></div>
     </AppDialog>
