@@ -1,3 +1,4 @@
+const { createWindowMessages } = require("./window-messages");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -32,6 +33,7 @@ async function createMainWindow(options, dependencies = {}) {
     },
   });
   onCreated?.(window);
+  const messages = createWindowMessages(window, electron);
 
   window.webContents.on("did-fail-load", (_, errorCode, errorDescription, validatedURL) => {
     const message = `did-fail-load code=${errorCode} desc=${errorDescription} url=${validatedURL}`;
@@ -65,48 +67,26 @@ async function createMainWindow(options, dependencies = {}) {
   let closePrepared = false;
   let closePreparation = null;
   window.on("close", (event) => {
-    if (isMaintenanceRunning()) {
-      event.preventDefault();
-      dialog.showMessageBoxSync(window, {
-        type: "warning",
-        title: "Maintenance Is Still Running",
-        message: "The current library maintenance task cannot be cancelled. Wait for it to finish before closing this window.",
-        buttons: ["OK"],
-      });
-      return;
-    }
-    const worker = getInitializationWorker();
-    if (worker) {
-      event.preventDefault();
-      const choice = dialog.showMessageBoxSync(window, {
-        type: "warning",
-        title: "Cancel Library Initialization",
-        message: "The library is still being initialized. Closing this window will cancel initialization and delete all incomplete data created during this attempt. Continue?",
-        buttons: ["Continue Initialization", "Cancel Initialization and Close"],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (choice === 1) cancelInitializationAndClose(worker);
-      return;
-    }
-    if (closePrepared || typeof prepareWindowClose !== "function") return;
+    if (closePrepared) return;
     event.preventDefault();
     if (closePreparation) return;
-    closePreparation = Promise.resolve()
-      .then(prepareWindowClose)
-      .then(() => {
-        closePrepared = true;
-        window.close();
-      })
-      .catch((error) => {
-        appendLog(`window close preparation failed: ${error?.stack || error?.message || error}`);
-        dialog.showMessageBoxSync(window, {
-          type: "error",
-          title: "Could Not Close Window",
-          message: error?.message || "The library session could not be closed safely.",
-          buttons: ["OK"],
-        });
-      })
+    closePreparation = Promise.resolve().then(async () => {
+      if (isMaintenanceRunning()) {
+        await messages.request({ title: "Maintenance is still running", message: "Wait for the current maintenance task to finish before closing this window. This task cannot be cancelled.", notice: true, confirmLabel: "OK" });
+        return;
+      }
+      const worker = getInitializationWorker();
+      if (worker) {
+        const accepted = await messages.request({ title: "Cancel initialization and close?", message: "Closing this window will cancel initialization and delete incomplete management data created during this attempt. Your original media files will remain unchanged.", cancelLabel: "Continue initialization", confirmLabel: "Cancel and close", danger: true });
+        if (accepted && !window.isDestroyed() && getInitializationWorker() === worker && !isMaintenanceRunning()) cancelInitializationAndClose(worker);
+        return;
+      }
+      await prepareWindowClose?.();
+      if (!window.isDestroyed()) { closePrepared = true; window.close(); }
+    }).catch(async error => {
+      appendLog(`window close preparation failed: ${error?.stack || error?.message || error}`);
+      if (!window.isDestroyed()) await messages.request({ title: "Could not close window", message: error?.message || "The library session could not be closed safely.", notice: true, confirmLabel: "OK" });
+    }).catch(error => appendLog(`window close message failed: ${error?.message || error}`))
       .finally(() => { closePreparation = null; });
   });
 

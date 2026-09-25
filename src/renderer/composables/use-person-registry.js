@@ -9,6 +9,7 @@ import {
 
 /** Owns the ID-backed people registry, picker state, and management workflow. */
 export function usePersonRegistry({
+  requestConfirm,
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   gallerySettingsOpen, recentPeople, rememberRecentPerson, pruneRecentPeople,
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
@@ -141,7 +142,8 @@ export function usePersonRegistry({
   async function deletePersonGlobally(person) {
     if (personManager.saving) return;
     const usage = Number(person?.UsageCount || 0);
-    if (!window.confirm(`Delete person “${person.Name}” from the entire library? This will remove them from ${usage} media item(s).`)) return;
+    const stillCurrent = requests.capture();
+    if (!await requestConfirm({ title: "Delete person?", confirmLabel: "Delete person", danger: true, message: `Delete person “${person.Name}” from the entire library? This will remove them from ${usage} media item(s).` + "\n\nMedia files will remain unchanged." }) || !stillCurrent()) return;
     const result = await requests.run(() => api.deletePersonGlobally({ personId: person.PersonId }));
     if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete person: ${result?.error || "Unknown error"}`); return; }

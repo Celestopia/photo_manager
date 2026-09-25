@@ -9,6 +9,7 @@ import {
 
 /** Owns the ID-backed single-valued album registry and management workflow. */
 export function useAlbumRegistry({
+  requestConfirm,
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem,
   orderedItems, gallerySettingsOpen, showToastMessage,
   closeOtherRegistryDropdowns, requestEdit, queryGallery,
@@ -139,7 +140,8 @@ export function useAlbumRegistry({
   async function deleteAlbumGlobally(album) {
     if (albumManager.saving) return;
     const usage = Number(album?.UsageCount || 0);
-    if (!window.confirm(`Delete album “${album.Title}” from the entire library? This will clear the album field on ${usage} media item(s).`)) return;
+    const stillCurrent = requests.capture();
+    if (!await requestConfirm({ title: "Delete album?", confirmLabel: "Delete album", danger: true, message: `Delete album “${album.Title}” from the entire library? This will clear the album field on ${usage} media item(s).` + "\n\nMedia files will remain unchanged." }) || !stillCurrent()) return;
     const result = await requests.run(() => api.deleteAlbumGlobally({ albumId: album.AlbumId }));
     if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete album: ${result?.error || "Unknown error"}`); return; }

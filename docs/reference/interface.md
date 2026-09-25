@@ -12,6 +12,8 @@ Library information shows the name as plain text by default. A pencil toggles ed
 
 Maintenance dialogs use operation-specific action labels and summaries derived from returned counters. Raw reports remain copyable under Detailed report, initially expanded on failure or reported issues. An incomplete or absent report never implies a clean verification. Running operations show progress and the current path; their existing close restrictions remain unchanged. This presentation does not change persistence or maintenance behavior.
 
+Application confirmations use one shared modal dialog for library closing, initialization cancellation/recovery, stale-lock removal, CSV overwrite, and global registry deletion. Action labels describe the operation; destructive actions use red styling and Cancel receives initial focus. Close cancels; Escape and backdrop clicks do not dismiss these dialogs. The modal traps focus, restores its opener, and stays above other panels. Only one request may be pending per window; library disposal cancels it and stale approvals cannot affect a replacement library. File and folder pickers remain Windows-native.
+
 ## Gallery Query and Filtering
 
 `gallery:query` filters the in-memory index in this order: media type; unioned rating/privacy levels intersected with other dimensions; album/tag/person/location including `__UNASSIGNED__`; case-sensitive title, filename-only, or description substring; shooting-time order; capture-date grouping. Empty level arrays mean all; rating defaults all and privacy defaults `[1]`. Location includes descendants; administrative filters resolve exact country/province/city sets. Invalid regions are rejected. `Detail` never participates.

@@ -7,6 +7,7 @@ import { MAINTENANCE_COPY } from "../domain/library-presentation.mjs";
  */
 export function useLibrarySession({
   api,
+  requestConfirm,
   showToastMessage,
   hasUnsavedChanges,
   onLibraryOpened,
@@ -96,7 +97,8 @@ export function useLibrarySession({
       if (request !== entryGeneration) return;
       if (!result?.ok && result?.code === "LIBRARY_LOCKED" && result?.lockState?.forceAllowed && !options.force) {
         const lock = result.lockState.lock || {};
-        const confirmed = window.confirm(`The library may have a stale lock.\n\nHost: ${lock.HostName || "Unknown"}\nProcess: ${lock.ProcessId || "Unknown"}\nStarted: ${lock.ApplicationStartedAt || "Unknown"}\n\nForcing an unlock may allow concurrent writes and corrupt data. Continue?`);
+        const confirmed = await requestConfirm({ title: "Unlock library?", path: libraryPath, confirmLabel: "Force unlock", danger: true, message: `The library may have a stale lock.\n\nHost: ${lock.HostName || "Unknown"}\nProcess: ${lock.ProcessId || "Unknown"}\nStarted: ${lock.ApplicationStartedAt || "Unknown"}\n\nForcing an unlock may allow concurrent writes and corrupt data. Continue?` });
+        if (request !== entryGeneration) return;
         if (confirmed) return await openLibraryPath(libraryPath, { force: true });
       }
       if (!result?.ok) {
@@ -153,7 +155,8 @@ export function useLibrarySession({
         return;
       }
       if (inspection.kind === "failed-initialization") {
-        const clean = window.confirm(`This folder contains data from a failed library initialization:\n\n${inspection.marker?.Error || "Unknown error"}\n\nThe failure log will remain until you confirm a retry. Delete the incomplete management data and rescan the folder now?`);
+        const clean = await requestConfirm({ title: "Retry initialization?", path: inspection.root, confirmLabel: "Clean up and retry", danger: true, message: `This folder contains data from a failed library initialization:\n\n${inspection.marker?.Error || "Unknown error"}\n\nThe failure log will remain until you confirm a retry. Delete the incomplete management data and rescan the folder now?` });
+        if (request !== entryGeneration) return;
         if (clean) {
           const cleaned = await api.cleanupFailedInitialization(inspection.root);
           if (request !== entryGeneration) return;
@@ -239,8 +242,9 @@ export function useLibrarySession({
   }
 
   async function cancelLibraryOperation() {
-    const confirmed = window.confirm("Cancel the current operation? Any incomplete management data created during this initialization will be deleted.");
-    if (!confirmed) return;
+    const request = entryGeneration, operation = entry.operation;
+    const confirmed = await requestConfirm({ title: "Cancel operation?", confirmLabel: "Cancel operation", cancelLabel: "Continue operation", danger: true, message: "Any incomplete management data created during this initialization will be deleted." });
+    if (!confirmed || request !== entryGeneration || operation !== entry.operation || !entry.cancellable) return;
     if (entry.operation === "quick-scan") await api.cancelLibraryScan();
     if (entry.operation === "initialize") await api.cancelLibraryInitialization();
   }
@@ -330,7 +334,7 @@ export function useLibrarySession({
       if (request !== maintenanceGeneration) return;
       if (!result?.ok && result?.code === "OUTPUT_EXISTS" && !overwrite) {
         maintenanceDialog.running = false;
-        if (window.confirm("photo_metadata.csv already exists. Replace it?")) await startMaintenanceOperation(true);
+        if (await requestConfirm({ title: "Replace CSV?", confirmLabel: "Replace", danger: true, message: "photo_metadata.csv already exists. Replace it?" }) && request === maintenanceGeneration) await startMaintenanceOperation(true);
         return;
       }
       maintenanceDialog.completed = true;
@@ -366,7 +370,8 @@ export function useLibrarySession({
       showToastMessage("Save or discard the current changes first");
       return;
     }
-    if (!window.confirm("Close the current library? The library will close safely, release its lock, and return to the library entry screen. Original media and data under .photo_manager will not be deleted.")) return;
+    const request = entryGeneration, active = libraryState.value.active;
+    if (!await requestConfirm({ title: "Close library?", path: active?.root, confirmLabel: "Close library", message: "Return to the welcome page.\nYour media and library data will remain unchanged." }) || request !== entryGeneration || active !== libraryState.value.active) return;
     const result = await api.closeLibrary();
     if (!result?.ok) {
       showToastMessage(`Could not close library: ${result?.error || "Unknown error"}`);

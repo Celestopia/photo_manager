@@ -1,6 +1,8 @@
 import { ref, onMounted, onBeforeUnmount, nextTick, provide } from "vue";
 import { ICONS, STAR_LEVELS, UNASSIGNED_FILTER, WINDOW_ACTIONS } from "../constants/ui-constants.mjs";
 import { buildImageUrl, formatBitRate, formatDuration, formatFileSize } from "../domain/media-formatters.mjs";
+import { useAppDialog } from "../composables/use-app-dialog.js";
+import { APP_DIALOG_CONTEXT } from "../context/renderer-contexts.js";
 import { useUiFeedback } from "../composables/use-ui-feedback.js";
 import { useWindowControls } from "../composables/use-window-controls.js";
 import { useMediaTransform } from "../composables/use-media-transform.js";
@@ -48,6 +50,10 @@ if (!API) {
  * narrow contexts; feature state and behavior remain owned by the composables.
  */
 export function useRendererApplication() {
+    const appDialog = useAppDialog();
+    const requestConfirm = appDialog.request;
+    provide(APP_DIALOG_CONTEXT, appDialog);
+    let removeWindowMessage;
     // --- Core view / query state ---
     const config = ref(null);
     const {
@@ -101,6 +107,7 @@ export function useRendererApplication() {
       initialize: initializeLibrarySession,
       dispose: disposeLibrarySession,
     } = useLibrarySession({
+      requestConfirm,
       api: API,
       showToastMessage,
       hasUnsavedChanges: () => editingDirty.value,
@@ -351,6 +358,7 @@ export function useRendererApplication() {
       deleteTagGlobally,
       resetTagState,
     } = useTagRegistry({
+      requestConfirm,
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
       query,
@@ -394,6 +402,7 @@ export function useRendererApplication() {
       deletePersonGlobally,
       resetPersonState,
     } = usePersonRegistry({
+      requestConfirm,
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
       query,
@@ -437,6 +446,7 @@ export function useRendererApplication() {
       deleteAlbumGlobally,
       resetAlbumState,
     } = useAlbumRegistry({
+      requestConfirm,
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
       query,
@@ -486,6 +496,7 @@ export function useRendererApplication() {
       deleteLocationGlobally,
       resetLocationState,
     } = useLocationRegistry({
+      requestConfirm,
       api: API,
       unassignedFilter: UNASSIGNED_FILTER,
       query,
@@ -604,6 +615,7 @@ export function useRendererApplication() {
     }
 
     function resetLibraryUiState() {
+      appDialog.reset();
       resetViewerState();
       resetGalleryState();
       resetTagState();
@@ -627,6 +639,11 @@ export function useRendererApplication() {
     }
 
     onMounted(async () => {
+      removeWindowMessage = API.onWindowMessage?.(async payload => {
+        if (payload.dismiss) { appDialog.reset(); return; }
+        const accepted = await requestConfirm(payload.options);
+        API.answerWindowMessage(payload.id, accepted);
+      });
       // Initial render flow: application config -> library state -> entry-page prefill.
       await loadConfig();
       await initializeWindowControls();
@@ -639,6 +656,8 @@ export function useRendererApplication() {
     });
 
     onBeforeUnmount(() => {
+      removeWindowMessage?.();
+      appDialog.reset();
       // Cleanup global listeners when app unmounts.
       releaseCurrentMedia();
       disposeMediaViewer();

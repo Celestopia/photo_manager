@@ -3,6 +3,7 @@
     <LibraryEntryView v-if="view === 'library-entry'" />
     <GalleryView v-else-if="view === 'gallery'" />
     <ViewerView v-else-if="view === 'viewer'" />
+    <AppMessageDialog />
     <LibraryDialogs />
     <TagManagerDialog />
     <AlbumManagerDialog />
@@ -15,6 +16,7 @@
 </template>
 
 <script>
+import AppMessageDialog from "./components/dialogs/AppMessageDialog.vue";
 import ProviderSettings from "./components/ProviderSettings.vue";
 import GalleryView from "./components/GalleryView.vue";
 import ViewerView from "./components/ViewerView.vue";
@@ -31,6 +33,7 @@ import { useRendererApplication } from "./application/use-renderer-application.j
 export default {
   name: "PhotoManagerApp",
   components: {
+    AppMessageDialog,
     ProviderSettings,
     GalleryView,
     ViewerView,

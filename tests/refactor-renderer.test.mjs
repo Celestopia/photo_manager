@@ -16,7 +16,7 @@ function browser(t) { const previous = globalThis.window; globalThis.window = wi
 for (const method of ['openLibraryPath', 'chooseLibrary', 'confirmInitializeLibrary', 'recheckMediaTools', 'startMaintenanceOperation']) {
   test(`${method} releases busy state on transport rejection`, async () => {
     const fail = async () => { throw new Error('Transport disconnected'); };
-    const session = useLibrarySession({ api: { openLibrary: fail, chooseLibraryDirectory: fail, initializeLibrary: fail, recheckMediaTools: fail, startMaintenance: fail }, showToastMessage: noop });
+    const session = useLibrarySession({ requestConfirm: async () => true, api: { openLibrary: fail, chooseLibraryDirectory: fail, initializeLibrary: fail, recheckMediaTools: fail, startMaintenance: fail }, showToastMessage: noop });
     await session[method]('fixture');
     assert.equal(session.entry.busy, false);
     assert.equal(session.entry.cancellable, false);
@@ -27,7 +27,7 @@ for (const method of ['openLibraryPath', 'chooseLibrary', 'confirmInitializeLibr
 
 test('an old entry request cannot clear a newer busy state or publish after disposal', async () => {
   const first = deferred(), second = deferred(); let calls = 0;
-  const session = useLibrarySession({ api: { openLibrary: () => ++calls === 1 ? first.promise : second.promise }, showToastMessage: noop });
+  const session = useLibrarySession({ requestConfirm: async () => true, api: { openLibrary: () => ++calls === 1 ? first.promise : second.promise }, showToastMessage: noop });
   const a = session.openLibraryPath('first'), b = session.openLibraryPath('second');
   first.reject(new Error('Old request failed')); await a;
   assert.equal(session.entry.busy, true); assert.equal(session.entry.error, '');
@@ -39,7 +39,7 @@ function registryFixture(useRegistry, api) {
   const selectedItem = ref({ MediaId: 'first' }), editDraft = reactive({ TagIds: [], PersonIds: [], AlbumId: null, LocationId: null });
   let refreshes = 0;
   const query = reactive({ filters: { tag: [], person: [], album: [], location: [], locationRegion: [] } });
-  const state = useRegistry({ api, selectedItem, editDraft, query, batchEdit: reactive({ tagIds: [], personIds: [], albumId: null, locationId: null }), orderedItems: ref([]),
+  const state = useRegistry({ requestConfirm: async () => true, api, selectedItem, editDraft, query, batchEdit: reactive({ tagIds: [], personIds: [], albumId: null, locationId: null }), orderedItems: ref([]),
     gallerySettingsOpen: ref(false), unassignedFilter: 'unassigned', recentTags: ref([]), recentPeople: ref([]), recentLocations: ref([]),
     rememberRecentTag: noop, rememberRecentPerson: noop, rememberRecentLocation: noop, pruneRecentTags: noop, pruneRecentPeople: noop, pruneRecentLocations: noop,
     showToastMessage: noop, requestEdit: noop, queryGallery: async () => { refreshes++; }, applyFilterSort: noop });

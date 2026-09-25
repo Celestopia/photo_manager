@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld("photoManagerApi", {
     test: () => ipcRenderer.invoke("chat:test"),
     onEvent: (listener) => subscribe("chat:event", listener),
   },
+  onWindowMessage: listener => {
+    const remove = subscribe("window:message", listener);
+    ipcRenderer.send("window:message-ready");
+    return remove;
+  },
+  answerWindowMessage: (id, accepted) => ipcRenderer.send("window:message-answer", { id, accepted }),
   // App/runtime config
   getConfig: () => ipcRenderer.invoke("app:get-config"),
 

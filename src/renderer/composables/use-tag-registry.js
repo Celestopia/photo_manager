@@ -9,6 +9,7 @@ import {
 
 /** Owns the ID-backed tag registry, picker state, and tag-management workflow. */
 export function useTagRegistry({
+  requestConfirm,
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   gallerySettingsOpen, recentTags, rememberRecentTag, pruneRecentTags,
   showToastMessage, closeOtherRegistryDropdowns, requestEdit,
@@ -153,7 +154,8 @@ export function useTagRegistry({
   async function deleteTagGlobally(tag) {
     if (tagManager.saving) return;
     const usage = Number(tag?.UsageCount || 0);
-    if (!window.confirm(`Delete tag “${tag.Text}” from the entire library? This will remove it from ${usage} media item(s).`)) return;
+    const stillCurrent = requests.capture();
+    if (!await requestConfirm({ title: "Delete tag?", confirmLabel: "Delete tag", danger: true, message: `Delete tag “${tag.Text}” from the entire library? This will remove it from ${usage} media item(s).` + "\n\nMedia files will remain unchanged." }) || !stillCurrent()) return;
     const result = await requests.run(() => api.deleteTagGlobally({ tagId: tag.TagId }));
     if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete tag: ${result?.error || "Unknown error"}`); return; }

@@ -32,6 +32,7 @@ import {
 
 /** Owns ID-backed hierarchical location pickers, manager folding, and registry mutations. */
 export function useLocationRegistry({
+  requestConfirm,
   api, unassignedFilter, query, editDraft, batchEdit, selectedItem, orderedItems,
   gallerySettingsOpen, recentLocations, rememberRecentLocation,
   pruneRecentLocations, showToastMessage, closeOtherRegistryDropdowns, requestEdit,
@@ -394,7 +395,8 @@ export function useLocationRegistry({
     if (locationManager.saving) return;
     const usage = Number(location?.UsageCount || 0);
     const childCount = Array.isArray(location?.ChildrenIds) ? location.ChildrenIds.length : 0;
-    if (!window.confirm(`Delete location “${location.Name}” from the entire library? This will clear it from ${usage} media item(s) and detach ${childCount} direct child location(s).`)) return;
+    const stillCurrent = requests.capture();
+    if (!await requestConfirm({ title: "Delete location?", confirmLabel: "Delete location", danger: true, message: `Delete location “${location.Name}” from the entire library? This will clear it from ${usage} media item(s) and detach ${childCount} direct child location(s).` + "\n\nMedia files will remain unchanged." }) || !stillCurrent()) return;
     const result = await requests.run(() => api.deleteLocationGlobally({ locationId: location.LocationId }));
     if (!result) return;
     if (!result?.ok) { showToastMessage(`Could not delete location: ${result?.error || "Unknown error"}`); return; }
