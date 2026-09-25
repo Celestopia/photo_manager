@@ -1,7 +1,7 @@
 /**
  * Shared library boundary and persistence primitives.
  *
- * A library is a user-selected media root. All PhotoManager-owned data for that
+ * A library is a user-selected media root. All Photo Manager-owned data for that
  * root lives under <root>/.photo_manager and is resolved exclusively here.
  */
 const fs = require("node:fs");
@@ -58,7 +58,7 @@ function assertPathInsideLibrary(paths, candidate) {
   const absolute = path.resolve(candidate);
   const relative = path.relative(paths.root, absolute);
   if (!relative || relative === MANAGER_DIR_NAME || relative.startsWith(`${MANAGER_DIR_NAME}${path.sep}`)) {
-    throw new Error("The path refers to PhotoManager-owned data, not a media file");
+    throw new Error("The path refers to Photo Manager-owned data, not a media file");
   }
   if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     throw new Error("The media path escapes the active library");

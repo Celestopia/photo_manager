@@ -17,7 +17,7 @@ async function validateExistingLibrary(paths, options = {}) {
   const rootLinkStat = await fsp.lstat(paths.root);
   if (rootLinkStat.isSymbolicLink()) throw new Error("A symbolic-link directory cannot be used as a library root");
   const parentManager = findParentManagerDirectory(paths.root);
-  if (parentManager) throw new Error(`The selected directory is inside another PhotoManager library: ${parentManager}`);
+  if (parentManager) throw new Error(`The selected directory is inside another Photo Manager library: ${parentManager}`);
   const manifest = await readLibraryManifest(paths);
   for (const fileName of Object.values(DATA_FILE_NAMES)) {
     const filePath = path.join(paths.dataDir, fileName);
@@ -26,7 +26,7 @@ async function validateExistingLibrary(paths, options = {}) {
   await assertDirectoryWritable(paths.managerDir);
   if (options.detectNested !== false) {
     const nested = await findNestedManagerDirectory(paths.root, options.onProgress);
-    if (nested) throw new Error(`Nested PhotoManager library detected: ${nested}`);
+    if (nested) throw new Error(`Nested Photo Manager library detected: ${nested}`);
   }
   return manifest;
 }

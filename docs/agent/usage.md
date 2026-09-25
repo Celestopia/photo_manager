@@ -6,13 +6,13 @@ Open a photo or video, then choose **Assistant** in the left sidebar. Customizat
 
 Choose the **Provider settings** gear in the Assistant header. Enter the Base URL, Model and API key in the centered dialog, then choose **Save settings**. Leave the API key blank to preserve a saved key. Advanced options contains environment-variable fallback and model thinking. Closing without saving discards draft changes.
 
-PhotoManager stores these settings in the following file; manual editing is optional:
+Photo Manager stores these settings in the following file; manual editing is optional:
 
 ```text
 %LOCALAPPDATA%\PhotoManager\app-data\chat-provider.yml
 ```
 
-Fill in your service's base URL, API key and model name. The base URL should end at the API version path, such as `/v1`; PhotoManager appends `/chat/completions`.
+Fill in your service's base URL, API key and model name. The base URL should end at the API version path, such as `/v1`; Photo Manager appends `/chat/completions`.
 
 ```yaml
 schemaVersion: 1
@@ -24,9 +24,9 @@ streaming: true
 enable_thinking: false
 ```
 
-Replace the example URL with the endpoint for your provider account and region. Put your key in `apiKey`, or leave it empty and set the environment variable named by `apiKeyEnv` before starting PhotoManager. A nonempty `apiKey` takes precedence. Keys entered in this file are stored as local plaintext; using an environment variable avoids putting the key in the file. Neither method puts credentials in conversation history.
+Replace the example URL with the endpoint for your provider account and region. Put your key in `apiKey`, or leave it empty and set the environment variable named by `apiKeyEnv` before starting Photo Manager. A nonempty `apiKey` takes precedence. Keys entered in this file are stored as local plaintext; using an environment variable avoids putting the key in the file. Neither method puts credentials in conversation history.
 
-The Qwen default is listed in [Alibaba Cloud's model documentation](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-vl-plus). A local multimodal server can use a loopback URL such as `http://127.0.0.1:8000/v1` and its own model name. If your server does not accept `enable_thinking`, choose **Use provider default** under Model thinking. The server must support streaming Chat Completions and function calling for tools. PhotoManager does not download or start a local model.
+The Qwen default is listed in [Alibaba Cloud's model documentation](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-vl-plus). A local multimodal server can use a loopback URL such as `http://127.0.0.1:8000/v1` and its own model name. If your server does not accept `enable_thinking`, choose **Use provider default** under Model thinking. The server must support streaming Chat Completions and function calling for tools. Photo Manager does not download or start a local model.
 
 Choose **Save settings**, then **Test connection**. The test sends a generated blue square; it does not use your photos. Opening Settings and saving configuration do not contact the provider. A successful configuration check validates the fields, not the availability of the remote model; the explicit test checks the connection.
 

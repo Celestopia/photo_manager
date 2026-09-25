@@ -1,7 +1,7 @@
 <template>
 <header class="topbar gallery-topbar">
   <div class="left-tools gallery-header-tools"><GallerySettingsMenu /><button class="btn icon-btn gallery-reset" data-tip="Reset gallery" aria-label="Reset gallery" @click="resetAll"><img class="icon" :src="ICONS.restoreView" alt="" /></button></div>
-  <div class="gallery-brand"><img :src="appIcon" alt="" /><span>PhotoManager</span></div>
+  <div class="gallery-brand"><img :src="appIcon" alt="" /><span>Photo Manager</span></div>
   <div class="gallery-right-tools">
     <div class="window-controls">
       <button class="btn ghost icon-btn" data-tip="Minimize" @click="doWindowAction(WINDOW_ACTIONS.minimize)"><img class="icon" :src="ICONS.windowMinimize" alt="Minimize" /></button>

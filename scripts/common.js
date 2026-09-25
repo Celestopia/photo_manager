@@ -73,7 +73,7 @@ async function walkFiles(root, options = {}) {
       if (e.isDirectory()) {
         if (e.name === MANAGER_DIR_NAME) {
           if (path.resolve(current) === resolvedRoot) continue;
-          const error = new Error(`Nested PhotoManager library detected: ${full}`);
+          const error = new Error(`Nested Photo Manager library detected: ${full}`);
           error.code = "NESTED_LIBRARY";
           throw error;
         }

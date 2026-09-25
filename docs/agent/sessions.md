@@ -94,7 +94,7 @@ Message IDs and attachment IDs must be unique within the session. An attachment 
 
 ### Record What Was Sent
 
-For each transmitted input, save enough information to explain how PhotoManager prepared it:
+For each transmitted input, save enough information to explain how Photo Manager prepared it:
 
 | Information | Fields to retain |
 | --- | --- |
@@ -106,7 +106,7 @@ For each transmitted input, save enough information to explain how PhotoManager 
 
 For Original file uploads, transmitted bytes, dimensions and SHA256 must match the source. Save the recorded values, not another copy of those bytes. Likewise, do not put base64 payloads or derivative image bytes in `session.json`.
 
-This record describes what PhotoManager sent. It cannot establish how the provider resized, processed or retained that content.
+This record describes what Photo Manager sent. It cannot establish how the provider resized, processed or retained that content.
 
 Next: [Building and Testing the Feature](implementation.md).
 

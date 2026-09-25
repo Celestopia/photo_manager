@@ -36,7 +36,7 @@ test("library paths are derived exclusively below the selected root", async (t) 
   assert.equal(paths.metadataFile, path.join(root, ".photo_manager", "data", "photo_metadata.jsonl"));
   assert.throws(() => resolveLibraryPaths(path.parse(root).root), /drive root/i);
   assert.throws(() => assertPathInsideLibrary(paths, path.join(root, "..", "outside.jpg")), /escapes the active library/i);
-  assert.throws(() => assertPathInsideLibrary(paths, path.join(paths.managerDir, "cache.webp")), /PhotoManager-owned data/i);
+  assert.throws(() => assertPathInsideLibrary(paths, path.join(paths.managerDir, "cache.webp")), /Photo Manager-owned data/i);
   assert.throws(() => parseLibraryArgument([]), /Missing required argument/);
 });
 
@@ -71,7 +71,7 @@ test("scanner excludes the root manager directory and rejects nested libraries",
   const files = await walkFiles(root);
   assert.deepEqual(files.map((file) => path.basename(file)), ["photo.jpg"]);
   await fsp.mkdir(path.join(root, "nested", ".photo_manager"), { recursive: true });
-  await assert.rejects(walkFiles(root), /Nested PhotoManager library/);
+  await assert.rejects(walkFiles(root), /Nested Photo Manager library/);
 });
 
 test("a directory below another library is rejected as a nested library root", async (t) => {

@@ -1,6 +1,6 @@
 # Project Documentation
 
-[PROJECT.md](../PROJECT.md) is the entry point to the implemented PhotoManager specification. The files in this directory are permanent project documentation and belong in version control.
+[PROJECT.md](../PROJECT.md) is the entry point to the implemented Photo Manager specification. The files in this directory are permanent project documentation and belong in version control.
 
 ## Reference Index
 

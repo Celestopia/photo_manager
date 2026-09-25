@@ -88,7 +88,7 @@ Opening validates before acquiring the exclusive lock. Only its holder can write
 
 Returning to the entry page requires confirmation, is blocked by an unresolved viewer draft or running maintenance, clears that window's renderer state and memory indexes, and releases its lock. Closing a window first cancels its quick scan, stops its Assistant work, drains outstanding IPC operations, and safely closes only that session. Maintenance blocks only its owning window. The application exits after the last window closes.
 
-Launching PhotoManager again creates another entry window rather than activating an existing one. Every new window prefills the globally most recently opened library but still requires an explicit Open action. There is no in-application New Window command. Different windows may open different libraries concurrently; each retains one active library at a time.
+Launching Photo Manager again creates another entry window rather than activating an existing one. Every new window prefills the globally most recently opened library but still requires an explicit Open action. There is no in-application New Window command. Different windows may open different libraries concurrently; each retains one active library at a time.
 
 ## Locking and Concurrency
 

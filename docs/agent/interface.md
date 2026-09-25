@@ -28,7 +28,7 @@ Reject unsupported files before completing their import. Explain that PDF, Offic
 
 Options includes an Image quality choice for the message:
 
-| Choice | What PhotoManager sends |
+| Choice | What Photo Manager sends |
 | --- | --- |
 | Optimized for chat | A smaller image, corrected for orientation and color, at most 1,024 pixels on its long edge. This is the default. |
 | Original file | The unchanged static-image file, without resizing, recompression or metadata removal. |
@@ -59,9 +59,9 @@ These notices are visible without opening Options. They explain the processing w
 
 ## Choose Metadata and Send
 
-Options lets users choose which saved PhotoManager metadata accompanies library media. Title, description and assigned tag names are enabled by default. Location, people, hidden description and technical details are opt-in. Unsaved metadata drafts are not included.
+Options lets users choose which saved Photo Manager metadata accompanies library media. Title, description and assigned tag names are enabled by default. Location, people, hidden description and technical details are opt-in. Unsaved metadata drafts are not included.
 
-These choices control the extra metadata supplied by PhotoManager. They cannot remove metadata embedded in an Original file upload without changing its bytes; the original-upload explanation must make that clear.
+These choices control the extra metadata supplied by Photo Manager. They cannot remove metadata embedded in an Original file upload without changing its bytes; the original-upload explanation must make that clear.
 
 Send dispatches in one action. Enter sends, Shift+Enter inserts a newline, and typing with a Chinese IME never sends before composition is complete. Only one model request can run at a time.
 

@@ -1,17 +1,17 @@
-# PhotoManager Project Specification
+# Photo Manager Project Specification
 
-This is the implementation-level specification for PhotoManager, intended for maintainers, reviewers, and future AI agents. It records the architecture, data contracts, interaction constraints, and failure-handling strategies implemented by the current code. If the code and this document disagree, first determine whether the difference is an incomplete migration or a defect; do not silently introduce a second set of rules.
+This is the implementation-level specification for Photo Manager, intended for maintainers, reviewers, and future AI agents. It records the architecture, data contracts, interaction constraints, and failure-handling strategies implemented by the current code. If the code and this document disagree, first determine whether the difference is an incomplete migration or a defect; do not silently introduce a second set of rules.
 
 This entry point and the linked references under `docs/reference` together form the implementation-level source of truth. Detailed contracts have one owning reference; update that reference when behavior changes.
 
 ## Product Scope
 
-PhotoManager is a local Windows desktop media manager for user-selected, independent libraries. A library may be any ordinary directory on the computer and does not need to be inside the project directory.
+Photo Manager is a local Windows desktop media manager for user-selected, independent libraries. A library may be any ordinary directory on the computer and does not need to be inside the project directory.
 
 Current capabilities include:
 
 - Managing images and videos on one timeline.
-- Opening multiple independent library windows by launching PhotoManager again, with one active library per window.
+- Opening multiple independent library windows by launching Photo Manager again, with one active library per window.
 - Viewing saved media GPS on read-only embedded or expanded OpenStreetMap maps (see Interface and Editing).
 - Viewing images, playing videos, resizing or collapsing viewer-session side panels, and editing shared customization fields.
 - Keeping viewer arrow navigation available after ordinary button clicks while preserving text editing, control adjustment, popup handling and video seeking shortcuts.
@@ -81,4 +81,4 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 
 ## Architecture Summary
 
-PhotoManager combines application code and global settings with user-selected independent libraries whose management data are self-contained. One Electron coordinator process owns shared application state and any number of window-scoped library sessions. Every window owns at most one active library, its in-memory indexes, chat service, workers, and writes; sender-routed IPC prevents one renderer from reaching another window's session. A library can be moved or backed up together with `.photo_manager` and has no dependency on data paths inside the application directory.
+Photo Manager combines application code and global settings with user-selected independent libraries whose management data are self-contained. One Electron coordinator process owns shared application state and any number of window-scoped library sessions. Every window owns at most one active library, its in-memory indexes, chat service, workers, and writes; sender-routed IPC prevents one renderer from reaching another window's session. A library can be moved or backed up together with `.photo_manager` and has no dependency on data paths inside the application directory.

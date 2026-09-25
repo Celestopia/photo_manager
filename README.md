@@ -1,6 +1,6 @@
-# PhotoManager
+# Photo Manager
 
-PhotoManager is a local-first Windows desktop application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
+Photo Manager is a local-first Windows desktop application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
 
 See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detailed data contracts and interaction rules. The [documentation index](docs/README.md) lists the maintained references.
 
@@ -18,7 +18,7 @@ See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detai
 - Chat about viewer media with a configured remote or local model; save conversations and import image/text attachments.
 - Enable optional Tavily web research, inspect cited sources, and review researched metadata suggestions before saving.
 - Initialize, update, verify, generate thumbnails for, and export a library without a database or cloud service.
-- Launch PhotoManager again to open another independent library window; the same library cannot be opened twice.
+- Launch Photo Manager again to open another independent library window; the same library cannot be opened twice.
 
 In gallery registry filters, use **Ctrl+Click** to select multiple albums, tags, people, or locations. Results match any selection within a field and all active fields. **All** clears that field; **Unassigned** can be combined with named entries.
 
@@ -30,16 +30,16 @@ Configure Tavily separately in **Provider settings → Web search**, then use th
 
 ## Run on Windows
 
-Keep the complete `release/win-unpacked/` folder together and double-click `PhotoManager.exe` on Windows 10 or 11 x64. No installation or Node.js is required; Electron, FFmpeg, FFprobe, and runtime dependencies are bundled. Do not copy the executable alone. You can move or rename the complete folder and create a Windows shortcut manually.
+Keep the complete `release/win-unpacked/` folder together and double-click `ptmgr-gui.exe` on Windows 10 or 11 x64. No installation or Node.js is required; Electron, FFmpeg, FFprobe, and runtime dependencies are bundled. Do not copy the executable alone. You can move or rename the complete folder and create a Windows shortcut manually.
 
-On first launch, PhotoManager automatically creates its data folders for the current Windows account:
+On first launch, Photo Manager automatically creates its data folders for the current Windows account:
 
 - `%APPDATA%\PhotoManager`: general configuration and Electron user data.
 - `%LOCALAPPDATA%\PhotoManager`: machine-specific settings, application state, logs, and caches.
 
 No installer or manual folder creation is needed. Missing general configuration is initialized with defaults; optional Assistant and web-search settings are configured separately. The app needs write access to these folders. Library metadata remains inside each selected library's `.photo_manager` folder, not in AppData.
 
-To update, close all PhotoManager windows and use the newly built folder. Settings remain in AppData and libraries remain in their selected directories; copying the application folder to another PC does not copy those settings or libraries. On a new account without existing PhotoManager data, the app starts with default settings and no previously selected library. Removing the application folder does not remove your AppData settings or library data.
+To update, close all Photo Manager windows and use the newly built folder. Settings remain in AppData and libraries remain in their selected directories; copying the application folder to another PC does not copy those settings or libraries. On a new account without existing Photo Manager data, the app starts with default settings and no previously selected library. Removing the application folder does not remove your AppData settings or library data.
 
 ## Development
 
@@ -63,9 +63,9 @@ npm run dist:win
 
 Both commands produce only `release/win-unpacked/`; `dist:win` also runs the complete test suite first. No installer is generated.
 
-On first use, select either an existing PhotoManager library or an ordinary directory to initialize. Initialization scans supported media, calculates hashes, extracts technical metadata, and creates the library management directory. It never modifies the original media files.
+On first use, select either an existing Photo Manager library or an ordinary directory to initialize. Initialization scans supported media, calculates hashes, extracts technical metadata, and creates the library management directory. It never modifies the original media files.
 
-Each application launch opens a new library-entry window in the existing PhotoManager process. Windows may manage different libraries concurrently. Every window owns one library session, and the library lock rejects attempts to open the same library in another window or maintenance process.
+Each application launch opens a new library-entry window in the existing Photo Manager process. Windows may manage different libraries concurrently. Every window owns one library session, and the library lock rejects attempts to open the same library in another window or maintenance process.
 
 ## Data Locations
 
@@ -105,7 +105,7 @@ Application-wide data stay outside the application directory:
 
 The generated `config.yml` controls shared thumbnail, FFmpeg, backup-retention, and UI defaults. Relative FFmpeg paths are resolved from the application directory.
 
-PhotoManager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See [PROJECT.md](PROJECT.md) for the exact persisted schemas and safety rules.
+Photo Manager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See [PROJECT.md](PROJECT.md) for the exact persisted schemas and safety rules.
 
 ## Maintenance Commands
 

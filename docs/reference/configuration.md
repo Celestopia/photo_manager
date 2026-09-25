@@ -61,7 +61,7 @@ The application does not maintain a recent-library list. Startup always shows th
 
 ### Library Directory
 
-A library is the selected media root. All PhotoManager data belonging to it must be inside:
+A library is the selected media root. All Photo Manager data belonging to it must be inside:
 
 ```text
 <library-root>/.photo_manager/
@@ -113,6 +113,6 @@ Search settings use the exact YAML fields `schemaVersion: 1`, `provider: tavily`
 
 ### Online map requests
 
-Leaflet code and styles are bundled locally. The only map tile endpoint is `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; no key or new settings file is required. `src/main/map-network.js` registers one tile-domain header hook per Electron session, identifying PhotoManager and its version without altering unrelated requests. The only map attribution destination is `https://www.openstreetmap.org/copyright`, opened in the system browser.
+Leaflet code and styles are bundled locally. The only map tile endpoint is `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; no key or new settings file is required. `src/main/map-network.js` registers one tile-domain header hook per Electron session, identifying Photo Manager and its version without altering unrelated requests. The only map attribution destination is `https://www.openstreetmap.org/copyright`, opened in the system browser.
 
 Chromium manages HTTP tile caching within the existing Local AppData session-data directory; no map data are written into library metadata or the application directory. Server cache headers are respected, and only currently viewed tiles are requested. OSM availability is best-effort. See https://operations.osmfoundation.org/policies/tiles/ for attribution, identification, caching and usage requirements. Map loading exposes IP and the viewed tile area to the provider; original media, titles, descriptions and stored GPS records are not uploaded.

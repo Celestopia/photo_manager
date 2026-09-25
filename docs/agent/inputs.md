@@ -18,7 +18,7 @@ The composer accepts library media references and imported attachments. Library 
 
 Check the file's contents as well as its extension. Other animated image formats are unsupported; do not quietly use their first frame. Reject symbolic links and paths outside the permitted library or attachment locations.
 
-A pasted image is stored as an imported file. For clipboard images, **Original file** means the representation supplied by the clipboard; PhotoManager cannot recover an original source file that the clipboard did not provide.
+A pasted image is stored as an imported file. For clipboard images, **Original file** means the representation supplied by the clipboard; Photo Manager cannot recover an original source file that the clipboard did not provide.
 
 ## 2. Prepare Static Images in the Selected Quality
 
@@ -42,7 +42,7 @@ Send the validated source bytes with their detected MIME type. Do not resize, re
 
 An original upload may be at most 20 MiB, including when it comes from the library. If it is larger, ask the user to choose optimized quality or remove the input. Never change the quality silently. If the provider rejects the format, dimensions or upload size, explain the rejection and leave the choice to the user.
 
-Original files can contain EXIF or other embedded metadata beyond the application metadata selected in the composer. The visible notice and its details are specified in the [interface design](interface.md#set-image-quality). Provider processing remains outside PhotoManager's control: sending original bytes does not guarantee that the model uses them at their original resolution.
+Original files can contain EXIF or other embedded metadata beyond the application metadata selected in the composer. The visible notice and its details are specified in the [interface design](interface.md#set-image-quality). Provider processing remains outside Photo Manager's control: sending original bytes does not guarantee that the model uses them at their original resolution.
 
 ## 3. Turn Videos and Animated GIFs into Still Frames
 

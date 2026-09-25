@@ -18,7 +18,7 @@ const yaml = require("js-yaml");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "photo-manager-chat-ui-"));
 process.env.APPDATA = path.join(root, "roaming");
 process.env.LOCALAPPDATA = path.join(root, "local");
-app.setName("PhotoManager Chat Smoke");
+app.setName("Photo Manager Chat Smoke");
 const {
   resolveApplicationPaths,
   configureElectronStoragePaths,
@@ -222,7 +222,7 @@ async function run() {
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-controls-toggle').getBoundingClientRect().top >= document.querySelector('#gallery-filter-panel').getBoundingClientRect().bottom - 1`), true);
 
   assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-footer'))`), false);
-  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-brand')?.textContent`), 'PhotoManager');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.gallery-brand')?.textContent`), 'Photo Manager');
   assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.gallery-header-tools [aria-label="Reset gallery"]'))`), true);
   await click('.gallery-settings-trigger');
   await waitFor(`Boolean(document.querySelector('.gallery-settings-menu'))`);

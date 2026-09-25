@@ -1,5 +1,5 @@
 appId: com.photomanager.desktop
-productName: PhotoManager
+productName: Photo Manager
 
 directories:
   buildResources: build
@@ -25,6 +25,7 @@ extraResources:
       - "*.exe"
 
 win:
+  executableName: ptmgr-gui
   target:
     - target: dir
       arch:

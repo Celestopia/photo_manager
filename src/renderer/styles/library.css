@@ -1,25 +1,23 @@
 /* Library entry, library lifecycle dialogs, and gallery library settings. */
 
-.topbar.library-entry-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+.topbar.library-entry-topbar { flex-shrink: 0; grid-template-columns: minmax(0, 1fr) auto; }
 .library-entry-brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
 .library-entry-brand img { width: 28px; height: 28px; }
-.library-entry-main {
-  min-height: calc(100vh - 62px);
-  display: grid;
-  place-items: center;
-  padding: 32px 32px 9vh;
-  background: #edf5ff;
-}
-.library-entry-panel {
-  width: min(640px, 100%);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg-card);
-  padding: 28px;
-  box-shadow: 0 10px 28px rgba(31, 74, 117, 0.08);
-}
-.library-entry-panel h1 { margin: 0 0 8px; font-size: 28px; }
-.library-entry-panel header > p { margin: 0 0 24px; color: var(--text-soft); }
+.library-entry-main { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-rows: 1fr auto; background: var(--bg-card); }
+.library-welcome-layout { display: grid; grid-template-columns: 1fr 1fr; }
+.library-welcome-intro, .library-entry-panel { display: flex; align-items: center; padding: clamp(32px, 6vw, 96px); min-width: 0; }
+.library-welcome-intro { background: linear-gradient(135deg, #edf5ff, #e1edfc); border-right: 1px solid var(--line); justify-content: flex-end; }
+.library-welcome-copy { width: 100%; max-width: 520px; }
+.library-welcome-icon { width: 72px; height: 72px; margin-bottom: 30px; }
+.library-welcome-copy h1 { font-size: clamp(32px, 3.5vw, 48px); line-height: 1.18; letter-spacing: -.025em; margin: 0 0 24px; }
+.library-welcome-tagline { font-size: 22px; line-height: 1.5; margin: 0; }
+.library-entry-workflow { width: 100%; max-width: 440px; }
+.library-entry-panel h2 { margin: 0 0 12px; font-size: 24px; }
+.library-entry-panel header > p { margin: 0 0 28px; color: var(--text-soft); line-height: 1.6; }
+.library-filesystem-path { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 13px; overflow-wrap: anywhere; user-select: text; }
+.library-entry-status { min-height: 112px; }
+.library-entry-actions .btn { min-height: 40px; }
+.library-entry-actions .library-entry-choose { background: transparent; border-color: transparent; color: var(--accent); }
 :is(.library-entry-panel, .library-info-modal, .library-confirm-modal, .maintenance-modal) .btn:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
 :is(.library-entry-panel, .library-info-modal, .library-confirm-modal, .maintenance-modal) .btn:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
 .library-entry-panel code,
@@ -42,7 +40,7 @@
 .library-entry-alert { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }
 .library-entry-alert.error { border-color: #e4a5a5; background: #fff4f4; color: #7c2525; }
 .library-entry-alert p { margin: 7px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.library-entry-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.library-entry-actions { display: grid; gap: 10px; margin-top: 22px; }
 .library-entry-note { margin: 20px 0 0; font-size: 13px; color: var(--text-soft); line-height: 1.5; }
 .library-field-label { display: block; margin: 0 0 8px; font-weight: 600; }
 .library-progress-panel { display: grid; gap: 10px; margin-top: 18px; }
@@ -107,7 +105,13 @@
 .maintenance-progress pre { max-height: 360px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--line); background: #f7fafc; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (max-width: 720px) {
-  .library-entry-main { padding: 16px; place-items: start center; }
-  .library-entry-panel { padding: 20px; }
+  .library-welcome-layout { grid-template-columns: 1fr; }
+  .library-welcome-intro, .library-entry-panel { padding: 32px 24px; justify-content: center; }
+  .library-welcome-intro { border-right: 0; border-bottom: 1px solid var(--line); }
+  .library-welcome-copy { max-width: 440px; }
+  .library-welcome-icon { width: 56px; height: 56px; margin-bottom: 16px; }
   .library-facts { grid-template-columns: 1fr; }
 }
+
+.library-entry-footer { display: flex; justify-content: space-between; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--line); color: var(--text-soft); background: var(--bg-card-soft); font-size: 12px; }
+.library-entry-footer > :last-child { white-space: nowrap; }

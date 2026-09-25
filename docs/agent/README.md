@@ -26,7 +26,7 @@ Videos and animated GIFs always become a small set of timestamped frames. They a
 
 ### 4. Send a message and read the reply
 
-Send takes one click. PhotoManager prepares the chosen inputs and sends them to the configured remote API or compatible local model server. Replies appear progressively and support Markdown. Stop interrupts the request and keeps the partial reply.
+Send takes one click. Photo Manager prepares the chosen inputs and sends them to the configured remote API or compatible local model server. Replies appear progressively and support Markdown. Stop interrupts the request and keeps the partial reply.
 
 By default, a library-media input includes its saved title, description and assigned tag names. Other metadata must be enabled in Options. Ordinary viewing and browsing chat history make no provider requests.
 
@@ -51,7 +51,7 @@ Sessions remain until the user deletes them. Deleting a session removes its mess
 
 ## What Users Need to Know
 
-Remote chat can upload the selected content and incur API charges. Original image bytes may include embedded metadata even when the corresponding PhotoManager metadata group is disabled. The provider may also resize or otherwise process an original upload; PhotoManager cannot control that.
+Remote chat can upload the selected content and incur API charges. Original image bytes may include embedded metadata even when the corresponding Photo Manager metadata group is disabled. The provider may also resize or otherwise process an original upload; Photo Manager cannot control that.
 
 Frame sampling can miss brief events. Imported attachments take disk space until removed or their conversation is deleted. This feature requires no local model downloads or vector database.
 

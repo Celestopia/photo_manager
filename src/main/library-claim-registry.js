@@ -5,7 +5,7 @@ function createLibraryClaimRegistry() {
   function claim(session, manifest, root) {
     const existing = claims.get(manifest.libraryId);
     if (existing && existing.session !== session) {
-      const error = new Error(`Library is already open in another PhotoManager window: ${existing.root}`);
+      const error = new Error(`Library is already open in another Photo Manager window: ${existing.root}`);
       error.code = "LIBRARY_LOCKED";
       error.lockState = {
         exists: true,

@@ -1,6 +1,6 @@
 const { groupMediaPathsByHash, countMediaTypes } = require("./media-summary");
 const { assertMediaTechnicalFields } = require("../src/shared/media-technical-schema");
-/** Initialize a new PhotoManager library. */
+/** Initialize a new Photo Manager library. */
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -53,13 +53,13 @@ async function run(options = {}) {
     const rootLinkStat = await fsp.lstat(paths.root);
     if (rootLinkStat.isSymbolicLink()) throw new Error("A symbolic-link directory cannot be used as a library root");
     const parentManager = findParentManagerDirectory(paths.root);
-    if (parentManager) throw new Error(`The selected directory is inside another PhotoManager library: ${parentManager}`);
+    if (parentManager) throw new Error(`The selected directory is inside another Photo Manager library: ${parentManager}`);
     emit({ phase: "validate", message: "Validating library directory" });
     await assertDirectoryWritable(paths.root);
     const nested = await findNestedManagerDirectory(paths.root, ({ visited, current }) => {
       emit({ phase: "scan-directories", current, processed: visited });
     }, () => cancelled);
-    if (nested) throw new Error(`Nested PhotoManager library detected: ${nested}`);
+    if (nested) throw new Error(`Nested Photo Manager library detected: ${nested}`);
     await validateMediaTools(APP_ROOT, config.media);
 
     const manifest = createLibraryManifest(paths.root, options.name || path.basename(paths.root));
@@ -69,9 +69,9 @@ async function run(options = {}) {
     await fsp.mkdir(paths.managerDir);
     ownsManager = true;
     const claimedParent = findParentManagerDirectory(paths.root);
-    if (claimedParent) throw new Error(`The selected directory is inside another PhotoManager library: ${claimedParent}`);
+    if (claimedParent) throw new Error(`The selected directory is inside another Photo Manager library: ${claimedParent}`);
     const claimedNested = await findNestedManagerDirectory(paths.root, null, () => cancelled);
-    if (claimedNested) throw new Error(`Nested PhotoManager library detected: ${claimedNested}`);
+    if (claimedNested) throw new Error(`Nested Photo Manager library detected: ${claimedNested}`);
     if (cancelled) throw Object.assign(new Error("Initialization cancelled"), { code: "OPERATION_CANCELLED" });
     structureStarted = true;
     await ensureLibraryDirectories(paths);

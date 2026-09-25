@@ -18,7 +18,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 ### Process and Window Model
 
-PhotoManager keeps Electron's single-instance lock so Chromium profile data, renderer `localStorage`, global configuration, provider settings, and machine-local state have one process owner. A later operating-system launch does not focus or reuse an existing window: the `second-instance` event creates another library-entry window. There is deliberately no in-application New Window command.
+Photo Manager keeps Electron's single-instance lock so Chromium profile data, renderer `localStorage`, global configuration, provider settings, and machine-local state have one process owner. A later operating-system launch does not focus or reuse an existing window: the `second-instance` event creates another library-entry window. There is deliberately no in-application New Window command.
 
 `window-session-router.js` maps trusted main-frame `webContents` senders to isolated sessions and preserves that ownership across asynchronous IPC work. Each session contains one `BrowserWindow`, one mutable application runtime, one chat service, one service set, and at most one active library. IPC payloads never choose a session or window identifier. Global normalized configuration, media-tool availability, the provider file, and the last successfully opened library path remain coordinator-owned.
 
@@ -33,7 +33,7 @@ An extension only determines scan eligibility. A record may still exist when its
 
 ### Windows Packaging
 
-`electron-builder.yml` defines only the Windows x64 directory target. The personal desktop release is the complete `release/win-unpacked/` folder, launched through `PhotoManager.exe`; no installer, shortcut registration, or uninstall entry is generated. The package contains the main process, preload, shared schemas, internal maintenance scripts, the built renderer, and production dependencies inside `app.asar`. Sharp's native packages are unpacked. FFmpeg and FFprobe are copied as executable program resources to `resources/tools/ffmpeg/bin`; they are never stored in ASAR or copied to AppData.
+`electron-builder.yml` defines only the Windows x64 directory target. The personal desktop release is the complete `release/win-unpacked/` folder, launched through `ptmgr-gui.exe`; no installer, shortcut registration, or uninstall entry is generated. The package contains the main process, preload, shared schemas, internal maintenance scripts, the built renderer, and production dependencies inside `app.asar`. Sharp's native packages are unpacked. FFmpeg and FFprobe are copied as executable program resources to `resources/tools/ffmpeg/bin`; they are never stored in ASAR or copied to AppData.
 
 The packaged runtime distinguishes the code root from the program-resource root. The code root contains `app.asar` and is used to load the renderer, preload, and maintenance worker. The program-resource root is the repository root in development and `process.resourcesPath` when packaged. `PHOTO_MANAGER_RESOURCE_ROOT` passes that real directory to maintenance child processes, which also use it as their working directory. Standalone scripts fall back to the repository root when the variable is absent. This prevents executable lookup and child-process working directories from resolving inside the read-only ASAR virtual filesystem.
 
