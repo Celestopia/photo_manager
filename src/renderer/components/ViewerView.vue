@@ -321,9 +321,8 @@
   </div>
   <div class="viewer-footer-spacer" aria-hidden="true"></div>
 </footer>
-<div class="tag-modal-backdrop" v-if="pendingViewerTransition.visible" @click="cancelViewerTransition">
-  <section class="library-confirm-modal viewer-unsaved-modal" role="dialog" aria-modal="true" aria-labelledby="viewer-unsaved-title" @click.stop>
-    <header class="tag-manager-header"><h3 id="viewer-unsaved-title">Unsaved Changes</h3></header>
+<AppDialog initial-focus=".tag-create-actions button" v-if="pendingViewerTransition.visible" class="library-confirm-modal viewer-unsaved-modal" dismiss-on-backdrop :busy="saving" @close="cancelViewerTransition">
+    <template #header><h3 id="viewer-unsaved-title">Unsaved Changes</h3></template>
     <div class="library-confirm-body">
       <p>This media item's customizations have not been saved. Save them before continuing, or discard the changes.</p>
       <div class="tag-create-actions">
@@ -332,11 +331,11 @@
         <button class="btn btn-primary" :disabled="saving" @click="saveAndContinueViewerTransition">{{ saving ? 'Saving...' : 'Save and Continue' }}</button>
       </div>
     </div>
-  </section>
-</div>
+  </AppDialog>
 </template>
 
 <script setup>
+import AppDialog from "./dialogs/AppDialog.vue";
 import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { computed, inject, ref } from "vue";
 import { VIEWER_CONTEXT } from "../context/renderer-contexts.js";

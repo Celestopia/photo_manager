@@ -1,13 +1,12 @@
 <template>
-  <div class="tag-modal-backdrop" v-if="tagManager.visible" @click="closeTagManager">
-    <section class="tag-manager-modal" @click.stop>
-      <header class="tag-manager-header">
+  <AppDialog v-if="tagManager.visible" class="tag-manager-modal" dismiss-on-backdrop :busy="tagManager.saving" @close="closeTagManager">
+      <template #header>
         <h3>Manage Tags</h3>
         <div class="tag-manager-header-actions">
           <button class="btn icon-btn modal-symbol-btn" data-tip="Create tag" :disabled="tagManager.saving" @click="openCreateTagMenu('manager')">+</button>
           <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" :disabled="tagManager.saving" @click="closeTagManager">×</button>
         </div>
-      </header>
+      </template>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="tagManager.search" placeholder="Search tags or descriptions" /></div>
       <div class="tag-manager-list">
         <article class="tag-manager-item" v-for="tag in managerFilteredTags" :key="'manager_' + tag.TagId">
@@ -25,22 +24,20 @@
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredTags.length">No matching tags</div>
       </div>
-    </section>
-  </div>
-  <div class="registry-create-backdrop" v-if="tagCreate.visible && tagCreate.target === 'manager'" @click="closeCreateTagMenu">
-    <section class="registry-create-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Tag</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateTagMenu" :disabled="tagManager.saving">×</button></header>
+    </AppDialog>
+  <AppDialog v-if="tagCreate.visible && tagCreate.target === 'manager'" class="registry-create-modal" dismiss-on-backdrop :busy="tagManager.saving" @close="closeCreateTagMenu">
+      <template #header><h3>Create Tag</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateTagMenu" :disabled="tagManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
         <label>Tag name</label><input class="input" v-model="tagCreate.text" :disabled="tagManager.saving" />
         <label>Description (optional)</label><textarea class="input tag-create-description" v-model="tagCreate.description" :disabled="tagManager.saving"></textarea>
         <div class="tag-create-error" v-if="tagCreate.error">{{ tagCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreateTagMenu" :disabled="tagManager.saving">Cancel</button><button class="btn btn-primary" @click="createTagAndSelect" :disabled="tagManager.saving">Create</button></div>
       </div>
-    </section>
-  </div>
+    </AppDialog>
 </template>
 
 <script setup>
+import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { TAG_CONTEXT } from "../../context/renderer-contexts.js";
 const context = inject(TAG_CONTEXT);

@@ -295,7 +295,7 @@ function handleGalleryKeydown(event) {
 
   const target = event.target;
   const isEditableTarget = ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName) || target?.isContentEditable;
-  const hasModalOverlay = Boolean(document.querySelector(".tag-modal-backdrop"));
+  const hasModalOverlay = Boolean(document.querySelector("dialog[open], .tag-modal-backdrop"));
   if (isEditableTarget || hasModalOverlay || !isSelectionMode.value) return;
 
   event.preventDefault();

@@ -1,13 +1,12 @@
 <template>
-  <div class="tag-modal-backdrop" v-if="personManager.visible" @click="closePersonManager">
-    <section class="tag-manager-modal" @click.stop>
-      <header class="tag-manager-header">
+  <AppDialog v-if="personManager.visible" class="tag-manager-modal" dismiss-on-backdrop :busy="personManager.saving" @close="closePersonManager">
+      <template #header>
         <h3>Manage People</h3>
         <div class="tag-manager-header-actions">
           <button class="btn icon-btn modal-symbol-btn" data-tip="Create person" :disabled="personManager.saving" @click="openCreatePersonMenu('manager')">+</button>
           <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" :disabled="personManager.saving" @click="closePersonManager">×</button>
         </div>
-      </header>
+      </template>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="personManager.search" placeholder="Search names or descriptions" /></div>
       <div class="tag-manager-list">
         <article class="tag-manager-item" v-for="person in managerFilteredPeople" :key="'person_manager_' + person.PersonId">
@@ -25,22 +24,20 @@
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredPeople.length">No matching people</div>
       </div>
-    </section>
-  </div>
-  <div class="registry-create-backdrop" v-if="personCreate.visible && personCreate.target === 'manager'" @click="closeCreatePersonMenu">
-    <section class="registry-create-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Person</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreatePersonMenu" :disabled="personManager.saving">×</button></header>
+    </AppDialog>
+  <AppDialog v-if="personCreate.visible && personCreate.target === 'manager'" class="registry-create-modal" dismiss-on-backdrop :busy="personManager.saving" @close="closeCreatePersonMenu">
+      <template #header><h3>Create Person</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreatePersonMenu" :disabled="personManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
         <label>Person name</label><input class="input" v-model="personCreate.name" :disabled="personManager.saving" />
         <label>Description (optional)</label><textarea class="input tag-create-description" v-model="personCreate.description" :disabled="personManager.saving"></textarea>
         <div class="tag-create-error" v-if="personCreate.error">{{ personCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreatePersonMenu" :disabled="personManager.saving">Cancel</button><button class="btn btn-primary" @click="createPersonAndSelect" :disabled="personManager.saving">Create</button></div>
       </div>
-    </section>
-  </div>
+    </AppDialog>
 </template>
 
 <script setup>
+import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { PERSON_CONTEXT } from "../../context/renderer-contexts.js";
 const context = inject(PERSON_CONTEXT);

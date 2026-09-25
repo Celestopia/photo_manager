@@ -1,13 +1,12 @@
 <template>
-  <div class="tag-modal-backdrop" v-if="locationManager.visible" @click="closeLocationManager">
-    <section class="tag-manager-modal" @click.stop>
-      <header class="tag-manager-header">
+  <AppDialog v-if="locationManager.visible" class="tag-manager-modal" dismiss-on-backdrop :busy="locationManager.saving" @close="closeLocationManager">
+      <template #header>
         <h3>Manage Locations</h3>
         <div class="tag-manager-header-actions">
           <button class="btn icon-btn modal-symbol-btn" data-tip="Create location" :disabled="locationManager.saving" @click="openCreateLocationMenu('manager')">+</button>
           <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" :disabled="locationManager.saving" @click="closeLocationManager">×</button>
         </div>
-      </header>
+      </template>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="locationManager.search" placeholder="Search locations, descriptions, or regions" /></div>
       <div class="location-manager-fold-actions">
         <button class="btn" :disabled="locationManager.saving || managerSearchActive" @click="expandManagerLocations">Expand all</button>
@@ -55,12 +54,10 @@
         </template>
         <div class="tag-manager-empty" v-if="!managerLocationRows.length">No matching locations</div>
       </div>
-    </section>
-  </div>
+    </AppDialog>
 
-  <div class="registry-create-backdrop" v-if="locationCreate.visible && locationCreate.target === 'manager'" @click="closeCreateLocationMenu">
-    <section class="registry-create-modal registry-create-location-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Location</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateLocationMenu" :disabled="locationManager.saving">×</button></header>
+  <AppDialog v-if="locationCreate.visible && locationCreate.target === 'manager'" class="registry-create-modal registry-create-location-modal" dismiss-on-backdrop :busy="locationManager.saving" @close="closeCreateLocationMenu">
+      <template #header><h3>Create Location</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateLocationMenu" :disabled="locationManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
         <label>Location name</label><input class="input" v-model="locationCreate.name" :disabled="locationManager.saving" />
         <label>Country</label><input class="input" v-model="locationCreate.country" :disabled="locationManager.saving" />
@@ -76,11 +73,11 @@
         <div class="tag-create-error" v-if="locationCreate.error">{{ locationCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreateLocationMenu" :disabled="locationManager.saving">Cancel</button><button class="btn btn-primary" @click="createLocationAndSelect" :disabled="locationManager.saving">Create</button></div>
       </div>
-    </section>
-  </div>
+    </AppDialog>
 </template>
 
 <script setup>
+import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { LOCATION_CONTEXT } from "../../context/renderer-contexts.js";
 import LocationParentPicker from "../LocationParentPicker.vue";

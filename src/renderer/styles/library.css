@@ -53,12 +53,6 @@
 .library-info-modal,
 .maintenance-modal {
   width: min(820px, calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg-card);
-  padding: 24px;
 }
 .library-info-modal { width: min(640px, calc(100vw - 48px)); }
 .maintenance-modal { width: min(600px, calc(100vw - 48px)); }
@@ -89,7 +83,6 @@
 .maintenance-progress .library-details { margin-top: 0; }
 .maintenance-progress .library-details { margin-top: 0; }
 .library-folder-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
-.library-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; margin-top: 20px; }
 .library-dialog-actions .btn { white-space: nowrap; }
 .maintenance-options .library-dialog-actions, .maintenance-progress .library-dialog-actions { margin-top: 0; }
 .maintenance-result-actions > .btn-primary:last-child { margin-left: auto; }

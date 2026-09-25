@@ -1,7 +1,6 @@
 <template>
-  <div class="tag-modal-backdrop" v-if="deletionDialog.visible" @click="closeDeletionDialog">
-    <section class="library-confirm-modal media-deletion-modal" role="dialog" aria-modal="true" aria-labelledby="media-deletion-title" @click.stop>
-      <header class="tag-manager-header"><h3 id="media-deletion-title">Permanently Delete Media?</h3></header>
+  <AppDialog initial-focus=".tag-create-actions button" v-if="deletionDialog.visible" class="library-confirm-modal media-deletion-modal" dismiss-on-backdrop :busy="deletionDialog.busy" @close="closeDeletionDialog">
+      <template #header><h3 id="media-deletion-title">Permanently Delete Media?</h3></template>
       <div class="library-confirm-body">
         <p v-if="deletionDialog.items.length === 1"><strong>{{ fileName(deletionDialog.items[0]) }}</strong> will be permanently removed from the filesystem and from Photo Manager metadata.</p>
         <p v-else><strong>{{ deletionDialog.items.length }} media items</strong> ({{ formatFileSize(deletionBytes) }}) will be permanently removed from the filesystem and from Photo Manager metadata.</p>
@@ -13,11 +12,11 @@
           <button class="btn danger-delete-btn" :disabled="deletionDialog.busy" @click="confirmDeletion">{{ deletionDialog.busy ? 'Deleting...' : 'Delete Permanently' }}</button>
         </div>
       </div>
-    </section>
-  </div>
+    </AppDialog>
 </template>
 
 <script setup>
+import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { MEDIA_DELETION_CONTEXT } from "../../context/renderer-contexts.js";
 import { formatFileSize } from "../../domain/media-formatters.mjs";

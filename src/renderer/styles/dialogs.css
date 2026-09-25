@@ -1,0 +1,19 @@
+/* Shared modal surface; feature classes own only content layout and dimensions. */
+.app-dialog[class] { max-width: calc(100vw - 48px); max-height: calc(100vh - 48px); margin: auto; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card); color: var(--text); box-shadow: var(--shadow); font-size: inherit; overflow: auto; }
+:where(.app-dialog-small) { width: 440px; }
+:where(.app-dialog-medium) { width: 520px; }
+:where(.app-dialog-large) { width: 820px; }
+.app-dialog::backdrop { background: rgba(23,55,86,.4); backdrop-filter: blur(var(--modal-backdrop-blur)); }
+.app-dialog .app-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 18px; }
+.app-dialog-header h3 { margin: 0; font-size: 20px; font-weight: 600; }
+.app-dialog :is(.app-dialog-actions, .library-dialog-actions, .tag-create-actions, form > footer) { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin: 20px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+.app-dialog button:disabled { opacity: .45; cursor: default; }
+.app-dialog .btn { white-space: nowrap; }
+.app-dialog .provider-subtitle { color: var(--text-soft); margin: 0 0 18px; }
+.app-dialog .conversation-delete-description { font-size: inherit; line-height: 1.6; }
+.app-dialog .provider-fields :is(input:not([type=checkbox]), select) { border-color: var(--line); background: var(--bg-card); color: var(--text); border-radius: 8px; font-size: 14px; }
+.app-dialog .provider-fields label { color: var(--text); font-size: 14px; }
+.app-dialog .provider-help, .app-dialog .provider-footnote { color: var(--text-soft); font-size: 12px; }
+
+.app-dialog.tag-manager-modal { max-height: min(760px, calc(100vh - 48px)); }
+.app-dialog.registry-create-location-modal { max-height: 75vh; overflow: visible; }

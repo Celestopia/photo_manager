@@ -7,50 +7,18 @@
 .media-deletion-error { color: var(--danger); overflow-wrap: anywhere; }
 .danger-delete-btn { color: #fff; border-color: #b92334; background: #c92f3f; }
 .danger-delete-btn:hover:not(:disabled) { border-color: #971c2a; background: #aa2534; }
-.tag-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 160;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(10, 32, 54, 0.34);
-  backdrop-filter: blur(var(--modal-backdrop-blur));
-}
 .tag-manager-modal {
   width: min(760px, 96vw);
   max-height: min(760px, 88vh);
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 22px 60px rgba(10, 32, 54, 0.28);
-}
-.registry-create-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(10, 32, 54, 0.42);
-  backdrop-filter: blur(var(--modal-backdrop-blur));
 }
 .registry-create-modal {
   width: min(560px, 94vw);
   max-height: 90vh;
   display: grid;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 26px 70px rgba(10, 32, 54, 0.36);
   overflow: auto;
 }
 .registry-create-location-modal {

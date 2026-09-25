@@ -192,6 +192,10 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.DIALOG_SHELL_SMOKE) {
+    await require('./dialog-shell-checks.cjs')({win, click, waitFor, setValue});
+    return;
+  }
   if (process.env.ESCAPE_UI_SMOKE) {
     await require('./escape-popup-checks.cjs')({win, click, waitFor, setValue});
     return;
@@ -234,7 +238,7 @@ async function run() {
   await setValue('.provider-fields input[type=url]', 'https://changed.example/v1');
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog footer button').disabled`), true);
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-footnote').textContent.includes('Save changes before testing')`), true);
-  await click('[aria-label="Close provider settings"]');
+  await click('.provider-dialog [aria-label="Close dialog"]');
   await click(".photo-card");
   await waitFor(`Boolean(document.querySelector('.viewer-sidebar-tabs'))`);
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.parameters-toggle').getAttribute('aria-expanded')`), 'false');
@@ -413,12 +417,12 @@ async function run() {
   await click('[aria-label="Provider settings"]');
   await waitFor(`Boolean(document.querySelector('.provider-dialog[open] input[type=password]'))`);
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.provider-dialog input[type=password]').value`), '');
-  await click('.provider-save');
+  await click('.provider-dialog .btn-primary');
   await waitFor(`document.querySelector('.provider-dialog')?.textContent.includes('Settings saved.')`);
   await fsp.mkdir(path.resolve('release'), { recursive: true });
   await new Promise(resolve => setTimeout(resolve, 200));
   await fsp.writeFile(path.resolve('release/provider-settings.png'), (await win.webContents.capturePage()).toPNG());
-  await click('[aria-label="Close provider settings"]');
+  await click('.provider-dialog [aria-label="Close dialog"]');
 
   assert.equal(
     requests.length,
@@ -563,7 +567,7 @@ async function run() {
   await waitFor(`Boolean(document.querySelector('.chat-history-item .btn'))`);
   await win.webContents.executeJavaScript(`document.querySelector('.chat-history-actions .btn').click()`);
   await setValue('.conversation-action-dialog input', 'Renamed conversation');
-  await click('.conversation-action-dialog .provider-save');
+  await click('.conversation-action-dialog .btn-primary');
   await waitFor(`document.querySelector('.chat-history-open strong')?.textContent === 'Renamed conversation'`);
   await new Promise((resolve) => setTimeout(resolve, 200));
   await fsp.writeFile(path.resolve('release/chat-history.png'), (await win.webContents.capturePage()).toPNG());
@@ -577,7 +581,7 @@ async function run() {
   await waitFor(`!document.querySelector('.conversation-action-dialog[open]')`);
   await click('.chat-selection-footer .chat-danger');
   await waitFor(`Boolean(document.querySelector('.conversation-action-dialog[open]'))`);
-  await click(".conversation-delete-confirm");
+  await click(".conversation-action-dialog .danger-delete-btn");
   await waitFor(
     `document.querySelector('.chat-history')?.textContent.includes('No saved chats.')`,
   );
@@ -610,7 +614,7 @@ async function run() {
   await sleep(10300);
   assert.equal(await win.webContents.executeJavaScript(`Boolean(document.querySelector('.provider-banner'))`), false);
 
-  await click('[aria-label="Close provider settings"]');
+  await click('.provider-dialog [aria-label="Close dialog"]');
   await click('[aria-label="New chat"]');
   await waitFor(`document.querySelectorAll('.chat-suggestions button').length===4`);
   const beforeStarter=requests.length;
@@ -652,12 +656,12 @@ async function run() {
   await click('[aria-label="Web search"]');
   await waitFor(`document.querySelector('.provider-tabs [aria-selected="true"]')?.textContent === 'Web search'`);
   await setValue('.provider-dialog input[type=password]', 'test-search-only');
-  await click('.provider-save');
+  await click('.provider-dialog .btn-primary');
   await waitFor(`Boolean(document.querySelector('.provider-banner-success'))`);
   await click('.provider-dialog footer button');
   await waitFor(`document.querySelector('.provider-banner-success')?.textContent.includes('extraction succeeded')`);
   await fsp.writeFile(path.resolve('release/web-settings.png'), (await win.webContents.capturePage()).toPNG());
-  await click('[aria-label="Close provider settings"]');
+  await click('.provider-dialog [aria-label="Close dialog"]');
   if (process.env.VIEWER_VISUAL_SMOKE) {
     await click('.gallery-settings-trigger');
     await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.gallery-settings-menu button')).find(b => b.textContent.includes('Generate Video Covers')).click()`);

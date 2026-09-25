@@ -327,13 +327,6 @@
 .chat-rename { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; margin-top: 8px; }
 .chat-rename .input { width: 100%; min-width: 0; font-size: 12px; }
 .chat-input-detail { font-size: 12px; line-height: 1.7; padding: 12px 0; border-bottom: 1px solid #eceef1; }
-.provider-dialog { width: min(440px, calc(100vw - 48px)); max-height: calc(100vh - 64px); margin: auto; padding: 26px; border: 1px solid #e4e7ec; border-radius: 20px; background: #fff; color: #343b45; box-shadow: 0 20px 80px #10192830; font-size: 13px; overflow: auto; }
-.provider-dialog::backdrop { background: #18243555; backdrop-filter: blur(var(--modal-backdrop-blur)); }
-.provider-dialog header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
-.provider-dialog h2 { margin: 0; font-size: 19px; font-weight: 600; }
-.provider-dialog header p { color: #858d97; margin: 7px 0 0; font-size: 12px; }
-.provider-dialog button { border: 0; padding: 9px 13px; background: #f0f2f5; color: #485361; border-radius: 9px; font: inherit; cursor: pointer; }
-.provider-dialog .provider-close { padding: 6px; background: transparent; }
 .provider-fields label { display: flex; flex-direction: column; gap: 7px; margin: 15px 0; font-size: 12px; font-weight: 500; }
 .provider-fields input:not([type=checkbox]), .provider-fields select { box-sizing: border-box; width: 100%; border: 1px solid #dfe4ea; background: #fafbfc; padding: 10px 12px; border-radius: 9px; font: inherit; color: #394553; }
 .provider-fields input:focus, .provider-fields select:focus { outline: 2px solid #bbcce0; outline-offset: 1px; }
@@ -341,9 +334,6 @@
 .provider-fields details { margin: 20px 0; }
 .provider-fields summary { cursor: pointer; color: #738092; font-size: 12px; }
 .provider-help, .provider-footnote { color: #8a929d; font-size: 11px; line-height: 1.6; }
-.provider-dialog footer { display: flex; justify-content: space-between; gap: 10px; margin-top: 23px; }
-.provider-dialog .provider-save { background: #344354; color: white; }
-.provider-dialog button:disabled { opacity: .45; cursor: default; }
 .provider-footnote { margin-bottom: 0; }
 .chat-options .chat-metadata-options { border: 0; border-top: 1px solid #eceef1; padding: 12px 0 8px; margin: 12px 0 8px; min-width: 0; }
 .chat-metadata-options legend { padding: 0 7px 0 0; color: #818a96; font-size: 11px; font-weight: 500; }
@@ -391,7 +381,6 @@
 
 .chat-panel .chat-history-open:hover:not(:disabled) { background: transparent; }
 .conversation-delete-description { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-.provider-dialog .conversation-delete-confirm { background: #b83f3f; color: white; }
 
 /* Keep intrinsic Markdown widths inside the sidebar; wide blocks scroll locally. */
 .chat-panel, .chat-conversation, .chat-message, .chat-markdown { min-width: 0; max-width: 100%; }

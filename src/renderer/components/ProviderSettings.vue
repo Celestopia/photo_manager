@@ -1,25 +1,24 @@
 <template>
-  <Teleport to="body">
-    <dialog ref="dialog" class="provider-dialog" aria-labelledby="provider-title" @cancel.prevent="settings = false" @keydown.stop>
+    <AppDialog class="provider-dialog" title="Provider settings" dismiss-on-escape @close="settings = false">
       <div v-if="banner" class="provider-banner" :class="'provider-banner-' + banner.kind" :role="banner.kind === 'error' ? 'alert' : 'status'" aria-live="polite">
         <span aria-hidden="true">{{ banner.kind === 'success' ? '✓' : banner.kind === 'error' ? '!' : 'ⓘ' }}</span>
         <span>{{ banner.text }}</span>
         <button v-if="!operation" type="button" aria-label="Dismiss notification" @click="banner = null"><ChatIcon name="close" /></button>
       </div>
       <form @submit.prevent="runOperation('save')">
-        <header><div><h2 id="provider-title">Provider settings</h2><p>{{ settingsTab === 'web' ? 'Connect Tavily for web research.' : 'Connect your preferred vision model.' }}</p></div><button type="button" class="provider-close" aria-label="Close provider settings" @click="settings = false"><ChatIcon name="close" /></button></header>
+        <p class="provider-subtitle">{{ settingsTab === 'web' ? 'Connect Tavily for web research.' : 'Connect your preferred vision model.' }}</p>
         <div class="provider-tabs" role="tablist" aria-label="Provider type">
-          <button type="button" role="tab" :aria-selected="settingsTab === 'assistant'" :disabled="working || busy" @click="selectTab('assistant')">Assistant</button>
-          <button type="button" role="tab" :aria-selected="settingsTab === 'web'" :disabled="working || busy" @click="selectTab('web')">Web search</button>
+          <button class="btn" type="button" role="tab" :aria-selected="settingsTab === 'assistant'" :disabled="working || busy" @click="selectTab('assistant')">Assistant</button>
+          <button class="btn" type="button" role="tab" :aria-selected="settingsTab === 'web'" :disabled="working || busy" @click="selectTab('web')">Web search</button>
         </div>
-        <p v-if="configurationStale" class="chat-notice">Settings changed in another window. <button type="button" :disabled="working || busy" @click="reloadConfiguration">Reload settings</button></p>
+        <p v-if="configurationStale" class="chat-notice">Settings changed in another window. <button class="btn" type="button" :disabled="working || busy" @click="reloadConfiguration">Reload settings</button></p>
         <div v-if="configuration" class="provider-fields">
           <p v-if="settingsTab === 'web'">Tavily · Search and page extraction</p>
           <label v-if="settingsTab === 'assistant'">Base URL<input v-model="configuration.baseUrl" type="url" required placeholder="https://your-provider.example/v1" :disabled="working || busy" /></label>
           <label v-if="settingsTab === 'assistant'">Model<input v-model="configuration.model" required placeholder="Vision model name" :disabled="working || busy" /></label>
           <label>API key<input v-model="configuration.apiKey" type="password" autocomplete="new-password" :placeholder="configuration.hasKey ? 'Saved key · leave blank to keep it' : settingsTab === 'web' ? 'Enter Tavily API key' : 'Enter API key (optional for local servers)'" :disabled="working || busy || configuration.clearKey" /></label>
           <div v-if="configuration.hasKey" class="provider-key-action">
-            <button type="button" :disabled="working || busy" @click="toggleKeyRemoval">{{ configuration.clearKey ? 'Undo removal' : 'Remove saved key' }}</button>
+            <button class="btn" type="button" :disabled="working || busy" @click="toggleKeyRemoval">{{ configuration.clearKey ? 'Undo removal' : 'Remove saved key' }}</button>
           </div>
           <details><summary>Advanced options</summary>
             <label>API key environment variable<input v-model="configuration.apiKeyEnv" placeholder="Optional fallback when no key is saved" :disabled="working || busy" /></label>
@@ -30,14 +29,14 @@
           <p v-if="settingsTab === 'web' && configuration.hasEnvironmentKey" class="provider-help">An environment key is available.</p>
         </div>
 
-        <footer><button type="button" :disabled="working || busy || !configuration || dirty || configurationStale" @click="runOperation('test')">{{ operation === 'test' ? 'Testing…' : 'Test connection' }}</button><button class="provider-save" :disabled="working || busy || !configuration || configurationStale">{{ operation === 'save' ? 'Saving…' : 'Save settings' }}</button></footer>
+        <footer><button class="btn" type="button" :disabled="working || busy || !configuration || dirty || configurationStale" @click="runOperation('test')">{{ operation === 'test' ? 'Testing…' : 'Test connection' }}</button><button class="btn btn-primary" :disabled="working || busy || !configuration || configurationStale">{{ operation === 'save' ? 'Saving…' : 'Save settings' }}</button></footer>
         <p class="provider-footnote">{{ dirty ? "Save changes before testing. " : "" }}{{ settingsTab === 'web' ? 'The test searches a generic topic and extracts one public page. No library content is sent.' : 'The test sends only a generated blue square.' }}</p>
       </form>
-    </dialog>
-  </Teleport>
+    </AppDialog>
 </template>
 <script setup>
-import { inject, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import AppDialog from './dialogs/AppDialog.vue';
+import { inject, ref, computed, watch, onBeforeUnmount } from 'vue';
 import { CHAT_CONTEXT } from '../context/renderer-contexts';
 import ChatIcon from './ChatIcon.vue';
 const { settings, configuration: assistantConfiguration, searchConfiguration, settingsTab, configurationStale, reloadConfiguration, working, busy, error, notice, saveConfiguration, testConnection } = inject(CHAT_CONTEXT);
@@ -47,7 +46,7 @@ async function selectTab(tab) {
   banner.value = null;
   if (!configuration.value || configurationStale.value) await reloadConfiguration();
 }
-const dialog = ref(null);
+
 const banner = ref(null);
 const operation = ref('');
 let bannerTimer;
@@ -82,6 +81,6 @@ const saved = ref({ assistant: '', web: '' });
 watch(assistantConfiguration, value => { saved.value.assistant = JSON.stringify(value); }, { immediate: true });
 watch(searchConfiguration, value => { saved.value.web = JSON.stringify(value); }, { immediate: true });
 const dirty = computed(() => JSON.stringify(configuration.value) !== saved.value[settingsTab.value]);
-onMounted(() => dialog.value.showModal());
-onBeforeUnmount(() => { mounted = false; clearTimeout(bannerTimer); dialog.value?.close(); for (const c of [assistantConfiguration.value, searchConfiguration.value]) if (c) c.apiKey = ''; });
+
+onBeforeUnmount(() => { mounted = false; clearTimeout(bannerTimer); for (const c of [assistantConfiguration.value, searchConfiguration.value]) if (c) c.apiKey = ''; });
 </script>

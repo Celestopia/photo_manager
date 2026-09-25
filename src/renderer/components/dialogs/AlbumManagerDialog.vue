@@ -1,13 +1,12 @@
 <template>
-  <div class="tag-modal-backdrop" v-if="albumManager.visible" @click="closeAlbumManager">
-    <section class="tag-manager-modal" @click.stop>
-      <header class="tag-manager-header">
+  <AppDialog v-if="albumManager.visible" class="tag-manager-modal" dismiss-on-backdrop :busy="albumManager.saving" @close="closeAlbumManager">
+      <template #header>
         <h3>Manage Albums</h3>
         <div class="tag-manager-header-actions">
           <button class="btn icon-btn modal-symbol-btn" data-tip="Create album" :disabled="albumManager.saving" @click="openCreateAlbumMenu('manager')">+</button>
           <button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" :disabled="albumManager.saving" @click="closeAlbumManager">×</button>
         </div>
-      </header>
+      </template>
       <div class="tag-manager-controls"><input class="input tag-manager-search" v-model="albumManager.search" placeholder="Search albums or descriptions" /></div>
       <div class="tag-manager-list">
         <article class="tag-manager-item" v-for="album in managerFilteredAlbums" :key="'album_manager_' + album.AlbumId">
@@ -25,22 +24,20 @@
         </article>
         <div class="tag-manager-empty" v-if="!managerFilteredAlbums.length">No matching albums</div>
       </div>
-    </section>
-  </div>
-  <div class="registry-create-backdrop" v-if="albumCreate.visible && albumCreate.target === 'manager'" @click="closeCreateAlbumMenu">
-    <section class="registry-create-modal" @click.stop>
-      <header class="tag-manager-header"><h3>Create Album</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">×</button></header>
+    </AppDialog>
+  <AppDialog v-if="albumCreate.visible && albumCreate.target === 'manager'" class="registry-create-modal" dismiss-on-backdrop :busy="albumManager.saving" @close="closeCreateAlbumMenu">
+      <template #header><h3>Create Album</h3><button class="btn icon-btn modal-symbol-btn modal-close-btn" data-tip="Close" aria-label="Close" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">×</button></template>
       <div class="tag-manager-create-panel">
         <label>Album name</label><input class="input" v-model="albumCreate.title" :disabled="albumManager.saving" />
         <label>Description</label><textarea class="input tag-create-description" v-model="albumCreate.description" :disabled="albumManager.saving"></textarea>
         <div class="tag-create-error" v-if="albumCreate.error">{{ albumCreate.error }}</div>
         <div class="tag-create-actions"><button class="btn" @click="closeCreateAlbumMenu" :disabled="albumManager.saving">Cancel</button><button class="btn btn-primary" @click="createAlbumAndSelect" :disabled="albumManager.saving">Create</button></div>
       </div>
-    </section>
-  </div>
+    </AppDialog>
 </template>
 
 <script setup>
+import AppDialog from "./AppDialog.vue";
 import { inject } from "vue";
 import { ALBUM_CONTEXT } from "../../context/renderer-contexts.js";
 const context = inject(ALBUM_CONTEXT);
