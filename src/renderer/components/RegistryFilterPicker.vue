@@ -65,8 +65,8 @@ const optionLabelKey = computed(() => {
   return "Name";
 });
 const selectionLabels = computed(() => selectedValues.value.map(id => id === UNASSIGNED_FILTER ? unassignedLabel : optionLabel(options.value.find(option => optionId(option) === id))));
+const selectionTooltip = computed(() => selectionLabels.value.length > 1 ? selectionLabels.value.join(', ') : 'Ctrl+Click to select multiple');
 const selectedLabel = computed(() => !selectionLabels.value.length ? 'All' : selectionLabels.value[0] + (selectionLabels.value.length > 1 ? ` +${selectionLabels.value.length - 1}` : ''));
-const selectionTooltip = computed(() => `${selectionLabels.value.join(', ') || 'All'}\nCtrl+Click to select multiple`);
 const options = computed(() => filterOptions[props.kind === "person" ? "people" : `${props.kind}s`] || []);
 const filteredOptions = computed(() => options.value.filter((option) => matches(`${optionLabel(option)} ${option?.Description || ""}`)));
 

@@ -48,7 +48,6 @@ const {
   UNASSIGNED_FILTER,
   query,
   getLocationFilterRows,
-  getLocationTooltip,
   getLocationName,
   setLocationFilter,
   setLocationRegionFilter,
@@ -63,12 +62,8 @@ const selectionLabels = computed(() => [
   ...selectedLocationIds.value.map(id => id === UNASSIGNED_FILTER ? 'Unassigned' : getLocationName(id)),
   ...selectedRegions.value.map(getLocationRegionFilterLabel),
 ]);
+const selectionTooltip = computed(() => selectionLabels.value.length > 1 ? selectionLabels.value.join(', ') : 'Ctrl+Click to select multiple');
 const selectedFilterLabel = computed(() => !selectionLabels.value.length ? 'All' : selectionLabels.value[0] + (selectionLabels.value.length > 1 ? ` +${selectionLabels.value.length - 1}` : ''));
-const selectionTooltip = computed(() => [
-  ...selectedLocationIds.value.map(id => id === UNASSIGNED_FILTER ? 'Unassigned' : getLocationTooltip(id)),
-  ...selectedRegions.value.map(getLocationRegionFilterLabel),
-  'Ctrl+Click to select multiple',
-].join('\n'));
 const filterRows = computed(() => getLocationFilterRows(searchText.value));
 
 function openDropdown() {
