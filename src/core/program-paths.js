@@ -1,7 +1,7 @@
 const path = require("node:path");
 
 const PROGRAM_RESOURCE_ROOT_ENV = "PHOTO_MANAGER_RESOURCE_ROOT";
-const DEFAULT_PROGRAM_RESOURCE_ROOT = path.resolve(__dirname, "..");
+const DEFAULT_PROGRAM_RESOURCE_ROOT = path.resolve(__dirname, "..", "..");
 
 function resolveProgramResourceRoot(options = {}) {
   const environment = options.environment || process.env;

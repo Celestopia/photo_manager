@@ -5,7 +5,7 @@ const {
   preserveUserFields,
   cloneMovedRecord,
   synchronizeMetadata,
-} = require("../scripts/update-metadata");
+} = require("../src/core/update-metadata");
 
 const MEDIA_IDS = {
   current: "00000000-0000-4000-8000-000000000001",

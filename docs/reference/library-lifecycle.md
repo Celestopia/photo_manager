@@ -27,7 +27,7 @@ Constraints:
 
 ## Library Boundary Rules
 
-Every entry point and CLI maintenance script follows the same boundaries:
+Every entry point and CLI command follows the same boundaries:
 
 1. The root must exist, be writable, and not be a Windows drive root.
 2. The root cannot be a symbolic link.
@@ -38,7 +38,7 @@ Every entry point and CLI maintenance script follows the same boundaries:
 7. Path keys are case-sensitive strings. Windows normally prevents entities that differ only by case, but the application does not collapse them.
 8. There is no live filesystem monitoring. Users run “Update Metadata” after adding, removing, moving, or renaming media.
 
-`scripts/library-core.js` is the sole shared implementation of path resolution, manifests, strict JSONL, and atomic text writes. Do not reconstruct internal library paths elsewhere.
+`src/core/library-core.js` is the sole shared implementation of path resolution, manifests, strict JSONL, and atomic text writes. Do not reconstruct internal library paths elsewhere.
 
 ## Library Lifecycle
 
@@ -102,7 +102,7 @@ The lock is created with `wx`, allowing one holder per path. On Windows, PID and
 - The coordinator reserves each open `LibraryId` in memory as well as acquiring its path-local lock, preventing simultaneous access to copied roots with the same logical identity.
 - Different window sessions may concurrently hold locks for different libraries; closing one window never releases another window's lock.
 - Standalone CLI tools acquire the same lock and cannot maintain a library concurrently with the application.
-- Maintenance cannot be cancelled. While it runs, the library is read-only and cannot be switched or closed.
+- GUI maintenance cannot be cancelled. While it runs, the library is read-only and cannot be switched or closed. CLI maintenance accepts Ctrl+C at safe boundaries, waits for active work, and releases its lock; an in-progress commit completes.
 
 ## Persistence, Backups, and Transactions
 
@@ -137,7 +137,7 @@ A snapshot includes `library.yml` and all five JSONL files, but not original med
 
 ### Multi-File Transactions
 
-Global tag, person, album, or location deletion normally changes both a registry and `photo_metadata.jsonl`. `scripts/library-transaction.js` performs:
+Global tag, person, album, or location deletion normally changes both a registry and `photo_metadata.jsonl`. `src/core/library-transaction.js` performs:
 
 1. Write old and new versions of every target under `temp/transactions/<uuid>`.
 2. Atomically write `transaction.json` in the prepared state.
@@ -148,7 +148,7 @@ Global tag, person, album, or location deletion normally changes both a registry
 
 An unparseable journal or missing rollback file rejects opening rather than guessing. Main-process global deletion keeps old in-memory objects only for media whose references actually change and transacts with copied replacements; unaffected media preserve object and Map identity. Do not deep-clone the entire active metadata set merely to simplify rollback.
 
-`scripts/library-recovery.js` is the shared readiness boundary. Opening and metadata update recover media deletion before text transactions under an authorized lock, before loading/scanning records. Other maintenance and ordinary mutations refuse either unresolved journal. A remaining committed journal still requires recovery; an orphaned temporary directory after journal removal cannot reverse a commit. Metadata edits prepare replacement records and their renderer results before publishing or persisting, so enrichment errors cannot cause partial edits or post-commit rollback.
+`src/core/library-recovery.js` is the shared readiness boundary. Opening and metadata update recover media deletion before text transactions under an authorized lock, before loading/scanning records. Other maintenance and ordinary mutations refuse either unresolved journal. A remaining committed journal still requires recovery; an orphaned temporary directory after journal removal cannot reverse a commit. Metadata edits prepare replacement records and their renderer results before publishing or persisting, so enrichment errors cannot cause partial edits or post-commit rollback.
 
 Opening and maintenance validate required technical structures, fingerprint syntax, and the existing nullable probe representations at disk boundaries. Reference and uniqueness validation remains separate. Validation does not normalize, migrate, repair, or rewrite records.
 

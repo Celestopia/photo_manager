@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { COLUMNS, toCell } = require("../scripts/export-metadata-csv");
+const { COLUMNS, toCell } = require("../src/core/export-metadata-csv");
 
 test("CSV schema exports all normalized video fields", () => {
   const headers = new Set(COLUMNS.map((column) => column.header));

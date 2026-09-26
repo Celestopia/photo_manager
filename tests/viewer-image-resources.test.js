@@ -4,8 +4,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { fileURLToPath } = require('node:url');
-const { resolveLibraryPaths } = require('../scripts/library-core');
-const { coverName } = require('../scripts/video-cover-cache');
+const { resolveLibraryPaths } = require('../src/core/library-core');
+const { coverName } = require('../src/core/video-cover-cache');
 const { createViewerImageResources, handleViewerImageRequest } = require('../src/main/viewer-image-resources');
 
 test('viewer resources stream photos and covers without decoding and revoke stale URLs', async t => {

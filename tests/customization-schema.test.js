@@ -6,7 +6,7 @@ const {
   assertPrivacy,
   assertCustomization,
 } = require("../src/shared/customization-schema");
-const { createMetadataEditService } = require("../src/main/metadata-edit-service");
+const { createMetadataEditService } = require("../src/core/metadata-edit-service");
 
 const MEDIA_A = "00000000-0000-4000-8000-000000000001";
 const MEDIA_B = "00000000-0000-4000-8000-000000000002";

@@ -4,9 +4,9 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const sharp = require('sharp');
-const { resolveLibraryPaths } = require('../scripts/library-core');
-const { coverName } = require('../scripts/video-cover-cache');
-const { ensureVideoCovers } = require('../scripts/build-video-covers');
+const { resolveLibraryPaths } = require('../src/core/library-core');
+const { coverName } = require('../src/core/video-cover-cache');
+const { ensureVideoCovers } = require('../src/core/build-video-covers');
 
 test('batch covers deduplicate, reuse, repair, force, report changes and continue after decode errors', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pm-batch-covers-'));
@@ -40,7 +40,7 @@ test('batch covers deduplicate, reuse, repair, force, report changes and continu
 });
 
 test('cached runs avoid pixel decoding and tool validation; generation validates tools once', async t => {
-  const cache = require('../scripts/video-cover-cache');
+  const cache = require('../src/core/video-cover-cache');
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pm-cover-fast-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const paths = resolveLibraryPaths(root);

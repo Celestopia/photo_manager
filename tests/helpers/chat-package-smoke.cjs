@@ -3,13 +3,13 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
-const resources = path.resolve("release/win-unpacked/resources");
+const resources = path.resolve("release/gui-win-x64-unpacked/resources");
 // Match the resource-root environment passed to packaged maintenance workers.
 process.env.PHOTO_MANAGER_RESOURCE_ROOT = resources;
 const code = path.join(resources, "app.asar");
 const inputs = require(path.join(code, "src/main/chat/inputs.js"));
 const { resolveMediaToolPaths, runMediaTool } = require(
-  path.join(code, "scripts/media-tools.js"),
+  path.join(code, "src/core/media-tools.js"),
 );
 const tools = resolveMediaToolPaths(resources, {});
 async function run() {
@@ -33,9 +33,9 @@ async function run() {
       video,
     ]);
     const info = await inputs.inspect(video, { video: true, tools });
-    const paths = require(path.join(code, 'scripts/library-core.js')).resolveLibraryPaths(root);
+    const paths = require(path.join(code, 'src/core/library-core.js')).resolveLibraryPaths(root);
     await fs.mkdir(paths.managerDir);
-    const cover = await require(path.join(code, 'scripts/video-cover-cache.js')).generateCover({
+    const cover = await require(path.join(code, 'src/core/video-cover-cache.js')).generateCover({
       paths, source: video, hash: 'a'.repeat(64), appRoot: resources, config: {}, beforePublish: async () => {},
     });
     assert.ok(cover.length > 0);
@@ -50,13 +50,13 @@ async function run() {
     assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()), cover);
     resourcesService.invalidate();
     const videoStat = await fs.stat(video);
-    const batchStats = await require(path.join(code, 'scripts/build-video-covers.js')).ensureVideoCovers([
+    const batchStats = await require(path.join(code, 'src/core/build-video-covers.js')).ensureVideoCovers([
       { FilePath: 'video.mp4', SHA256Hash: 'a'.repeat(64), FileSystem: {
         FileType: 'video', FileSize: videoStat.size, ModificationTimeMs: videoStat.mtimeMs } },
     ], { paths, config: {}, force: true });
     assert.equal(batchStats.generated, 1);
     const thumbnailPath = path.join(root, 'thumbnail.webp');
-    await require(path.join(code, 'scripts/thumbnail-cache.js')).generateVideoThumbnail({}, video, thumbnailPath,
+    await require(path.join(code, 'src/core/thumbnail-cache.js')).generateVideoThumbnail({}, video, thumbnailPath,
       { size: 32, webpQuality: 80, extremeAspectRatio: 4 }, {});
     assert.ok((await fs.stat(thumbnailPath)).size > 0);
     const frames = await inputs.prepare(video, info, "sampled", 3, { tools });

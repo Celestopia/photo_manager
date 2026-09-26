@@ -4,10 +4,10 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
 const sharp = require("sharp");
-const { resolveLibraryPaths } = require("../scripts/library-core");
-const { resolveMediaToolPaths, runMediaTool } = require("../scripts/media-tools");
-const { generateCover, coverName, pruneVideoCovers } = require("../scripts/video-cover-cache");
-const { runCoverTool } = require("../scripts/video-first-frame");
+const { resolveLibraryPaths } = require("../src/core/library-core");
+const { resolveMediaToolPaths, runMediaTool } = require("../src/core/media-tools");
+const { generateCover, coverName, pruneVideoCovers } = require("../src/core/video-cover-cache");
+const { runCoverTool } = require("../src/core/video-first-frame");
 const appRoot = path.resolve(__dirname, "..");
 const hash = "a".repeat(64);
 async function fixture(t) {
@@ -43,7 +43,7 @@ test("real first-frame covers preserve size, SAR, rotation and black openings", 
       const stats = await sharp(bytes).stats();
       assert.ok(stats.channels.slice(0, 3).every(channel => channel.mean < 3));
       const thumbnail = path.join(paths.root, "first-frame-thumbnail.webp");
-      await require("../scripts/thumbnail-cache").generateVideoThumbnail(
+      await require("../src/core/thumbnail-cache").generateVideoThumbnail(
         { Video: { DurationSeconds: 20 } }, source, thumbnail,
         { size: 160, webpQuality: 80, extremeAspectRatio: 4 }, {});
       const thumbBytes = await fs.readFile(thumbnail);

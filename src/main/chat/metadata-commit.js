@@ -1,7 +1,7 @@
 const {
   commitTextTransaction,
   serializeJsonl,
-} = require("../../../scripts/library-transaction");
+} = require("../../core/library-transaction");
 const {
   assertCustomizationPatch,
 } = require("../../shared/customization-schema");

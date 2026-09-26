@@ -5,7 +5,7 @@ const test = require("node:test");
 const {
   PROGRAM_RESOURCE_ROOT_ENV,
   resolveProgramResourceRoot,
-} = require("../scripts/program-paths.js");
+} = require("../src/core/program-paths.js");
 
 test("program resources use the explicit packaged root when provided", () => {
   const packagedRoot = path.join("C:\\", "Program Files", "PhotoManager", "resources");

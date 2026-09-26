@@ -1,14 +1,17 @@
 /** Child-process entry used by Electron for long-running library operations. */
-const { resolveLibraryPaths } = require("./library-core");
+const { resolveLibraryPaths } = require("../core/library-core");
 
 const OPERATIONS = {
-  initialize: () => require("./init-metadata").run,
-  update: () => require("./update-metadata").run,
-  verify: () => require("./verify-metadata").run,
-  thumbnails: () => require("./build-thumbnails").run,
-  "video-covers": () => require("./build-video-covers").run,
-  export: () => require("./export-metadata-csv").run,
+  initialize: () => require("../core/init-metadata").run,
+  update: () => require("../core/update-metadata").run,
+  verify: () => require("../core/verify-metadata").run,
+  thumbnails: () => require("../core/build-thumbnails").run,
+  "video-covers": () => require("../core/build-video-covers").run,
+  export: () => require("../core/export-metadata-csv").run,
 };
+
+const controller = new AbortController();
+process.on("message", message => { if (message?.type === "cancel") controller.abort(); });
 
 async function main() {
   const operation = process.argv[2];
@@ -20,6 +23,9 @@ async function main() {
   const result = await run({
     ...options,
     paths: resolveLibraryPaths(root),
+    parentSessionId: process.env.PHOTO_MANAGER_LIBRARY_SESSION || "",
+    signal: controller.signal,
+    onProgress: message => process.send?.(message),
     logger: {
       // createOperationReporter already emits structured IPC messages. Keep its
       // secondary sink quiet so warnings are not duplicated in UI and logs.

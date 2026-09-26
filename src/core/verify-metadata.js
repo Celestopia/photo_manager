@@ -9,7 +9,6 @@ const {
   extensionType,
 } = require("./common");
 const { validateMediaTools, probeVideoFile, sanitizeMediaError } = require("./media-tools");
-const { parseLibraryArgument } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
 const { assertLibraryReady } = require("./library-recovery");
@@ -21,12 +20,13 @@ function approximatelyEqual(a, b, tolerance = 0.1) {
 }
 
 async function run(options = {}) {
+  options.signal?.throwIfAborted();
   const config = options.config || resolveConfig();
-  const paths = options.paths || parseLibraryArgument();
-  const reprobe = options.reprobe ?? process.argv.includes("--probe");
+  const paths = options.paths;
+  const reprobe = options.reprobe ?? false;
   const { emit, logger, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
   if (reprobe) await validateMediaTools(APP_ROOT, config.media, { requireFfmpeg: false, requireFfprobe: true });
-  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
+  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress), signal: options.signal });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
     assertLibraryReady(paths);
@@ -34,7 +34,7 @@ async function run(options = {}) {
     const registries = await loadRegistryIndexes(paths);
     validateMetadataMap(existing, registries);
     validateMetadataPaths(paths, existing.values());
-    const files = (await walkFiles(paths.root, { onProgress: (progress) => emit(progress) }))
+    const files = (await walkFiles(paths.root, { signal: options.signal, onProgress: (progress) => emit(progress) }))
       .filter((file) => extensionType(path.extname(file)));
     const liveRelativePaths = new Set();
     const counts = {
@@ -49,6 +49,7 @@ async function run(options = {}) {
     privacyInvalid: 0,
     };
   for (let index = 0; index < files.length; index += 1) {
+    options.signal?.throwIfAborted();
     const absFile = files[index];
     const relativePath = path.relative(paths.root, absFile).replace(/\\/g, "/");
     emit({ phase: "verify", processed: index, total: files.length, current: relativePath });
@@ -66,12 +67,13 @@ async function run(options = {}) {
       logger.warn(`[TYPE] ${relativePath}: metadata=${current?.FileSystem?.FileType || "unknown"}, disk=${expectedType}`);
     }
     try {
-      const liveHash = await sha256File(absFile);
+      const liveHash = await sha256File(absFile, { signal: options.signal });
       if (current.SHA256Hash !== liveHash) {
         counts.tampered += 1;
         logger.warn(`[TAMPERED] ${relativePath}`);
       }
     } catch (error) {
+      options.signal?.throwIfAborted();
       counts.readFailed += 1;
       logger.warn(`[READ-FAILED] ${relativePath}: ${error.message}`);
     }
@@ -109,20 +111,12 @@ async function run(options = {}) {
     counts.extra += 1;
     logger.warn(`[EXTRA] ${filePath} exists in metadata but not in workspace.`);
   }
+  options.signal?.throwIfAborted();
   emit({ phase: "complete", processed: counts.checked, total: files.length, message: "Metadata verification complete" });
   return { ...counts, warnings, errors };
   } finally {
     await authorization.release();
   }
-}
-
-if (require.main === module) {
-  run({ logger: console }).then((counts) => {
-    console.log(`Verify done: checked=${counts.checked}, missing=${counts.missing}, extra=${counts.extra}, tampered=${counts.tampered}, typeMismatch=${counts.typeMismatch}, probeFailed=${counts.probeFailed}, probeChanged=${counts.probeChanged}, readFailed=${counts.readFailed}, privacyInvalid=${counts.privacyInvalid}`);
-  }).catch((error) => {
-    console.error(error.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { approximatelyEqual, run };

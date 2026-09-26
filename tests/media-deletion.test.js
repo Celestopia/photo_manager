@@ -11,11 +11,11 @@ const {
   resolveLibraryPaths,
   writeJsonlAtomic,
   writeTextAtomic,
-} = require("../scripts/library-core.js");
+} = require("../src/core/library-core.js");
 const {
   commitMediaDeletion,
   recoverMediaDeletionTransaction,
-} = require("../scripts/media-deletion-transaction.js");
+} = require("../src/core/media-deletion-transaction.js");
 const { createMediaDeletionService } = require("../src/main/media-deletion-service.js");
 
 const ID_A = "00000000-0000-4000-8000-000000000001";

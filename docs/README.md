@@ -14,6 +14,10 @@
 | [Interface and Editing](reference/interface.md) | Gallery queries, selection, viewer drafts, location hierarchy and registry management. |
 | [Maintenance and Acceptance](reference/maintenance-and-testing.md) | Library maintenance, explicit CLI commands, tests and Windows release checks. |
 
+## Command-line tool
+
+The [CLI guide](cli/README.md) documents `ptmgr.exe`, including the [command reference](cli/commands.md) and [automation contract](cli/automation.md).
+
 ## Assistant
 
 The [viewer chat reference](agent/README.md) documents the implemented Assistant, its input processing and conversation storage. Start with [Using Assistant](agent/usage.md) for provider configuration and everyday use.

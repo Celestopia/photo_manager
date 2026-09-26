@@ -110,7 +110,7 @@ function createSimpleRegistryService(options) {
     }
   }
 
-  async function deleteGlobal(payload) {
+  async function deleteGlobal(payload, { dryRun = false } = {}) {
     requireOpenLibrary({ writable: true });
     let id;
     try {
@@ -121,6 +121,7 @@ function createSimpleRegistryService(options) {
     }
     const registry = getRegistry();
     if (!registry.has(id)) return { ok: false, error: `${kind} not found` };
+    if (dryRun) return { ok: true, dryRun: true, deletedId: id, updatedCount: getUsageCounts().get(id) || 0 };
     try {
       await prepareLibraryWrite(`${kind.toLowerCase()}-global-delete`, { immediate: true });
     } catch (error) {

@@ -1,4 +1,4 @@
-const { assertMediaTechnicalFields } = require("../src/shared/media-technical-schema");
+const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
 /**
  * Shared utilities for metadata maintenance scripts.
  *
@@ -25,7 +25,7 @@ const { probeVideoFile, failedVideoMetadata } = require("./media-tools");
 const {
   assertUuidV4,
   createEntityId,
-} = require("../src/shared/identity-schema.js");
+} = require("../shared/identity-schema.js");
 const {
   UTC_TIME_CONTEXT,
   formatInstantWithContext,
@@ -57,6 +57,7 @@ async function walkFiles(root, options = {}) {
   let visitedDirectories = 0;
 
   while (stack.length) {
+    options.signal?.throwIfAborted();
     if (options.isCancelled?.()) {
       const error = new Error("Operation cancelled");
       error.code = "OPERATION_CANCELLED";
@@ -91,10 +92,10 @@ async function walkFiles(root, options = {}) {
  * Compute SHA256 hash using streaming reads.
  * Streaming avoids loading large files fully into memory.
  */
-function sha256File(filePath) {
+function sha256File(filePath, { signal } = {}) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash("sha256");
-    const stream = fs.createReadStream(filePath);
+    const stream = fs.createReadStream(filePath, { signal });
     stream.on("data", (chunk) => hash.update(chunk));
     stream.on("error", reject);
     stream.on("end", () => resolve(hash.digest("hex")));
@@ -226,6 +227,7 @@ async function inspectMediaFile(filePath, libraryRoot) {
  * Reads filesystem stats, hash, and EXIF fields (for images).
  */
 async function buildMetadata(filePath, libraryRoot, options = {}) {
+  options.signal?.throwIfAborted();
   const snapshot = options.snapshot || await inspectMediaFile(filePath, libraryRoot);
   if (!snapshot) return null;
   const {
@@ -236,7 +238,7 @@ async function buildMetadata(filePath, libraryRoot, options = {}) {
     modified: scannedModification,
     relativePath,
   } = snapshot;
-  const hash = options.hash || await sha256File(filePath);
+  const hash = options.hash || await sha256File(filePath, { signal: options.signal });
 
   let exif = null;
   let width = 0;

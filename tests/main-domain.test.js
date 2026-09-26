@@ -4,18 +4,18 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { DEFAULT_CONFIG, loadConfig } = require("../scripts/application-config.js");
+const { DEFAULT_CONFIG, loadConfig } = require("../src/core/application-config.js");
 const { createApplicationRuntime } = require("../src/main/application-runtime.js");
 const { createGalleryItemEnricher } = require("../src/main/gallery-item-enricher.js");
-const { createGalleryQueryService } = require("../src/main/gallery-query.js");
+const { createGalleryQueryService } = require("../src/core/gallery-query.js");
 const {
   createLocationDomain,
   normalizeLocationField,
   normalizeLocationName,
-} = require("../src/main/location-domain.js");
-const { createLocationRegistryService } = require("../src/main/location-registry-service.js");
-const { createSimpleRegistryCatalog } = require("../src/main/simple-registry-catalog.js");
-const { createSimpleRegistryService } = require("../src/main/simple-registry-service.js");
+} = require("../src/core/location-domain.js");
+const { createLocationRegistryService } = require("../src/core/location-registry-service.js");
+const { createSimpleRegistryCatalog } = require("../src/core/simple-registry-catalog.js");
+const { createSimpleRegistryService } = require("../src/core/simple-registry-service.js");
 const { locationContextKey } = require("../src/shared/library-data-schema.js");
 
 const IDS = {

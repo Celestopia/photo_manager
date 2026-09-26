@@ -1,7 +1,7 @@
 const fs = require('node:fs/promises');
 const yaml = require('js-yaml');
 const { randomUUID } = require('node:crypto');
-const { writeTextAtomic } = require('../../../scripts/library-core');
+const { writeTextAtomic } = require('../../core/library-core');
 const { exact, str, AgentError } = require('./runtime');
 const { publicUrl, clip, validateSearch } = require('./web-sources');
 const DEFAULT = { schemaVersion: 1, provider: 'tavily', apiKey: '', apiKeyEnv: 'TAVILY_API_KEY' };

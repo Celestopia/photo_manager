@@ -4,14 +4,13 @@ const { loadRegistryIndexes, validateMetadataMap } = require("./library-data");
 /** Generate missing or all first-frame covers for one explicitly selected library. */
 const path = require("node:path");
 const { APP_ROOT, resolveConfig, loadExisting } = require("./common");
-const { parseLibraryArgument } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { assertLibraryReady } = require("./library-recovery");
 const { createOperationReporter } = require("./operation-progress");
 const { validateMediaTools, sanitizeMediaError } = require("./media-tools");
 const cache = require("./video-cover-cache");
 
-async function ensureVideoCovers(items, { paths, config, force = false, emit = () => {}, logger = console,
+async function ensureVideoCovers(items, { paths, config, force = false, emit = () => {}, logger = console, signal,
   generate = cache.generateCover, validateTools = () => validateMediaTools(APP_ROOT, config.media) }) {
   await cache.assertCacheDirectory(paths, true);
   const groups = new Map();
@@ -26,6 +25,7 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
   const work = { id: 'generation', processed: 0, total: pending.size };
   let toolsValidated = false;
   for (const [hash, candidates] of groups) {
+    signal?.throwIfAborted();
     let selected;
     let changed = false;
     let sourceFailure;
@@ -65,10 +65,12 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
           stats.skipped++;
         } else {
           await generate({ paths, source, hash, appRoot: APP_ROOT, config: config.media,
+            signal,
             beforePublish: () => cache.checkCoverSource(paths, item, source) });
           stats.generated++;
         }
       } catch (error) {
+        signal?.throwIfAborted();
         logger.warn(formatLog("warning", "cover-failed", { path: item.FilePath, stage: error.stage || "generate", code: error.code, message: sanitizeMediaError(error, source) }));
         if (["EACCES", "EPERM", "ENOSPC", "EROFS", "EIO"].includes(error.code)) throw error;
         if (error.code === "SOURCE_CHANGED") stats.sourceChanged++;
@@ -79,26 +81,26 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
     emit({ phase: "video-covers", estimateWork: [{ ...work }], processed: stats.generated + stats.skipped + stats.failed + stats.sourceChanged,
       ...stats, current: candidates[0].FilePath, message: "Generating video covers" });
   }
+  signal?.throwIfAborted();
   emit({ phase: "complete", processed: stats.total, total: stats.total, message: "Video cover generation complete" });
   return stats;
 }
 
 async function run(options = {}) {
+  options.signal?.throwIfAborted();
   const config = options.config || resolveConfig();
-  const paths = options.paths || parseLibraryArgument();
+  const paths = options.paths;
   const { emit, logger, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
-  const manifest = await validateExistingLibrary(paths, { onProgress: emit });
+  const manifest = await validateExistingLibrary(paths, { onProgress: emit, signal: options.signal });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
     assertLibraryReady(paths);
     const existing = await loadExisting(paths.metadataFile);
     validateMetadataPaths(paths, existing.values());
     validateMetadataMap(existing, await loadRegistryIndexes(paths));
-    const force = options.force ?? process.argv.includes("--force");
-    const stats = await ensureVideoCovers([...existing.values()], { paths, config, force, emit, logger });
+    const force = options.force ?? false;
+    const stats = await ensureVideoCovers([...existing.values()], { paths, config, force, emit, logger, signal: options.signal });
     return { ...stats, force, warnings, errors };
   } finally { await authorization.release(); }
 }
-if (require.main === module) run().then(stats => console.log(JSON.stringify(stats, null, 2)))
-  .catch(error => { console.error(error.message); process.exitCode = 1; });
 module.exports = { run, ensureVideoCovers };

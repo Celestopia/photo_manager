@@ -1,4 +1,4 @@
-const { assertLibraryReady } = require("../../scripts/library-recovery");
+const { assertLibraryReady } = require("../core/library-recovery");
 
 /** One queue per window/library. Never hold it around model/network generation. */
 function createMutationCoordinator() {

@@ -6,7 +6,7 @@ This entry point and the linked references under `docs/reference` together form 
 
 ## Product Scope
 
-Photo Manager is a local Windows desktop media manager for user-selected, independent libraries. A library may be any ordinary directory on the computer and does not need to be inside the project directory.
+Photo Manager is a local Windows desktop and command-line media manager for user-selected, independent libraries. A library may be any ordinary directory on the computer and does not need to be inside the project directory.
 
 Current capabilities include:
 
@@ -79,6 +79,10 @@ The [viewer chat reference](docs/agent/README.md) documents the implemented Assi
 - Video proxy transcoding, subtitles, chapters, track switching, manual covers, remembered position, looping, screenshots, or exact variable-frame-rate indexing.
 - In-application backup restoration.
 
+The [CLI reference](docs/cli/README.md) owns terminal commands and automation contracts. The first CLI release edits user fields only, defaults queries to all privacy levels, and excludes permanent media deletion.
+
 ## Architecture Summary
 
 Photo Manager combines application code and global settings with user-selected independent libraries whose management data are self-contained. One Electron coordinator process owns shared application state and any number of window-scoped library sessions. Every window owns at most one active library, its in-memory indexes, chat service, workers, and writes; sender-routed IPC prevents one renderer from reaching another window's session. A library can be moved or backed up together with `.photo_manager` and has no dependency on data paths inside the application directory.
+
+The independent `ptmgr.exe` owns argument parsing, terminal output, confirmation, and signal handling. Both frontends call `src/core` directly; core has no dependency on Electron or either frontend. The CLI holds an exclusive library lock for each command, including reads. GUI workers adapt IPC/environment into explicit core options. Shared service assembly and persistence preserve one implementation of edits, registry transactions, and backups. See the runtime architecture and CLI references for packaging and contracts.

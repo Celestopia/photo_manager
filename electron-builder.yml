@@ -11,7 +11,7 @@ files:
   - dist/renderer/**/*
   - src/main/**/*
   - src/shared/**/*
-  - scripts/**/*
+  - src/core/**/*
 
 asar: true
 asarUnpack:

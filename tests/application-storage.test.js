@@ -8,7 +8,7 @@ const {
   resolveApplicationPaths,
   ensureApplicationDirectories,
   configureElectronStoragePaths,
-} = require("../scripts/application-paths.js");
+} = require("../src/core/application-paths.js");
 const {
   loadApplicationState,
   saveApplicationState,

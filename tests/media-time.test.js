@@ -6,7 +6,7 @@ const {
   formatInstantWithContext,
   resolveMediaShootingTime,
   resolveStoredMediaTimeContext,
-} = require("../scripts/media-time");
+} = require("../src/core/media-time");
 
 test("parses explicit offsets and floating wall times without using the host timezone", () => {
   const zoned = parseMediaTimestamp("2025-08-02T11:43:25.250-0700");

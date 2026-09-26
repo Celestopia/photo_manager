@@ -22,7 +22,7 @@ const {
   formatInstantWithContext,
   resolveStoredMediaTimeContext,
 } = require("./media-time");
-const { parseLibraryArgument, writeLibraryManifest } = require("./library-core");
+const { writeLibraryManifest } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createLibraryBackup } = require("./library-backup");
 const { recoverLibraryTransactions } = require("./library-recovery");
@@ -30,7 +30,7 @@ const { createOperationReporter } = require("./operation-progress");
 const {
   assertUuidV4,
   createUniqueEntityId,
-} = require("../src/shared/identity-schema.js");
+} = require("../shared/identity-schema.js");
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
 function isUnchangedRecord(existing, snapshot) {
@@ -83,6 +83,7 @@ async function synchronizeMetadata({
   dependencies = {},
   onProgress = null,
   reservedEntityIds = [],
+  signal,
 }) {
   const usedEntityIds = new Set(reservedEntityIds);
   for (const item of existing.values()) usedEntityIds.add(assertUuidV4(item.MediaId, `MediaId for ${item.FilePath}`));
@@ -101,6 +102,7 @@ async function synchronizeMetadata({
   const failedPaths = new Set();
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
   for (let fileIndex = 0; fileIndex < sortedFiles.length; fileIndex += 1) {
+    signal?.throwIfAborted();
     const absFile = sortedFiles[fileIndex];
     if (!extensionType(path.extname(absFile))) continue;
     onProgress?.({ phase: "inspect", processed: fileIndex, total: sortedFiles.length, current: path.relative(root, absFile).replace(/\\/g, "/") });
@@ -137,6 +139,7 @@ async function synchronizeMetadata({
   const changedSnapshots = snapshots.filter(snapshot => !isUnchangedRecord(existing.get(snapshot.relativePath), snapshot));
   const estimateWork = [{ id: 'changed-bytes', processed: 0, total: changedSnapshots.reduce((sum, snapshot) => sum + Math.max(1, snapshot.stat.size), 0) }];
   for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex += 1) {
+    signal?.throwIfAborted();
     const snapshot = snapshots[snapshotIndex];
     onProgress?.({ phase: "metadata", estimateWork: estimateWork.map(group => ({ ...group })), processed: snapshotIndex, total: snapshots.length, current: snapshot.relativePath });
     const direct = existing.get(snapshot.relativePath);
@@ -151,6 +154,7 @@ async function synchronizeMetadata({
         const built = preserveUserFields(await buildFileMetadata(snapshot.filePath, root, {
           snapshot,
           mediaConfig: config.media,
+          signal,
         }), direct);
         next.set(snapshot.relativePath, built);
         stats.hashed += 1;
@@ -158,7 +162,7 @@ async function synchronizeMetadata({
         continue;
       }
 
-      const hash = await hashFile(snapshot.filePath);
+      const hash = await hashFile(snapshot.filePath, { signal });
       stats.hashed += 1;
       const movedCandidates = movedCandidatesByHash.get(hash) || [];
       const movedIndex = movedCandidates.findIndex(
@@ -172,12 +176,14 @@ async function synchronizeMetadata({
         const built = registerNewMediaId(await buildFileMetadata(snapshot.filePath, root, {
           snapshot,
           hash,
+          signal,
           mediaConfig: config.media,
         }));
         next.set(snapshot.relativePath, built);
         stats.rebuilt += 1;
       }
     } catch (error) {
+      signal?.throwIfAborted();
       stats.failed += 1;
       if (direct) {
         next.set(snapshot.relativePath, direct);
@@ -203,11 +209,12 @@ async function synchronizeMetadata({
 }
 
 async function run(options = {}) {
+  options.signal?.throwIfAborted();
   const config = options.config || resolveConfig();
-  const paths = options.paths || parseLibraryArgument();
+  const paths = options.paths;
   const { emit, logger, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
   await validateMediaTools(APP_ROOT, config.media);
-  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
+  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress), signal: options.signal });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
     await recoverLibraryTransactions(paths, message => logger.warn(message));
@@ -221,12 +228,13 @@ async function run(options = {}) {
     const registries = await loadRegistryIndexes(paths);
     validateMetadataMap(existing, registries);
     validateMetadataPaths(paths, existing.values());
-    const files = await walkFiles(paths.root, { onProgress: (progress) => emit(progress) });
+    const files = await walkFiles(paths.root, { signal: options.signal, onProgress: (progress) => emit(progress) });
     const result = await synchronizeMetadata({
       config,
       root: paths.root,
       existing,
       files,
+      signal: options.signal,
       logger,
       onProgress: (progress) => emit(progress),
       reservedEntityIds: [
@@ -237,6 +245,7 @@ async function run(options = {}) {
       ],
     });
     validateMetadataMap(result.next, registries);
+    options.signal?.throwIfAborted();
     const nextEntries = [...result.next.values()];
     emit({ phase: "commit", processed: nextEntries.length, total: nextEntries.length, message: "Writing metadata atomically" });
     await writeAll(paths.metadataFile, nextEntries);
@@ -273,15 +282,6 @@ async function run(options = {}) {
   } finally {
     await authorization.release();
   }
-}
-
-if (require.main === module) {
-  run({ logger: console }).then((result) => {
-    console.log(`Updated metadata: total=${result.total}, images=${result.images}, videos=${result.videos}, reused=${result.reused}, hashed=${result.hashed}, rebuilt=${result.rebuilt}, moved=${result.moved}, failed=${result.failed}, skipped=${result.skipped}, probeFailed=${result.probeFailed}`);
-  }).catch((error) => {
-    console.error(error.message);
-    process.exit(1);
-  });
 }
 
 module.exports = {

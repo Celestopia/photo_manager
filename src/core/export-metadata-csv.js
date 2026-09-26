@@ -7,11 +7,11 @@
  */
 const path = require("node:path");
 const { loadExisting } = require("./common");
-const { parseLibraryArgument, writeTextAtomic } = require("./library-core");
+const { writeTextAtomic } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
 const { assertLibraryReady } = require("./library-recovery");
-const { assertCustomization } = require("../src/shared/customization-schema");
+const { assertCustomization } = require("../shared/customization-schema");
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data.js");
 
 // Ordered flattened columns. Left side is intentionally user-facing.
@@ -126,12 +126,12 @@ function toCell(value) {
  */
 
 async function run(options = {}) {
-  const paths = options.paths || parseLibraryArgument();
+  options.signal?.throwIfAborted();
+  const paths = options.paths;
   const { emit, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
-  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
+  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress), signal: options.signal });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
-  const outputIndex = process.argv.indexOf("--output");
-  const rawOutput = options.outputFile || (outputIndex >= 0 ? process.argv[outputIndex + 1] : "");
+  const rawOutput = options.outputFile || "";
   const outputFile = rawOutput
     ? (path.isAbsolute(rawOutput) ? rawOutput : path.resolve(process.cwd(), rawOutput))
     : path.join(paths.dataDir, "photo_metadata.csv");
@@ -159,21 +159,13 @@ async function run(options = {}) {
 
   // Prefix BOM for better UTF-8 compatibility in spreadsheet apps on Windows.
   const csvText = `\uFEFF${lines.join("\r\n")}\r\n`;
+  options.signal?.throwIfAborted();
   await writeTextAtomic(outputFile, csvText);
   emit({ phase: "complete", processed: items.length, total: items.length, message: "CSV export complete" });
   return { rows: items.length, outputFile, warnings, errors };
   } finally {
     await authorization.release();
   }
-}
-
-if (require.main === module) {
-  run({ logger: console }).then((result) => {
-    console.log(`Exported ${result.rows} rows to ${result.outputFile}`);
-  }).catch((error) => {
-    console.error(error.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { COLUMNS, formatValue, toCell, run };

@@ -14,7 +14,7 @@ const { createChatService } = require("../src/main/chat/service");
 const {
   resolveMediaToolPaths,
   runMediaTool,
-} = require("../scripts/media-tools");
+} = require("../src/core/media-tools");
 const tools = resolveMediaToolPaths(path.resolve(__dirname, ".."), {});
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "photo-manager-chat-"));

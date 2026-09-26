@@ -3,17 +3,17 @@ const assert = require("node:assert/strict");
 const fsp = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { APP_ROOT, buildMetadata } = require("../scripts/common");
+const { APP_ROOT, buildMetadata } = require("../src/core/common");
 const {
   resolveMediaToolPaths,
   runMediaTool,
   validateMediaTools,
-} = require("../scripts/media-tools");
+} = require("../src/core/media-tools");
 const {
   normalizeThumbnailConfig,
   thumbnailAbsolutePath,
   ensureThumbnailForItem,
-} = require("../scripts/thumbnail-cache");
+} = require("../src/core/thumbnail-cache");
 
 const mediaConfig = {
   ffmpegDir: "./tools/ffmpeg/bin",

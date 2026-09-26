@@ -1,5 +1,5 @@
 const { groupMediaPathsByHash, countMediaTypes } = require("./media-summary");
-const { assertMediaTechnicalFields } = require("../src/shared/media-technical-schema");
+const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
 /** Initialize a new Photo Manager library. */
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
@@ -17,7 +17,6 @@ const {
   createLibraryManifest,
   ensureLibraryDirectories,
   assertDirectoryWritable,
-  parseLibraryArgument,
   writeJsonlAtomic,
   writeLibraryManifest,
   writeTextAtomic,
@@ -30,21 +29,21 @@ const { createOperationReporter } = require("./operation-progress");
 const {
   assertUuidV4,
   createUniqueEntityId,
-} = require("../src/shared/identity-schema.js");
-const { validateMediaEntries } = require("../src/shared/library-data-schema.js");
+} = require("../shared/identity-schema.js");
+const { validateMediaEntries } = require("../shared/library-data-schema.js");
 
 async function run(options = {}) {
+  options.signal?.throwIfAborted();
   const config = options.config || resolveConfig();
-  const paths = options.paths || parseLibraryArgument();
+  const paths = options.paths;
   const { emit, logger, warnings, errors } = createOperationReporter(options);
-  let cancelled = false;
+  let cancelled = Boolean(options.signal?.aborted);
   let lock = null;
   let ownsManager = false;
   let structureStarted = false;
   let marker;
   const cancel = () => { cancelled = true; };
-  const onMessage = message => { if (message?.type === "cancel") cancel(); };
-  process.on("message", onMessage);
+  options.signal?.addEventListener("abort", cancel, { once: true });
 
   try {
     if (fs.existsSync(paths.managerDir)) throw new Error(`Library data already exists: ${paths.managerDir}`);
@@ -89,6 +88,7 @@ async function run(options = {}) {
     });
     const mediaFiles = files.filter((file) => extensionType(path.extname(file))).sort((a, b) => a.localeCompare(b));
     const entries = [];
+    let failed = 0;
     const usedEntityIds = new Set();
     for (let index = 0; index < mediaFiles.length; index += 1) {
       if (cancelled) {
@@ -100,7 +100,7 @@ async function run(options = {}) {
       const relative = path.relative(paths.root, file).replace(/\\/g, "/");
       emit({ phase: "metadata", processed: index, total: mediaFiles.length, current: relative });
       try {
-        const item = await buildMetadata(file, paths.root, { mediaConfig: config.media });
+        const item = await buildMetadata(file, paths.root, { mediaConfig: config.media, signal: options.signal });
         if (item) {
           const id = assertUuidV4(item.MediaId, `MediaId for ${item.FilePath}`);
           if (usedEntityIds.has(id)) item.MediaId = createUniqueEntityId((candidate) => usedEntityIds.has(candidate));
@@ -108,6 +108,8 @@ async function run(options = {}) {
           entries.push(item);
         }
       } catch (error) {
+        options.signal?.throwIfAborted();
+        failed += 1;
         logger.warn(`Skip unreadable media: ${relative} (${error.message})`);
       }
     }
@@ -139,6 +141,7 @@ async function run(options = {}) {
       ok: true,
       manifest,
       total: entries.length,
+      failed,
       ...countMediaTypes(entries),
       warnings,
       errors,
@@ -170,17 +173,8 @@ async function run(options = {}) {
     throw error;
   } finally {
     if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
-    process.removeListener("message", onMessage);
+    options.signal?.removeEventListener("abort", cancel);
   }
-}
-
-if (require.main === module) {
-  run({ logger: console }).then((result) => {
-    console.log(`Initialized library: total=${result.total}, images=${result.images}, videos=${result.videos}, warnings=${result.warnings.length}`);
-  }).catch((error) => {
-    console.error(error.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { run };

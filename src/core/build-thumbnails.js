@@ -9,7 +9,7 @@ const {
 } = require("./common");
 const { normalizeThumbnailConfig, ensureThumbnailsForItems } = require("./thumbnail-cache");
 const { validateMediaTools } = require("./media-tools");
-const { parseLibraryArgument, writeTextAtomic } = require("./library-core");
+const { writeTextAtomic } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { createOperationReporter } = require("./operation-progress");
 const { assertLibraryReady } = require("./library-recovery");
@@ -30,10 +30,11 @@ function thumbnailManifestMatches(current, expected) {
 }
 
 async function run(options = {}) {
+  options.signal?.throwIfAborted();
   const config = options.config || resolveConfig();
-  const paths = options.paths || parseLibraryArgument();
+  const paths = options.paths;
   const { emit, logger, warnings, errors } = createOperationReporter({ ...options, logger: options.logger || console });
-  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress) });
+  const manifest = await validateExistingLibrary(paths, { onProgress: (progress) => emit(progress), signal: options.signal });
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
     assertLibraryReady(paths);
@@ -44,7 +45,7 @@ async function run(options = {}) {
     if (fs.existsSync(paths.thumbnailManifestFile)) {
       try { currentManifest = JSON.parse(await fsp.readFile(paths.thumbnailManifestFile, "utf8")); } catch { currentManifest = null; }
     }
-    const force = Boolean(options.force ?? process.argv.includes("--force")) || !thumbnailManifestMatches(currentManifest, expectedManifest);
+    const force = Boolean(options.force ?? false) || !thumbnailManifestMatches(currentManifest, expectedManifest);
     const existing = await loadExisting(paths.metadataFile);
     validateMetadataPaths(paths, existing.values());
     validateMetadataMap(existing, await loadRegistryIndexes(paths));
@@ -58,8 +59,10 @@ async function run(options = {}) {
       force,
       logger: (message) => logger.warn(message),
       onGenerated: options.onGenerated,
+      signal: options.signal,
       onProgress: (progress) => emit({ phase: "thumbnails", ...progress }),
     });
+    options.signal?.throwIfAborted();
     if (stats.failed === 0) {
       await writeTextAtomic(paths.thumbnailManifestFile, `${JSON.stringify(expectedManifest, null, 2)}\n`);
     }
@@ -68,15 +71,6 @@ async function run(options = {}) {
   } finally {
     await authorization.release();
   }
-}
-
-if (require.main === module) {
-  run({ logger: console }).then((stats) => {
-    console.log(`Thumbnail cache complete: total=${stats.total}, generated=${stats.generated}, skipped=${stats.skipped}, failed=${stats.failed}, force=${stats.force}`);
-  }).catch((error) => {
-    console.error(error.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { THUMBNAIL_GENERATOR_VERSION, buildThumbnailManifest, thumbnailManifestMatches, run };

@@ -8,7 +8,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 ### First Launch Without Installation
 
-The unpacked release initializes its own user-data storage; no installer action or source-code environment is required. At process startup, `src/main/main.js` resolves the current account's `APPDATA` and `LOCALAPPDATA` paths and calls `configureElectronStoragePaths()` from `scripts/application-paths.js`. Before Electron becomes ready, that function recursively creates missing configuration, Electron user-data, local application-state, log, session-cache, and crash-dump directories under the respective `PhotoManager` roots, then assigns Electron's storage paths. Existing directories and data are retained.
+The unpacked release initializes its own user-data storage; no installer action or source-code environment is required. At process startup, `src/main/main.js` resolves the current account's `APPDATA` and `LOCALAPPDATA` paths and calls `configureElectronStoragePaths()` from `src/core/application-paths.js`. Before Electron becomes ready, that function recursively creates missing configuration, Electron user-data, local application-state, log, session-cache, and crash-dump directories under the respective `PhotoManager` roots, then assigns Electron's storage paths. Existing directories and data are retained.
 
 During initialization, `loadConfig()` writes default `config.yml` when absent. Missing application state loads as an empty last-library selection; state and optional provider files are written when their owning operations require them, rather than all being pre-created. A new account can launch the complete unpacked folder and select or initialize a library directly. The account needs write access to AppData and the selected library. Unavailable environment paths or denied filesystem access prevent initialization rather than redirecting writes into the program folder.
 
@@ -55,7 +55,7 @@ Global data are split between roaming configuration and machine-specific state:
 
 All windows share these paths because they live in one Electron coordinator process. The most recently completed library open wins `state.json`; writes are serialized and atomic. Provider-setting saves are also serialized, and other open windows receive a notice so a stale settings form can be reopened before editing. Window-scoped media, registry, chat-session, and maintenance state never enters these global files.
 
-Before Electron becomes ready, the main process must create these directories and explicitly set `userData`, `sessionData`, `crashDumps`, and the log path. `scripts/application-paths.js` is the only shared source of global path rules for Electron and standalone CLI tools. Other modules must not reconstruct AppData paths.
+Before Electron becomes ready, the main process must create these directories and explicitly set `userData`, `sessionData`, `crashDumps`, and the log path. `src/core/application-paths.js` is the only shared source of global path rules for Electron and standalone CLI tools. Other modules must not reconstruct AppData paths.
 
 The application does not maintain a recent-library list. Startup always shows the library-entry page. If a last successful path exists, its real name is read from `library.yml` and displayed with the full path, but the library is not loaded until the user chooses to enter it.
 

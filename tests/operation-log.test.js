@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createOperationLog, formatLog, appendDailyLog } = require('../scripts/operation-log');
+const { createOperationLog, formatLog, appendDailyLog } = require('../src/core/operation-log');
 
 test('operation logs throttle progress, preserve warnings, summarize counts and omit arbitrary payloads', () => {
   let time = 0;

@@ -22,7 +22,7 @@ app.setName("Photo Manager Chat Smoke");
 const {
   resolveApplicationPaths,
   configureElectronStoragePaths,
-} = require("../../scripts/application-paths");
+} = require("../../src/core/application-paths");
 const paths = resolveApplicationPaths();
 configureElectronStoragePaths(app, paths);
 BrowserWindow.prototype.show = function () {};
@@ -90,21 +90,21 @@ async function run() {
   const oldDate = new Date("2025-01-01T00:00:00Z");
   await fsp.utimes(path.join(library, "second.jpg"), oldDate, oldDate);
   if (process.env.VIEWER_VISUAL_SMOKE || process.env.MANUAL_CACHE_SMOKE) {
-    const { resolveMediaToolPaths, runMediaTool } = require('../../scripts/media-tools');
+    const { resolveMediaToolPaths, runMediaTool } = require('../../src/core/media-tools');
     const tools = resolveMediaToolPaths(path.resolve('.'), {});
     await runMediaTool(tools.ffmpegPath, ['-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-t', '2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(library, 'viewer-video.mp4')]);
     await fsp.utimes(path.join(library, 'viewer-video.mp4'), oldDate, oldDate);
   }
-  const { DEFAULT_CONFIG } = require("../../scripts/application-config");
-  const { resolveLibraryPaths } = require("../../scripts/library-core");
-  await require("../../scripts/init-metadata").run({
+  const { DEFAULT_CONFIG } = require("../../src/core/application-config");
+  const { resolveLibraryPaths } = require("../../src/core/library-core");
+  await require("../../src/core/init-metadata").run({
     paths: resolveLibraryPaths(library),
     config: structuredClone(DEFAULT_CONFIG),
     logger: { info() {}, warn() {}, error() {} },
   });
   if (process.env.REGISTRY_UI_SMOKE || process.env.BATCH_POPUP_SMOKE || process.env.SHARED_UI_SMOKE) await require('./registry-filter-checks.cjs').prepare(library);
   if (process.env.BATCH_POPUP_SMOKE) await require('./batch-popup-checks.cjs').prepare(library);
-  if (process.env.VIEWER_VISUAL_SMOKE) await require('../../scripts/build-video-covers').run({paths:resolveLibraryPaths(library),config:structuredClone(DEFAULT_CONFIG),logger:{info(){},warn(){},error(){}}});
+  if (process.env.VIEWER_VISUAL_SMOKE) await require('../../src/core/build-video-covers').run({paths:resolveLibraryPaths(library),config:structuredClone(DEFAULT_CONFIG),logger:{info(){},warn(){},error(){}}});
   const metadata = await fsp.readFile(
     path.join(library, ".photo_manager", "data", "photo_metadata.jsonl"),
   );

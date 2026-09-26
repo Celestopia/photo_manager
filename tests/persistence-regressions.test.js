@@ -7,10 +7,10 @@ const path = require('node:path');
 const { fork } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const sharp = require('sharp');
-const core = require('../scripts/library-core');
-const { DEFAULT_CONFIG } = require('../scripts/application-config');
-const { assertLibraryReady, recoverLibraryTransactions } = require('../scripts/library-recovery');
-const { commitTextTransaction } = require('../scripts/library-transaction');
+const core = require('../src/core/library-core');
+const { DEFAULT_CONFIG } = require('../src/core/application-config');
+const { assertLibraryReady, recoverLibraryTransactions } = require('../src/core/library-recovery');
+const { commitTextTransaction } = require('../src/core/library-transaction');
 
 async function directory(t) {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'photo-manager-regression-'));
@@ -35,7 +35,7 @@ test('metadata update restores an uncommitted staged deletion before scanning', 
   const { paths, manifest } = await library(t);
   const source = path.join(paths.root, 'source.png');
   await sharp({ create: { width: 2, height: 2, channels: 3, background: 'red' } }).png().toFile(source);
-  const record = await require('../scripts/common').buildMetadata(source, paths.root);
+  const record = await require('../src/core/common').buildMetadata(source, paths.root);
   await core.writeJsonlAtomic(paths.metadataFile, [record]);
   const transactionId = randomUUID();
   const relativeDirectory = path.join('temp', 'media-deletions', transactionId);
@@ -48,7 +48,7 @@ test('metadata update restores an uncommitted staged deletion before scanning', 
   assert.throws(() => assertLibraryReady(paths), { code: 'RECOVERY_REQUIRED' });
   const parentSessionId = randomUUID();
   await core.writeTextAtomic(paths.lockFile, JSON.stringify({ LibraryId: manifest.libraryId, SessionId: parentSessionId }));
-  const result = await require('../scripts/update-metadata').run({ paths, parentSessionId, config: DEFAULT_CONFIG,
+  const result = await require('../src/core/update-metadata').run({ paths, parentSessionId, config: DEFAULT_CONFIG,
     logger: { info() {}, warn() {}, error() {} } });
   assert.equal(result.total, 1);
   assert.equal(fs.existsSync(source), true);
@@ -90,7 +90,7 @@ test('location deletion rejects a detached-child collision before backup or publ
   let registry = new Map([row(1, 'Parent', null), row(2, 'Room', id(1)), row(3, 'Room', null)].map(r => [r.LocationId, r]));
   const before = [...registry];
   let writes = 0;
-  const service = require('../src/main/location-registry-service').createLocationRegistryService({
+  const service = require('../src/core/location-registry-service').createLocationRegistryService({
     getRegistry: () => registry, setRegistry: value => { registry = value; }, getMetadata: () => new Map(), requireOpenLibrary() {},
     prepareLibraryWrite: async () => { writes++; }, saveTransaction: async () => { writes++; }, appendLog() {},
   });
@@ -108,7 +108,7 @@ test('every read/cache maintenance entry refuses either unresolved journal', asy
   for (const journal of [paths.mediaDeletionFile, paths.transactionFile]) {
     await core.writeTextAtomic(journal, '{}');
     for (const script of ['verify-metadata', 'build-thumbnails', 'build-video-covers', 'export-metadata-csv']) {
-      await assert.rejects(require('../scripts/' + script).run({ paths, parentSessionId, config: DEFAULT_CONFIG }), { code: 'RECOVERY_REQUIRED' });
+      await assert.rejects(require('../src/core/' + script).run({ paths, parentSessionId, config: DEFAULT_CONFIG }), { code: 'RECOVERY_REQUIRED' });
     }
     await fsp.rm(journal);
   }
@@ -117,7 +117,7 @@ test('every read/cache maintenance entry refuses either unresolved journal', asy
 test('failed initialization validation does not leak a cancellation listener', async t => {
   const root = await directory(t);
   const listeners = process.listeners('message');
-  await assert.rejects(require('../scripts/init-metadata').run({ paths: core.resolveLibraryPaths(path.join(root, 'missing')), config: DEFAULT_CONFIG }), /does not exist/);
+  await assert.rejects(require('../src/core/init-metadata').run({ paths: core.resolveLibraryPaths(path.join(root, 'missing')), config: DEFAULT_CONFIG }), /does not exist/);
   assert.deepEqual(process.listeners('message'), listeners);
 });
 

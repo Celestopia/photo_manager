@@ -1,8 +1,8 @@
 {
   "name": "photo-manager",
   "productName": "Photo Manager",
-  "version": "0.40.13",
-  "description": "Local image and video manager built with Electron and Vue",
+  "version": "0.41.0",
+  "description": "Local image and video manager with desktop and command-line applications",
   "author": "Photo Manager",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
@@ -11,20 +11,19 @@
   "scripts": {
     "start": "npm run build:renderer && node scripts/start-electron.js",
     "build:renderer": "vite build --config vite.config.mjs",
-    "pack:win": "npm run build:renderer && electron-builder --dir --win --x64",
+    "pack:gui": "npm run build:renderer && node scripts/pack-gui.cjs",
+    "pack:cli": "node scripts/pack-cli.cjs",
+    "pack:win": "npm run pack:gui && npm run pack:cli",
     "dist:win": "npm test && npm run pack:win",
-    "build-thumbnails": "node scripts/build-thumbnails.js",
-    "build-video-covers": "node scripts/build-video-covers.js",
-    "init-metadata": "node scripts/init-metadata.js",
-    "update-metadata": "node scripts/update-metadata.js",
-    "verify-metadata": "node scripts/verify-metadata.js",
-    "export-metadata-csv": "node scripts/export-metadata-csv.js",
+    "cli": "node src/cli/main.js",
     "test": "node --test \"tests/*.test.js\" \"tests/*.test.mjs\""
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
     "electron": "^44.2.0",
     "electron-builder": "^26.15.3",
+    "postject": "1.0.0-alpha.6",
+    "resedit": "1.7.2",
     "vite": "^8.2.2",
     "vue": "^3.5.42"
   },

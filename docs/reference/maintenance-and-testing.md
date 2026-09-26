@@ -8,7 +8,7 @@ Part of the [project specification](../../PROJECT.md). See the [documentation in
 
 The gallery settings menu, visible only in normal gallery mode, exposes library information/directories, metadata update, verification, thumbnail generation, CSV export, registry management, and return to entry.
 
-`scripts/maintenance-worker.js` runs operations as child processes with structured progress, logs, and results. The UI shows phase/count/current path and supports copying reports or opening outputs/logs.
+`src/main/maintenance-worker.js` runs operations as child processes with structured progress, logs, and results. The UI shows phase/count/current path and supports copying reports or opening outputs/logs.
 
 Desktop maintenance writes readable daily UTC logs under the operation library's `.photo_manager/logs`; initialization uses application logs until the management directory exists. Each run has an ID, start entry with application version and force/reprobe flags, phase/current-path progress snapshots with combined counts such as `progress=482/557` at most once per two seconds within a phase, and a terminal summary with elapsed milliseconds and numeric result counters. Phase changes, final progress and explicit warnings/errors are logged immediately; UI progress is not throttled. Warnings, errors or failed/changed-source items produce a partial outcome. Worker failures retain their original stack, code and exit status/signal. Maintenance resolves and releases its active-worker barrier only on child `close`, after queued IPC results are received; `exit` alone is not completion. Spawn errors are retained and rejected through the same close-time cleanup. Routine reused items do not get individual log entries.
 
@@ -23,21 +23,9 @@ Log values preserve Unicode and escape newlines. Only selected progress fields, 
 
 ## CLI Maintenance
 
-Every script requires `--library` and shares path, lock, strict loading, and FFmpeg configuration:
+The independent `ptmgr.exe` exposes `maintenance update`, `maintenance verify [--probe]`, `maintenance thumbnails [--force]`, `maintenance video-covers [--force]`, and `export csv`. Each requires `--library`. In development, use `npm run cli -- <command> --library <test-library>`.
 
-```powershell
-npm run init-metadata -- --library "D:\Media\My Library"
-npm run update-metadata -- --library "D:\Media\My Library"
-npm run verify-metadata -- --library "D:\Media\My Library"
-npm run verify-metadata -- --library "D:\Media\My Library" --probe
-npm run build-thumbnails -- --library "D:\Media\My Library"
-npm run build-thumbnails -- --library "D:\Media\My Library" --force
-npm run build-video-covers -- --library "D:\Media\My Library"
-npm run build-video-covers -- --library "D:\Media\My Library" --force
-npm run export-metadata-csv -- --library "D:\Media\My Library"
-```
-
-Missing `--library` fails immediately. No script infers a path from configuration.
+See [CLI commands](../cli/commands.md) and [automation](../cli/automation.md) for all options, lock ownership, confirmations, output, exit codes and cancellation. GUI maintenance uses the internal worker directly and never launches the public CLI.
 
 ## Tests and Acceptance
 
@@ -50,8 +38,8 @@ npm test
 npm run build:renderer
 node --check src/main/main.js
 node --check src/main/preload.js
-node --check scripts/*.js  # use a reliable per-file PowerShell loop
-npm run verify-metadata -- --library "<library-path>"
+node --check src/cli/main.js  # also syntax-check changed core/main/build files individually
+npm run cli -- maintenance verify --library "<library-path>"
 git diff --check
 ```
 
@@ -72,3 +60,7 @@ Set `LOGGING_SMOKE=1` with `tests/helpers/chat-ui-smoke.cjs` to check real worke
 The maintenance dialog shows total elapsed time, retained on completion, and an approximate current-stage remaining time. Estimates reset on phase changes, require at least three progress advances spanning five seconds, use a recent 30-second throughput window, and round upward to seconds and count down on each one-second UI tick between progress events. Unknown totals, unsampled workloads and ten seconds without progress or an exhausted prediction display Estimating; write/commit/complete phases display Finishing until the worker closes. These estimates are advisory, especially for unusually large files and changing storage speeds.
 
 Thumbnail estimates track uncached image and video work separately and use the slower remaining lane; video-cover estimates exclude existing cache entries and reset when an invalid cache increases the generation workload. Metadata processing estimates use changed-file bytes, excluding unchanged records. Scanning and export can remain indeterminate. Timing belongs to the window's library session; timers stop on completion, failure, library closure and disposal. Warning events preserve phase progress. Set `ETA_SMOKE=1` with the isolated Electron smoke helper to check elapsed time in the maintenance dialog.
+
+CLI acceptance covers all privacy levels, exact-name ambiguity, hierarchy/region filters, batch validation and dry runs, registry transactions, active-lock rejection, explicit recovery, cancellation and output separation. Packaged acceptance runs both executables from their distinct output folders and exercises CLI maintenance on an explicit isolated library with spaces and Unicode.
+
+After `pack:cli`, run `node tests/helpers/cli-package-smoke.cjs`. It creates a disposable test library under `tmp/`, removes Node.js from the child PATH, and exercises the portable executable. Set `CLI_PACKAGE_ROOT` to test a relocated package. The CLI ships the pinned Node runtime license under `LICENSE.node.txt`, dependency licenses beside dependencies, and the bundled FFmpeg documentation.

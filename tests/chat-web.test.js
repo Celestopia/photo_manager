@@ -11,7 +11,7 @@ const { tools } = require('../src/main/chat/tools');
 const { createBudget } = require('../src/main/chat/runtime');
 const { createChatService } = require('../src/main/chat/service');
 const { defaultGroups, assertSession } = require('../src/main/chat/schema');
-const { resolveLibraryPaths } = require('../scripts/library-core');
+const { resolveLibraryPaths } = require('../src/core/library-core');
 const json = value => new Response(JSON.stringify(value));
 const result = { results: [{ title: 'Eiffel Tower', url: 'https://www.toureiffel.paris/en', content: 'A landmark in Paris.' }], usage: { credits: 1 } };
 const extracted = { results: [{ url: result.results[0].url, raw_content: 'The Eiffel Tower is in Paris.' }], usage: { credits: 0.2 } };

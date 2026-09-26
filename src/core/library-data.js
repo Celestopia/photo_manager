@@ -4,7 +4,7 @@ const {
   validateLocationRegistryEntries,
   validateMediaEntries,
   validateSimpleRegistryEntries,
-} = require("../src/shared/library-data-schema.js");
+} = require("../shared/library-data-schema.js");
 
 async function loadRegistryIndexes(paths) {
   const tagEntries = await readJsonlStrict(path.join(paths.dataDir, DATA_FILE_NAMES.tags), {

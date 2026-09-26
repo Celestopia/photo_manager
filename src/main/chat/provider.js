@@ -2,7 +2,7 @@ const { normalizeUsage } = require("./usage");
 const fs = require("node:fs/promises");
 const yaml = require("js-yaml");
 const { object } = require("./schema");
-const { writeTextAtomic } = require("../../../scripts/library-core");
+const { writeTextAtomic } = require("../../core/library-core");
 const DEFAULT = {
   schemaVersion: 1,
   baseUrl: "",

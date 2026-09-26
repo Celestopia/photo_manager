@@ -12,6 +12,7 @@ const {
 const { acquireLibraryLock, readLock, releaseLibraryLock } = require("./library-lock");
 
 async function validateExistingLibrary(paths, options = {}) {
+  options.signal?.throwIfAborted();
   const stat = await fsp.stat(paths.root).catch(() => null);
   if (!stat?.isDirectory()) throw new Error(`Library directory does not exist: ${paths.root}`);
   const rootLinkStat = await fsp.lstat(paths.root);
@@ -21,18 +22,18 @@ async function validateExistingLibrary(paths, options = {}) {
   const manifest = await readLibraryManifest(paths);
   for (const fileName of Object.values(DATA_FILE_NAMES)) {
     const filePath = path.join(paths.dataDir, fileName);
-    if (!fs.existsSync(filePath)) throw new Error(`Missing required data file: ${fileName}`);
+    if (!options.allowIncompleteData && !fs.existsSync(filePath)) throw new Error(`Missing required data file: ${fileName}`);
   }
   await assertDirectoryWritable(paths.managerDir);
   if (options.detectNested !== false) {
-    const nested = await findNestedManagerDirectory(paths.root, options.onProgress);
+    const nested = await findNestedManagerDirectory(paths.root, options.onProgress, () => Boolean(options.signal?.aborted));
     if (nested) throw new Error(`Nested Photo Manager library detected: ${nested}`);
   }
   return manifest;
 }
 
 async function authorizeLibraryOperation(paths, manifest, options = {}) {
-  const parentSessionId = options.parentSessionId || process.env.PHOTO_MANAGER_LIBRARY_SESSION || "";
+  const parentSessionId = options.parentSessionId || "";
   if (parentSessionId) {
     const lock = await readLock(paths.lockFile);
     if (!lock || lock.SessionId !== parentSessionId || lock.LibraryId !== manifest.libraryId) {

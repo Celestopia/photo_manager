@@ -4,11 +4,11 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const sharp = require('sharp');
-const { buildMetadata, loadExisting } = require('../scripts/common');
-const { parseProbeJson, failedVideoMetadata } = require('../scripts/media-tools');
+const { buildMetadata, loadExisting } = require('../src/core/common');
+const { parseProbeJson, failedVideoMetadata } = require('../src/core/media-tools');
 const { assertMediaTechnicalFields, assertSha256Hash } = require('../src/shared/media-technical-schema');
-const { serializeJsonl } = require('../scripts/library-core');
-const { normalizeConfig, DEFAULT_CONFIG } = require('../scripts/application-config');
+const { serializeJsonl } = require('../src/core/library-core');
+const { normalizeConfig, DEFAULT_CONFIG } = require('../src/core/application-config');
 
 test('current producers and documented nullable/parser-shaped variants retain exact JSONL bytes', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'photo-manager-contract-'));

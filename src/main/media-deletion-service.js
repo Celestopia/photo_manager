@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const { assertUuidArray } = require("../shared/identity-schema.js");
 const { assertExactObjectKeys } = require("../shared/object-schema.js");
-const { pruneVideoCovers } = require("../../scripts/video-cover-cache.js");
+const { pruneVideoCovers } = require("../core/video-cover-cache.js");
 
 function createMediaDeletionService(options) {
   const {

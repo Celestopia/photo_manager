@@ -125,7 +125,7 @@ function createLocationRegistryService(options) {
     }
   }
 
-  async function deleteGlobal(payload) {
+  async function deleteGlobal(payload, { dryRun = false } = {}) {
     requireOpenLibrary({ writable: true });
     let locationId;
     try {
@@ -147,6 +147,8 @@ function createLocationRegistryService(options) {
     }
     try {
       validateLocationRegistryEntries([...candidate.values()]);
+      if (dryRun) return { ok: true, dryRun: true, deletedId: locationId, orphanedChildren,
+        updatedCount: [...getMetadata().values()].filter(item => item.Location?.LocationId === locationId).length };
       await prepareLibraryWrite("location-global-delete", { immediate: true });
     } catch (error) {
       return { ok: false, error: error.message };

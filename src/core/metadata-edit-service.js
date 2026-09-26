@@ -210,7 +210,70 @@ function createMetadataEditService(options) {
     }
   }
 
-  return { batchUpdate, updateCustomization };
+  /** Strict multi-item edit for automation: validate the entire batch before publication. */
+  async function editMany(payload, { dryRun = false, signal } = {}) {
+    requireOpenLibrary({ writable: true });
+    assertExactObjectKeys(payload, ['mediaIds', 'customization', 'location', 'addTagIds', 'removeTagIds',
+      'addPersonIds', 'removePersonIds'], 'Media edit');
+    assertUuidArray(payload.mediaIds, 'mediaIds');
+    if (!payload.mediaIds.length) throw new Error('No target MediaIds');
+    const customization = { ...(payload.customization || {}) };
+    if (payload.customization !== undefined) assertCustomizationPatch(payload.customization, EDITABLE_CUSTOMIZATION_FIELDS);
+    validateCustomizationReferences(customization);
+    const location = payload.location;
+    if (location !== undefined) {
+      assertExactObjectKeys(location, ['LocationId', 'Detail'], 'Location patch');
+      if ('Detail' in location && typeof location.Detail !== 'string') throw new Error('Location.Detail must be a string');
+      if ('LocationId' in location) {
+        const validation = normalizeRegisteredLocation({ LocationId: location.LocationId, Detail: '' });
+        if (validation.unknown.length) throw new Error(`Unknown LocationId: ${validation.unknown.join(', ')}`);
+      }
+    }
+    const lists = {};
+    for (const [field, addKey, removeKey, normalize] of [
+      ['TagIds', 'addTagIds', 'removeTagIds', normalizeRegisteredTags],
+      ['PersonIds', 'addPersonIds', 'removePersonIds', normalizeRegisteredPeople],
+    ]) {
+      const add = payload[addKey] === undefined ? [] : payload[addKey];
+      const remove = payload[removeKey] === undefined ? [] : payload[removeKey];
+      assertUuidArray(add, addKey); assertUuidArray(remove, removeKey);
+      if (field in customization && (add.length || remove.length)) throw new Error(`Cannot replace and add/remove ${field} in one edit`);
+      if (add.some(id => remove.includes(id))) throw new Error(`Cannot add and remove the same ${field} value`);
+      const validation = normalize([...add, ...remove]);
+      if (validation.unknown.length) throw new Error(`Unknown ${field}: ${validation.unknown.join(', ')}`);
+      lists[field] = { add, remove: new Set(remove) };
+    }
+    if (!Object.keys(customization).length && !Object.keys(location || {}).length
+      && !Object.values(lists).some(list => list.add.length || list.remove.size)) throw new Error('No editable fields supplied');
+    const metadata = getMetadata(), previous = new Map(), next = new Map(), changes = [];
+    for (const id of payload.mediaIds) {
+      const current = metadata.get(id);
+      if (!current) throw Object.assign(new Error(`MediaId not found: ${id}`), { code: 'NOT_FOUND' });
+      const item = { ...current, Customization: { ...current.Customization, ...customization },
+        Location: { ...current.Location, ...(location || {}) } };
+      for (const [field, { add, remove }] of Object.entries(lists)) {
+        item.Customization[field] = [...new Set([...item.Customization[field], ...add])].filter(id => !remove.has(id));
+      }
+      if (JSON.stringify(item.Customization) === JSON.stringify(current.Customization)
+        && JSON.stringify(item.Location) === JSON.stringify(current.Location)) continue;
+      previous.set(id, current);
+      changes.push({ MediaId: id, FilePath: current.FilePath,
+        before: { Customization: current.Customization, Location: current.Location },
+        after: { Customization: { ...item.Customization }, Location: item.Location } });
+      item.Customization.MetadataUpdateDate = new Date().toISOString();
+      next.set(id, item);
+    }
+    signal?.throwIfAborted();
+    if (!dryRun && next.size) {
+      for (const [id, item] of next) metadata.set(id, item);
+      try { await saveMetadata({ reason: 'media-batch-edit' }); }
+      catch (error) { for (const [id, item] of previous) metadata.set(id, item); throw error; }
+      appendLog(`media-edit requested=${payload.mediaIds.length} updated=${next.size}`);
+    }
+    return { requestedCount: payload.mediaIds.length, updatedCount: next.size, dryRun, changes };
+  }
+
+  return { batchUpdate, updateCustomization, editMany };
 }
 
 module.exports = { createMetadataEditService };

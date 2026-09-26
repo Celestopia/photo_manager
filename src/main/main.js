@@ -1,7 +1,6 @@
-const { appendDailyLog, createOperationLog, formatLog } = require("../../scripts/operation-log");
+const { appendDailyLog, createOperationLog, formatLog } = require("../core/operation-log");
 const { configureMapNetwork } = require("./map-network");
-const { groupMediaPathsByHash, countMediaTypes } = require("../../scripts/media-summary");
-const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
+const { groupMediaPathsByHash, countMediaTypes } = require("../core/media-summary");
 /**
  * Electron main-process entry.
  *
@@ -18,28 +17,16 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { fork } = require("node:child_process");
-const { loadConfig } = require(path.join(__dirname, "..", "..", "scripts", "application-config.js"));
+const { loadConfig } = require(path.join(__dirname, "..", "core", "application-config.js"));
 const {
   resolveApplicationPaths,
   configureElectronStoragePaths,
-} = require(path.join(__dirname, "..", "..", "scripts", "application-paths.js"));
+} = require(path.join(__dirname, "..", "core", "application-paths.js"));
 const {
   loadApplicationState,
   saveApplicationState,
 } = require("./application-state.js");
-const {
-  createLocationDomain,
-  normalizeLocationField,
-  normalizeLocationName,
-  normalizeLocationObject,
-} = require("./location-domain.js");
-const { createGalleryQueryService } = require("./gallery-query.js");
 const { createGalleryItemEnricher } = require("./gallery-item-enricher.js");
-const { createSimpleRegistryService } = require("./simple-registry-service.js");
-const { createSimpleRegistryCatalog } = require("./simple-registry-catalog.js");
-const { createLocationCatalog } = require("./location-catalog.js");
-const { createLocationRegistryService } = require("./location-registry-service.js");
-const { createMetadataEditService } = require("./metadata-edit-service.js");
 const { createMediaDeletionService } = require("./media-deletion-service.js");
 const { registerIpcHandlers: registerMainIpcHandlers } = require("./ipc-handlers.js");
 const { createMainWindow } = require("./window-manager.js");
@@ -52,46 +39,38 @@ const { createMetadataCommit } = require("./chat/metadata-commit");
 const { createChatService } = require("./chat/service.js");
 const { registerChatIpc } = require("./chat/ipc.js");
 const { metadataGroups } = require("./chat/metadata.js");
-const { resolveMediaToolPaths } = require("../../scripts/media-tools.js");
-const { createUniqueEntityId } = require("../shared/identity-schema.js");
-const { validateMediaEntries } = require("../shared/library-data-schema.js");
+const { resolveMediaToolPaths } = require("../core/media-tools.js");
 const {
   thumbnailAbsolutePath,
-} = require(path.join(__dirname, "..", "..", "scripts", "thumbnail-cache.js"));
+} = require(path.join(__dirname, "..", "core", "thumbnail-cache.js"));
 const {
   validateMediaTools,
   sanitizeMediaError,
-} = require(path.join(__dirname, "..", "..", "scripts", "media-tools.js"));
+} = require(path.join(__dirname, "..", "core", "media-tools.js"));
 const {
   DATA_FILE_NAMES,
   resolveLibraryPaths,
   readLibraryManifest,
   writeLibraryManifest,
   normalizeLibraryName,
-  readJsonlStrict,
-  writeJsonlAtomic,
   assertPathInsideLibrary,
   findParentManagerDirectory,
-} = require(path.join(__dirname, "..", "..", "scripts", "library-core.js"));
-const { validateExistingLibrary } = require(path.join(__dirname, "..", "..", "scripts", "library-access.js"));
+} = require(path.join(__dirname, "..", "core", "library-core.js"));
+const { validateExistingLibrary } = require(path.join(__dirname, "..", "core", "library-access.js"));
 const {
   acquireLibraryLock,
   releaseLibraryLock,
   inspectLibraryLock,
-} = require(path.join(__dirname, "..", "..", "scripts", "library-lock.js"));
-const { createLibraryBackup } = require(path.join(__dirname, "..", "..", "scripts", "library-backup.js"));
-const {
-  commitJsonlTransaction,
-} = require(path.join(__dirname, "..", "..", "scripts", "library-transaction.js"));
+} = require(path.join(__dirname, "..", "core", "library-lock.js"));
 const {
   commitMediaDeletion,
-} = require(path.join(__dirname, "..", "..", "scripts", "media-deletion-transaction.js"));
-const { recoverLibraryTransactions } = require("../../scripts/library-recovery");
+} = require(path.join(__dirname, "..", "core", "media-deletion-transaction.js"));
+const { recoverLibraryTransactions } = require("../core/library-recovery");
 const {
   walkFiles,
   extensionType,
-} = require(path.join(__dirname, "..", "..", "scripts", "common.js"));
-const { PROGRAM_RESOURCE_ROOT_ENV } = require(path.join(__dirname, "..", "..", "scripts", "program-paths.js"));
+} = require(path.join(__dirname, "..", "core", "common.js"));
+const { PROGRAM_RESOURCE_ROOT_ENV } = require(path.join(__dirname, "..", "core", "program-paths.js"));
 
 const APP_CODE_ROOT = path.resolve(__dirname, "..", "..");
 const PROGRAM_RESOURCE_ROOT = app.isPackaged ? process.resourcesPath : APP_CODE_ROOT;
@@ -109,17 +88,6 @@ let appStateWriteQueue = Promise.resolve();
 let mediaToolsState = { available: false, error: "Media tools have not been checked", versions: null };
 const libraryClaims = createLibraryClaimRegistry();
 const applicationStartedAt = new Date().toISOString();
-const UNASSIGNED_FILTER = "__UNASSIGNED__";
-
-function createRuntimeEntityId() {
-  return createUniqueEntityId((id) => (
-    state.metadataIndex.has(id)
-    || state.tagRegistryIndex.has(id)
-    || state.albumRegistryIndex.has(id)
-    || state.personRegistryIndex.has(id)
-    || state.locationRegistryIndex.has(id)
-  ));
-}
 
 /**
  * Force value into plain JSON-serializable structure.
@@ -204,177 +172,18 @@ function requireOpenLibrary({ writable = false } = {}) {
  * inconsistent library never opens as if it were healthy.
  */
 async function loadMetadataIndex() {
-  state.metadataIndex.clear();
-  const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
-  const entries = await readJsonlStrict(metadataFile, {
-    label: DATA_FILE_NAMES.metadata,
-    keyOf: (item) => item?.MediaId,
+  await require('../core/library-session').loadMetadataIndex(state.activeLibrary.paths, state);
+}
+const { prepareLibraryWrite, touchLibraryManifest, saveMetadataMap, saveRegistryAndMetadataTransaction } =
+  require('../core/library-persistence').createLibraryPersistence({
+    getLibrary: requireOpenLibrary, getMetadata: () => state.metadataIndex, getConfig: () => config, appendLog,
   });
-  validateMediaEntries(entries, {
-    tags: state.tagRegistryIndex,
-    albums: state.albumRegistryIndex,
-    people: state.personRegistryIndex,
-    locations: state.locationRegistryIndex,
-  });
-  for (const item of entries) {
-    assertPathInsideLibrary(state.activeLibrary.paths, path.join(state.activeLibrary.paths.root, item.FilePath));
-    assertMediaTechnicalFields(item);
-    state.metadataIndex.set(item.MediaId, item);
-  }
-}
 
-/**
- * Normalize tag text into the canonical key stored in photo metadata.
- */
-function normalizeTagText(value) {
-  return String(value ?? "").trim();
-}
-
-function normalizePersonName(value) {
-  return String(value ?? "").trim();
-}
-
-function normalizeAlbumTitle(value) {
-  return String(value ?? "").trim();
-}
-
-async function prepareLibraryWrite(reason, { immediate = false } = {}) {
-  const library = state.activeLibrary;
-  if (!library || !["opening", "open"].includes(library.state)) throw new Error("No writable library session is active");
-  if (state.maintenanceState.running) throw new Error("The library is read-only while maintenance is running");
-  assertMutationReady(library);
-  await createLibraryBackup(library.paths, {
-    kind: immediate ? "immediate" : "daily",
-    reason,
-    retentionCount: config.backup.retentionCount,
-  });
-}
-
-async function touchLibraryManifest() {
-  if (!state.activeLibrary) return;
-  const nextManifest = { ...state.activeLibrary.manifest, updatedAt: new Date().toISOString() };
-  try {
-    state.activeLibrary.manifest = await writeLibraryManifest(state.activeLibrary.paths, nextManifest);
-  } catch (error) {
-    // The JSONL commit is already durable at this point. updatedAt is advisory,
-    // so a manifest timestamp failure must not make memory diverge from disk.
-    appendLog(`library manifest timestamp update failed: ${error.message}`);
-  }
-}
-
-const tagCatalog = createSimpleRegistryCatalog({
-  idKey: "TagId",
-  definitionKey: "Text",
-  invalidKeyLabel: "tag key",
-  dataFileName: DATA_FILE_NAMES.tags,
-  backupReason: "tag-registry-write",
-  normalize: normalizeTagText,
-  extractReferences: (item) => Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [],
-  getRegistry: () => state.tagRegistryIndex,
-  getMetadata: () => state.metadataIndex,
-  resolveDataFile,
-  prepareLibraryWrite,
-  touchLibraryManifest,
-  readJsonlStrict,
-  writeJsonlAtomic,
-});
-const personCatalog = createSimpleRegistryCatalog({
-  idKey: "PersonId",
-  definitionKey: "Name",
-  invalidKeyLabel: "person key",
-  dataFileName: DATA_FILE_NAMES.people,
-  backupReason: "person-registry-write",
-  normalize: normalizePersonName,
-  extractReferences: (item) => Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [],
-  getRegistry: () => state.personRegistryIndex,
-  getMetadata: () => state.metadataIndex,
-  resolveDataFile,
-  prepareLibraryWrite,
-  touchLibraryManifest,
-  readJsonlStrict,
-  writeJsonlAtomic,
-});
-const albumCatalog = createSimpleRegistryCatalog({
-  idKey: "AlbumId",
-  definitionKey: "Title",
-  invalidKeyLabel: "album key",
-  dataFileName: DATA_FILE_NAMES.albums,
-  backupReason: "album-registry-write",
-  normalize: normalizeAlbumTitle,
-  normalizeLoadedDescription: normalizeAlbumTitle,
-  extractReferences: (item) => {
-    const albumId = item?.Customization?.AlbumId;
-    return albumId ? [albumId] : [];
-  },
-  getRegistry: () => state.albumRegistryIndex,
-  getMetadata: () => state.metadataIndex,
-  resolveDataFile,
-  prepareLibraryWrite,
-  touchLibraryManifest,
-  readJsonlStrict,
-  writeJsonlAtomic,
-});
-const {
-  buildLocationPath,
-  getLocationChildrenMap,
-  getLocationDepth,
-  getLocationDescendants,
-  getLocationIdsForRegion,
-  validateLocationParent,
-} = createLocationDomain(() => state.locationRegistryIndex);
-const locationCatalog = createLocationCatalog({
-  dataFileName: DATA_FILE_NAMES.locations,
-  getRegistry: () => state.locationRegistryIndex,
-  getMetadata: () => state.metadataIndex,
-  normalizeField: normalizeLocationField,
-  normalizeObject: normalizeLocationObject,
-  getChildrenMap: getLocationChildrenMap,
-  getDepth: getLocationDepth,
-  buildPath: buildLocationPath,
-  resolveDataFile,
-  prepareLibraryWrite,
-  touchLibraryManifest,
-  readJsonlStrict,
-  writeJsonlAtomic,
-});
-
-const listTagDefinitions = tagCatalog.listDefinitions;
-const getTagUsageCounts = tagCatalog.getUsageCounts;
-const saveTagRegistryMap = tagCatalog.save;
-const loadTagRegistryIndex = tagCatalog.load;
-const listPersonDefinitions = personCatalog.listDefinitions;
-const getPersonUsageCounts = personCatalog.getUsageCounts;
-const savePersonRegistryMap = personCatalog.save;
-const loadPersonRegistryIndex = personCatalog.load;
-const listAlbumDefinitions = albumCatalog.listDefinitions;
-const getAlbumUsageCounts = albumCatalog.getUsageCounts;
-const saveAlbumRegistryMap = albumCatalog.save;
-const loadAlbumRegistryIndex = albumCatalog.load;
-const listLocationDefinitions = locationCatalog.listDefinitions;
-const saveLocationRegistryMap = locationCatalog.save;
-const loadLocationRegistryIndex = locationCatalog.load;
-const normalizeRegisteredLocation = locationCatalog.normalizeRegistered;
-
-function normalizeRegisteredTags(rawTags) {
-  const validation = tagCatalog.validateMany(rawTags);
-  return { tagIds: validation.values, unknown: validation.unknown };
-}
-
-function normalizeRegisteredPeople(rawPeople) {
-  const validation = personCatalog.validateMany(rawPeople);
-  return { personIds: validation.values, unknown: validation.unknown };
-}
-
-function normalizeRegisteredAlbum(rawAlbum) {
-  const validation = albumCatalog.validateOne(rawAlbum);
-  return { albumId: validation.value, unknown: validation.unknown };
-}
-
-const { execute: executeGalleryQuery, groupByDate } = createGalleryQueryService({
-  getLocationDescendants,
-  getLocationIdsForRegion,
-  unassignedFilter: UNASSIGNED_FILTER,
-});
+const { createLibraryServices } = require('../core/library-services');
+const libraryServices = createLibraryServices({ state, requireOpenLibrary, resolveDataFile,
+  prepareLibraryWrite, touchLibraryManifest, saveMetadataMap, saveRegistryAndMetadataTransaction,
+  enrichItem: item => enrichItem(item), appendLog });
+const { listTagDefinitions, getTagUsageCounts, saveTagRegistryMap, loadTagRegistryIndex, listPersonDefinitions, savePersonRegistryMap, loadPersonRegistryIndex, listAlbumDefinitions, saveAlbumRegistryMap, loadAlbumRegistryIndex, listLocationDefinitions, saveLocationRegistryMap, loadLocationRegistryIndex, normalizeRegisteredLocation, normalizeRegisteredTags, normalizeRegisteredPeople, normalizeRegisteredAlbum, executeGalleryQuery, groupByDate, buildLocationPath, getLocationChildrenMap, getLocationDepth, getLocationDescendants, getLocationIdsForRegion, validateLocationParent } = libraryServices;
 const { enrichItem, clearThumbnailStatusCache } = createGalleryItemEnricher({
   getLibrary: requireOpenLibrary,
   assertPathInsideLibrary,
@@ -430,32 +239,6 @@ function broadcastProviderConfigurationChange(sourceWindow) {
  * Persist full metadata Map back to JSONL using atomic replace:
  * write temp file -> rename.
  */
-async function saveMetadataMap(options = {}) {
-  if (options.backup !== false) await prepareLibraryWrite(options.reason || "metadata-write", { immediate: Boolean(options.immediate) });
-  const metadataFile = resolveDataFile(DATA_FILE_NAMES.metadata);
-  await writeJsonlAtomic(metadataFile, state.metadataIndex.values());
-  await touchLibraryManifest();
-}
-
-async function saveRegistryAndMetadataTransaction(registryFileName, registryEntries, reason, includeMetadata) {
-  const library = state.activeLibrary;
-  if (!library || !["opening", "open"].includes(library.state)) throw new Error("No writable library session is active");
-  if (state.maintenanceState.running) throw new Error("The library is read-only while maintenance is running");
-  const changes = [{
-    filePath: resolveDataFile(registryFileName),
-    entries: registryEntries,
-  }];
-  if (includeMetadata) {
-    changes.push({
-      filePath: resolveDataFile(DATA_FILE_NAMES.metadata),
-      entries: state.metadataIndex.values(),
-    });
-  }
-  const result = await commitJsonlTransaction(library.paths, changes, { reason });
-  if (result.cleanupPending) appendLog(`Transaction committed; temporary cleanup pending: ${result.cleanupError}`);
-  await touchLibraryManifest();
-}
-
 function clearLibraryIndexes() {
   clearThumbnailStatusCache();
   state.metadataIndex.clear();
@@ -682,7 +465,7 @@ function runOperationWorker(operation, root, options = {}) {
     error.code = "MAINTENANCE_RUNNING";
     return Promise.reject(error);
   }
-  const workerPath = path.join(APP_CODE_ROOT, "scripts", "maintenance-worker.js");
+  const workerPath = path.join(APP_CODE_ROOT, "src", "main", "maintenance-worker.js");
   const operationLog = createOperationLog({ operation, version: app.getVersion(), options,
     write: message => appendOperationLog(operation, root, message) });
   let worker;
@@ -772,139 +555,7 @@ function queryGallery(query) {
 }
 
 function createDomainServices() {
-  const commonRegistryOptions = {
-    getMetadata: () => state.metadataIndex,
-    requireOpenLibrary,
-    prepareLibraryWrite,
-    saveTransaction: saveRegistryAndMetadataTransaction,
-    appendLog,
-    createId: createRuntimeEntityId,
-  };
-  const tagService = createSimpleRegistryService({
-    ...commonRegistryOptions,
-    kind: "Tag",
-    keyLabel: "Tag text",
-    idKey: "TagId",
-    definitionKey: "Text",
-    responseItemKey: "tag",
-    responseListKey: "tags",
-    dataFileName: DATA_FILE_NAMES.tags,
-    descriptionRequired: false,
-    normalize: normalizeTagText,
-    payloadKey: "text",
-    payloadIdKey: "tagId",
-    getRegistry: () => state.tagRegistryIndex,
-    setRegistry: (next) => { state.tagRegistryIndex = next; },
-    saveRegistry: saveTagRegistryMap,
-    listDefinitions: listTagDefinitions,
-    getUsageCounts: getTagUsageCounts,
-    findByLabel: tagCatalog.findByLabel,
-    sortEntries: (values) => [...values].sort((a, b) => a.Text.localeCompare(b.Text, "en-US")),
-    updateMetadataOnDelete: (item, tagId, now) => {
-      const tagIds = Array.isArray(item?.Customization?.TagIds) ? item.Customization.TagIds : [];
-      if (!tagIds.includes(tagId)) return null;
-      return {
-        ...item,
-        Customization: {
-          ...(item.Customization || {}),
-          TagIds: tagIds.filter((id) => id !== tagId),
-          MetadataUpdateDate: now,
-        },
-      };
-    },
-  });
-  const personService = createSimpleRegistryService({
-    ...commonRegistryOptions,
-    kind: "Person",
-    keyLabel: "Person name",
-    idKey: "PersonId",
-    definitionKey: "Name",
-    responseItemKey: "person",
-    responseListKey: "people",
-    dataFileName: DATA_FILE_NAMES.people,
-    descriptionRequired: false,
-    normalize: normalizePersonName,
-    payloadKey: "name",
-    payloadIdKey: "personId",
-    getRegistry: () => state.personRegistryIndex,
-    setRegistry: (next) => { state.personRegistryIndex = next; },
-    saveRegistry: savePersonRegistryMap,
-    listDefinitions: listPersonDefinitions,
-    getUsageCounts: getPersonUsageCounts,
-    findByLabel: personCatalog.findByLabel,
-    sortEntries: (values) => [...values].sort((a, b) => a.Name.localeCompare(b.Name, "en-US")),
-    updateMetadataOnDelete: (item, personId, now) => {
-      const personIds = Array.isArray(item?.Customization?.PersonIds) ? item.Customization.PersonIds : [];
-      if (!personIds.includes(personId)) return null;
-      return {
-        ...item,
-        Customization: {
-          ...(item.Customization || {}),
-          PersonIds: personIds.filter((id) => id !== personId),
-          MetadataUpdateDate: now,
-        },
-      };
-    },
-  });
-  const albumService = createSimpleRegistryService({
-    ...commonRegistryOptions,
-    kind: "Album",
-    keyLabel: "Album title",
-    idKey: "AlbumId",
-    definitionKey: "Title",
-    responseItemKey: "album",
-    responseListKey: "albums",
-    dataFileName: DATA_FILE_NAMES.albums,
-    descriptionRequired: true,
-    normalize: normalizeAlbumTitle,
-    payloadKey: "title",
-    payloadIdKey: "albumId",
-    getRegistry: () => state.albumRegistryIndex,
-    setRegistry: (next) => { state.albumRegistryIndex = next; },
-    saveRegistry: saveAlbumRegistryMap,
-    listDefinitions: listAlbumDefinitions,
-    getUsageCounts: getAlbumUsageCounts,
-    findByLabel: albumCatalog.findByLabel,
-    sortEntries: (values) => [...values].sort((a, b) => a.Title.localeCompare(b.Title, "en-US")),
-    updateMetadataOnDelete: (item, albumId, now) => {
-      if (item?.Customization?.AlbumId !== albumId) return null;
-      return {
-        ...item,
-        Customization: {
-          ...(item.Customization || {}),
-          AlbumId: null,
-          MetadataUpdateDate: now,
-        },
-      };
-    },
-  });
-  const locationService = createLocationRegistryService({
-    ...commonRegistryOptions,
-    dataFileName: DATA_FILE_NAMES.locations,
-    getRegistry: () => state.locationRegistryIndex,
-    setRegistry: (next) => { state.locationRegistryIndex = next; },
-    normalizeName: normalizeLocationName,
-    normalizeField: normalizeLocationField,
-    validateParent: validateLocationParent,
-    getDepth: getLocationDepth,
-    buildPath: buildLocationPath,
-    listDefinitions: listLocationDefinitions,
-    findDuplicate: locationCatalog.findDuplicate,
-    sortEntries: locationCatalog.sortEntries,
-    saveRegistry: saveLocationRegistryMap,
-  });
-  const metadataEditService = createMetadataEditService({
-    getMetadata: () => state.metadataIndex,
-    requireOpenLibrary,
-    normalizeRegisteredTags,
-    normalizeRegisteredAlbum,
-    normalizeRegisteredPeople,
-    normalizeRegisteredLocation,
-    normalizeLocationObject,
-    saveMetadata: saveMetadataMap,
-    enrichItem,
-    appendLog,
-  });
+  const { tagService, personService, albumService, locationService, metadataEditService } = libraryServices.services;
   const mediaDeletionService = createMediaDeletionService({
     getMetadata: () => state.metadataIndex,
     requireOpenLibrary,

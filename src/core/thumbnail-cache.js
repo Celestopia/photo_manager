@@ -18,7 +18,7 @@ const {
 } = require("./media-tools");
 const { extractFirstVideoFrame } = require("./video-first-frame");
 const { resolveProgramResourceRoot } = require("./program-paths.js");
-const { assertSha256Hash } = require("../src/shared/media-technical-schema");
+const { assertSha256Hash } = require("../shared/media-technical-schema");
 
 const APP_ROOT = resolveProgramResourceRoot();
 
@@ -85,7 +85,7 @@ async function generateVideoThumbnail(item, sourcePath, targetPath, options, med
   let completed = false;
   try {
     await fsp.mkdir(path.dirname(targetPath), { recursive: true });
-    await extractFrame(sourcePath, tempPath, APP_ROOT, mediaConfig, { maxEdge: Infinity });
+    await extractFrame(sourcePath, tempPath, APP_ROOT, mediaConfig, { maxEdge: Infinity, signal: dependencies.signal });
     await renderThumbnail(tempPath, targetPath, options);
     completed = true;
   } finally {
@@ -118,7 +118,7 @@ async function ensureThumbnailForItem(item, params) {
   await fsp.mkdir(cacheDir, { recursive: true });
   try {
     if (fileType === "video") {
-      await generateVideoThumbnail(item, sourcePath, targetPath, options, params.mediaConfig);
+      await generateVideoThumbnail(item, sourcePath, targetPath, options, params.mediaConfig, { signal: params.signal });
     } else {
       await generateThumbnail(sourcePath, targetPath, options);
     }
@@ -154,7 +154,7 @@ async function ensureThumbnailsForItems(items, params) {
   const log = typeof logger === "function" ? logger : () => {};
   const notifyGenerated = typeof onGenerated === "function" ? onGenerated : () => {};
   const notifyProgress = typeof onProgress === "function" ? onProgress : () => {};
-  const cancelled = typeof isCancelled === "function" ? isCancelled : () => false;
+  const cancelled = () => Boolean(params.signal?.aborted || isCancelled?.());
 
   const estimateWork = [];
   async function runQueue(queue, concurrency, id) {
@@ -177,6 +177,7 @@ async function ensureThumbnailsForItems(items, params) {
             options,
             mediaConfig,
             force,
+            signal: params.signal,
           });
           if (didGenerate) {
             generated += 1;
@@ -213,6 +214,7 @@ async function ensureThumbnailsForItems(items, params) {
     runQueue(imageItems, maxConcurrency, "images"),
     runQueue(videoItems, mediaConfig.videoThumbnailConcurrency, "videos"),
   ]);
+  params.signal?.throwIfAborted();
   return {
     total: list.length,
     generated,

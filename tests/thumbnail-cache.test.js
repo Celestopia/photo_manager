@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fsp = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { generateVideoThumbnail, normalizeThumbnailConfig } = require("../scripts/thumbnail-cache");
+const { generateVideoThumbnail, normalizeThumbnailConfig } = require("../src/core/thumbnail-cache");
 
 test("video thumbnail generation extracts only the first frame and removes its temporary PNG", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "photo-manager-thumbnail-test-"));

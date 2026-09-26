@@ -1,4 +1,4 @@
-const { validGps, dmsToDecimal, gpsFromStoredMetadata } = require("../src/shared/gps.mjs");
+const { validGps, dmsToDecimal, gpsFromStoredMetadata } = require("../shared/gps.mjs");
 const { find: findTimeZones } = require("geo-tz");
 
 const formatterCache = new Map();

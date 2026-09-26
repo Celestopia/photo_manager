@@ -1,5 +1,5 @@
 const fsp = require("node:fs/promises");
-const { writeTextAtomic } = require("../../scripts/library-core");
+const { writeTextAtomic } = require("../core/library-core");
 
 const EMPTY_APPLICATION_STATE = Object.freeze({ lastLibraryPath: "" });
 

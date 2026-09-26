@@ -6,7 +6,7 @@ const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const sharp = require("sharp");
 const yaml = require("js-yaml");
-const { resolveLibraryPaths } = require("../scripts/library-core");
+const { resolveLibraryPaths } = require("../src/core/library-core");
 const provider = require("../src/main/chat/provider");
 const { createChatService } = require("../src/main/chat/service");
 const { createMetadataCommit } = require("../src/main/chat/metadata-commit");
@@ -111,7 +111,7 @@ async function fixture(t, respond, searchFetchImpl) {
     enrich: (v) => v,
     touchManifest: async () => {},
     commitTransaction: (paths, changes, options) =>
-      require("../scripts/library-transaction").commitTextTransaction(
+      require("../src/core/library-transaction").commitTextTransaction(
         paths,
         changes,
         {

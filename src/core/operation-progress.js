@@ -4,7 +4,6 @@ function createOperationReporter(options = {}) {
   const emit = (payload) => {
     const message = { type: "progress", ...payload };
     options.onProgress?.(message);
-    if (typeof process.send === "function") process.send(message);
   };
   const logger = {
     info(message) {

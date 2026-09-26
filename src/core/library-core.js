@@ -9,7 +9,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const yaml = require("js-yaml");
-const { assertExactObjectKeys } = require("../src/shared/object-schema.js");
+const { assertExactObjectKeys } = require("../shared/object-schema.js");
 
 const LIBRARY_SCHEMA_VERSION = 4;
 const MANAGER_DIR_NAME = ".photo_manager";
@@ -194,14 +194,6 @@ async function writeJsonlAtomic(filePath, entries) {
   await writeTextAtomic(filePath, serializeJsonl(entries));
 }
 
-function parseLibraryArgument(argv = process.argv.slice(2)) {
-  const index = argv.indexOf("--library");
-  if (index < 0 || !argv[index + 1] || argv[index + 1].startsWith("--")) {
-    throw new Error('Missing required argument: --library "<path>"');
-  }
-  return resolveLibraryPaths(path.resolve(process.cwd(), argv[index + 1]));
-}
-
 async function findNestedManagerDirectory(root, onProgress = null, isCancelled = null) {
   const stack = [path.resolve(root)];
   let visited = 0;
@@ -257,7 +249,6 @@ module.exports = {
   readJsonlStrict,
   writeJsonlAtomic,
   serializeJsonl,
-  parseLibraryArgument,
   findNestedManagerDirectory,
   findParentManagerDirectory,
 };

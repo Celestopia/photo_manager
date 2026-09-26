@@ -33,11 +33,19 @@ An extension only determines scan eligibility. A record may still exist when its
 
 ### Windows Packaging
 
-`electron-builder.yml` defines only the Windows x64 directory target. The personal desktop release is the complete `release/win-unpacked/` folder, launched through `ptmgr-gui.exe`; no installer, shortcut registration, or uninstall entry is generated. The package contains the main process, preload, shared schemas, internal maintenance scripts, the built renderer, and production dependencies inside `app.asar`. Sharp's native packages are unpacked. FFmpeg and FFprobe are copied as executable program resources to `resources/tools/ffmpeg/bin`; they are never stored in ASAR or copied to AppData.
+`electron-builder.yml` defines only the Windows x64 directory target. The personal desktop release is the complete `release/gui-win-x64-unpacked/` folder, launched through `ptmgr-gui.exe`; no installer, shortcut registration, or uninstall entry is generated. The package contains the main process, preload, shared schemas, shared backend and internal maintenance worker, the built renderer, and production dependencies inside `app.asar`. Sharp's native packages are unpacked. FFmpeg and FFprobe are copied as executable program resources to `resources/tools/ffmpeg/bin`; they are never stored in ASAR or copied to AppData.
 
-The packaged runtime distinguishes the code root from the program-resource root. The code root contains `app.asar` and is used to load the renderer, preload, and maintenance worker. The program-resource root is the repository root in development and `process.resourcesPath` when packaged. `PHOTO_MANAGER_RESOURCE_ROOT` passes that real directory to maintenance child processes, which also use it as their working directory. Standalone scripts fall back to the repository root when the variable is absent. This prevents executable lookup and child-process working directories from resolving inside the read-only ASAR virtual filesystem.
+The packaged runtime distinguishes the code root from the program-resource root. The code root contains `app.asar` and is used to load the renderer, preload, and maintenance worker. The program-resource root is the repository root in development and `process.resourcesPath` when packaged. `PHOTO_MANAGER_RESOURCE_ROOT` passes that real directory to maintenance child processes, which also use it as their working directory. Development commands fall back to the repository root when the variable is absent. This prevents executable lookup and child-process working directories from resolving inside the read-only ASAR virtual filesystem.
 
-`npm run pack:win` builds the renderer and creates an unpacked application under `release/win-unpacked/`. `npm run dist:win` runs all tests and then invokes `pack:win` to produce that same unpacked folder. Release builds require the Git LFS FFmpeg files to be materialized. The folder includes all runtime dependencies and must remain intact when moved. User settings stay in AppData and library data stay in the selected libraries; the executable directory is not a portable user-data store.
+`npm run pack:gui` builds the renderer and the GUI directory. `npm run pack:cli` builds a separate `release/cli-win-x64-unpacked/` containing `ptmgr.exe`, `resources/app/src/{core,shared,cli}`, Node-compatible production dependencies, geographic time-zone data, FFmpeg/FFprobe, and CLI documentation. The CLI executable uses Node.js 24.19.0 SEA with a console subsystem. It locates resources relative to its executable, not the working directory. It does not ship or start Electron, the renderer, or Assistant. Keep either package intact when moving it.
+
+`npm run pack:win` builds both packages. `npm run dist:win` tests first, then builds both. Neither creates an installer. Builds require materialized Git LFS FFmpeg files. User configuration remains in AppData and library data remain in their selected roots. The CLI shares general processing configuration without touching Electron profiles or last-library state.
+
+### GUI and CLI separation
+
+`src/cli` owns strict command parsing, terminal prompts, stdout/stderr formats, exit codes, and Ctrl+C. `src/core` receives explicit paths/options/progress callbacks/signals and never imports Electron, CLI parsing, or renderer code. The GUI calls the same core functions through its main-process services and internal worker; it never executes `ptmgr.exe`. CLI maintenance acquires its own exclusive lock. Only the private GUI worker passes an explicit parent session ID; inherited environment variables cannot grant the CLI access to an active GUI library.
+
+`library-services.js` assembles shared query, metadata-edit, registry and location services. `library-persistence.js` owns backup-before-write and recoverable commits. `library-session.js` provides strict shared index loading and the short-lived CLI session lifecycle; the GUI keeps its existing per-window ownership. CLI edits validate the complete batch and preserve technical metadata before one atomic write. Registry deletion reuses the GUI transaction and child-detachment rules. No compatibility parser or alternate data schema is introduced.
 
 ## IPC Contract
 
@@ -53,25 +61,30 @@ IPC registration requires sender-session routing and a mutation coordinator. The
 
 ## Source Responsibilities
 
-### `scripts/`
+### `src/core/`
 
 - `application-paths.js`: roaming/local paths and pre-ready Electron storage setup.
 - `program-paths.js`: development/packaged program-resource root resolution and worker propagation contract.
 - `application-config.js`: complete defaults and shared strict configuration loading.
 - `library-core.js`, `library-access.js`, `library-lock.js`, `library-backup.js`, `library-transaction.js`, `media-deletion-transaction.js`: boundaries, authorization, locking, snapshots, atomic writes, registry transactions, media-file staging, and recovery.
-- `operation-progress.js`, `maintenance-worker.js`: structured operation reporting and child-process dispatch.
+- `operation-progress.js`: callback-based structured operation reporting; the GUI worker lives under `src/main`.
 - `common.js`, `library-data.js`: scanning, hashing, record creation, registry loading, and reference validation.
 - `media-tools.js`, `media-time.js`, `thumbnail-cache.js`: FFmpeg execution/normalization, reference-time-zone logic, and thumbnail queues.
 - `video-first-frame.js`: shared first-frame stream selection, orientation/aspect normalization, and cancellable FFmpeg execution for thumbnails and covers. `video-cover-cache.js` owns the separate derived cover cache; generation is available only through explicit maintenance/CLI operations.
-- `viewer-image-resources.js` owns capability-scoped viewer image URLs and streams trusted photo/cover files to Chromium. `ViewerImage.vue` and `use-viewer-image.js` own shared image display, bounded read-only adjacent preloads and unavailable states; playback owns the decoded-frame handoff. See the media-pipeline reference for lifecycle and cache contracts.
-- `init-metadata.js`, `update-metadata.js`, `verify-metadata.js`, `build-thumbnails.js`, `export-metadata-csv.js`: maintenance operations.
-- `start-electron.js`: sanitize the inherited environment and launch Electron.
+- `init-metadata.js`, `update-metadata.js`, `verify-metadata.js`, `build-thumbnails.js`, `build-video-covers.js`, `export-metadata-csv.js`: maintenance operations.
+- `gallery-query.js`, `metadata-edit-service.js`, and registry/catalog modules: shared queries, user-field edits, and registry operations.
 
 ### `src/main/`
 
-`main.js` is the composition root and application coordinator. `application-window-lifecycle.js` converts later operating-system launches into windows; `window-session-router.js` owns sender-to-session routing; `library-claim-registry.js` prevents duplicate logical-library ownership inside the coordinator; `application-runtime.js` creates isolated per-window runtime state; `application-state.js` handles shared local state through the common atomic writer. Simple registry catalog/service modules share tag/person/album logic; location domain/catalog/service modules own hierarchy-specific behavior. `gallery-query.js` is pure filtering/grouping; `gallery-item-enricher.js` adds renderer paths and cached thumbnail status. `metadata-edit-service.js` owns validated edits and rollback. `ipc-handlers.js` registers the allowlist without owning session state; `window-manager.js` owns BrowserWindow lifecycle and awaits safe session closure; `preload.js` is the only renderer bridge.
+Electron window/session routing, IPC, viewer resources, media-file deletion, Assistant, and application state. `maintenance-worker.js` adapts private worker IPC, parent-session authorization, and cancellation into explicit core operation options. `main.js` assembles shared services for each session using owner-scoped accessors. It retains GUI lifecycle and runtime enrichment.
 
-Shared schema modules enforce exact keys, UUID v4 identity, customization patches, global uniqueness, references, location contexts, and parent chains. Dependency direction is `main.js` assembly → IPC → domain services through explicit runtime accessors → `scripts/library-*` persistence. Domain modules never import the IPC registrar or window.
+### `src/cli/`
+
+`arguments.js` validates syntax and per-command flags; `selectors.js` resolves IDs/names and gallery filters; `commands.js` adapts commands to shared services; `output.js` owns terminal serialization; `main.js` owns command lifecycle, locks, confirmation, cancellation and exit codes. The complete command contract lives under `docs/cli`.
+
+### `scripts/`
+
+Development launch and packaging only: `start-electron.js`, `pack-gui.cjs`, `pack-cli.cjs`, and the SEA bootstrap `cli-bootstrap.cjs`. Maintenance behavior lives in core and command parsing lives in CLI.
 
 ### `src/renderer/`
 

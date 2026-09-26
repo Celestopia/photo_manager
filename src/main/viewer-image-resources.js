@@ -2,7 +2,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomBytes } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
-const { assertCacheDirectory, checkCoverSource, coverName } = require("../../scripts/video-cover-cache");
+const { assertCacheDirectory, checkCoverSource, coverName } = require("../core/video-cover-cache");
 
 const owners = new Map();
 const SCHEME = "viewer-image";

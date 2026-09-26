@@ -4,8 +4,8 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { assertPathInsideLibrary, readJsonlStrict, writeJsonlAtomic, writeTextAtomic } = require("./library-core.js");
-const { assertUuidV4 } = require("../src/shared/identity-schema.js");
-const { assertExactObjectKeys } = require("../src/shared/object-schema.js");
+const { assertUuidV4 } = require("../shared/identity-schema.js");
+const { assertExactObjectKeys } = require("../shared/object-schema.js");
 
 const MEDIA_DELETION_VERSION = 1;
 

@@ -8,8 +8,8 @@ const {
   resolveMediaToolPaths,
   runMediaTool,
   sanitizeMediaError,
-} = require("../scripts/media-tools");
-const { defaultCustomization, timeInfoFromDate } = require("../scripts/common");
+} = require("../src/core/media-tools");
+const { defaultCustomization, timeInfoFromDate } = require("../src/core/common");
 
 test("normalizes the default video/audio streams and display dimensions", () => {
   const parsed = parseProbeJson({

@@ -10,10 +10,10 @@ const {
   writeLibraryManifest,
   writeJsonlAtomic,
   DATA_FILE_NAMES,
-} = require("../scripts/library-core");
-const { acquireLibraryLock, inspectLibraryLock, releaseLibraryLock } = require("../scripts/library-lock");
-const { createLibraryBackup, listBackupSnapshots } = require("../scripts/library-backup");
-const { commitJsonlTransaction } = require("../scripts/library-transaction");
+} = require("../src/core/library-core");
+const { acquireLibraryLock, inspectLibraryLock, releaseLibraryLock } = require("../src/core/library-lock");
+const { createLibraryBackup, listBackupSnapshots } = require("../src/core/library-backup");
+const { commitJsonlTransaction } = require("../src/core/library-transaction");
 
 async function createLibrary(t) {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "photo-manager-lock-test-"));

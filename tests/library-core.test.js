@@ -13,15 +13,14 @@ const {
   writeJsonlAtomic,
   findParentManagerDirectory,
   assertPathInsideLibrary,
-  parseLibraryArgument,
-} = require("../scripts/library-core");
+} = require("../src/core/library-core");
 const {
   walkFiles,
   buildMetadata,
   normalizeFlashUsed,
   normalizePictureBitDepth,
   normalizePositiveNumber,
-} = require("../scripts/common");
+} = require("../src/core/common");
 
 async function temporaryDirectory(t) {
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), "photo-manager-library-test-"));
@@ -37,7 +36,6 @@ test("library paths are derived exclusively below the selected root", async (t) 
   assert.throws(() => resolveLibraryPaths(path.parse(root).root), /drive root/i);
   assert.throws(() => assertPathInsideLibrary(paths, path.join(root, "..", "outside.jpg")), /escapes the active library/i);
   assert.throws(() => assertPathInsideLibrary(paths, path.join(paths.managerDir, "cache.webp")), /Photo Manager-owned data/i);
-  assert.throws(() => parseLibraryArgument([]), /Missing required argument/);
 });
 
 test("library manifest round-trips with a validated UUID and name", async (t) => {

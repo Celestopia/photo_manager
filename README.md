@@ -1,6 +1,6 @@
 # Photo Manager
 
-Photo Manager is a local-first Windows desktop application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
+Photo Manager is a local-first Windows desktop and command-line application for organizing image and video libraries. It uses Electron and Vue, keeps original media in place, and stores each library's metadata and supporting data beside that library.
 
 See [PROJECT.md](PROJECT.md) for the architecture entry point and links to detailed data contracts and interaction rules. The [documentation index](docs/README.md) lists the maintained references.
 
@@ -30,7 +30,7 @@ Configure Tavily separately in **Provider settings → Web search**, then use th
 
 ## Run on Windows
 
-Keep the complete `release/win-unpacked/` folder together and double-click `ptmgr-gui.exe` on Windows 10 or 11 x64. No installation or Node.js is required; Electron, FFmpeg, FFprobe, and runtime dependencies are bundled. Do not copy the executable alone. You can move or rename the complete folder and create a Windows shortcut manually.
+Keep the complete `release/gui-win-x64-unpacked/` folder together and double-click `ptmgr-gui.exe` on Windows 10 or 11 x64. No installation or Node.js is required; Electron, FFmpeg, FFprobe, and runtime dependencies are bundled. Do not copy the executable alone. You can move or rename the complete folder and create a Windows shortcut manually.
 
 On first launch, Photo Manager automatically creates its data folders for the current Windows account:
 
@@ -61,7 +61,7 @@ npm run pack:win
 npm run dist:win
 ```
 
-Both commands produce only `release/win-unpacked/`; `dist:win` also runs the complete test suite first. No installer is generated.
+Both commands produce `release/gui-win-x64-unpacked/ptmgr-gui.exe` and `release/cli-win-x64-unpacked/ptmgr.exe`; `dist:win` also runs the complete test suite first. Use `pack:gui` or `pack:cli` to build either package independently. CLI packaging requires Windows x64 Node.js 24.19.0. No installer is generated.
 
 On first use, select either an existing Photo Manager library or an ordinary directory to initialize. Initialization scans supported media, calculates hashes, extracts technical metadata, and creates the library management directory. It never modifies the original media files.
 
@@ -107,19 +107,17 @@ The generated `config.yml` controls shared thumbnail, FFmpeg, backup-retention, 
 
 Photo Manager uses strict JSONL loading, atomic writes, backups, recoverable multi-file transactions, and an exclusive library lock. See [PROJECT.md](PROJECT.md) for the exact persisted schemas and safety rules.
 
-## Maintenance Commands
+## Command-line tool
 
-Every standalone command requires an explicit library root. Close that library in the desktop application before running a command directly.
+The independent `release/cli-win-x64-unpacked/` package runs without the GUI or an installed Node.js. Keep the entire folder together. Close the target library in the GUI before any command, including reads.
 
 ```powershell
-npm run init-metadata -- --library "D:\Media\Example Library"
-npm run update-metadata -- --library "D:\Media\Example Library"
-npm run verify-metadata -- --library "D:\Media\Example Library"
-npm run verify-metadata -- --library "D:\Media\Example Library" --probe
-npm run build-thumbnails -- --library "D:\Media\Example Library"
-npm run build-thumbnails -- --library "D:\Media\Example Library" --force
-npm run export-metadata-csv -- --library "D:\Media\Example Library"
+ptmgr library info --library "D:\Media\Test Library"
+ptmgr media list --library "D:\Media\Test Library" --privacy 1 --format json
+ptmgr maintenance update --library "D:\Media\Test Library"
 ```
+
+The CLI supports metadata inspection and user-field edits, gallery filters, registry management, maintenance, and CSV export. All privacy levels are included unless filtered. See the dedicated [CLI documentation](docs/cli/README.md) for commands, automation, confirmation, and exit codes. In development, use `npm run cli -- <command> --library <folder>`.
 
 ## Development Checks
 

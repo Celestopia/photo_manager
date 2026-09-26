@@ -1,7 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
-const { writeTextAtomic } = require("../../../scripts/library-core");
+const { writeTextAtomic } = require("../../core/library-core");
 const { id, assertSession } = require("./schema");
 
 async function safePath(root, ...parts) {
