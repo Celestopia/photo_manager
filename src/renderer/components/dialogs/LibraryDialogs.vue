@@ -58,6 +58,7 @@
           <progress :value="maintenanceDialog.progress.total ? maintenanceDialog.progress.processed || 0 : undefined" :max="maintenanceDialog.progress.total || 1" aria-label="Operation progress"></progress>
           <div class="library-progress-path" v-if="maintenanceDialog.progress.current">{{ maintenanceDialog.progress.current }}</div>
         </template>
+        <p class="library-helper">Elapsed: {{ formatMaintenanceTime(maintenanceDialog.timing.elapsedMs) }}<span v-if="!maintenanceDialog.completed"> · {{ maintenanceDialog.timing.estimate }}</span></p>
         <details v-if="maintenanceDialog.reportText" :key="maintenanceDialog.completed ? 'complete' : 'running'" class="library-details" :open="maintenanceDialog.completed && summary.needsAttention"><summary>Detailed report</summary><pre>{{ maintenanceDialog.reportText }}</pre></details>
         <div class="library-dialog-actions maintenance-result-actions" v-if="maintenanceDialog.completed"><button class="btn" @click="copyMaintenanceReport">Copy report</button><button class="btn" @click="openLibraryLogDir">Open logs</button><button v-if="maintenanceDialog.operation === 'export' && !maintenanceDialog.error" class="btn" @click="showMaintenanceOutput">Show CSV</button><button class="btn btn-primary" @click="closeMaintenanceDialog">Close</button></div>
       </div>
@@ -65,6 +66,7 @@
 </template>
 
 <script setup>
+import { formatMaintenanceTime } from "../../domain/maintenance-estimate.mjs";
 import AppDialog from "./AppDialog.vue";
 import { computed, inject, ref, watch, nextTick } from "vue";
 import { formatLibraryDate, maintenanceSummary, MAINTENANCE_COPY } from "../../domain/library-presentation.mjs";

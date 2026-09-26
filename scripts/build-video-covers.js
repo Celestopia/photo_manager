@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const { formatLog } = require("./operation-log");
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data");
 /** Generate missing or all first-frame covers for one explicitly selected library. */
@@ -21,6 +22,8 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
     groups.set(item.SHA256Hash, group);
   }
   const stats = { total: groups.size, generated: 0, skipped: 0, failed: 0, sourceChanged: 0 };
+  const pending = new Set([...groups.keys()].filter(hash => force || !fs.existsSync(path.join(paths.videoCoverDir, cache.coverName(hash)))));
+  const work = { id: 'generation', processed: 0, total: pending.size };
   let toolsValidated = false;
   for (const [hash, candidates] of groups) {
     let selected;
@@ -52,6 +55,7 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
           if (error.code !== "ENOENT") logger.warn(formatLog("warning", "cover-cache-invalid", { path: item.FilePath, message: error.message, action: "regenerate" }));
         }
       }
+      if (!valid && !pending.has(hash)) { pending.add(hash); work.total++; }
       if (!valid && !toolsValidated) {
         await validateTools();
         toolsValidated = true;
@@ -71,7 +75,8 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
         else stats.failed++;
       }
     }
-    emit({ phase: "video-covers", processed: stats.generated + stats.skipped + stats.failed + stats.sourceChanged,
+    if (pending.has(hash)) work.processed++;
+    emit({ phase: "video-covers", estimateWork: [{ ...work }], processed: stats.generated + stats.skipped + stats.failed + stats.sourceChanged,
       ...stats, current: candidates[0].FilePath, message: "Generating video covers" });
   }
   emit({ phase: "complete", processed: stats.total, total: stats.total, message: "Video cover generation complete" });

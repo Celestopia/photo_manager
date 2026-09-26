@@ -192,6 +192,16 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.ETA_SMOKE) {
+    await click('.gallery-settings-trigger');
+    await win.webContents.executeJavaScript(`[...document.querySelectorAll('.gallery-settings-menu button')].find(b => b.textContent.includes('Generate Thumbnails')).click()`);
+    await click('.maintenance-options .btn-primary');
+    await waitFor(`Boolean(document.querySelector('.maintenance-progress .library-helper')?.textContent.includes('Elapsed:')) || document.querySelector('.maintenance-progress')?.textContent.includes('Elapsed:')`);
+    await waitFor(`Boolean(document.querySelector('.maintenance-result-actions'))`);
+    assert.match(await win.webContents.executeJavaScript(`document.querySelector('.maintenance-progress').textContent`), /Elapsed: \d+s/);
+    console.log('ETA_SMOKE_PASS: maintenance elapsed time remains in the completed dialog.');
+    return;
+  }
   if (process.env.LOGGING_SMOKE) {
     const result = await win.webContents.executeJavaScript(`window.photoManagerApi.startMaintenance({ operation: 'video-covers', force: false })`);
     assert.equal(result.ok, true);

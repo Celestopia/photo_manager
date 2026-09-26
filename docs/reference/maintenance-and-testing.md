@@ -66,3 +66,9 @@ Set `DIALOG_SHELL_SMOKE=1` when running `tests/helpers/chat-ui-smoke.cjs` with E
 Set `SHARED_UI_SMOKE=1` with the same isolated Electron helper to verify shared registry fields, album description validation, Unicode and case-insensitive search, edit shortcuts, location parent selection, customization creation and Assistant tooltips.
 
 Set `LOGGING_SMOKE=1` with `tests/helpers/chat-ui-smoke.cjs` to check real worker start/result logs and close-time library log routing against an isolated test library.
+
+## Maintenance Time Estimates
+
+The maintenance dialog shows total elapsed time, retained on completion, and an approximate current-stage remaining time. Estimates reset on phase changes, require at least three progress advances spanning five seconds, use a recent 30-second throughput window, and round upward to seconds and count down on each one-second UI tick between progress events. Unknown totals, unsampled workloads and ten seconds without progress or an exhausted prediction display Estimating; write/commit/complete phases display Finishing until the worker closes. These estimates are advisory, especially for unusually large files and changing storage speeds.
+
+Thumbnail estimates track uncached image and video work separately and use the slower remaining lane; video-cover estimates exclude existing cache entries and reset when an invalid cache increases the generation workload. Metadata processing estimates use changed-file bytes, excluding unchanged records. Scanning and export can remain indeterminate. Timing belongs to the window's library session; timers stop on completion, failure, library closure and disposal. Warning events preserve phase progress. Set `ETA_SMOKE=1` with the isolated Electron smoke helper to check elapsed time in the maintenance dialog.

@@ -156,7 +156,11 @@ async function ensureThumbnailsForItems(items, params) {
   const notifyProgress = typeof onProgress === "function" ? onProgress : () => {};
   const cancelled = typeof isCancelled === "function" ? isCancelled : () => false;
 
-  async function runQueue(queue, concurrency) {
+  const estimateWork = [];
+  async function runQueue(queue, concurrency, id) {
+    const pending = new Set(queue.filter(item => force || !fs.existsSync(thumbnailAbsolutePath(cacheDir, item.SHA256Hash))));
+    const work = { id, processed: 0, total: pending.size };
+    estimateWork.push(work);
     let index = 0;
     const workerCount = Math.min(Math.max(1, concurrency), Math.max(1, queue.length));
     async function worker() {
@@ -185,7 +189,8 @@ async function ensureThumbnailsForItems(items, params) {
           const sourcePath = item?.FilePath ? path.join(libraryRoot, item.FilePath) : "";
           log(`Thumbnail generation failed for ${item?.FilePath || "unknown"}: ${sanitizeMediaError(error, sourcePath)}`);
         } finally {
-          notifyProgress({ total: list.length, processed: generated + skipped + failed, generated, skipped, failed, current: item?.FilePath || "" });
+          if (pending.has(item)) work.processed++;
+          notifyProgress({ estimateWork: estimateWork.map(group => ({ ...group })), total: list.length, processed: generated + skipped + failed, generated, skipped, failed, current: item?.FilePath || "" });
         }
       }
     }
@@ -205,8 +210,8 @@ async function ensureThumbnailsForItems(items, params) {
   skipped += list.length - unique.length;
   skipped += unsupportedCount;
   await Promise.all([
-    runQueue(imageItems, maxConcurrency),
-    runQueue(videoItems, mediaConfig.videoThumbnailConcurrency),
+    runQueue(imageItems, maxConcurrency, "images"),
+    runQueue(videoItems, mediaConfig.videoThumbnailConcurrency, "videos"),
   ]);
   return {
     total: list.length,

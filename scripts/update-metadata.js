@@ -134,9 +134,11 @@ async function synchronizeMetadata({
     failed: failedPaths.size,
     skipped: [...failedPaths].filter((filePath) => !existing.has(filePath)).length,
   };
+  const changedSnapshots = snapshots.filter(snapshot => !isUnchangedRecord(existing.get(snapshot.relativePath), snapshot));
+  const estimateWork = [{ id: 'changed-bytes', processed: 0, total: changedSnapshots.reduce((sum, snapshot) => sum + Math.max(1, snapshot.stat.size), 0) }];
   for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex += 1) {
     const snapshot = snapshots[snapshotIndex];
-    onProgress?.({ phase: "metadata", processed: snapshotIndex, total: snapshots.length, current: snapshot.relativePath });
+    onProgress?.({ phase: "metadata", estimateWork: estimateWork.map(group => ({ ...group })), processed: snapshotIndex, total: snapshots.length, current: snapshot.relativePath });
     const direct = existing.get(snapshot.relativePath);
     if (isUnchangedRecord(direct, snapshot)) {
       next.set(snapshot.relativePath, direct);
@@ -184,6 +186,8 @@ async function synchronizeMetadata({
         stats.skipped += 1;
         logger.warn(`Skip new media after hash/build failure: ${snapshot.relativePath} (${error.message})`);
       }
+    } finally {
+      estimateWork[0].processed += Math.max(1, snapshot.stat.size);
     }
   }
 

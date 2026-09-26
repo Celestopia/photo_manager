@@ -1,3 +1,4 @@
+import { createMaintenanceEstimate } from "../domain/maintenance-estimate.mjs";
 import { computed, reactive, ref } from "vue";
 import { MAINTENANCE_COPY } from "../domain/library-presentation.mjs";
 
@@ -47,7 +48,12 @@ export function useLibrarySession({
     result: null,
     error: "",
     reportText: "",
+    timing: { elapsedMs: 0, estimate: "" },
   });
+  const estimate = createMaintenanceEstimate();
+  let timingTimer;
+  function stopTiming() { clearInterval(timingTimer); timingTimer = undefined; }
+  function finishTiming() { stopTiming(); estimate.finish(); maintenanceDialog.timing = estimate.snapshot(); }
 
   const maintenanceDialogTitle = computed(() => MAINTENANCE_COPY[maintenanceDialog.operation]?.title || "Library maintenance");
   const maintenanceDialogDescription = computed(() => MAINTENANCE_COPY[maintenanceDialog.operation]?.description || "");
@@ -323,6 +329,10 @@ export function useLibrarySession({
     if (maintenanceDialog.running) return;
     const request = ++maintenanceGeneration;
     const operation = maintenanceDialog.operation;
+    stopTiming();
+    estimate.reset();
+    maintenanceDialog.timing = estimate.snapshot();
+    timingTimer = setInterval(() => { maintenanceDialog.timing = estimate.snapshot(); }, 1000);
     maintenanceDialog.running = true;
     maintenanceDialog.completed = false;
     maintenanceDialog.error = "";
@@ -333,10 +343,12 @@ export function useLibrarySession({
       });
       if (request !== maintenanceGeneration) return;
       if (!result?.ok && result?.code === "OUTPUT_EXISTS" && !overwrite) {
+        finishTiming();
         maintenanceDialog.running = false;
         if (await requestConfirm({ title: "Replace CSV?", confirmLabel: "Replace", danger: true, message: "photo_metadata.csv already exists. Replace it?" }) && request === maintenanceGeneration) await startMaintenanceOperation(true);
         return;
       }
+      finishTiming();
       maintenanceDialog.completed = true;
       maintenanceDialog.result = result?.result || null;
       maintenanceDialog.error = result?.ok ? "" : result?.error || "Task failed";
@@ -345,6 +357,7 @@ export function useLibrarySession({
       await onMaintenanceRefresh?.(operation, Boolean(result?.ok));
     } catch (error) {
       if (request === maintenanceGeneration) {
+        finishTiming();
         maintenanceDialog.completed = true;
         maintenanceDialog.error = error?.message || "Task failed";
         maintenanceDialog.reportText = JSON.stringify({ error: maintenanceDialog.error }, null, 2);
@@ -380,6 +393,7 @@ export function useLibrarySession({
     entryGeneration++;
     maintenanceGeneration++;
     maintenanceDialog.running = false;
+    stopTiming();
     maintenanceDialog.visible = false;
     await onLibraryClosed?.(result.library);
     applyLibraryState(result.library);
@@ -402,7 +416,12 @@ export function useLibrarySession({
       }
       if (typeof api.onMaintenanceProgress === "function") {
         removeMaintenanceProgressListener = api.onMaintenanceProgress((progress) => {
-          maintenanceDialog.progress = progress || {};
+          if (!maintenanceDialog.running) return;
+          if (!progress?.level) {
+            maintenanceDialog.progress = progress || {};
+            estimate.update(progress);
+            maintenanceDialog.timing = estimate.snapshot();
+          }
           if (progress?.level && progress?.message) {
             const previous = maintenanceDialog.reportText ? `${maintenanceDialog.reportText}\n` : "";
             maintenanceDialog.reportText = `${previous}[${progress.level}] ${progress.message}`;
@@ -430,6 +449,7 @@ export function useLibrarySession({
   }
 
   function dispose() {
+    stopTiming();
     entryGeneration++;
     maintenanceGeneration++;
     entry.busy = false;
