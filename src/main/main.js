@@ -713,8 +713,9 @@ function runOperationWorker(operation, root, options = {}) {
       if (message?.type === "result") result = message.result;
       if (message?.type === "failure") failure = message.error;
     }));
-    worker.on("error", inSession((error) => { operationLog.finish(null, error); reject(error); }));
-    worker.on("exit", inSession((code, signal) => {
+    worker.on("error", inSession((error) => { failure = error; }));
+    // Exit can precede queued IPC results; keep the maintenance barrier until close.
+    worker.once("close", inSession((code, signal) => {
       operationLog.finish(result, failure, code, signal);
       state.activeWorker = null;
       state.activeWorkerOperation = "";
@@ -724,7 +725,7 @@ function runOperationWorker(operation, root, options = {}) {
           session.runtime.mainWindow?.destroy();
         });
       }
-      if (code === 0 && result) resolve(result);
+      if (code === 0 && result && !failure) resolve(result);
       else {
         const error = new Error(failure?.message || `${operation} worker exited with code ${code}`);
         error.code = failure?.code || "OPERATION_FAILED";

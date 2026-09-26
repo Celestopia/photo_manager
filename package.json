@@ -1,7 +1,7 @@
 {
   "name": "photo-manager",
   "productName": "Photo Manager",
-  "version": "0.40.10",
+  "version": "0.40.11",
   "description": "Local image and video manager built with Electron and Vue",
   "author": "Photo Manager",
   "engines": {
