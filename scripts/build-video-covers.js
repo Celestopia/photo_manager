@@ -1,3 +1,4 @@
+const { formatLog } = require("./operation-log");
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data");
 /** Generate missing or all first-frame covers for one explicitly selected library. */
 const path = require("node:path");
@@ -6,7 +7,7 @@ const { parseLibraryArgument } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { assertLibraryReady } = require("./library-recovery");
 const { createOperationReporter } = require("./operation-progress");
-const { validateMediaTools } = require("./media-tools");
+const { validateMediaTools, sanitizeMediaError } = require("./media-tools");
 const cache = require("./video-cover-cache");
 
 async function ensureVideoCovers(items, { paths, config, force = false, emit = () => {}, logger = console,
@@ -24,6 +25,7 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
   for (const [hash, candidates] of groups) {
     let selected;
     let changed = false;
+    let sourceFailure;
     for (const item of candidates) {
       const source = path.resolve(paths.root, item.FilePath);
       try {
@@ -33,12 +35,13 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
       } catch (error) {
         if (error.code === "SOURCE_CHANGED") changed = true;
         else if (error.code !== "ENOENT") throw error;
+        if (!sourceFailure || error.code === "SOURCE_CHANGED") sourceFailure = { item, error };
       }
     }
     if (!selected) {
       if (changed) stats.sourceChanged++;
       else stats.failed++;
-      logger.warn(`Cover skipped: ${candidates[0].FilePath}; source missing or changed. Update Metadata before retrying.`);
+      logger.warn(formatLog("warning", "cover-source-unavailable", { path: sourceFailure.item.FilePath, stage: "source-check", code: sourceFailure.error.code, message: sourceFailure.error.message }));
     } else {
       const { item, source } = selected;
       let valid = false;
@@ -46,6 +49,7 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
         try { await cache.checkExistingCover(path.join(paths.videoCoverDir, cache.coverName(hash))); valid = true; }
         catch (error) {
           if (["EACCES", "EPERM", "EIO"].includes(error.code)) throw error;
+          if (error.code !== "ENOENT") logger.warn(formatLog("warning", "cover-cache-invalid", { path: item.FilePath, message: error.message, action: "regenerate" }));
         }
       }
       if (!valid && !toolsValidated) {
@@ -61,14 +65,14 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
           stats.generated++;
         }
       } catch (error) {
+        logger.warn(formatLog("warning", "cover-failed", { path: item.FilePath, stage: error.stage || "generate", code: error.code, message: sanitizeMediaError(error, source) }));
         if (["EACCES", "EPERM", "ENOSPC", "EROFS", "EIO"].includes(error.code)) throw error;
         if (error.code === "SOURCE_CHANGED") stats.sourceChanged++;
         else stats.failed++;
-        logger.warn(`Cover unavailable: ${item.FilePath}${error.code === "SOURCE_CHANGED" ? "; update metadata" : ""}`);
       }
     }
     emit({ phase: "video-covers", processed: stats.generated + stats.skipped + stats.failed + stats.sourceChanged,
-      total: stats.total, current: candidates[0].FilePath, message: "Generating video covers" });
+      ...stats, current: candidates[0].FilePath, message: "Generating video covers" });
   }
   emit({ phase: "complete", processed: stats.total, total: stats.total, message: "Video cover generation complete" });
   return stats;

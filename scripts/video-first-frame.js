@@ -8,7 +8,7 @@ function runCoverTool(executable, args, { signal, timeoutMs }) {
   return new Promise((resolve, reject) => {
     let outcome;
     const child = execFile(executable, args, { windowsHide: true, timeout: timeoutMs,
-      maxBuffer: 1024 * 1024, encoding: "utf8" }, (error, stdout) => { outcome = { error, stdout }; });
+      maxBuffer: 1024 * 1024, encoding: "utf8" }, (error, stdout, stderr) => { if (error) error.stderr = stderr; outcome = { error, stdout }; });
     const abort = () => child.kill();
     signal?.addEventListener("abort", abort, { once: true });
     child.on("close", () => {

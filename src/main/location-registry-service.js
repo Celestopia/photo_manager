@@ -170,6 +170,7 @@ function createLocationRegistryService(options) {
 
     try {
       await saveTransaction(dataFileName, sortEntries(candidate.values()), "location-global-delete", updatedCount > 0);
+      appendLog(`registry-delete kind=Location id=${locationId} affectedMedia=${updatedCount} detachedChildren=${orphanedChildren}`);
       return { ok: true, deletedId: locationId, updatedCount, orphanedChildren, locations: listDefinitions() };
     } catch (error) {
       setRegistry(previousRegistry);

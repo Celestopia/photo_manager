@@ -10,6 +10,11 @@ The gallery settings menu, visible only in normal gallery mode, exposes library 
 
 `scripts/maintenance-worker.js` runs operations as child processes with structured progress, logs, and results. The UI shows phase/count/current path and supports copying reports or opening outputs/logs.
 
+Desktop maintenance writes readable daily UTC logs under the operation library's `.photo_manager/logs`; initialization uses application logs until the management directory exists. Each run has an ID, start entry with application version and force/reprobe flags, phase/current-path progress snapshots with combined counts such as `progress=482/557` at most once per two seconds within a phase, and a terminal summary with elapsed milliseconds and numeric result counters. Phase changes, final progress and explicit warnings/errors are logged immediately; UI progress is not throttled. Warnings, errors or failed/changed-source items produce a partial outcome. Worker failures retain their original stack, code and exit status/signal. Routine reused items do not get individual log entries.
+
+Log values preserve Unicode and escape newlines. Only selected progress fields, numeric summary counts and relevant options are recorded; configuration objects and chat contents are not serialized. Common credential patterns are redacted and text is bounded. Logging failures do not block normal operations. Library open/close, registry/media deletion summaries and recovery/cleanup errors are also logged. Existing files are retained without migration. Cover diagnostics distinguish source checks, invalid-cache regeneration, extraction, output validation and publication; changed-source diagnostics include expected and actual size/mtime.
+
+
 - Update: create an update backup, incrementally replace metadata, strictly reload indexes, and refresh without generating thumbnails.
 - Verify: read-only rescan and full hashes; report missing metadata/files, changes, type mismatches, probe/read failures. Optional probe compares video status, duration, dimensions, and codec.
 - Thumbnails: generate missing/stale or forcibly rebuild all, without editing metadata; then requery.
@@ -59,3 +64,5 @@ Packaging acceptance additionally requires `npm run pack:win`, launch on a Windo
 Set `DIALOG_SHELL_SMOKE=1` when running `tests/helpers/chat-ui-smoke.cjs` with Electron to check shared dialog styling, nested registry modals, focus restoration, background isolation, and owner-specific Escape handling against an isolated test library.
 
 Set `SHARED_UI_SMOKE=1` with the same isolated Electron helper to verify shared registry fields, album description validation, Unicode and case-insensitive search, edit shortcuts, location parent selection, customization creation and Assistant tooltips.
+
+Set `LOGGING_SMOKE=1` with `tests/helpers/chat-ui-smoke.cjs` to check real worker start/result logs and close-time library log routing against an isolated test library.

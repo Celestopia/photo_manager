@@ -143,6 +143,7 @@ function createSimpleRegistryService(options) {
 
     try {
       await saveTransaction(dataFileName, sortEntries(registry.values()), `${kind.toLowerCase()}-global-delete`, updatedCount > 0);
+      appendLog(`registry-delete kind=${kind} id=${id} affectedMedia=${updatedCount}`);
       return { ok: true, deletedId: id, updatedCount, [responseListKey]: listDefinitions() };
     } catch (error) {
       setRegistry(previousRegistry);

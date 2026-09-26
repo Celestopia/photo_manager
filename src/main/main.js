@@ -1,3 +1,4 @@
+const { appendDailyLog, createOperationLog, formatLog } = require("../../scripts/operation-log");
 const { configureMapNetwork } = require("./map-network");
 const { groupMediaPathsByHash, countMediaTypes } = require("../../scripts/media-summary");
 const { assertMediaTechnicalFields } = require("../shared/media-technical-schema");
@@ -153,35 +154,14 @@ function releaseLibraryIdentity(session = sessionRouter.current()) {
 /**
  * Append one line into date-partitioned log file under configured log directory.
  */
-function appendLog(message) {
-  try {
-    const session = sessionRouter.current({ optional: true });
-    const logDir = session?.runtime?.activeLibrary?.paths?.logDir || APPLICATION_PATHS.logsDir;
-    fs.mkdirSync(logDir, { recursive: true });
-    const dayKey = new Date().toISOString().slice(0, 10);
-    fs.appendFileSync(path.join(logDir, `${dayKey}.log`), `[${new Date().toISOString()}] ${message}\n`);
-  } catch {
-    // Ignore logging failures to avoid crash loops.
-  }
+function appendLog(message, directory) {
+  const session = sessionRouter.current({ optional: true });
+  appendDailyLog(directory || session?.runtime?.activeLibrary?.paths?.logDir || APPLICATION_PATHS.logsDir, message);
 }
 
 function appendOperationLog(operation, root, message) {
-  if (operation !== "initialize") {
-    appendLog(message);
-    return;
-  }
-  try {
-    const paths = resolveLibraryPaths(root);
-    if (!fs.existsSync(paths.managerDir)) {
-      appendLog(message);
-      return;
-    }
-    fs.mkdirSync(paths.logDir, { recursive: true });
-    const dayKey = new Date().toISOString().slice(0, 10);
-    fs.appendFileSync(path.join(paths.logDir, `${dayKey}.log`), `[${new Date().toISOString()}] ${message}\n`);
-  } catch {
-    appendLog(message);
-  }
+  const paths = resolveLibraryPaths(root);
+  appendLog(message, fs.existsSync(paths.managerDir) ? paths.logDir : APPLICATION_PATHS.logsDir);
 }
 
 async function loadAppState() {
@@ -595,13 +575,15 @@ async function openLibrary(rawRoot, options = {}) {
       await loadAllLibraryIndexes();
       if (marker?.Status === "committed") await fsp.rm(paths.initializationFile, { force: true });
       state.activeLibrary.state = "open";
-      await chat.open().catch(() => appendLog("Chat recovery could not finish; library browsing remains available."));
+      await chat.open().catch(error => appendLog(formatLog("warning", "chat-recovery-failed", { code: error.code, message: error.message })));
+      appendLog(formatLog("info", "library-open", { version: app.getVersion(), mediaCount: state.metadataIndex.size }));
       appState.lastLibraryPath = paths.root;
       lastLibraryName = state.activeLibrary.manifest.name;
       await saveAppState().catch((error) => appendLog(`app-state write failed: ${error.message}`));
       emitLibraryState();
       return getLibraryState();
     } catch (error) {
+      appendOperationLog("open", paths.root, formatLog("error", "library-open-failed", { code: error.code, message: error.message, stack: error.stack }));
       if (lock) await releaseLibraryLock(paths, lock.SessionId).catch(() => {});
       if (identityClaimed) releaseLibraryIdentity(session);
       state.activeLibrary = null;
@@ -624,12 +606,13 @@ async function closeLibrary() {
   state.activeLibrary.state = "closing";
   sessionRouter.current().viewerImages.invalidate();
   try { await chat.close(); }
-  catch (error) { state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
+  catch (error) { appendLog(formatLog("error", "library-close-failed", { message: error.message })); state.activeLibrary.state = "open"; emitLibraryState(); throw error; }
   emitLibraryState();
   const closing = state.activeLibrary;
   state.activeLibrary = null;
   clearLibraryIndexes();
-  await releaseLibraryLock(closing.paths, closing.sessionId).catch((error) => appendLog(`lock-release failed: ${error.message}`));
+  await releaseLibraryLock(closing.paths, closing.sessionId).catch((error) => appendLog(`lock-release failed: ${error.message}`, closing.paths.logDir));
+  appendLog(formatLog("info", "library-close", {}), closing.paths.logDir);
   releaseLibraryIdentity();
   emitLibraryState();
   return getLibraryState();
@@ -700,7 +683,10 @@ function runOperationWorker(operation, root, options = {}) {
     return Promise.reject(error);
   }
   const workerPath = path.join(APP_CODE_ROOT, "scripts", "maintenance-worker.js");
-  const worker = fork(workerPath, [operation, root, JSON.stringify(options)], {
+  const operationLog = createOperationLog({ operation, version: app.getVersion(), options,
+    write: message => appendOperationLog(operation, root, message) });
+  let worker;
+  try { worker = fork(workerPath, [operation, root, JSON.stringify(options)], {
     cwd: PROGRAM_RESOURCE_ROOT,
     windowsHide: true,
     env: {
@@ -710,24 +696,26 @@ function runOperationWorker(operation, root, options = {}) {
     },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
+  } catch (error) { operationLog.finish(null, error); return Promise.reject(error); }
   state.activeWorker = worker;
   state.activeWorkerOperation = operation;
   return new Promise((resolve, reject) => {
     const inSession = (listener) => (...args) => sessionRouter.run(session, () => listener(...args));
     let result = null;
     let failure = null;
-    worker.stdout?.on("data", inSession((chunk) => appendOperationLog(operation, root, `worker-${operation} ${String(chunk).trim()}`)));
-    worker.stderr?.on("data", inSession((chunk) => appendOperationLog(operation, root, `worker-${operation}-stderr ${String(chunk).trim()}`)));
+    worker.stdout?.on("data", inSession((chunk) => operationLog.output("stdout", String(chunk).trim())));
+    worker.stderr?.on("data", inSession((chunk) => operationLog.output("stderr", String(chunk).trim())));
     worker.on("message", inSession((message) => {
       if (message?.type === "progress" || message?.type === "log") {
-        if (message.message) appendOperationLog(operation, root, `worker-${operation} ${message.level || "info"}: ${message.message}`);
+        operationLog.progress(message);
         state.mainWindow?.webContents.send(operation === "initialize" ? "library:progress" : "maintenance:progress", toSerializable(message));
       }
       if (message?.type === "result") result = message.result;
       if (message?.type === "failure") failure = message.error;
     }));
-    worker.on("error", reject);
-    worker.on("exit", inSession((code) => {
+    worker.on("error", inSession((error) => { operationLog.finish(null, error); reject(error); }));
+    worker.on("exit", inSession((code, signal) => {
+      operationLog.finish(result, failure, code, signal);
       state.activeWorker = null;
       state.activeWorkerOperation = "";
       if (state.pendingWindowClose) {
@@ -740,6 +728,7 @@ function runOperationWorker(operation, root, options = {}) {
       else {
         const error = new Error(failure?.message || `${operation} worker exited with code ${code}`);
         error.code = failure?.code || "OPERATION_FAILED";
+        if (failure?.stack) error.stack = failure.stack;
         reject(error);
       }
     }));

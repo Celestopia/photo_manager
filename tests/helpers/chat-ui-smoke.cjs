@@ -192,6 +192,19 @@ async function run() {
     `[...document.querySelectorAll('button')].find(b=>b.textContent==='Open library').click()`,
   );
   await waitFor(`Boolean(document.querySelector('.photo-card'))`);
+  if (process.env.LOGGING_SMOKE) {
+    const result = await win.webContents.executeJavaScript(`window.photoManagerApi.startMaintenance({ operation: 'video-covers', force: false })`);
+    assert.equal(result.ok, true);
+    await win.webContents.executeJavaScript(`window.photoManagerApi.closeLibrary()`);
+    const logDir = path.join(library, '.photo_manager', 'logs');
+    const logs = (await Promise.all((await fsp.readdir(logDir)).filter(name => name.endsWith('.log')).map(name => fsp.readFile(path.join(logDir, name), 'utf8')))).join('');
+    assert.match(logs, /event="start" operation="video-covers"/);
+    assert.match(logs, /event="complete" operation="video-covers".*generated=0.*outcome="success"/);
+    assert.match(logs, /event="library-open"/);
+    assert.match(logs, /event="library-close"/);
+    console.log('LOGGING_SMOKE_PASS: real worker start, summary and library close destination.');
+    return;
+  }
   if (process.env.SHARED_UI_SMOKE) {
     await require('./shared-ui-checks.cjs')({win, click, waitFor, setValue});
     return;

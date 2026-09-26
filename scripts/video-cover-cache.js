@@ -9,7 +9,7 @@ async function checkCoverSource(paths, item, source) {
   assertPathInsideLibrary(paths, source);
   const stat = await fs.stat(source);
   if (!stat.isFile() || stat.size !== item.FileSystem.FileSize || stat.mtimeMs !== item.FileSystem.ModificationTimeMs)
-    throw Object.assign(new Error("Source changed; update library metadata"), { code: "SOURCE_CHANGED" });
+    throw Object.assign(new Error(`Source changed; update library metadata (expected size=${item.FileSystem.FileSize} mtimeMs=${item.FileSystem.ModificationTimeMs}; actual size=${stat.size} mtimeMs=${stat.mtimeMs})`), { code: "SOURCE_CHANGED" });
 }
 
 const RECIPE = "v1-2560-q90";
@@ -53,14 +53,21 @@ async function generateCover({ paths, source, hash, appRoot, config, signal, bef
   await assertCacheDirectory(paths, true);
   const target = path.join(paths.videoCoverDir, coverName(hash));
   const temporary = path.join(paths.videoCoverDir, `${randomUUID()}.tmp.webp`);
+  let stage = "extract";
   try {
     await extractFirstVideoFrame(source, temporary, appRoot, config, { signal, webp: true });
+    stage = "validate-output";
     const bytes = await readCover(temporary);
+    stage = "source-check";
     await beforePublish();
     signal?.throwIfAborted();
+    stage = "publish";
     await assertCacheDirectory(paths);
     await fs.rename(temporary, target);
     return bytes;
+  } catch (error) {
+    error.stage = stage;
+    throw error;
   } finally {
     await fs.rm(temporary, { force: true });
   }

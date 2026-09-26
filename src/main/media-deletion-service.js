@@ -56,7 +56,7 @@ function createMediaDeletionService(options) {
       }
       clearThumbnailStatusCache();
       if (library.paths.videoCoverDir) await pruneVideoCovers(library.paths, remainingEntries)
-        .catch(() => appendLog("video cover cleanup failed"));
+        .catch(error => appendLog(`video cover cleanup failed: ${error.code || ""} ${error.message}`));
       emitLibraryState();
       appendLog(`media-delete committed count=${targets.length} cleanupPending=${transaction.cleanupPending}`);
       return {
