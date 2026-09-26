@@ -1,9 +1,8 @@
 const { loadRegistryIndexes, validateMetadataMap } = require("./library-data");
 /** Generate missing or all first-frame covers for one explicitly selected library. */
-const fs = require("node:fs/promises");
 const path = require("node:path");
 const { APP_ROOT, resolveConfig, loadExisting } = require("./common");
-const { parseLibraryArgument, assertPathInsideLibrary } = require("./library-core");
+const { parseLibraryArgument } = require("./library-core");
 const { validateExistingLibrary, authorizeLibraryOperation, validateMetadataPaths } = require("./library-access");
 const { assertLibraryReady } = require("./library-recovery");
 const { createOperationReporter } = require("./operation-progress");
@@ -11,7 +10,7 @@ const { validateMediaTools } = require("./media-tools");
 const cache = require("./video-cover-cache");
 
 async function ensureVideoCovers(items, { paths, config, force = false, emit = () => {}, logger = console,
-  generate = cache.generateCover }) {
+  generate = cache.generateCover, validateTools = () => validateMediaTools(APP_ROOT, config.media) }) {
   await cache.assertCacheDirectory(paths, true);
   const groups = new Map();
   for (const item of items) {
@@ -21,11 +20,12 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
     groups.set(item.SHA256Hash, group);
   }
   const stats = { total: groups.size, generated: 0, skipped: 0, failed: 0, sourceChanged: 0 };
+  let toolsValidated = false;
   for (const [hash, candidates] of groups) {
     let selected;
     let changed = false;
     for (const item of candidates) {
-      const source = assertPathInsideLibrary(paths, path.resolve(paths.root, item.FilePath));
+      const source = path.resolve(paths.root, item.FilePath);
       try {
         await cache.checkCoverSource(paths, item, source);
         selected = { item, source };
@@ -43,14 +43,17 @@ async function ensureVideoCovers(items, { paths, config, force = false, emit = (
       const { item, source } = selected;
       let valid = false;
       if (!force) {
-        try { await cache.readCover(path.join(paths.videoCoverDir, cache.coverName(hash))); valid = true; }
+        try { await cache.checkExistingCover(path.join(paths.videoCoverDir, cache.coverName(hash))); valid = true; }
         catch (error) {
           if (["EACCES", "EPERM", "EIO"].includes(error.code)) throw error;
         }
       }
+      if (!valid && !toolsValidated) {
+        await validateTools();
+        toolsValidated = true;
+      }
       try {
         if (valid) {
-          await cache.checkCoverSource(paths, item, source);
           stats.skipped++;
         } else {
           await generate({ paths, source, hash, appRoot: APP_ROOT, config: config.media,
@@ -79,7 +82,6 @@ async function run(options = {}) {
   const authorization = await authorizeLibraryOperation(paths, manifest, options);
   try {
     assertLibraryReady(paths);
-    await validateMediaTools(APP_ROOT, config.media);
     const existing = await loadExisting(paths.metadataFile);
     validateMetadataPaths(paths, existing.values());
     validateMetadataMap(existing, await loadRegistryIndexes(paths));

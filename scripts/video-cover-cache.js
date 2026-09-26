@@ -30,6 +30,17 @@ async function assertCacheDirectory(paths, create = false) {
     if (stat && (stat.isSymbolicLink() || !stat.isDirectory())) throw new Error("Unsafe video cover directory");
   }
 }
+// Reuse checks inspect headers only; newly generated output still receives a full decode.
+async function checkExistingCover(file) {
+  const stat = await fs.lstat(file);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size === 0 || stat.size > 32 * 1024 * 1024)
+    throw new Error("Invalid video cover file");
+  // Buffer input avoids libvips retaining a file handle on Windows.
+  const metadata = await sharp(await fs.readFile(file), { limitInputPixels: 2560 * 2560 }).metadata();
+  if (metadata.format !== "webp" || !(metadata.width > 0 && metadata.width <= 2560)
+    || !(metadata.height > 0 && metadata.height <= 2560) || (metadata.pages || 1) !== 1)
+    throw new Error("Invalid video cover header");
+}
 async function readCover(file) {
   const stat = await fs.lstat(file);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32 * 1024 * 1024) throw new Error("Invalid video cover file");
@@ -66,4 +77,4 @@ async function pruneVideoCovers(paths, entries) {
       await fs.unlink(path.join(paths.videoCoverDir, file.name));
   }
 }
-module.exports = { RECIPE, coverName, assertCacheDirectory, readCover, generateCover, pruneVideoCovers, checkCoverSource };
+module.exports = { RECIPE, coverName, assertCacheDirectory, checkExistingCover, readCover, generateCover, pruneVideoCovers, checkCoverSource };
