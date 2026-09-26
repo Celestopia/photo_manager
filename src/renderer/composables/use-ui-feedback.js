@@ -94,6 +94,19 @@ export function useUiFeedback() {
     hideDynamicTooltip();
   }
 
+  function onTooltipFocus(event) {
+    const target = event.target.closest?.("[data-tip-focus][data-tip]");
+    if (target) scheduleDynamicTooltip(target);
+  }
+
+  function onTooltipBlur(event) {
+    if (event.target === tooltipTarget) onTooltipGlobalHide();
+  }
+
+  function onTooltipKeyDown(event) {
+    if (event.key === "Escape") onTooltipGlobalHide();
+  }
+
   function onTooltipGlobalHide() {
     tooltipTarget = null;
     hideDynamicTooltip();
@@ -113,6 +126,9 @@ export function useUiFeedback() {
     document.addEventListener("mouseover", onTooltipMouseOver);
     document.addEventListener("mouseout", onTooltipMouseOut);
     document.addEventListener("mousedown", onTooltipGlobalHide);
+    document.addEventListener("focusin", onTooltipFocus);
+    document.addEventListener("focusout", onTooltipBlur);
+    document.addEventListener("keydown", onTooltipKeyDown);
   }
 
   function dispose() {
@@ -123,6 +139,9 @@ export function useUiFeedback() {
       document.removeEventListener("mouseover", onTooltipMouseOver);
       document.removeEventListener("mouseout", onTooltipMouseOut);
       document.removeEventListener("mousedown", onTooltipGlobalHide);
+      document.removeEventListener("focusin", onTooltipFocus);
+      document.removeEventListener("focusout", onTooltipBlur);
+      document.removeEventListener("keydown", onTooltipKeyDown);
     }
     if (toastTimer) clearTimeout(toastTimer);
     if (saveNoticeTimer) clearTimeout(saveNoticeTimer);

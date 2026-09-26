@@ -35,3 +35,11 @@ export function formatBitRate(value) {
   if (bits >= 1000000) return `${(bits / 1000000).toFixed(2)} Mbps`;
   return `${Math.round(bits / 1000)} Kbps`;
 }
+
+/** Display the saved UTC offset in hours without inferring a time zone. */
+export function formatTimeZone(value) {
+  if (!Number.isFinite(value)) return "Time zone unknown";
+  const minutes = Math.round(Math.abs(value) * 60);
+  const sign = value < 0 && minutes > 0 ? "−" : "+";
+  return `UTC${sign}${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}

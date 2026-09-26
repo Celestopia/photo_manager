@@ -27,8 +27,16 @@
     <h3>{{ isSelectedVideo ? 'Video Information' : 'Image Information' }}</h3>
     <dl>
       <dt>File name</dt><dd>{{ selectedItem?.FilePath?.split('/').pop() }}</dd>
-      <dt>Date taken</dt><dd>{{ selectedItem?.FileSystem?.ShootingTimeString || '-' }}</dd>
-      <dt>Date modified</dt><dd>{{ selectedItem?.FileSystem?.ModificationTimeString || '-' }}</dd>
+      <dt class="viewer-date-label">Date taken<button type="button" class="viewer-time-zone-info" data-tip-focus
+      :data-tip="formatTimeZone(selectedItem?.FileSystem?.ShootingTimeZone)"
+      :aria-label="'Date taken time zone: ' + formatTimeZone(selectedItem?.FileSystem?.ShootingTimeZone)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg>
+    </button></dt><dd>{{ selectedItem?.FileSystem?.ShootingTimeString || '-' }}</dd>
+      <dt class="viewer-date-label">Date modified<button type="button" class="viewer-time-zone-info" data-tip-focus
+      :data-tip="formatTimeZone(selectedItem?.FileSystem?.ModificationTimeZone)"
+      :aria-label="'Date modified time zone: ' + formatTimeZone(selectedItem?.FileSystem?.ModificationTimeZone)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg>
+    </button></dt><dd>{{ selectedItem?.FileSystem?.ModificationTimeString || '-' }}</dd>
       <dt>File size</dt><dd>{{ formatFileSize(selectedItem?.FileSystem?.FileSize) }}</dd>
       <dt>Resolution</dt><dd v-if="isSelectedVideo">{{ selectedItem?.Video?.DisplayWidth && selectedItem?.Video?.DisplayHeight ? selectedItem.Video.DisplayWidth + 'x' + selectedItem.Video.DisplayHeight : '-' }}</dd><dd v-else>{{ selectedItem?.Picture?.Width && selectedItem?.Picture?.Height ? selectedItem.Picture.Width + 'x' + selectedItem.Picture.Height : '-' }}</dd>
       <template v-if="isSelectedVideo">
@@ -335,6 +343,7 @@
 </template>
 
 <script setup>
+import { formatTimeZone } from "../domain/media-formatters.mjs";
 import AppDialog from "./dialogs/AppDialog.vue";
 import vEscapeDismiss from "../directives/escape-dismiss.mjs";
 import { computed, inject, ref } from "vue";

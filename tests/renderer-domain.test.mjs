@@ -6,6 +6,7 @@ import {
   formatBitRate,
   formatDuration,
   formatFileSize,
+  formatTimeZone,
 } from "../src/renderer/domain/media-formatters.mjs";
 import {
   buildLocationCreateParentPatch,
@@ -515,4 +516,13 @@ test('registry multi-selection uses All as reset and Unassigned as an ordinary a
   assert.deepEqual(toggleRegistryFilter([u], u, true), []);
   assert.deepEqual(toggleRegistryFilter(['food'], 'travel'), ['travel']);
   assert.deepEqual(toggleRegistryFilter(['food', u], '', true), []);
+});
+
+test("time zone tooltips format stored offsets and preserve unknown values", () => {
+  for (const value of [null, undefined, "", "8", NaN, Infinity]) {
+    assert.equal(formatTimeZone(value), "Time zone unknown");
+  }
+  for (const [value, expected] of [[0, "UTC+00:00"], [8, "UTC+08:00"], [-4, "UTC−04:00"], [5.5, "UTC+05:30"], [5.75, "UTC+05:45"], [-3.5, "UTC−03:30"]]) {
+    assert.equal(formatTimeZone(value), expected);
+  }
 });
